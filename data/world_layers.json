@@ -1,0 +1,70 @@
+{
+	"_comment": "Раскладка слоёв генерации мира. Формат читается world_gen.gd. Глубина (y) отсчитывается от 1 у поверхности вниз. Диапазоны инклюзивны с обеих сторон. Значения без явного роста в ГДД (нет стрелки X%→Y%) взяты как плоская вероятность = середина указанного в ГДД диапазона — это авторское допущение, не число из ГДД.",
+
+	"world_width": 32,
+	"house_x_max": 14,
+	"garden_x_min": 15,
+	"max_depth": 6000,
+
+	"foundation_y": 5,
+
+	"staircase": {
+		"_comment": "Нерушимая лестница слева у дома: 1 клетка на ур.1, 2 на ур.2, 3 на ур.3, 4 на ур.4 — ступенчатый треугольник от края огорода (x=15) вправо. Точная геометрия не описана в ГДД дословно, взята как наиболее естественное прочтение раздела 3.",
+		"x_start": 15,
+		"y_max": 4
+	},
+
+	"peat_seam": {
+		"_comment": "Сплошной торфяной пласт, раздел 4. После сброса не восстанавливается (см. collapse.gd) — недокопанный торф остаётся, докопанный не возвращается.",
+		"y_min": 450,
+		"y_max": 455
+	},
+
+	"scripted_diamond": {
+		"_comment": "Сценарная клетка алмаза на глубине 80 (раздел 4). x подобран произвольно в пределах огорода — точная колонка в ГДД не задана.",
+		"x": 20,
+		"y": 80,
+		"guard_offsets": [[-1, 0], [1, 0], [0, 1]]
+	},
+
+	"shallow_layers": [
+		{ "y_min": 1, "y_max": 1, "stone_chance": 0.03 },
+		{ "y_min": 2, "y_max": 2, "stone_chance": 0.07 },
+		{ "y_min": 3, "y_max": 4, "stone_chance": 0.10 }
+	],
+
+	"deep": {
+		"_comment": "Слои 5+ (ниже фундамента). Пустоты 10%, камень фоном.",
+		"y_min": 6,
+		"void_chance": 0.10,
+		"stone_chance": 0.075
+	},
+
+	"ores": [
+		{ "id": "divine_heart", "tile": "DIVINE_HEART", "y_min": 5600, "y_max": 999999, "density": 0.001, "note": "плейсхолдер — точный слой не решён (раздел 18 ГДД)" },
+		{ "id": "angel_stone", "tile": "ANGEL_STONE", "y_min": 5200, "y_max": 999999, "density": 0.0015, "note": "плейсхолдер" },
+		{ "id": "universalium", "tile": "UNIVERSALIUM", "y_min": 4800, "y_max": 999999, "density": 0.002, "note": "плейсхолдер" },
+		{ "id": "dark_matter", "tile": "DARK_MATTER", "y_min": 4400, "y_max": 999999, "density": 0.003, "note": "плейсхолдер" },
+		{ "id": "hellstone", "tile": "HELLSTONE", "y_min": 4001, "y_max": 999999, "density": 0.004, "note": "ГДД: '>4000', плотность не задана" },
+		{ "id": "obsidian", "tile": "OBSIDIAN", "y_min": 3700, "y_max": 999999, "density": 0.005, "note": "плейсхолдер" },
+		{ "id": "ancient_metal", "tile": "ANCIENT_METAL", "y_min": 3300, "y_max": 999999, "density": 0.006, "note": "плейсхолдер" },
+		{ "id": "geocrystal", "tile": "GEOCRYSTAL", "y_min": 2900, "y_max": 999999, "density": 0.007, "note": "плейсхолдер" },
+		{ "id": "uranium", "tile": "URANIUM_ORE", "y_min": 2500, "y_max": 999999, "density": 0.008, "note": "плейсхолдер" },
+		{ "id": "mercury", "tile": "MERCURY_ORE", "y_min": 2100, "y_max": 999999, "density": 0.009, "note": "плейсхолдер" },
+		{ "id": "lithium", "tile": "LITHIUM_ORE", "y_min": 1700, "y_max": 999999, "density": 0.010, "note": "плейсхолдер" },
+		{ "id": "titanium", "tile": "TITANIUM_ORE", "y_min": 1300, "y_max": 999999, "density": 0.011, "note": "плейсхолдер, ГДД: 'после платины'" },
+		{ "id": "platinum", "tile": "PLATINUM_ORE", "y_min": 900, "y_max": 999999, "density": 0.012, "note": "плейсхолдер" },
+		{ "id": "ruby", "tile": "RUBY", "y_min": 2000, "y_max": 999999, "density": 0.015, "note": "ГДД: 2000+, 'чисто на продажу', плотность не задана" },
+		{ "id": "emerald", "tile": "EMERALD", "y_min": 2000, "y_max": 999999, "density": 0.015, "note": "ГДД: 2000+, плотность не задана" },
+		{ "id": "diamond", "tile": "DIAMOND", "y_min": 200, "y_max": 999999, "density": 0.01 },
+		{ "id": "nickel", "tile": "NICKEL_ORE", "y_min": 500, "y_max": 999999, "density": 0.015, "note": "ГДД: 500+, плотность не задана" },
+		{ "id": "gold", "tile": "GOLD_ORE", "y_min": 100, "y_max": 500, "density_start": 0.02, "density_end": 0.10, "ramp_end_y": 500 },
+		{ "id": "silver", "tile": "SILVER_ORE", "y_min": 50, "y_max": 250, "density": 0.025 },
+		{ "id": "lead", "tile": "LEAD_ORE", "y_min": 20, "y_max": 200, "density": 0.03 },
+		{ "id": "copper", "tile": "COPPER_ORE", "y_min": 100, "y_max": 500, "density": 0.03, "note": "ГДД: плотность не задана" },
+		{ "id": "iron", "tile": "IRON_ORE", "y_min": 5, "y_max": 200, "density": 0.075 },
+		{ "id": "scrap_metal", "tile": "SCRAP_METAL", "y_min": 1, "y_max": 50, "density": 0.03, "note": "плейсхолдер — глубина в ГДД не указана вовсе" },
+		{ "id": "coal", "tile": "COAL", "y_min": 1000, "y_max": 1500, "density": 0.20, "note": "заменяет торф, ГДД: 'вместо торфа', плотность не задана" },
+		{ "id": "peat", "tile": "PEAT", "y_min": 60, "y_max": 999, "density_start": 0.05, "density_end": 0.20, "ramp_end_y": 450, "note": "ГДД диапазон начала '60/80' неоднозначен, взято 60" }
+	]
+}

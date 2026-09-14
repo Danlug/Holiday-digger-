@@ -7,8 +7,8 @@ extends Node
 ## Числа делятся на два вида в JSON:
 ##   - обычное число / строка / массив — взято из GDD напрямую;
 ##   - объект {"value": X, "proposed": true, "note": "..."} — число придумано
-##     геймдизайнером-агентом, ждёт утверждения. Используй _v() чтобы достать
-##     значение независимо от того, какой это вид.
+##     геймдизайнером-агентом, ждёт утверждения. Используй unwrap() чтобы
+##     достать значение независимо от того, какой это вид.
 
 const DATA_DIR := "res://data/"
 
@@ -51,10 +51,14 @@ func _load_json(path: String) -> Dictionary:
 
 ## Достаёт числовое/любое значение из "сырого" JSON-узла, независимо от того,
 ## обычное это значение или обёртка {"value":X,"proposed":true,"note":"..."}.
-static func _v(node):
+## Публичная точка входа для других скриптов — используй Balance.unwrap(x).
+static func unwrap(node):
 	if typeof(node) == TYPE_DICTIONARY and node.has("value") and node.has("proposed"):
 		return node["value"]
 	return node
+
+static func _v(node):
+	return unwrap(node)
 
 
 ## true, если узел — придуманное (не из GDD) значение.

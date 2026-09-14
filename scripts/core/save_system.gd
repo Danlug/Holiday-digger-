@@ -22,8 +22,11 @@ static func has_save() -> bool:
 
 
 static func delete_save() -> void:
-	if has_save():
-		DirAccess.remove_absolute(SAVE_PATH)
+	if not has_save():
+		return
+	var dir := DirAccess.open("user://")
+	if dir:
+		dir.remove(SAVE_PATH.get_file())
 
 
 ## Собирает состояние GameState в plain-Dictionary, готовый к JSON.stringify.

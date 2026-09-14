@@ -402,8 +402,8 @@ func collect_artifact(artifact_id: String) -> void:
 		if Balance.is_branch_complete(branch_num, collected_artifacts):
 			completed_branches.append(branch_num)
 			var reward := _find_branch_completion_reward(branch_num)
-			add_coins(int(Balance._v(reward.get("coins", 0))))
-			add_dollars(int(Balance._v(reward.get("premium_currency", 0))))
+			add_coins(int(Balance.unwrap(reward.get("coins", 0))))
+			add_dollars(int(Balance.unwrap(reward.get("premium_currency", 0))))
 			branch_completed.emit(branch_num)
 
 

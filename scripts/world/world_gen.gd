@@ -25,9 +25,15 @@ const GARDEN_X_MIN := 15        # огород: 15..31
 
 const LAYERS_PATH := "res://data/world_layers.json"
 
+# Нечётные константы-множители для лавинного перемешивания в _roll. Записаны
+# знаковыми: int в GDScript — 64-битный со знаком, и 0x9E37... / 0xC2B2...
+# в шестнадцатеричном виде движок обрезает как "слишком большие".
+const MIX_A := -7046029254386353131   # 0x9E3779B97F4A7C15
+const MIX_B := -4417276706812531889   # 0xC2B2AE3D27D4EB4F
+
 var world_seed: int = 0
 var layers: Dictionary = {}
-var max_depth: int = 6000
+var max_depth: int = 6500
 
 var diffs: Dictionary = {}      # int key -> true (клетка выкопана)
 var events: Array = []          # [{x0:int, y0:int, w:int, h:int, salt:int}, ...]
@@ -36,6 +42,7 @@ var events: Array = []          # [{x0:int, y0:int, w:int, h:int, salt:int}, ...
 var _shallow_layers: Array = []
 var _deep: Dictionary = {}
 var _ores: Array = []
+var _label_ids: Dictionary = {}
 var _staircase_x_start: int = GARDEN_X_MIN
 var _staircase_y_max: int = 4
 var _foundation_y: int = 5
@@ -72,7 +79,7 @@ func _load_layers() -> void:
 ## Минимальный набор на случай отсутствия/порчи JSON — игра не должна падать.
 func _fallback_layers() -> Dictionary:
 	return {
-		"max_depth": 6000,
+		"max_depth": 6500,
 		"foundation_y": 5,
 		"staircase": {"x_start": GARDEN_X_MIN, "y_max": 4},
 		"peat_seam": {"y_min": 450, "y_max": 455},
@@ -84,7 +91,7 @@ func _fallback_layers() -> Dictionary:
 		],
 		"deep": {"y_min": 6, "void_chance": 0.10, "stone_chance": 0.075},
 		"ores": [
-			{"id": "iron", "tile": "IRON_ORE", "y_min": 5, "y_max": 200, "density": 0.075},
+			{"id": "iron_ore", "tile": "IRON_ORE", "y_min": 5, "y_max": 200, "density": 0.075},
 		],
 	}
 
@@ -207,8 +214,9 @@ func _clear_diffs_in_rect(x0: int, y0: int, w: int, h: int) -> void:
 	var x1 := x0 + w
 	var y1 := y0 + h
 	for key in diffs.keys():
-		var x := key % WIDTH
-		var y := key / WIDTH
+		var packed: int = key
+		var x: int = packed % WIDTH
+		var y: int = packed / WIDTH
 		if x >= x0 and x < x1 and y >= y0 and y < y1 and not is_permanent_feature(x, y):
 			diffs.erase(key)
 
@@ -264,7 +272,7 @@ func _generate_layered(x: int, y: int, salt: int) -> int:
 		var ore_id: String = ore.get("id", "")
 		if _roll(x, y, ore_id, salt) < density:
 			var tile_name: String = ore.get("tile", "")
-			return TileTypes.Type[tile_name]
+			return TileTypes.from_name(tile_name)
 
 	var stone_chance: float = _deep.get("stone_chance", 0.0)
 	if _roll(x, y, "stone", salt) < stone_chance:
@@ -286,11 +294,29 @@ func _ore_density(ore: Dictionary, y: int) -> float:
 	return ore.get("density", 0.0)
 
 
-## Детерминированный псевдослучайный [0, 1) для клетки. Строковый хеш вместо
-## ручной битовой арифметики — в GDScript int умножение больших констант
-## легко переполняет int64, а String.hash() даёт стабильный 32-битный хеш
-## без риска UB/платформенных расхождений.
+## Детерминированный псевдослучайный [0, 1) для клетки.
+##
+## Броски разных руд в одной клетке обязаны быть независимыми: руды
+## проверяются по списку, и клетка достаётся первой совпавшей. Если броски
+## коррелируют, то клетки, пережившие верхние руды, систематически получают
+## смещённый бросок для нижних, и последняя руда в списке недобирает в разы.
+## Строковый хеш такую независимость не давал — метка руды стоит в середине
+## строки, а djb2 слабо размазывает различия в середине.
 func _roll(x: int, y: int, label: String, salt: int) -> float:
-	var s := "%d|%d|%d|%s|%d" % [world_seed, x, y, label, salt]
-	var h: int = absi(s.hash())
-	return float(h % 1000003) / 1000003.0
+	var h := (_label_id(label) * MIX_A) ^ (world_seed * MIX_B)
+	h = (h ^ (x * 0x27D4EB2F)) * MIX_A
+	h = (h ^ (y * 0x165667B1)) * MIX_B
+	h = (h ^ (salt * 0x85EBCA6B)) * MIX_A
+	h ^= h >> 29
+	h *= MIX_B
+	h ^= h >> 32
+	return float((h & 0x3FFFFFFFFFFFFFFF) % 1000003) / 1000003.0
+
+
+func _label_id(label: String) -> int:
+	var cached: int = _label_ids.get(label, -1)
+	if cached != -1:
+		return cached
+	var id := absi(label.hash()) | 1
+	_label_ids[label] = id
+	return id

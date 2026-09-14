@@ -3,11 +3,6 @@ extends SceneTree
 ##   godot --headless --script res://tests/test_world_gen.gd
 ## Не использует автозагрузки и сцены — только WorldGen/TileTypes/FogOfWar/
 ## CollapseEvents напрямую (все доступны глобально через class_name).
-##
-## ВНИМАНИЕ: в контейнере сборки этого агента бинарник Godot отсутствует,
-## поэтому скрипт не был прогнан вживую. Синтаксис и API соответствуют
-## world_gen.gd/fog.gd/collapse.gd/tile_types.gd в этом же коммите — при
-## запуске в окружении с Godot 4.4 тест должен пройти без правок.
 
 var checks := 0
 var failures := 0
@@ -177,9 +172,20 @@ func test_gold_and_peat_ramp_grow() -> void:
 	print("     золото на y=101: %.4f, на y=498: %.4f" % [frac_early, frac_late])
 	check("золото: плотность у глубины 500 выше, чем у глубины 100", frac_late > frac_early)
 
-	var peat_early := _ore_fraction(w, TileTypes.Type.PEAT, 61, 65)
-	var peat_late := _ore_fraction(w, TileTypes.Type.PEAT, 446, 449)
-	print("     торф на y=61-65: %.4f, на y=446-449: %.4f" % [peat_early, peat_late])
+	var peat_early_hits := 0
+	var peat_late_hits := 0
+	var peat_total := 0
+	for s in range(60):
+		w.world_seed = s * 131 + 5
+		for x in range(WorldGen.WIDTH):
+			peat_total += 1
+			if w.get_tile(x, 61) == TileTypes.Type.PEAT:
+				peat_early_hits += 1
+			if w.get_tile(x, 449) == TileTypes.Type.PEAT:
+				peat_late_hits += 1
+	var peat_early := float(peat_early_hits) / float(peat_total)
+	var peat_late := float(peat_late_hits) / float(peat_total)
+	print("     торф на y=61: %.4f, на y=449: %.4f" % [peat_early, peat_late])
 	check("торф: плотность к глубине 450 выше, чем у начала пласта", peat_late > peat_early)
 
 

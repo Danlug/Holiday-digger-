@@ -119,3 +119,9 @@ static func type_name(type: Type) -> String:
 ## блоком после служебных типов (EMPTY..STAIRCASE).
 static func is_ore(type: Type) -> bool:
 	return type >= Type.IRON_ORE
+
+## Тип по имени ключа enum (используется world_gen.gd при чтении world_layers.json,
+## где типы заданы строками). Enum в GDScript ведёт себя как Dictionary,
+## поэтому .get() с запасным значением работает и защищает от опечатки в JSON.
+static func from_name(name: String, fallback: Type = Type.STONE) -> Type:
+	return Type.get(name, fallback)

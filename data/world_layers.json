@@ -1,10 +1,12 @@
 {
 	"_comment": "Раскладка слоёв генерации мира. Формат читается world_gen.gd. Глубина (y) отсчитывается от 1 у поверхности вниз. Диапазоны инклюзивны с обеих сторон. Значения без явного роста в ГДД (нет стрелки X%→Y%) взяты как плоская вероятность = середина указанного в ГДД диапазона — это авторское допущение, не число из ГДД.",
 
+	"_comment_density": "ВАЖНО: density здесь — вероятность броска, а не итоговая доля клеток. Руды проверяются по порядку массива ores, клетка достаётся первой совпавшей, плюс 10% клеток отсекаются как пустоты. Поэтому фактическая доля руды = density * (1 - сумма вытеснения вышестоящими рудами) * 0.9, и чем ниже руда в списке, тем сильнее она недобирает. Пример: торф на глубине 449 при density 0.20 реально занимает около 14.4% массы грунта. Если нужна точная доля из ГДД — поднимайте руду выше по списку или закладывайте поправку в density.",
+
 	"world_width": 32,
 	"house_x_max": 14,
 	"garden_x_min": 15,
-	"max_depth": 6000,
+	"max_depth": 6500,
 
 	"foundation_y": 5,
 
@@ -40,31 +42,32 @@
 		"stone_chance": 0.075
 	},
 
+	"_ores_comment": "Глубины/плотности для материалов лестницы редкости после алмаза (никель..божественное сердце), а также медь/рубин/изумруд/металлолом СОГЛАСОВАНЫ с плейсхолдерами агента data/minerals.json (тот же открытый вопрос раздела 18 ГДД решался независимо в обоих файлах — числа сведены к одному источнику, чтобы экономика и генерация не расходились; density здесь = середина percent_min/percent_max оттуда). id в этом файле — только метка для хеш-соли, не обязана дословно совпадать с id в minerals.json (там 'universum'/'angelstone' без подчёркивания).",
 	"ores": [
-		{ "id": "divine_heart", "tile": "DIVINE_HEART", "y_min": 5600, "y_max": 999999, "density": 0.001, "note": "плейсхолдер — точный слой не решён (раздел 18 ГДД)" },
-		{ "id": "angel_stone", "tile": "ANGEL_STONE", "y_min": 5200, "y_max": 999999, "density": 0.0015, "note": "плейсхолдер" },
-		{ "id": "universalium", "tile": "UNIVERSALIUM", "y_min": 4800, "y_max": 999999, "density": 0.002, "note": "плейсхолдер" },
-		{ "id": "dark_matter", "tile": "DARK_MATTER", "y_min": 4400, "y_max": 999999, "density": 0.003, "note": "плейсхолдер" },
-		{ "id": "hellstone", "tile": "HELLSTONE", "y_min": 4001, "y_max": 999999, "density": 0.004, "note": "ГДД: '>4000', плотность не задана" },
-		{ "id": "obsidian", "tile": "OBSIDIAN", "y_min": 3700, "y_max": 999999, "density": 0.005, "note": "плейсхолдер" },
-		{ "id": "ancient_metal", "tile": "ANCIENT_METAL", "y_min": 3300, "y_max": 999999, "density": 0.006, "note": "плейсхолдер" },
-		{ "id": "geocrystal", "tile": "GEOCRYSTAL", "y_min": 2900, "y_max": 999999, "density": 0.007, "note": "плейсхолдер" },
-		{ "id": "uranium", "tile": "URANIUM_ORE", "y_min": 2500, "y_max": 999999, "density": 0.008, "note": "плейсхолдер" },
-		{ "id": "mercury", "tile": "MERCURY_ORE", "y_min": 2100, "y_max": 999999, "density": 0.009, "note": "плейсхолдер" },
-		{ "id": "lithium", "tile": "LITHIUM_ORE", "y_min": 1700, "y_max": 999999, "density": 0.010, "note": "плейсхолдер" },
-		{ "id": "titanium", "tile": "TITANIUM_ORE", "y_min": 1300, "y_max": 999999, "density": 0.011, "note": "плейсхолдер, ГДД: 'после платины'" },
-		{ "id": "platinum", "tile": "PLATINUM_ORE", "y_min": 900, "y_max": 999999, "density": 0.012, "note": "плейсхолдер" },
-		{ "id": "ruby", "tile": "RUBY", "y_min": 2000, "y_max": 999999, "density": 0.015, "note": "ГДД: 2000+, 'чисто на продажу', плотность не задана" },
-		{ "id": "emerald", "tile": "EMERALD", "y_min": 2000, "y_max": 999999, "density": 0.015, "note": "ГДД: 2000+, плотность не задана" },
+		{ "id": "divine_heart", "tile": "DIVINE_HEART", "y_min": 5800, "y_max": 6500, "density": 0.000125, "note": "= data/minerals.json divine_heart" },
+		{ "id": "angelstone", "tile": "ANGEL_STONE", "y_min": 5200, "y_max": 5800, "density": 0.0003, "note": "= data/minerals.json angelstone" },
+		{ "id": "universum", "tile": "UNIVERSALIUM", "y_min": 4700, "y_max": 5200, "density": 0.0005, "note": "= data/minerals.json universum" },
+		{ "id": "dark_matter", "tile": "DARK_MATTER", "y_min": 4300, "y_max": 4700, "density": 0.001, "note": "= data/minerals.json dark_matter" },
+		{ "id": "ancient_metal", "tile": "ANCIENT_METAL", "y_min": 3100, "y_max": 3600, "density": 0.001, "note": "= data/minerals.json ancient_metal" },
+		{ "id": "hellstone", "tile": "HELLSTONE", "y_min": 4000, "y_max": 4300, "density": 0.02, "note": "ГДД: '>4000'; = data/minerals.json hellstone" },
+		{ "id": "geocrystal", "tile": "GEOCRYSTAL", "y_min": 2600, "y_max": 3100, "density": 0.002, "note": "= data/minerals.json geocrystal" },
+		{ "id": "uranium", "tile": "URANIUM_ORE", "y_min": 2150, "y_max": 2600, "density": 0.002, "note": "= data/minerals.json uranium" },
+		{ "id": "emerald", "tile": "EMERALD", "y_min": 2000, "y_max": 999999, "density": 0.00275, "note": "ГДД: 2000+; = data/minerals.json emerald" },
+		{ "id": "ruby", "tile": "RUBY", "y_min": 2000, "y_max": 999999, "density": 0.0035, "note": "ГДД: 2000+; = data/minerals.json ruby" },
+		{ "id": "mercury", "tile": "MERCURY_ORE", "y_min": 1750, "y_max": 2150, "density": 0.0035, "note": "= data/minerals.json mercury" },
+		{ "id": "obsidian", "tile": "OBSIDIAN", "y_min": 3600, "y_max": 4000, "density": 0.0045, "note": "= data/minerals.json obsidian" },
+		{ "id": "lithium", "tile": "LITHIUM_ORE", "y_min": 1400, "y_max": 1750, "density": 0.0055, "note": "= data/minerals.json lithium" },
+		{ "id": "titanium", "tile": "TITANIUM_ORE", "y_min": 1050, "y_max": 1400, "density": 0.0075, "note": "ГДД: 'после платины'; = data/minerals.json titanium" },
+		{ "id": "platinum", "tile": "PLATINUM_ORE", "y_min": 750, "y_max": 1050, "density": 0.01, "note": "= data/minerals.json platinum" },
 		{ "id": "diamond", "tile": "DIAMOND", "y_min": 200, "y_max": 999999, "density": 0.01 },
-		{ "id": "nickel", "tile": "NICKEL_ORE", "y_min": 500, "y_max": 999999, "density": 0.015, "note": "ГДД: 500+, плотность не задана" },
+		{ "id": "nickel", "tile": "NICKEL_ORE", "y_min": 500, "y_max": 750, "density": 0.02, "note": "= data/minerals.json nickel" },
 		{ "id": "gold", "tile": "GOLD_ORE", "y_min": 100, "y_max": 500, "density_start": 0.02, "density_end": 0.10, "ramp_end_y": 500 },
 		{ "id": "silver", "tile": "SILVER_ORE", "y_min": 50, "y_max": 250, "density": 0.025 },
 		{ "id": "lead", "tile": "LEAD_ORE", "y_min": 20, "y_max": 200, "density": 0.03 },
-		{ "id": "copper", "tile": "COPPER_ORE", "y_min": 100, "y_max": 500, "density": 0.03, "note": "ГДД: плотность не задана" },
-		{ "id": "iron", "tile": "IRON_ORE", "y_min": 5, "y_max": 200, "density": 0.075 },
-		{ "id": "scrap_metal", "tile": "SCRAP_METAL", "y_min": 1, "y_max": 50, "density": 0.03, "note": "плейсхолдер — глубина в ГДД не указана вовсе" },
-		{ "id": "coal", "tile": "COAL", "y_min": 1000, "y_max": 1500, "density": 0.20, "note": "заменяет торф, ГДД: 'вместо торфа', плотность не задана" },
-		{ "id": "peat", "tile": "PEAT", "y_min": 60, "y_max": 999, "density_start": 0.05, "density_end": 0.20, "ramp_end_y": 450, "note": "ГДД диапазон начала '60/80' неоднозначен, взято 60" }
+		{ "id": "copper", "tile": "COPPER_ORE", "y_min": 100, "y_max": 500, "density": 0.045, "note": "= data/minerals.json copper (3-6%)" },
+		{ "id": "scrap", "tile": "SCRAP_METAL", "y_min": 1, "y_max": 200, "density": 0.02, "note": "= data/minerals.json scrap (1-3%)" },
+		{ "id": "iron_ore", "tile": "IRON_ORE", "y_min": 5, "y_max": 200, "density": 0.075 },
+		{ "id": "coal", "tile": "COAL", "y_min": 1000, "y_max": 1500, "density": 0.20, "note": "заменяет торф; = data/minerals.json coal (15-25%)" },
+		{ "id": "peat", "tile": "PEAT", "y_min": 60, "y_max": 999, "density_start": 0.05, "density_end": 0.20, "ramp_end_y": 450, "note": "ГДД диапазон начала '60/80' неоднозначен, взято 60 (= data/minerals.json peat)" }
 	]
 }

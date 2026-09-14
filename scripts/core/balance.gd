@@ -129,6 +129,21 @@ func get_mineral_density_percent(id: String, depth: int) -> float:
 				return p1
 			var t := float(depth - d0) / float(d1 - d0)
 			return lerp(p0, p1, t)
+		"parabola":
+			# выше depth_min руды нет; рост к peak_depth; за пиком спад, но не
+			# ниже tail_percent — руды не заканчиваются с глубиной
+			var dmin := int(_v(density.get("depth_min", 0)))
+			if depth < dmin:
+				return 0.0
+			var peak_depth := int(_v(density.get("peak_depth", dmin)))
+			var peak := float(_v(density.get("peak_percent", 0.0)))
+			var tail := float(_v(density.get("tail_percent", 0.0)))
+			var width := float(peak_depth - dmin) if depth <= peak_depth \
+				else float(_v(density.get("fall_width", 1.0)))
+			if width <= 0.0:
+				return maxf(peak, tail)
+			var t := float(depth - peak_depth) / width
+			return maxf(peak * (1.0 - t * t), tail)
 		"by_depth_table":
 			for entry in density.get("entries", []):
 				var dmin := int(_v(entry.get("depth_min", 0)))

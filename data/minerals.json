@@ -1,941 +1,1007 @@
 {
-  "version": 1,
-  "_source": "docs/GDD.md разделы 4, 5, 13",
-  "_legend": "поле {value, proposed:true, note} = число не задано в GDD и предложено геймдизайнеру на утверждение; обычное число = взято из GDD напрямую",
-  "minerals": [
-    {
-      "id": "earth",
-      "name_ru": "Земля",
-      "category": "soil",
-      "price_coins": 1,
-      "depth_min": 1,
-      "depth_max": null,
-      "density": {
-        "type": "flat",
-        "percent_min": 100,
-        "percent_max": 100
-      },
-      "weight_kg": {
-        "value": 1.0,
-        "proposed": true,
-        "note": "вес не задан в GDD; 1кг даёт интуитивную связь с грузоподъёмностью 60кг"
-      },
-      "max_stack": 99,
-      "tool_required": "shovel",
-      "hazard": [],
-      "notes": "базовый ресурс, берётся лопатой и киркой"
-    },
-    {
-      "id": "stone",
-      "name_ru": "Камень",
-      "category": "obstacle",
-      "price_coins": 0,
-      "depth_min": 1,
-      "depth_max": 1500,
-      "density": {
-        "type": "by_depth_table",
-        "entries": [
-          {
-            "depth_min": 1,
-            "depth_max": 1,
-            "percent": 3
-          },
-          {
-            "depth_min": 2,
-            "depth_max": 2,
-            "percent": 7
-          },
-          {
-            "depth_min": 3,
-            "depth_max": 4,
-            "percent": 10
-          },
-          {
-            "depth_min": 5,
-            "depth_max": 1500,
-            "percent_min": 5,
-            "percent_max": 10
-          }
-        ]
-      },
-      "weight_kg": {
-        "value": 1.5,
-        "proposed": true,
-        "note": "вес не задан; камень не является ресурсом, но может подбираться как хлам"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": [],
-      "notes": "не ресурс, а помеха; лопатой не берётся; иногда прячет ценности"
-    },
-    {
-      "id": "scrap",
-      "name_ru": "Металлолом",
-      "category": "ore",
-      "price_coins": 5,
-      "depth_min": 1,
-      "depth_max": {
-        "value": 200,
-        "proposed": true,
-        "note": "глубина не задана в GDD; металлолом логично встречается в тех же неглубоких слоях, что и железо"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 1,
-          "percent_max": 3
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD; невысокая, чтобы не конкурировать с железом"
-      },
-      "weight_kg": {
-        "value": 1.2,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": {
-        "value": "shovel",
-        "proposed": true,
-        "note": "GDD не уточняет инструмент; предполагается, что лом лежит у поверхности, как земля"
-      },
-      "hazard": [],
-      "notes": "сырьё для плавки бронзы (5 металлолома = 1 бронза, предложение из самого GDD п.5)"
-    },
-    {
-      "id": "bronze",
-      "name_ru": "Бронза",
-      "category": "crafted",
-      "price_coins": {
-        "value": 30,
-        "proposed": true,
-        "note": "цена продажи не задана; чуть выше сырьевой стоимости (5×5=25 монет металлолома), чтобы плавка была не убыточна"
-      },
-      "depth_min": null,
-      "depth_max": null,
-      "density": null,
-      "weight_kg": {
-        "value": 2.0,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": null,
-      "hazard": [],
-      "obtained_by": "smelting",
-      "recipe": {
-        "scrap": 5,
-        "output": 1
-      },
-      "notes": "не добывается напрямую; плавится в мастерской (соотношение из самого GDD, п.5)"
-    },
-    {
-      "id": "iron_ore",
-      "name_ru": "Железо",
-      "category": "ore",
-      "price_coins": 5,
-      "depth_min": 5,
-      "depth_max": 200,
-      "density": {
-        "type": "flat",
-        "percent_min": 5,
-        "percent_max": 10
-      },
-      "weight_kg": {
-        "value": 2.0,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": []
-    },
-    {
-      "id": "lead",
-      "name_ru": "Свинец",
-      "category": "ore",
-      "price_coins": {
-        "value": 8,
-        "proposed": true,
-        "note": "цена не задана в GDD; между железом(5) и серебром(20), с учётом что свинец используется в рецепте кирки как расходник"
-      },
-      "depth_min": 20,
-      "depth_max": 200,
-      "density": {
-        "type": "flat",
-        "percent_min": 2,
-        "percent_max": 4
-      },
-      "weight_kg": {
-        "value": 3.0,
-        "proposed": true,
-        "note": "вес не задан в GDD; свинец — плотный металл"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": []
-    },
-    {
-      "id": "silver",
-      "name_ru": "Серебро",
-      "category": "ore",
-      "price_coins": 20,
-      "depth_min": 50,
-      "depth_max": 250,
-      "density": {
-        "type": "flat",
-        "percent_min": 2,
-        "percent_max": 3
-      },
-      "weight_kg": {
-        "value": 2.5,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": []
-    },
-    {
-      "id": "copper",
-      "name_ru": "Медь",
-      "category": "ore",
-      "price_coins": {
-        "value": 35,
-        "proposed": true,
-        "note": "цена не задана в GDD (п.18); между серебром(20) и золотом(100), медь имеет схожий с золотом диапазон глубин 100-500, но менее ценна"
-      },
-      "depth_min": 100,
-      "depth_max": 500,
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 3,
-          "percent_max": 6
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD (п.18)"
-      },
-      "weight_kg": {
-        "value": 2.2,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": []
-    },
-    {
-      "id": "gold",
-      "name_ru": "Золото",
-      "category": "ore",
-      "price_coins": 100,
-      "depth_min": 100,
-      "depth_max": 500,
-      "density": {
-        "type": "linear_growth",
-        "depth_start": 100,
-        "depth_end": 500,
-        "percent_start": 2,
-        "percent_end": 10,
-        "note": "после depth_end плотность держится на percent_end"
-      },
-      "weight_kg": {
-        "value": 3.5,
-        "proposed": true,
-        "note": "вес не задан в GDD; золото плотное"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": [],
-      "notes": "лопатой НЕ берётся (см. GDD п.5); ржавая кирка деда трескается на алмазе, не на золоте"
-    },
-    {
-      "id": "diamond",
-      "name_ru": "Алмаз",
-      "category": "gem",
-      "price_coins": 500,
-      "depth_min": 200,
-      "depth_max": null,
-      "density": {
-        "type": "flat",
-        "percent_min": 1,
-        "percent_max": 1
-      },
-      "weight_kg": {
-        "value": 0.5,
-        "proposed": true,
-        "note": "вес не задан в GDD; алмаз — маленький и лёгкий камень"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": [],
-      "notes": "сценарная клетка алмаза на глубине 80 (среди камней) ломает дедову кирку (см. GDD п.4)"
-    },
-    {
-      "id": "peat",
-      "name_ru": "Торф",
-      "category": "fuel",
-      "price_coins": {
-        "value": 1,
-        "proposed": true,
-        "note": "GDD прямо говорит 'денег почти не даёт' без числа; приравнено к земле как ловушка-подсказка ('может продать его? а может не надо')"
-      },
-      "depth_min": 60,
-      "depth_max": 1000,
-      "density": {
-        "type": "linear_growth",
-        "depth_start": 60,
-        "depth_end": 450,
-        "percent_start": 5,
-        "percent_end": 20,
-        "note": "после depth_end плотность держится на percent_end"
-      },
-      "weight_kg": {
-        "value": 4.0,
-        "proposed": true,
-        "note": "вес не задан в GDD; топливо объёмное"
-      },
-      "max_stack": 99,
-      "tool_required": {
-        "value": "shovel",
-        "proposed": true,
-        "note": "GDD не уточняет инструмент; торф — мягкая органика, добывается лопатой"
-      },
-      "hazard": [],
-      "notes": "топливо для ручного бура и буровой скважины; пласт 450-455 зафиксирован навсегда (см. GDD п.4,8). Начало слоя двойное (60 или 80) — см. world_layers.json у мирового модуля"
-    },
-    {
-      "id": "coal",
-      "name_ru": "Каменный уголь",
-      "category": "fuel",
-      "price_coins": {
-        "value": 3,
-        "proposed": true,
-        "note": "цена не задана; чуть выше торфа как более энергоёмкое топливо"
-      },
-      "depth_min": 1000,
-      "depth_max": 1500,
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 15,
-          "percent_max": 25
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 3.5,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "pickaxe",
-      "hazard": [],
-      "notes": "заменяет торф как топливо на глубине 1000-1500 (см. GDD п.4,5)"
-    },
-    {
-      "id": "nickel",
-      "name_ru": "Никель",
-      "category": "ore",
-      "price_coins": {
-        "value": 750,
-        "proposed": true,
-        "note": "цена не задана (п.18); первая ступень лестницы редкости после алмаза(500), рост ×1.5"
-      },
-      "depth_min": 500,
-      "depth_max": {
-        "value": 750,
-        "proposed": true,
-        "note": "верхняя граница не задана в GDD, только 'от 500'"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 1,
-          "percent_max": 3
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 2.8,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "hand_drill",
-      "hazard": [],
-      "notes": "используется в электронике"
-    },
-    {
-      "id": "platinum",
-      "name_ru": "Платина",
-      "category": "ore",
-      "price_coins": {
-        "value": 1100,
-        "proposed": true,
-        "note": "цена не задана (п.18); следующая ступень лестницы редкости"
-      },
-      "depth_min": {
-        "value": 750,
-        "proposed": true,
-        "note": "точный слой не задан (п.18); продолжение лестницы после никеля"
-      },
-      "depth_max": {
-        "value": 1050,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.5,
-          "percent_max": 1.5
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 4.0,
-        "proposed": true,
-        "note": "вес не задан в GDD; платина — очень плотный металл"
-      },
-      "max_stack": 99,
-      "tool_required": "hand_drill",
-      "hazard": [],
-      "notes": "используется в технике и установках"
-    },
-    {
-      "id": "titanium",
-      "name_ru": "Титан",
-      "category": "ore",
-      "price_coins": {
-        "value": 1600,
-        "proposed": true,
-        "note": "цена не задана (п.18); следующая ступень"
-      },
-      "depth_min": {
-        "value": 1050,
-        "proposed": true,
-        "note": "точный слой не задан (п.18); идёт после платины по GDD"
-      },
-      "depth_max": {
-        "value": 1400,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.5,
-          "percent_max": 1
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 1.8,
-        "proposed": true,
-        "note": "вес не задан в GDD; титан лёгкий при высокой прочности"
-      },
-      "max_stack": 99,
-      "tool_required": "hand_drill",
-      "hazard": []
-    },
-    {
-      "id": "lithium",
-      "name_ru": "Литий",
-      "category": "ore",
-      "price_coins": {
-        "value": 2300,
-        "proposed": true,
-        "note": "цена не задана (п.18); следующая ступень"
-      },
-      "depth_min": {
-        "value": 1400,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 1750,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.3,
-          "percent_max": 0.8
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 0.3,
-        "proposed": true,
-        "note": "вес не задан в GDD; литий — самый лёгкий металл"
-      },
-      "max_stack": 99,
-      "tool_required": "hand_drill",
-      "hazard": [],
-      "notes": "используется в электронике"
-    },
-    {
-      "id": "mercury",
-      "name_ru": "Ртуть",
-      "category": "liquid_metal",
-      "price_coins": {
-        "value": 3200,
-        "proposed": true,
-        "note": "цена не задана (п.18); следующая ступень, опасный материал ценится выше"
-      },
-      "depth_min": {
-        "value": 1750,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 2150,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.2,
-          "percent_max": 0.5
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": 2.0,
-      "max_stack": 1,
-      "tool_required": "hand_drill",
-      "hazard": [
-        "mercury",
-        "poison"
-      ],
-      "requires_container": "mercury_bottle",
-      "notes": "нужна металлическая бутылка (1 ртуть, 2кг, не стакается — см. GDD п.13). Без сбора: стекает вниз 2с (если пустота снизу), испаряется через 1 мин, облако на 8 клеток на 5 минут"
-    },
-    {
-      "id": "uranium",
-      "name_ru": "Уран",
-      "category": "radioactive",
-      "price_coins": {
-        "value": 4800,
-        "proposed": true,
-        "note": "цена не задана (п.18); самый опасный и глубокий материал лестницы редкости"
-      },
-      "depth_min": {
-        "value": 2150,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 2600,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.1,
-          "percent_max": 0.3
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 1.0,
-        "proposed": true,
-        "note": "вес самого урана за соту не задан в GDD напрямую (задан только вес контейнера целиком — 10кг на 9кг свинца+1кг урана, см. п.13); 1кг — доля урана"
-      },
-      "max_stack": 1,
-      "tool_required": "drill_rig",
-      "hazard": [
-        "uranium",
-        "radioactive"
-      ],
-      "requires_container": "lead_container",
-      "notes": "свинцовый контейнер: 10кг (9кг свинец + 1кг уран), 4 соты, не стакается (см. GDD п.13). Топливный апгрейд для буровой скважины и буровой машины"
-    },
-    {
-      "id": "geocrystal",
-      "name_ru": "Геотермальный кристалл",
-      "category": "exotic",
-      "price_coins": {
-        "value": 7000,
-        "proposed": true,
-        "note": "цена не задана (п.18); следующая ступень лестницы редкости"
-      },
-      "depth_min": {
-        "value": 2600,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 3100,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.1,
-          "percent_max": 0.3
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 1.5,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": []
-    },
-    {
-      "id": "ancient_metal",
-      "name_ru": "Древний металл",
-      "category": "exotic",
-      "price_coins": {
-        "value": 10000,
-        "proposed": true,
-        "note": "цена не задана (п.18); следующая ступень"
-      },
-      "depth_min": {
-        "value": 3100,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 3600,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.05,
-          "percent_max": 0.15
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 3.0,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": []
-    },
-    {
-      "id": "obsidian",
-      "name_ru": "Обсидиан",
-      "category": "exotic",
-      "price_coins": {
-        "value": 14000,
-        "proposed": true,
-        "note": "цена не задана (п.18); последняя ступень перед адским камнем"
-      },
-      "depth_min": {
-        "value": 3600,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 4000,
-        "proposed": true,
-        "note": "верхняя граница не задана; ступень заканчивается точно на пороге 'адского камня' (>4000)"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.3,
-          "percent_max": 0.6
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 2.0,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": []
-    },
-    {
-      "id": "ruby",
-      "name_ru": "Рубин",
-      "category": "gem",
-      "price_coins": {
-        "value": 2600,
-        "proposed": true,
-        "note": "цена не задана (п.18); самоцвет 'чисто на продажу', сопоставим по редкости с геотермальным кристаллом"
-      },
-      "depth_min": 2000,
-      "depth_max": null,
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.2,
-          "percent_max": 0.5
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 0.3,
-        "proposed": true,
-        "note": "вес не задан в GDD; самоцвет лёгкий"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": [],
-      "notes": "чисто на продажу (см. GDD п.4)"
-    },
-    {
-      "id": "emerald",
-      "name_ru": "Изумруд",
-      "category": "gem",
-      "price_coins": {
-        "value": 2900,
-        "proposed": true,
-        "note": "цена не задана (п.18); немного дороже рубина"
-      },
-      "depth_min": 2000,
-      "depth_max": null,
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.15,
-          "percent_max": 0.4
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 0.3,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": [],
-      "notes": "чисто на продажу (см. GDD п.4)"
-    },
-    {
-      "id": "hellstone",
-      "name_ru": "Адский камень",
-      "category": "warzone",
-      "price_coins": {
-        "value": 25000,
-        "proposed": true,
-        "note": "цена не задана (п.18); первая ступень зоны >4000"
-      },
-      "depth_min": 4000,
-      "depth_max": {
-        "value": 4300,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 1,
-          "percent_max": 3
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD; выше чем у соседей — базовый материал для брони этой зоны"
-      },
-      "weight_kg": {
-        "value": 3.5,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": [
-        "hot"
-      ]
-    },
-    {
-      "id": "dark_matter",
-      "name_ru": "Чёрная материя",
-      "category": "warzone",
-      "price_coins": {
-        "value": 45000,
-        "proposed": true,
-        "note": "цена не задана (п.18)"
-      },
-      "depth_min": {
-        "value": 4300,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 4700,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.05,
-          "percent_max": 0.15
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 0.8,
-        "proposed": true,
-        "note": "вес не задан в GDD; экзотическая почти безмассовая материя"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": []
-    },
-    {
-      "id": "universum",
-      "name_ru": "Вселениум",
-      "category": "warzone",
-      "price_coins": {
-        "value": 80000,
-        "proposed": true,
-        "note": "цена не задана (п.18)"
-      },
-      "depth_min": {
-        "value": 4700,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 5200,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.02,
-          "percent_max": 0.08
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 0.5,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": []
-    },
-    {
-      "id": "angelstone",
-      "name_ru": "Ангельский камень",
-      "category": "warzone",
-      "price_coins": {
-        "value": 140000,
-        "proposed": true,
-        "note": "цена не задана (п.18)"
-      },
-      "depth_min": {
-        "value": 5200,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 5800,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.01,
-          "percent_max": 0.05
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD"
-      },
-      "weight_kg": {
-        "value": 1.0,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": []
-    },
-    {
-      "id": "divine_heart",
-      "name_ru": "Божественное сердце",
-      "category": "warzone",
-      "price_coins": {
-        "value": 250000,
-        "proposed": true,
-        "note": "цена не задана (п.18); самый ценный материал игры, венчает лестницу"
-      },
-      "depth_min": {
-        "value": 5800,
-        "proposed": true,
-        "note": "точный слой не задан (п.18)"
-      },
-      "depth_max": {
-        "value": 6500,
-        "proposed": true,
-        "note": "верхняя граница не задана"
-      },
-      "density": {
-        "value": {
-          "type": "flat",
-          "percent_min": 0.005,
-          "percent_max": 0.02
-        },
-        "proposed": true,
-        "note": "плотность не задана в GDD; почти уникальный материал"
-      },
-      "weight_kg": {
-        "value": 1.0,
-        "proposed": true,
-        "note": "вес не задан в GDD"
-      },
-      "max_stack": 99,
-      "tool_required": "drill_rig",
-      "hazard": [],
-      "notes": "венчает лестницу редкости; используется как один из 5 сокетов Перчатки Мироздания (см. artifacts.json)"
-    }
-  ],
-  "terrain_hazards": [
-    {
-      "id": "hot_rock",
-      "name_ru": "Горячая порода",
-      "depth_min": {
-        "value": 1000,
-        "proposed": true,
-        "note": "глубина появления не задана в GDD (п.18, 'с какой глубины горячие породы'); выбрана глубина слоя угля/бура как символ индустриальной жары"
-      },
-      "burn_damage_per_second": {
-        "value": 2.0,
-        "proposed": true,
-        "note": "урон не задан в GDD (п.18, 'сколько жгут')"
-      },
-      "hazard": [
-        "hot"
-      ],
-      "notes": "ожоги наносят урон HP при контакте; также источник перегрева бура (см. balance.json -> tools)"
-    }
-  ]
+	"version": 1,
+	"_source": "docs/GDD.md разделы 4, 5, 13",
+	"_legend": "поле {value, proposed:true, note} = число не задано в GDD и предложено геймдизайнеру на утверждение; обычное число = взято из GDD напрямую",
+	"minerals": [
+		{
+			"id": "earth",
+			"name_ru": "Земля",
+			"category": "soil",
+			"price_coins": 1,
+			"depth_min": 1,
+			"depth_max": null,
+			"density": {
+				"type": "flat",
+				"percent_min": 100,
+				"percent_max": 100
+			},
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": true,
+				"note": "вес не задан в GDD; 1кг даёт интуитивную связь с грузоподъёмностью 60кг"
+			},
+			"max_stack": 99,
+			"tool_required": "shovel",
+			"hazard": [],
+			"notes": "базовый ресурс, берётся лопатой и киркой",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 3.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "stone",
+			"name_ru": "Камень",
+			"category": "obstacle",
+			"price_coins": 0,
+			"depth_min": 1,
+			"depth_max": 1500,
+			"density": {
+				"type": "by_depth_table",
+				"entries": [
+					{
+						"depth_min": 1,
+						"depth_max": 1,
+						"percent": 3
+					},
+					{
+						"depth_min": 2,
+						"depth_max": 2,
+						"percent": 7
+					},
+					{
+						"depth_min": 3,
+						"depth_max": 4,
+						"percent": 10
+					},
+					{
+						"depth_min": 5,
+						"depth_max": 1500,
+						"percent_min": 5,
+						"percent_max": 10
+					}
+				]
+			},
+			"weight_kg": {
+				"value": 1.5,
+				"proposed": true,
+				"note": "вес не задан; камень не является ресурсом, но может подбираться как хлам"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"notes": "не ресурс, а помеха; лопатой не берётся; иногда прячет ценности",
+			"sellable": true,
+			"drill_seconds": 10.0
+		},
+		{
+			"id": "scrap",
+			"name_ru": "Металлолом",
+			"category": "ore",
+			"price_coins": 5,
+			"depth_min": 1,
+			"depth_max": {
+				"value": 200,
+				"proposed": true,
+				"note": "глубина не задана в GDD; металлолом логично встречается в тех же неглубоких слоях, что и железо"
+			},
+			"density": {
+				"value": {
+					"type": "flat",
+					"percent_min": 1,
+					"percent_max": 3
+				},
+				"proposed": true,
+				"note": "плотность не задана в GDD; невысокая, чтобы не конкурировать с железом"
+			},
+			"weight_kg": {
+				"value": 1.2,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": {
+				"value": "shovel",
+				"proposed": true,
+				"note": "GDD не уточняет инструмент; предполагается, что лом лежит у поверхности, как земля"
+			},
+			"hazard": [],
+			"notes": "сырьё для плавки бронзы (5 металлолома = 1 бронза, предложение из самого GDD п.5)",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 4.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "bronze",
+			"name_ru": "Бронза",
+			"category": "crafted",
+			"price_coins": {
+				"value": 30,
+				"proposed": true,
+				"note": "цена продажи не задана; чуть выше сырьевой стоимости (5×5=25 монет металлолома), чтобы плавка была не убыточна"
+			},
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 2.0,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "smelting",
+			"recipe": {
+				"scrap": 5,
+				"output": 1
+			},
+			"notes": "не добывается напрямую; плавится в мастерской (соотношение из самого GDD, п.5)",
+			"sellable": true
+		},
+		{
+			"id": "iron_ore",
+			"name_ru": "Железо",
+			"category": "ore",
+			"price_coins": 5,
+			"depth_min": 5,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 5,
+				"peak_depth": 100,
+				"peak_percent": 8.0,
+				"fall_width": 600,
+				"tail_percent": 2.0,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 2.0,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"sellable": true,
+			"drill_seconds": {
+				"value": 5.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "lead",
+			"name_ru": "Свинец",
+			"category": "ore",
+			"price_coins": 35,
+			"depth_min": 20,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 20,
+				"peak_depth": 120,
+				"peak_percent": 3.5,
+				"fall_width": 600,
+				"tail_percent": 0.875,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 3.0,
+				"proposed": true,
+				"note": "вес не задан в GDD; свинец — плотный металл"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"sellable": true,
+			"drill_seconds": {
+				"value": 5.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "silver",
+			"name_ru": "Серебро",
+			"category": "ore",
+			"price_coins": 20,
+			"depth_min": 50,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 50,
+				"peak_depth": 160,
+				"peak_percent": 2.8,
+				"fall_width": 700,
+				"tail_percent": 0.7,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 2.5,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"sellable": true,
+			"drill_seconds": {
+				"value": 6.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "copper",
+			"name_ru": "Медь",
+			"category": "ore",
+			"price_coins": 15,
+			"depth_min": 100,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 100,
+				"peak_depth": 320,
+				"peak_percent": 5.0,
+				"fall_width": 900,
+				"tail_percent": 1.25,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 2.2,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"sellable": true,
+			"drill_seconds": {
+				"value": 5.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "aluminium",
+			"name_ru": "Алюминий",
+			"name_en": "Aluminium",
+			"category": "ore",
+			"price_coins": 10,
+			"sellable": true,
+			"depth_min": 150,
+			"depth_max": null,
+			"weight_kg": {
+				"value": 0.8,
+				"proposed": true,
+				"note": "лёгкий металл, легче железа"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"notes": "дешёвый лёгкий металл",
+			"density": {
+				"type": "parabola",
+				"depth_min": 150,
+				"peak_depth": 500,
+				"peak_percent": 6.0,
+				"fall_width": 1000,
+				"tail_percent": 1.5,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"drill_seconds": {
+				"value": 5.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "gold",
+			"name_ru": "Золото",
+			"category": "ore",
+			"price_coins": 100,
+			"depth_min": 100,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 100,
+				"peak_depth": 500,
+				"peak_percent": 10.0,
+				"fall_width": 1200,
+				"tail_percent": 2.5,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 3.5,
+				"proposed": true,
+				"note": "вес не задан в GDD; золото плотное"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"notes": "лопатой НЕ берётся (см. GDD п.5); ржавая кирка деда трескается на алмазе, не на золоте",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 7.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "diamond",
+			"name_ru": "Алмаз",
+			"category": "gem",
+			"price_coins": 500,
+			"depth_min": 200,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 200,
+				"peak_depth": 900,
+				"peak_percent": 1.5,
+				"fall_width": 1800,
+				"tail_percent": 0.375,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 0.5,
+				"proposed": true,
+				"note": "вес не задан в GDD; алмаз — маленький и лёгкий камень"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"notes": "сценарная клетка алмаза на глубине 80 (среди камней) ломает дедову кирку (см. GDD п.4)",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 12.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "peat",
+			"name_ru": "Торф",
+			"category": "fuel",
+			"price_coins": {
+				"value": 1,
+				"proposed": true,
+				"note": "GDD прямо говорит 'денег почти не даёт' без числа; приравнено к земле как ловушка-подсказка ('может продать его? а может не надо')"
+			},
+			"depth_min": 60,
+			"depth_max": 1000,
+			"density": {
+				"type": "linear_growth",
+				"depth_start": 60,
+				"depth_end": 450,
+				"percent_start": 5,
+				"percent_end": 20,
+				"note": "после depth_end плотность держится на percent_end"
+			},
+			"weight_kg": {
+				"value": 4.0,
+				"proposed": true,
+				"note": "вес не задан в GDD; топливо объёмное"
+			},
+			"max_stack": 99,
+			"tool_required": {
+				"value": "shovel",
+				"proposed": true,
+				"note": "GDD не уточняет инструмент; торф — мягкая органика, добывается лопатой"
+			},
+			"hazard": [],
+			"notes": "топливо для ручного бура и буровой скважины; пласт 450-455 зафиксирован навсегда (см. GDD п.4,8). Начало слоя двойное (60 или 80) — см. world_layers.json у мирового модуля",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 3.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "coal",
+			"name_ru": "Каменный уголь",
+			"category": "fuel",
+			"price_coins": {
+				"value": 3,
+				"proposed": true,
+				"note": "цена не задана; чуть выше торфа как более энергоёмкое топливо"
+			},
+			"depth_min": 1000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 1000,
+				"peak_depth": 1300,
+				"peak_percent": 38.0,
+				"fall_width": 1500,
+				"tail_percent": 28.5,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 3.5,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "pickaxe",
+			"hazard": [],
+			"notes": "заменяет торф как топливо на глубине 1000-1500 (см. GDD п.4,5)",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 5.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "nickel",
+			"name_ru": "Никель",
+			"category": "ore",
+			"price_coins": 20,
+			"depth_min": 500,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 500,
+				"peak_depth": 1200,
+				"peak_percent": 7.6,
+				"fall_width": 1500,
+				"tail_percent": 5.7,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту"
+			},
+			"weight_kg": {
+				"value": 2.8,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "hand_drill",
+			"hazard": [],
+			"notes": "используется в электронике",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 6.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "platinum",
+			"name_ru": "Платина",
+			"category": "ore",
+			"price_coins": 350,
+			"depth_min": 1000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 1000,
+				"peak_depth": 1800,
+				"peak_percent": 3.8,
+				"fall_width": 1600,
+				"tail_percent": 2.85,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 4.0,
+				"proposed": true,
+				"note": "вес не задан в GDD; платина — очень плотный металл"
+			},
+			"max_stack": 99,
+			"tool_required": "hand_drill",
+			"hazard": [],
+			"notes": "используется в технике и установках",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 10.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "titanium",
+			"name_ru": "Титан",
+			"category": "ore",
+			"price_coins": 80,
+			"depth_min": 1000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 1000,
+				"peak_depth": 1900,
+				"peak_percent": 6.65,
+				"fall_width": 1600,
+				"tail_percent": 4.9875,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 1.8,
+				"proposed": true,
+				"note": "вес не задан в GDD; титан лёгкий при высокой прочности"
+			},
+			"max_stack": 99,
+			"tool_required": "hand_drill",
+			"hazard": [],
+			"sellable": true,
+			"drill_seconds": {
+				"value": 12.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "lithium",
+			"name_ru": "Литий",
+			"category": "ore",
+			"price_coins": 80,
+			"depth_min": 1000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 1000,
+				"peak_depth": 2000,
+				"peak_percent": 6.65,
+				"fall_width": 1600,
+				"tail_percent": 4.9875,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 0.3,
+				"proposed": true,
+				"note": "вес не задан в GDD; литий — самый лёгкий металл"
+			},
+			"max_stack": 99,
+			"tool_required": "hand_drill",
+			"hazard": [],
+			"notes": "используется в электронике",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 8.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "mercury",
+			"name_ru": "Ртуть",
+			"category": "liquid_metal",
+			"price_coins": 250,
+			"depth_min": 800,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 800,
+				"peak_depth": 1600,
+				"peak_percent": 4.75,
+				"fall_width": 1500,
+				"tail_percent": 3.5625,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": 2.0,
+			"max_stack": 1,
+			"tool_required": "hand_drill",
+			"hazard": [
+				"mercury",
+				"poison"
+			],
+			"requires_container": "mercury_bottle",
+			"notes": "нужна металлическая бутылка (1 ртуть, 2кг, не стакается — см. GDD п.13). Без сбора: стекает вниз 2с (если пустота снизу), испаряется через 1 мин, облако на 8 клеток на 5 минут",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 6.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "uranium",
+			"name_ru": "Уран",
+			"category": "radioactive",
+			"price_coins": 3500,
+			"depth_min": 1500,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 1500,
+				"peak_depth": 2600,
+				"peak_percent": 4.75,
+				"fall_width": 1800,
+				"tail_percent": 3.5625,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": true,
+				"note": "вес самого урана за соту не задан в GDD напрямую (задан только вес контейнера целиком — 10кг на 9кг свинца+1кг урана, см. п.13); 1кг — доля урана"
+			},
+			"max_stack": 1,
+			"tool_required": "drill_rig",
+			"hazard": [
+				"uranium",
+				"radioactive"
+			],
+			"requires_container": "lead_container",
+			"notes": "свинцовый контейнер: 10кг (9кг свинец + 1кг уран), 4 соты, не стакается (см. GDD п.13). Топливный апгрейд для буровой скважины и буровой машины",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 12.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "geocrystal",
+			"name_ru": "Геотермальный кристалл",
+			"category": "exotic",
+			"price_coins": null,
+			"depth_min": 3000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 3000,
+				"peak_depth": 3800,
+				"peak_percent": 3.8,
+				"fall_width": 2000,
+				"tail_percent": 2.85,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 1.5,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 14.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "ancient_metal",
+			"name_ru": "Древний металл",
+			"category": "exotic",
+			"price_coins": null,
+			"depth_min": 3000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 3000,
+				"peak_depth": 4000,
+				"peak_percent": 3.8,
+				"fall_width": 2000,
+				"tail_percent": 2.85,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 3.0,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 18.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "obsidian",
+			"name_ru": "Обсидиан",
+			"category": "exotic",
+			"price_coins": null,
+			"depth_min": 3000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 3000,
+				"peak_depth": 4200,
+				"peak_percent": 5.7,
+				"fall_width": 2000,
+				"tail_percent": 4.275,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 2.0,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 16.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "ruby",
+			"name_ru": "Рубин",
+			"category": "gem",
+			"price_coins": 800,
+			"depth_min": 2000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 2000,
+				"peak_depth": 3000,
+				"peak_percent": 3.42,
+				"fall_width": 1800,
+				"tail_percent": 2.565,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 0.3,
+				"proposed": true,
+				"note": "вес не задан в GDD; самоцвет лёгкий"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"notes": "чисто на продажу (см. GDD п.4)",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 10.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "emerald",
+			"name_ru": "Изумруд",
+			"category": "gem",
+			"price_coins": 650,
+			"depth_min": 2000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 2000,
+				"peak_depth": 3000,
+				"peak_percent": 3.42,
+				"fall_width": 1800,
+				"tail_percent": 2.565,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 0.3,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"notes": "чисто на продажу (см. GDD п.4)",
+			"sellable": true,
+			"drill_seconds": {
+				"value": 10.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "hellstone",
+			"name_ru": "Адский камень",
+			"category": "warzone",
+			"price_coins": null,
+			"depth_min": 4000,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 4000,
+				"peak_depth": 4800,
+				"peak_percent": 5.7,
+				"fall_width": 2000,
+				"tail_percent": 4.275,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 3.5,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [
+				"hot"
+			],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 20.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "dark_matter",
+			"name_ru": "Чёрная материя",
+			"category": "warzone",
+			"price_coins": null,
+			"depth_min": 4300,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 4300,
+				"peak_depth": 5200,
+				"peak_percent": 2.85,
+				"fall_width": 2000,
+				"tail_percent": 2.1375,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 0.8,
+				"proposed": true,
+				"note": "вес не задан в GDD; экзотическая почти безмассовая материя"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 24.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "universum",
+			"name_ru": "Вселениум",
+			"category": "warzone",
+			"price_coins": null,
+			"depth_min": 4700,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 4700,
+				"peak_depth": 5600,
+				"peak_percent": 1.9,
+				"fall_width": 2000,
+				"tail_percent": 1.425,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 0.5,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 28.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "angelstone",
+			"name_ru": "Ангельский камень",
+			"category": "warzone",
+			"price_coins": null,
+			"depth_min": 5200,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 5200,
+				"peak_depth": 6000,
+				"peak_percent": 1.52,
+				"fall_width": 2000,
+				"tail_percent": 1.14,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"sellable": false,
+			"notes": "не продаётся: материал для брони и оружия",
+			"drill_seconds": {
+				"value": 32.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		},
+		{
+			"id": "divine_heart",
+			"name_ru": "Божественное сердце",
+			"category": "warzone",
+			"price_coins": null,
+			"depth_min": 5800,
+			"depth_max": null,
+			"density": {
+				"type": "parabola",
+				"depth_min": 5800,
+				"peak_depth": 6400,
+				"peak_percent": 0.95,
+				"fall_width": 2000,
+				"tail_percent": 0.7125,
+				"proposed": true,
+				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+			},
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": true,
+				"note": "вес не задан в GDD"
+			},
+			"max_stack": 99,
+			"tool_required": "drill_rig",
+			"hazard": [],
+			"notes": "не продаётся: материал для брони и оружия",
+			"sellable": false,
+			"drill_seconds": {
+				"value": 40.0,
+				"proposed": true,
+				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
+			}
+		}
+	],
+	"terrain_hazards": [
+		{
+			"id": "hot_rock",
+			"name_ru": "Горячая порода",
+			"depth_min": {
+				"value": 1000,
+				"proposed": true,
+				"note": "глубина появления не задана в GDD (п.18, 'с какой глубины горячие породы'); выбрана глубина слоя угля/бура как символ индустриальной жары"
+			},
+			"burn_damage_per_second": {
+				"value": 2.0,
+				"proposed": true,
+				"note": "урон не задан в GDD (п.18, 'сколько жгут')"
+			},
+			"hazard": [
+				"hot"
+			],
+			"notes": "ожоги наносят урон HP при контакте; также источник перегрева бура (см. balance.json -> tools)"
+		}
+	],
+	"_legend_density_parabola": "до depth_min минерала нет; от depth_min к peak_depth плотность растёт по параболе до peak_percent; глубже peak_depth спадает по параболе с полушириной fall_width, но никогда не ниже tail_percent — минералы не заканчиваются, а редко встречаются на любой глубине.",
+	"_legend_drill": "drill_seconds — время бурения одной клетки в секундах. База копки лопатой/киркой — 3 с (balance.json digging), бур тратит своё время."
 }

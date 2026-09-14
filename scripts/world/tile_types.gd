@@ -16,6 +16,7 @@ enum Type {
 	LEAD_ORE,            # свинец
 	SILVER_ORE,          # серебро
 	COPPER_ORE,          # медь
+	ALUMINIUM_ORE,       # алюминий
 	GOLD_ORE,            # золото
 	DIAMOND,             # алмаз
 	NICKEL_ORE,          # никель
@@ -69,6 +70,7 @@ static func _build_props() -> Dictionary:
 	d[Type.LEAD_ORE] = Props.new(false, true, false)
 	d[Type.SILVER_ORE] = Props.new(false, true, false)
 	d[Type.COPPER_ORE] = Props.new(false, true, false)
+	d[Type.ALUMINIUM_ORE] = Props.new(false, true, false)
 	d[Type.GOLD_ORE] = Props.new(false, true, false)
 	d[Type.DIAMOND] = Props.new(false, true, false)
 	d[Type.NICKEL_ORE] = Props.new(false, true, false)

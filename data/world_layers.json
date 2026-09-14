@@ -1,73 +1,325 @@
 {
 	"_comment": "Раскладка слоёв генерации мира. Формат читается world_gen.gd. Глубина (y) отсчитывается от 1 у поверхности вниз. Диапазоны инклюзивны с обеих сторон. Значения без явного роста в ГДД (нет стрелки X%→Y%) взяты как плоская вероятность = середина указанного в ГДД диапазона — это авторское допущение, не число из ГДД.",
-
-	"_comment_density": "ВАЖНО: density здесь — вероятность броска, а не итоговая доля клеток. Руды проверяются по порядку массива ores, клетка достаётся первой совпавшей, плюс 10% клеток отсекаются как пустоты. Поэтому фактическая доля руды = density * (1 - сумма вытеснения вышестоящими рудами) * 0.9, и чем ниже руда в списке, тем сильнее она недобирает. Пример: торф на глубине 449 при density 0.20 реально занимает около 14.4% массы грунта. Если нужна точная доля из ГДД — поднимайте руду выше по списку или закладывайте поправку в density.",
-
+	"_comment_density": "Руды проверяются по порядку массива ores, клетка достаётся первой совпавшей, плюс часть клеток отсекается как пустоты. Массив отсортирован от редких к частым, чтобы редкие не вытеснялись. curve=parabola: до y_min руды нет; от y_min к peak_y плотность растёт по параболе до peak; глубже peak_y спадает с полушириной fall_width, но не ниже tail — руды не заканчиваются.",
 	"world_width": 32,
 	"house_x_max": 14,
 	"garden_x_min": 15,
 	"max_depth": 6500,
-
 	"foundation_y": 5,
-
 	"staircase": {
 		"_comment": "Нерушимая лестница слева у дома: 1 клетка на ур.1, 2 на ур.2, 3 на ур.3, 4 на ур.4 — ступенчатый треугольник от края огорода (x=15) вправо. Точная геометрия не описана в ГДД дословно, взята как наиболее естественное прочтение раздела 3.",
 		"x_start": 15,
 		"y_max": 4
 	},
-
 	"peat_seam": {
 		"_comment": "Сплошной торфяной пласт, раздел 4. После сброса не восстанавливается (см. collapse.gd) — недокопанный торф остаётся, докопанный не возвращается.",
 		"y_min": 450,
 		"y_max": 455
 	},
-
 	"scripted_diamond": {
-		"_comment": "Сценарная клетка алмаза на глубине 80 (раздел 4). x подобран произвольно в пределах огорода — точная колонка в ГДД не задана.",
+		"_comment": "Сценарная клетка алмаза на глубине 80 (раздел 4 ГДД). Окружена камнем со всех четырёх сторон: сверху, снизу, слева и справа. x подобран произвольно в пределах огорода.",
 		"x": 20,
 		"y": 80,
-		"guard_offsets": [[-1, 0], [1, 0], [0, 1]]
+		"guard_offsets": [
+			[
+				-1,
+				0
+			],
+			[
+				1,
+				0
+			],
+			[
+				0,
+				1
+			],
+			[
+				0,
+				-1
+			]
+		]
 	},
-
 	"shallow_layers": [
-		{ "y_min": 1, "y_max": 1, "stone_chance": 0.03 },
-		{ "y_min": 2, "y_max": 2, "stone_chance": 0.07 },
-		{ "y_min": 3, "y_max": 4, "stone_chance": 0.10 }
+		{
+			"y_min": 1,
+			"y_max": 1,
+			"stone_chance": 0.03
+		},
+		{
+			"y_min": 2,
+			"y_max": 2,
+			"stone_chance": 0.07
+		},
+		{
+			"y_min": 3,
+			"y_max": 4,
+			"stone_chance": 0.1
+		}
 	],
-
 	"deep": {
-		"_comment": "Слои 5+ (ниже фундамента). Пустоты 10%, камень фоном.",
+		"_comment": "Слои 5+ (ниже фундамента). Пустоты 10%. Камень проверяется ПОСЛЕ руд, поэтому его вероятность броска (0.14) выше целевой доли: руды занимают до 54% породы и вытесняют его примерно вдвое, на выходе получается заявленные ГДД 5-10%.",
 		"y_min": 6,
-		"void_chance": 0.10,
-		"stone_chance": 0.075
+		"void_chance": 0.1,
+		"stone_chance": 0.14
 	},
-
-	"_ores_comment": "Глубины/плотности для материалов лестницы редкости после алмаза (никель..божественное сердце), а также медь/рубин/изумруд/металлолом СОГЛАСОВАНЫ с плейсхолдерами агента data/minerals.json (тот же открытый вопрос раздела 18 ГДД решался независимо в обоих файлах — числа сведены к одному источнику, чтобы экономика и генерация не расходились; density здесь = середина percent_min/percent_max оттуда). id в этом файле — только метка для хеш-соли, не обязана дословно совпадать с id в minerals.json (там 'universum'/'angelstone' без подчёркивания).",
+	"_ores_comment": "Глубины и профили руд синхронизированы с data/minerals.json — один источник правды, чтобы экономика и генерация не расходились. Значения, не заданные владельцем, помечены proposed там же. curve=ramp — линейный рост density_start->density_end к ramp_end_y (торф). curve=parabola — рост к пику и вечный хвост (все руды).",
 	"ores": [
-		{ "id": "divine_heart", "tile": "DIVINE_HEART", "y_min": 5800, "y_max": 6500, "density": 0.000125, "note": "= data/minerals.json divine_heart" },
-		{ "id": "angelstone", "tile": "ANGEL_STONE", "y_min": 5200, "y_max": 5800, "density": 0.0003, "note": "= data/minerals.json angelstone" },
-		{ "id": "universum", "tile": "UNIVERSALIUM", "y_min": 4700, "y_max": 5200, "density": 0.0005, "note": "= data/minerals.json universum" },
-		{ "id": "dark_matter", "tile": "DARK_MATTER", "y_min": 4300, "y_max": 4700, "density": 0.001, "note": "= data/minerals.json dark_matter" },
-		{ "id": "ancient_metal", "tile": "ANCIENT_METAL", "y_min": 3100, "y_max": 3600, "density": 0.001, "note": "= data/minerals.json ancient_metal" },
-		{ "id": "hellstone", "tile": "HELLSTONE", "y_min": 4000, "y_max": 4300, "density": 0.02, "note": "ГДД: '>4000'; = data/minerals.json hellstone" },
-		{ "id": "geocrystal", "tile": "GEOCRYSTAL", "y_min": 2600, "y_max": 3100, "density": 0.002, "note": "= data/minerals.json geocrystal" },
-		{ "id": "uranium", "tile": "URANIUM_ORE", "y_min": 2150, "y_max": 2600, "density": 0.002, "note": "= data/minerals.json uranium" },
-		{ "id": "emerald", "tile": "EMERALD", "y_min": 2000, "y_max": 999999, "density": 0.00275, "note": "ГДД: 2000+; = data/minerals.json emerald" },
-		{ "id": "ruby", "tile": "RUBY", "y_min": 2000, "y_max": 999999, "density": 0.0035, "note": "ГДД: 2000+; = data/minerals.json ruby" },
-		{ "id": "mercury", "tile": "MERCURY_ORE", "y_min": 1750, "y_max": 2150, "density": 0.0035, "note": "= data/minerals.json mercury" },
-		{ "id": "obsidian", "tile": "OBSIDIAN", "y_min": 3600, "y_max": 4000, "density": 0.0045, "note": "= data/minerals.json obsidian" },
-		{ "id": "lithium", "tile": "LITHIUM_ORE", "y_min": 1400, "y_max": 1750, "density": 0.0055, "note": "= data/minerals.json lithium" },
-		{ "id": "titanium", "tile": "TITANIUM_ORE", "y_min": 1050, "y_max": 1400, "density": 0.0075, "note": "ГДД: 'после платины'; = data/minerals.json titanium" },
-		{ "id": "platinum", "tile": "PLATINUM_ORE", "y_min": 750, "y_max": 1050, "density": 0.01, "note": "= data/minerals.json platinum" },
-		{ "id": "diamond", "tile": "DIAMOND", "y_min": 200, "y_max": 999999, "density": 0.01 },
-		{ "id": "nickel", "tile": "NICKEL_ORE", "y_min": 500, "y_max": 750, "density": 0.02, "note": "= data/minerals.json nickel" },
-		{ "id": "gold", "tile": "GOLD_ORE", "y_min": 100, "y_max": 500, "density_start": 0.02, "density_end": 0.10, "ramp_end_y": 500 },
-		{ "id": "silver", "tile": "SILVER_ORE", "y_min": 50, "y_max": 250, "density": 0.025 },
-		{ "id": "lead", "tile": "LEAD_ORE", "y_min": 20, "y_max": 200, "density": 0.03 },
-		{ "id": "copper", "tile": "COPPER_ORE", "y_min": 100, "y_max": 500, "density": 0.045, "note": "= data/minerals.json copper (3-6%)" },
-		{ "id": "scrap", "tile": "SCRAP_METAL", "y_min": 1, "y_max": 200, "density": 0.02, "note": "= data/minerals.json scrap (1-3%)" },
-		{ "id": "iron_ore", "tile": "IRON_ORE", "y_min": 5, "y_max": 200, "density": 0.075 },
-		{ "id": "coal", "tile": "COAL", "y_min": 1000, "y_max": 1500, "density": 0.20, "note": "заменяет торф; = data/minerals.json coal (15-25%)" },
-		{ "id": "peat", "tile": "PEAT", "y_min": 60, "y_max": 999, "density_start": 0.05, "density_end": 0.20, "ramp_end_y": 450, "note": "ГДД диапазон начала '60/80' неоднозначен, взято 60 (= data/minerals.json peat)" }
+		{
+			"id": "divine_heart",
+			"tile": "DIVINE_HEART",
+			"curve": "parabola",
+			"y_min": 5800,
+			"peak_y": 6400,
+			"peak": 0.0095,
+			"fall_width": 2000,
+			"tail": 0.00712
+		},
+		{
+			"id": "angelstone",
+			"tile": "ANGEL_STONE",
+			"curve": "parabola",
+			"y_min": 5200,
+			"peak_y": 6000,
+			"peak": 0.0152,
+			"fall_width": 2000,
+			"tail": 0.0114
+		},
+		{
+			"id": "universum",
+			"tile": "UNIVERSALIUM",
+			"curve": "parabola",
+			"y_min": 4700,
+			"peak_y": 5600,
+			"peak": 0.019,
+			"fall_width": 2000,
+			"tail": 0.01425
+		},
+		{
+			"id": "diamond",
+			"tile": "DIAMOND",
+			"curve": "parabola",
+			"y_min": 200,
+			"peak_y": 900,
+			"peak": 0.015,
+			"fall_width": 1800,
+			"tail": 0.00375
+		},
+		{
+			"id": "dark_matter",
+			"tile": "DARK_MATTER",
+			"curve": "parabola",
+			"y_min": 4300,
+			"peak_y": 5200,
+			"peak": 0.0285,
+			"fall_width": 2000,
+			"tail": 0.02138
+		},
+		{
+			"id": "ruby",
+			"tile": "RUBY",
+			"curve": "parabola",
+			"y_min": 2000,
+			"peak_y": 3000,
+			"peak": 0.0342,
+			"fall_width": 1800,
+			"tail": 0.02565
+		},
+		{
+			"id": "emerald",
+			"tile": "EMERALD",
+			"curve": "parabola",
+			"y_min": 2000,
+			"peak_y": 3000,
+			"peak": 0.0342,
+			"fall_width": 1800,
+			"tail": 0.02565
+		},
+		{
+			"id": "platinum",
+			"tile": "PLATINUM_ORE",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 1800,
+			"peak": 0.038,
+			"fall_width": 1600,
+			"tail": 0.0285
+		},
+		{
+			"id": "geocrystal",
+			"tile": "GEOCRYSTAL",
+			"curve": "parabola",
+			"y_min": 3000,
+			"peak_y": 3800,
+			"peak": 0.038,
+			"fall_width": 2000,
+			"tail": 0.0285
+		},
+		{
+			"id": "ancient_metal",
+			"tile": "ANCIENT_METAL",
+			"curve": "parabola",
+			"y_min": 3000,
+			"peak_y": 4000,
+			"peak": 0.038,
+			"fall_width": 2000,
+			"tail": 0.0285
+		},
+		{
+			"id": "mercury",
+			"tile": "MERCURY_ORE",
+			"curve": "parabola",
+			"y_min": 800,
+			"peak_y": 1600,
+			"peak": 0.0475,
+			"fall_width": 1500,
+			"tail": 0.03563
+		},
+		{
+			"id": "uranium",
+			"tile": "URANIUM_ORE",
+			"curve": "parabola",
+			"y_min": 1500,
+			"peak_y": 2600,
+			"peak": 0.0475,
+			"fall_width": 1800,
+			"tail": 0.03563
+		},
+		{
+			"id": "silver",
+			"tile": "SILVER_ORE",
+			"curve": "parabola",
+			"y_min": 50,
+			"peak_y": 160,
+			"peak": 0.027999999999999997,
+			"fall_width": 700,
+			"tail": 0.007
+		},
+		{
+			"id": "obsidian",
+			"tile": "OBSIDIAN",
+			"curve": "parabola",
+			"y_min": 3000,
+			"peak_y": 4200,
+			"peak": 0.057,
+			"fall_width": 2000,
+			"tail": 0.04275
+		},
+		{
+			"id": "hellstone",
+			"tile": "HELLSTONE",
+			"curve": "parabola",
+			"y_min": 4000,
+			"peak_y": 4800,
+			"peak": 0.057,
+			"fall_width": 2000,
+			"tail": 0.04275
+		},
+		{
+			"id": "lead",
+			"tile": "LEAD_ORE",
+			"curve": "parabola",
+			"y_min": 20,
+			"peak_y": 120,
+			"peak": 0.035,
+			"fall_width": 600,
+			"tail": 0.00875
+		},
+		{
+			"id": "titanium",
+			"tile": "TITANIUM_ORE",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 1900,
+			"peak": 0.0665,
+			"fall_width": 1600,
+			"tail": 0.04988
+		},
+		{
+			"id": "lithium",
+			"tile": "LITHIUM_ORE",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 2000,
+			"peak": 0.0665,
+			"fall_width": 1600,
+			"tail": 0.04988
+		},
+		{
+			"id": "nickel",
+			"tile": "NICKEL_ORE",
+			"curve": "parabola",
+			"y_min": 500,
+			"peak_y": 1200,
+			"peak": 0.076,
+			"fall_width": 1500,
+			"tail": 0.057
+		},
+		{
+			"id": "copper",
+			"tile": "COPPER_ORE",
+			"curve": "parabola",
+			"y_min": 100,
+			"peak_y": 320,
+			"peak": 0.05,
+			"fall_width": 900,
+			"tail": 0.0125
+		},
+		{
+			"id": "aluminium",
+			"tile": "ALUMINIUM_ORE",
+			"curve": "parabola",
+			"y_min": 150,
+			"peak_y": 500,
+			"peak": 0.06,
+			"fall_width": 1000,
+			"tail": 0.015
+		},
+		{
+			"id": "iron_ore",
+			"tile": "IRON_ORE",
+			"curve": "parabola",
+			"y_min": 5,
+			"peak_y": 100,
+			"peak": 0.08,
+			"fall_width": 600,
+			"tail": 0.02
+		},
+		{
+			"id": "gold",
+			"tile": "GOLD_ORE",
+			"curve": "parabola",
+			"y_min": 100,
+			"peak_y": 500,
+			"peak": 0.1,
+			"fall_width": 1200,
+			"tail": 0.025
+		},
+		{
+			"id": "peat",
+			"tile": "PEAT",
+			"curve": "ramp",
+			"y_min": 60,
+			"y_max": 1000,
+			"density_start": 0.05,
+			"density_end": 0.2,
+			"ramp_end_y": 450
+		},
+		{
+			"id": "coal",
+			"tile": "COAL",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 1300,
+			"peak": 0.38,
+			"fall_width": 1500,
+			"tail": 0.285
+		},
+		{
+			"id": "scrap",
+			"tile": "SCRAP_METAL",
+			"y_min": 1,
+			"y_max": 200,
+			"density": 0.02
+		}
 	]
 }

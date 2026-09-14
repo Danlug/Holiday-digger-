@@ -264,9 +264,10 @@ func _generate_layered(x: int, y: int, salt: int) -> int:
 		return TileTypes.Type.EMPTY
 
 	for ore: Dictionary in _ores:
-		var y_min := int(ore.get("y_min", 0))
-		var y_max := int(ore.get("y_max", 0))
-		if y < y_min or y > y_max:
+		if y < int(ore.get("y_min", 0)):
+			continue
+		# отсутствие y_max означает, что руда не заканчивается с глубиной
+		if ore.has("y_max") and y > int(ore.get("y_max")):
 			continue
 		var density := _ore_density(ore, y)
 		var ore_id: String = ore.get("id", "")
@@ -281,8 +282,31 @@ func _generate_layered(x: int, y: int, salt: int) -> int:
 	return TileTypes.Type.DIRT
 
 
+## Плотность руды на глубине y. Три профиля:
+##   parabola — руда появляется не раньше y_min, растёт по параболе к пику на
+##              peak_y, за пиком спадает, но не ниже tail: выработанных
+##              насовсем горизонтов нет, редкие вкрапления есть на любой
+##              глубине. Из-за этого к нижним слоям руды занимают уже больше
+##              половины породы, и игроку приходится выбирать, что уносить.
+##   ramp     — линейный рост density_start -> density_end к ramp_end_y (торф).
+##   flat     — постоянная density.
 func _ore_density(ore: Dictionary, y: int) -> float:
-	if ore.has("ramp_end_y"):
+	var curve: String = ore.get("curve", "")
+
+	if curve == "parabola":
+		var y_min := int(ore.get("y_min", 0))
+		if y < y_min:
+			return 0.0
+		var peak_y := int(ore.get("peak_y", y_min))
+		var peak: float = ore.get("peak", 0.0)
+		var tail: float = ore.get("tail", 0.0)
+		var width := float(peak_y - y_min) if y <= peak_y else float(ore.get("fall_width", 1.0))
+		if width <= 0.0:
+			return maxf(peak, tail)
+		var t := float(y - peak_y) / width
+		return maxf(peak * (1.0 - t * t), tail)
+
+	if curve == "ramp" or ore.has("ramp_end_y"):
 		var y_min := int(ore.get("y_min", 0))
 		var ramp_end := int(ore.get("ramp_end_y", y_min))
 		var d_start: float = ore.get("density_start", 0.0)
@@ -291,6 +315,7 @@ func _ore_density(ore: Dictionary, y: int) -> float:
 		if ramp_end > y_min:
 			t = clampf(float(y - y_min) / float(ramp_end - y_min), 0.0, 1.0)
 		return lerpf(d_start, d_end, t)
+
 	return ore.get("density", 0.0)
 
 

@@ -218,8 +218,10 @@ func test_scripted_diamond() -> void:
 			ok_guards = false
 		if w.get_tile(20, 81) != TileTypes.Type.STONE:  # снизу
 			ok_guards = false
+		if w.get_tile(20, 79) != TileTypes.Type.STONE:  # сверху
+			ok_guards = false
 	check("алмаз на (20, 80) при любом seed", ok_diamond)
-	check("алмаз окружён камнями снизу/слева/справа", ok_guards)
+	check("алмаз окружён камнями со всех четырёх сторон", ok_guards)
 
 
 func test_staircase() -> void:

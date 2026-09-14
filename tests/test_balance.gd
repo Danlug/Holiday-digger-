@@ -130,10 +130,12 @@ func _test_mineral_data(bal) -> void:
 	_check_int("золото = 100 монет", bal.get_mineral_price("gold"), 100)
 	_check_int("алмаз = 500 монет", bal.get_mineral_price("diamond"), 500)
 
-	# золото: 2% на глубине 100 -> 10% на глубине 500 (линейный рост)
-	_check("плотность золота на глубине 100 = 2%", bal.get_mineral_density_percent("gold", 100), 2.0, 0.01)
-	_check("плотность золота на глубине 500 = 10%", bal.get_mineral_density_percent("gold", 500), 10.0, 0.01)
-	_check("плотность золота на глубине 300 = 6% (середина)", bal.get_mineral_density_percent("gold", 300), 6.0, 0.01)
+	# золото — парабола: нет выше 100, пик 10% на 500, вечный хвост 2.5%
+	_check("золота нет выше глубины 100", bal.get_mineral_density_percent("gold", 50), 0.0, 0.01)
+	_check("плотность золота на глубине 100 = хвост 2.5%", bal.get_mineral_density_percent("gold", 100), 2.5, 0.01)
+	_check("плотность золота на пике (500) = 10%", bal.get_mineral_density_percent("gold", 500), 10.0, 0.01)
+	_check("плотность золота на глубине 300 = 7.5%", bal.get_mineral_density_percent("gold", 300), 7.5, 0.01)
+	_check("золото не исчезает на глубине 3000 (хвост 2.5%)", bal.get_mineral_density_percent("gold", 3000), 2.5, 0.01)
 
 	# торф: 5% на глубине 60 -> 20% на глубине 450 (линейный рост)
 	_check("плотность торфа на глубине 60 = 5%", bal.get_mineral_density_percent("peat", 60), 5.0, 0.01)

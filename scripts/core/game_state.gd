@@ -168,6 +168,41 @@ func respawn() -> void:
 	respawned.emit()
 
 
+## Полный сброс прогресса игрока (кнопка ↺ в нижней полосе — отладочный "новый
+## огород", как в web-демо). Мир/туман main.gd сбрасывает отдельно (это его
+## зона ответственности), здесь — только то, что принадлежит GameState.
+func reset_progress() -> void:
+	hp = get_max_hp()
+	stamina = 100.0
+	hunger = 100.0
+	is_alive = true
+	xp = 0
+	level = 1
+	skill_points_available = 0
+	skill_stages.clear()
+	coins = 0
+	dollars = 0
+	inventory.clear()
+	black_box.clear()
+	current_tool = "shovel"
+	max_depth_reached = 0
+	collected_artifacts.clear()
+	completed_branches.clear()
+	game_clock_hours = 0.0
+	world_dug_cells.clear()
+	hp_changed.emit(hp, get_max_hp())
+	stamina_changed.emit(stamina)
+	hunger_changed.emit(hunger)
+	xp_changed.emit(xp, level)
+	skill_points_changed.emit(skill_points_available)
+	coins_changed.emit(coins)
+	dollars_changed.emit(dollars)
+	inventory_changed.emit()
+	black_box_changed.emit()
+	tool_changed.emit(current_tool)
+	max_depth_changed.emit(max_depth_reached)
+
+
 # ---------------------------------------------------------------------------
 # Игровое время и сон (см. GDD раздел 7)
 # ---------------------------------------------------------------------------
@@ -287,6 +322,16 @@ func get_total_weight() -> float:
 
 func get_max_carry_kg() -> float:
 	return Balance.get_max_carry_kg(get_skill_stage("strength"))
+
+
+## Радиусы аур тумана войны (ГДД раздел 12): большая — рельеф, маленькая —
+## ресурсы. Растут прокачкой веток terrain_vision/resource_vision.
+func get_vision_terrain_radius() -> int:
+	return Balance.get_vision_radius("terrain_vision", get_skill_stage("terrain_vision"))
+
+
+func get_vision_resource_radius() -> int:
+	return Balance.get_vision_radius("resource_vision", get_skill_stage("resource_vision"))
 
 
 ## Пытается положить count единиц mineral_id в инвентарь, учитывая макс. стак
@@ -451,9 +496,32 @@ func try_use_ad_reward(ad_id: String) -> bool:
 # Интерфейс для мира (owner: scripts/world/, не входит в мою зону)
 # ---------------------------------------------------------------------------
 
-## Диффы выкопанных клеток мира. Мир детерминирован от сида и генерируется
-## отдельным модулем (scripts/world/) — GameState лишь хранит и сохраняет
-## список изменений (что выкопано), не саму карту (см. GDD, save_system.gd).
+## Ссылки на живые экземпляры мира/тумана, которые создаёт и владеет main.gd.
+## GameState сам карту не хранит (мир детерминирован от сида, см. world_gen.gd)
+## — но SaveSystem должен где-то достать их диффы для записи в user://save.json,
+## а автолоад — единственное место, доступное отовсюду без явной прокидки.
+## Пока main.gd не назначил эти поля (например, в headless-тестах баланса),
+## SaveSystem просто пропускает сохранение/загрузку мира — это ожидаемо.
+var world_ref: WorldGen = null
+var fog_ref: FogOfWar = null
+
+## Сид генерации мира (см. world_gen.gd) — должен быть стабилен между
+## запусками, иначе сохранённые диффы "выкопано" разъедутся с новой
+## генерацией. 0 значит "ещё не назначен"; main.gd просит один при первом
+## запуске через ensure_world_seed() ДО создания WorldGen.
+var world_seed: int = 0
+
+
+func ensure_world_seed() -> int:
+	if world_seed == 0:
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		world_seed = rng.randi() | 1  # нечётный: 0 зарезервирован под "не назначен"
+	return world_seed
+
+## Диффы выкопанных клеток мира — запасной путь, если world_ref не назначен
+## (например, старый сейв или тест). В обычной игре не используется: реальный
+## источник правды — world_ref.diffs/events (см. save_system.gd).
 var world_dug_cells: Dictionary = {}  # "x,y":String -> Dictionary (что было на клетке)
 
 

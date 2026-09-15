@@ -310,6 +310,25 @@ func get_overload_speed_multiplier(load_kg: float, max_kg: float) -> float:
 	return pow(min_mult, t)
 
 
+## Урон от падения по СКОРОСТИ удара, а не по высоте (см. GDD раздел 6:
+## "урон считается от скорости удара... спуск на пропеллере — не то же самое,
+## что падение той же высоты"). Использует те же coefficient/exponent, что и
+## get_fall_damage(height), но в реальном времени игрок-контроллер знает
+## только скорость удара — height там не отслеживается для полёта.
+## gravity — текущее G мира (физическая константа, см. player.gd), передаётся
+## аргументом, а не хранится здесь: G — это ощущение движения, а не баланс.
+func get_fall_damage_from_speed(speed_cells_per_sec: float, gravity: float) -> float:
+	var fd: Dictionary = balance.get("fall_damage", {})
+	var coeff: float = float(_v(fd.get("coefficient", 0.154)))
+	var exponent: float = float(_v(fd.get("exponent", 2.16)))
+	var min_height: float = float(_v(fd.get("min_height_cells", 5)))
+	var safe_speed: float = sqrt(2.0 * gravity * min_height)
+	if speed_cells_per_sec < safe_speed:
+		return 0.0
+	var k: float = coeff / pow(2.0 * gravity, exponent)
+	return k * pow(speed_cells_per_sec, exponent * 2.0)
+
+
 ## Урон от падения: 0.154 * height^2.16, ниже min_height урона нет.
 func get_fall_damage(height_cells: float) -> float:
 	var fd: Dictionary = balance.get("fall_damage", {})
@@ -392,3 +411,36 @@ func get_black_box_capacity(tier: String) -> int:
 
 func get_ad_daily_limit(ad_id: String) -> int:
 	return int(balance.get("ads", {}).get("daily_limits", {}).get(ad_id, 0))
+
+
+# ---------------------------------------------------------------------------
+# Инструменты (см. GDD раздел 5, balance.json -> tools)
+# ---------------------------------------------------------------------------
+
+func get_tool(id: String) -> Dictionary:
+	return balance.get("tools", {}).get(id, {})
+
+
+func get_tool_speed_multiplier(id: String) -> float:
+	return float(_v(get_tool(id).get("speed_multiplier", 1.0)))
+
+
+## Максимальная глубина инструмента (null/отсутствует = без ограничения).
+func get_tool_max_depth(id: String) -> int:
+	var t := get_tool(id)
+	if not t.has("max_depth") or t["max_depth"] == null:
+		return -1
+	return int(_v(t["max_depth"]))
+
+
+func get_tool_name_ru(id: String) -> String:
+	return String(get_tool(id).get("name_ru", id))
+
+
+## Время бурения клетки минерала id базовым инструментом (drill_seconds из
+## minerals.json), с запасным значением, если минерал не описан явно.
+func get_mineral_drill_seconds(id: String) -> float:
+	var m := get_mineral(id)
+	if m.is_empty():
+		return float(_v(balance.get("digging", {}).get("base_seconds_per_cell", 3.0)))
+	return float(_v(m.get("drill_seconds", 3.0)))

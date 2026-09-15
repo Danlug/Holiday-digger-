@@ -74,10 +74,22 @@ static func _serialize() -> Dictionary:
 			"daily_counts": gs.ad_daily_counts,
 			"last_reset_utc_date": gs.last_reset_utc_date,
 		},
-		"world": {
-			"dug_cells": gs.world_dug_cells,
-		},
+		"world_seed": gs.world_seed,
+		"world": _serialize_world(gs),
 	}
+
+
+## Реальный мир хранится в GameState.world_ref (WorldGen), назначаемом
+## main.gd: только он знает и диффы, и события обвалов/землетрясений
+## (см. world_gen.gd:get_save_data). Запасной путь — устаревший
+## GameState.world_dug_cells, на случай если world_ref ещё не назначен.
+static func _serialize_world(gs) -> Dictionary:
+	if gs.world_ref != null:
+		var out := {"gen": gs.world_ref.get_save_data()}
+		if gs.fog_ref != null:
+			out["fog"] = gs.fog_ref.to_save_data()
+		return out
+	return {"dug_cells": gs.world_dug_cells}
 
 
 ## Накатывает загруженные данные на GameState. Ожидает уже мигрированный
@@ -124,8 +136,15 @@ static func _apply(data: Dictionary) -> void:
 	gs.ad_daily_counts = ads_data.get("daily_counts", {})
 	gs.last_reset_utc_date = String(ads_data.get("last_reset_utc_date", gs.last_reset_utc_date))
 
+	gs.world_seed = int(data.get("world_seed", gs.world_seed))
+
 	var world_data: Dictionary = data.get("world", {})
-	gs.world_dug_cells = world_data.get("dug_cells", {})
+	if world_data.has("gen") and gs.world_ref != null:
+		gs.world_ref.load_save_data(world_data["gen"])
+		if gs.fog_ref != null and world_data.has("fog"):
+			gs.fog_ref.load_save_data(world_data["fog"])
+	else:
+		gs.world_dug_cells = world_data.get("dug_cells", {})
 
 
 ## Приводит сохранение произвольной старой версии к текущей SCHEMA_VERSION.

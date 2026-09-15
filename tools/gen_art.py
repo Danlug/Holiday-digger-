@@ -40,7 +40,30 @@ def out(relpath):
     return p
 
 
+# Что нарисовал художник, а не этот скрипт. Такие файлы приходят из
+# tools/import_art.py и перезаписывать их плейсхолдерами нельзя: генератор
+# остаётся для того, что ещё не нарисовано.
+AUTHORED = (
+    "character/",
+    "items/shovel.png",
+    "items/pickaxe_rusty.png",
+    "items/pickaxe_rusty_cracked.png",
+    "items/pickaxe_iron.png",
+    "items/backpack_propeller.png",
+    "items/jetpack.png",
+    "items/hand_drill.png",
+    "ui/icon_inventory.png",
+    "ui/icon_dollar.png",
+    "env/workbench.png",
+    "env/bed.png",
+    "env/drill_mobile.png",
+)
+
+
 def save(img, relpath):
+    if any(relpath.startswith(a) for a in AUTHORED):
+        print(f"  пропуск {relpath} — авторский арт, см. tools/import_art.py")
+        return
     img.save(out(relpath))
 
 

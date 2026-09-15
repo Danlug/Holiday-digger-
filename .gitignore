@@ -8,3 +8,4 @@ export.cfg
 *.translation
 build/
 .DS_Store
+tools/__pycache__/

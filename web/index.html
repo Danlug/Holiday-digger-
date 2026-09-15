@@ -80,7 +80,8 @@ body{
 .purse img{width:14px;height:14px;image-rendering:pixelated;flex:0 0 auto}
 .purse .coins{color:var(--gold);font-weight:600}
 .purse .dollars{color:#7FB86B;font-weight:600}
-.purse .xp-u{color:#7FB86B;font-size:10px;width:14px;text-align:center}
+.purse .xp{color:#9FC0E0;font-weight:600}
+.purse .xp-u{color:#9FC0E0;font-size:10px;width:14px;text-align:center}
 .purse .load{color:var(--moss)}
 .purse .load.over{color:var(--rust)}
 
@@ -207,6 +208,34 @@ body{
   font-family:"Pixelify Sans","Manrope",sans-serif;
 }
 .sheet-foot b{color:var(--gold)}
+.sheet-row .drop-btn{
+  flex:0 0 auto;background:none;border:1px solid var(--edge);color:var(--muted);
+  font:inherit;font-size:11px;line-height:1;padding:4px 7px;cursor:pointer;
+}
+.sheet-row .drop-btn:active{border-color:var(--rust);color:var(--rust)}
+
+/* окно «сколько выкинуть» */
+.drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#0B0907CC;padding:16px}
+.drop[hidden]{display:none}
+.drop-box{
+  width:100%;max-width:280px;background:#1A140F;
+  border:1px solid var(--edge);padding:12px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.drop-title{font-family:"Pixelify Sans","Manrope",sans-serif;font-size:13px}
+.drop-range{width:100%;accent-color:var(--rust)}
+.drop-count{display:flex;align-items:baseline;justify-content:center;gap:6px}
+.drop-num{
+  width:82px;background:#0B0907;border:1px solid var(--muted);color:var(--bone);
+  font-family:"IBM Plex Mono",monospace;font-size:22px;font-variant-numeric:tabular-nums;
+  text-align:center;padding:4px 2px;
+}
+.drop-num:focus{outline:none;border-color:var(--gold)}
+.drop-of{color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:13px}
+.drop-btns{display:flex;gap:8px}
+.drop-btns .chip{flex:1;justify-content:center;padding-block:7px}
+.drop-ok{color:var(--rust);border-color:var(--rust)}
 .chip[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
 .chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
@@ -223,7 +252,8 @@ body{
     </div>
     <div class="purse">
       <div class="row"><span class="coins" id="v-coins">0</span><img id="i-coin" alt="монеты"></div>
-      <div class="row"><span class="dollars" id="v-xp">0</span><span class="xp-u">XP</span></div>
+      <div class="row"><span class="dollars" id="v-dollars">0</span><img id="i-dollar" alt="доллары"></div>
+      <div class="row"><span class="xp" id="v-xp">0</span><span class="xp-u">XP</span></div>
       <div class="row"><span class="load" id="v-load">0 / 60 кг</span><img id="i-inv" alt="инвентарь"></div>
     </div>
     <div class="depth" id="depth"><span class="n" id="v-depth">0</span><span class="u">кл</span></div>
@@ -238,6 +268,23 @@ body{
       </div>
       <div class="sheet-body" id="inv-list"></div>
       <div class="sheet-foot">К продаже: <b id="inv-total">0</b> монет</div>
+      <div class="drop" id="drop" hidden>
+        <div class="drop-box">
+          <div class="drop-title" id="drop-title"></div>
+          <input class="drop-range" id="drop-range" type="range" min="1" max="1" value="1">
+          <div class="drop-count">
+            <!-- type=number + inputmode=numeric: на телефоне открывается
+                 цифровая клавиатура, а не полная -->
+            <input class="drop-num" id="drop-num" type="number" inputmode="numeric"
+                   pattern="[0-9]*" min="1" step="1" value="1" aria-label="Сколько выкинуть">
+            <span class="drop-of" id="drop-of"></span>
+          </div>
+          <div class="drop-btns">
+            <button class="chip" id="drop-cancel" type="button">Отмена</button>
+            <button class="chip drop-ok" id="drop-ok" type="button">Выкинуть</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -263,6 +310,7 @@ ctx.imageSmoothingEnabled = false;
 const el = {
   coins: document.getElementById('v-coins'),
   load: document.getElementById('v-load'),
+  dollars: document.getElementById('v-dollars'),
   xp: document.getElementById('v-xp'),
   depthBox: document.getElementById('depth'),
   depthN: document.getElementById('v-depth'),
@@ -282,6 +330,11 @@ const el = {
   invList: document.getElementById('inv-list'),
   invLoad: document.getElementById('inv-load'),
   invTotal: document.getElementById('inv-total'),
+  drop: document.getElementById('drop'),
+  dropTitle: document.getElementById('drop-title'),
+  dropRange: document.getElementById('drop-range'),
+  dropNum: document.getElementById('drop-num'),
+  dropOf: document.getElementById('drop-of'),
   gPack: document.getElementById('g-pack'),
   gJet: document.getElementById('g-jet'),
 };
@@ -637,16 +690,23 @@ function finishDig(){
   // продаже. Иначе шахта оплачивает себя сама, и подъём на поверхность с
   // грузом перестаёт быть решением игрока. Опыт при этом идёт сразу.
   // Земля, камень и фундамент — не добыча: в рюкзак не ложатся и не стоят ничего.
-  if (!LOOT.has(d.name)){
-    S.xp += 1;
-  } else if (S.loadKg + m.weight > MAX_KG){
-    toast(`Рюкзак полон — <b>${m.name.toLowerCase()}</b> пришлось оставить.`);
-  } else {
-    S.loadKg += m.weight;
-    S.xp += Math.max(1, Math.round(m.price / 5));
-    S.bag.set(d.name, (S.bag.get(d.name) || 0) + 1);
-    if (!el.invSheet.hidden) renderInv();
-    if (m.price >= 100) toast(`<b>${m.name}!</b> — в рюкзак, ${m.price} монет при продаже`);
+  // Опыт идёт за САМ ТРУД и не зависит от того, влезла ли добыча в рюкзак:
+  // клетка выкопана, спина заболела. Иначе с полным рюкзаком игрок копает
+  // впустую и прокачка молча останавливается ровно тогда, когда игрок
+  // работает больше всего.
+  S.xp += LOOT.has(d.name) ? Math.max(1, Math.round(m.price / 5)) : 1;
+
+  // Земля, камень и фундамент — не добыча: в рюкзак не ложатся и не стоят
+  // ничего. Монеты за копку не капают вовсе, сырьё продаётся (см. ГДД §15).
+  if (LOOT.has(d.name)){
+    if (S.loadKg + m.weight > MAX_KG){
+      toast(`Рюкзак полон — <b>${m.name.toLowerCase()}</b> пришлось оставить. Выкинь лишнее в инвентаре.`);
+    } else {
+      S.loadKg += m.weight;
+      S.bag.set(d.name, (S.bag.get(d.name) || 0) + 1);
+      if (!el.invSheet.hidden) renderInv();
+      if (m.price >= 100) toast(`<b>${m.name}!</b> — в рюкзак, ${m.price} монет при продаже`);
+    }
   }
   if (d.y > S.maxDepth){
     S.maxDepth = d.y;
@@ -752,6 +812,9 @@ function camera(){
   };
 }
 
+// Вариантов земли столько же, сколько в DIRT_FILES у scripts/world/tile_art.gd.
+const DIRT_VARIANTS = 8;
+
 function drawTile(name, sx, sy, resKnown, wx, wy){
   if (!resKnown){
     ctx.fillStyle = solid(name) ? '#2C241B' : '#100D0A';
@@ -769,7 +832,7 @@ function drawTile(name, sx, sy, resKnown, wx, wy){
     // Вариант выбирается по МИРОВЫМ координатам клетки. По экранным он менялся
     // на каждый пиксель прокрутки, и земля рябила, будто тайлы вращаются.
     const h = ((wx * 73856093) ^ (wy * 19349663)) >>> 0;
-    file = 'dirt_' + (1 + h % 4);
+    file = 'dirt_' + (1 + h % DIRT_VARIANTS);
   }
   const img = sprites[file];
   if (img && img.complete && img.naturalWidth) ctx.drawImage(img, sx, sy);
@@ -864,6 +927,7 @@ function placeDepth(cam){
 
 function syncHud(){
   el.coins.textContent = S.coins.toLocaleString('ru-RU');
+  el.dollars.textContent = S.dollars;
   el.xp.textContent = S.xp;
   el.load.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG} кг`;
   el.load.classList.toggle('over', S.loadKg > MAX_KG * 0.85);
@@ -989,12 +1053,78 @@ function renderInv(){
       `<div class="sheet-row">${icon}` +
       `<span class="nm">${m.name}</span>` +
       `<span class="ct">×${n}</span>` +
-      `<span class="pr">${sum.toLocaleString('ru-RU')}</span></div>`
+      `<span class="pr">${sum.toLocaleString('ru-RU')}</span>` +
+      `<button class="drop-btn" type="button" data-drop="${name}">Выкинуть</button></div>`
     );
   }
   el.invList.innerHTML = html.join('');
   el.invTotal.textContent = total.toLocaleString('ru-RU');
 }
+
+/* ── выбросить часть стопки ──
+   Рюкзак наполняется быстрее, чем игрок доходит до поверхности, и без
+   возможности что-то выкинуть он вынужден бросать НОВУЮ находку вместо
+   старого хлама. Количество выбирается ползунком, а число рядом можно
+   тапнуть и ввести с клавиатуры: ползунком не попасть точно в «оставить 3». */
+let dropName = null;
+
+function clampDrop(v){
+  const max = S.bag.get(dropName) || 1;
+  v = Math.round(Number(v) || 1);
+  return Math.min(max, Math.max(1, v));
+}
+
+function syncDrop(v){
+  const n = clampDrop(v);
+  el.dropRange.value = n;
+  if (document.activeElement !== el.dropNum) el.dropNum.value = n;
+  const m = meta(dropName);
+  document.getElementById('drop-ok').textContent = `Выкинуть ${n}`;
+  el.dropOf.textContent = `из ${S.bag.get(dropName) || 0} · −${(m.weight * n).toFixed(1)} кг`;
+}
+
+function openDrop(name){
+  if (!S.bag.has(name)) return;
+  dropName = name;
+  const max = S.bag.get(name);
+  el.dropTitle.textContent = meta(name).name;
+  el.dropRange.min = 1;
+  el.dropRange.max = max;
+  el.dropNum.max = max;
+  // по умолчанию вся стопка: выкидывают, чтобы освободить место, а не
+  // чтобы расстаться с одной штукой
+  syncDrop(max);
+  el.drop.hidden = false;
+}
+
+function closeDrop(){ el.drop.hidden = true; dropName = null; }
+
+function applyDrop(){
+  if (!dropName) return;
+  const n = clampDrop(el.dropNum.value);
+  const m = meta(dropName);
+  const left = (S.bag.get(dropName) || 0) - n;
+  if (left > 0) S.bag.set(dropName, left); else S.bag.delete(dropName);
+  S.loadKg = Math.max(0, S.loadKg - m.weight * n);
+  toast(`Выкинуто: <b>${m.name.toLowerCase()}</b> ×${n}`);
+  closeDrop();
+  renderInv();
+}
+
+el.invList.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-drop]');
+  if (b) openDrop(b.dataset.drop);
+});
+el.dropRange.addEventListener('input', () => syncDrop(el.dropRange.value));
+el.dropNum.addEventListener('input', () => {
+  // во время набора не переписываем поле под курсором, только ползунок
+  const n = clampDrop(el.dropNum.value);
+  el.dropRange.value = n;
+  syncDrop(n);
+});
+el.dropNum.addEventListener('blur', () => syncDrop(el.dropNum.value));
+document.getElementById('drop-ok').addEventListener('click', applyDrop);
+document.getElementById('drop-cancel').addEventListener('click', closeDrop);
 
 function openInv(){
   releaseStick();          // иначе джойстик останется «зажатым» под шторкой
@@ -1005,6 +1135,7 @@ function openInv(){
   el.invBtn.setAttribute('aria-pressed', 'true');
 }
 function closeInv(){
+  closeDrop();
   el.invSheet.hidden = true;
   el.invBtn.setAttribute('aria-pressed', 'false');
 }
@@ -1099,7 +1230,7 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
     const f = W.art[name];
     if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
   }
-  for (let i = 1; i <= 4; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
+  for (let i = 1; i <= DIRT_VARIANTS; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
   for (const a of ['idle','walk','fall','fly','fly_jet','dig_shovel','dig_pick','dig_pick_rusty'])
     charSprites[a] = loadImg(`art/character/${a}.png`);
   el.toolIcon.src = 'art/items/shovel.png';
@@ -1107,6 +1238,7 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
   el.gJet.src = 'art/items/jetpack.png';
   syncGear();
   document.getElementById('i-coin').src = 'art/ui/icon_coin.png';
+  document.getElementById('i-dollar').src = 'art/ui/icon_dollar.png';
   document.getElementById('i-inv').src = 'art/ui/icon_inventory.png';
   document.getElementById('i-invbtn').src = 'art/ui/icon_inventory.png';
   document.getElementById('i-hp').src = 'art/ui/icon_hp.png';

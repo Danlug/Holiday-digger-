@@ -30,10 +30,14 @@ static var _tile_to_file: Dictionary = {
 	TileTypes.Type.URANIUM_ORE: "ore_uranium",
 	TileTypes.Type.RUBY: "ore_ruby",
 	TileTypes.Type.EMERALD: "ore_emerald",
-	# DIRT рисуется отдельно — 4 варианта по мировым координатам (см. ниже)
+	# DIRT рисуется отдельно — варианты по мировым координатам (см. ниже)
 }
 
-const DIRT_FILES := ["dirt_1", "dirt_2", "dirt_3", "dirt_4"]
+## Восемь вариантов земли: четыре разных грунта с листа, сведённых к одному
+## тону (см. tools/import_tiles.py), и поворот каждого на 180°. Столько же
+## должно грузиться в web/index.html — там список свой.
+const DIRT_FILES := ["dirt_1", "dirt_2", "dirt_3", "dirt_4",
+		"dirt_5", "dirt_6", "dirt_7", "dirt_8"]
 
 static var _cache: Dictionary = {}
 
@@ -43,7 +47,7 @@ static func dirt_variant(wx: int, wy: int) -> int:
 	var a: int = (wx * 73856093) & 0xFFFFFFFF
 	var b: int = (wy * 19349663) & 0xFFFFFFFF
 	var h: int = (a ^ b) & 0xFFFFFFFF
-	return h % 4
+	return h % DIRT_FILES.size()
 
 
 ## Текстура клетки по типу и мировым координатам (для варианта земли).

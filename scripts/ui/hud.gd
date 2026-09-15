@@ -438,6 +438,12 @@ func _build_strip() -> void:
 	strip.add_child(shop_btn)
 	# --- конец блока экономики ---
 
+	# --- прокачка и музей: кнопка экрана героя (scripts/progress/) ---
+	# Одна кнопка на три вкладки: прокачка, музей, рекорды. Витрина музея
+	# открывается и отдельно — ProgressScreen.open("museum").
+	strip.add_child(ProgressScreen.make_hud_button(_make_chip("")))
+	# --- конец блока прокачки ---
+
 	_mode_button = _make_chip("")
 	_mode_button.pressed.connect(_on_mode_button_pressed)
 	strip.add_child(_mode_button)
@@ -765,7 +771,7 @@ func _on_reset_pressed() -> void:
 # ---------------------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
-	if player == null or _inv_sheet.visible:
+	if player == null or _inv_sheet.visible or ProgressScreen.is_open():
 		return
 
 	if mode == "stick":
@@ -869,7 +875,7 @@ func _handle_hold_input(event: InputEvent) -> void:
 ## Пересчитывает намерение удержания каждый физический кадр (см.
 ## readHoldIntent в web-демо) — вызывается из main.gd перед player.physics_tick.
 func update_hold_intent() -> void:
-	if mode != "hold" or player == null:
+	if mode != "hold" or player == null or ProgressScreen.is_open():
 		return
 	if not _has_touch:
 		player.resolve_dir(0.0, 0.0, 1.0)

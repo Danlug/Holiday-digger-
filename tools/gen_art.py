@@ -80,8 +80,8 @@ PALETTE = [
     # --- Руды: освоенные металлы (тёплые/нейтральные, неглубокие) ---
     ("iron_base",   "#8B4A3A", "Руда:Железо",   "ржаво-бурые вкрапления"),
     ("iron_light",   "#BC6A4C", "Руда:Железо",   "блик на вкраплении"),
-    ("lead_base",    "#55616E", "Руда:Свинец",   "тусклый сине-серый"),
-    ("lead_light",    "#798592", "Руда:Свинец",   "блик свинца"),
+    ("lead_base",    "#4A4F58", "Руда:Свинец",   "тусклый сине-серый"),
+    ("lead_light",    "#6E7480", "Руда:Свинец",   "блик свинца"),
     ("silver_base",   "#C7CDD6", "Руда:Серебро",  "холодный светлый металл"),
     ("silver_light",   "#F4F7FA", "Руда:Серебро",  "яркий блик серебра"),
     ("copper_base",    "#C2703A", "Руда:Медь",     "оранжево-рыжий металл"),
@@ -96,8 +96,10 @@ PALETTE = [
     ("diamond_light",  "#FFFFFF", "Руда:Алмаз",    "белая искра алмаза"),
     ("nickel_base",     "#A3B79E", "Руда:Никель",   "бледно-зелёный металл"),
     ("nickel_light",     "#CBDFC4", "Руда:Никель",   "блик никеля"),
-    ("platinum_base",     "#C6D2DE", "Руда:Платина",  "светлый сине-серый металл"),
-    ("platinum_light",     "#F0F6FC", "Руда:Платина",  "яркий блик платины"),
+    ("platinum_base",     "#A9C4E0", "Руда:Платина",  "светлый сине-серый металл"),
+    ("platinum_light",     "#DCEBFA", "Руда:Платина",  "яркий блик платины"),
+    ("aluminium_base",      "#9FB8C4", "Руда:Алюминий", "матовый бледно-бирюзовый металл"),
+    ("aluminium_light",      "#C8DDE6", "Руда:Алюминий", "мягкий блик алюминия"),
     ("titanium_base",       "#A996C4", "Руда:Титан",    "холодный сиреневый металл"),
     ("titanium_light",       "#D2C2EE", "Руда:Титан",    "блик титана"),
 
@@ -111,7 +113,7 @@ PALETTE = [
     ("lithium_base",  "#D878BC", "Руда:Литий",  "розово-пурпурный кристалл"),
     ("lithium_light",  "#FFB2E6", "Руда:Литий",  "яркая грань лития"),
     ("mercury_base",    "#CDD2D6", "Руда:Ртуть",  "жидкий металл"),
-    ("mercury_accent",   "#B85A52", "Руда:Ртуть",  "красноватый отблеск (ядовитое облако)"),
+    ("mercury_accent",   "#8E6663", "Руда:Ртуть",  "красноватый отблеск (ядовитое облако)"),
     ("uranium_core",       "#14601F", "Руда:Уран",   "тёмное ядро уранового куска"),
     ("uranium_glow",        "#3DFF6F", "Руда:Уран",   "ядовито-неоновое свечение"),
 
@@ -425,6 +427,7 @@ ORES = [
     ("peat", "Торф", "peat_base", "peat_light", "fiber"),
     ("coal", "Каменный уголь", "coal_base", "coal_light", "chunk_sparkle"),
     ("platinum", "Платина", "platinum_base", "platinum_light", "nugget_sparkle"),
+    ("aluminium", "Алюминий", "aluminium_base", "aluminium_light", "chunk_dull"),
     ("titanium", "Титан", "titanium_base", "titanium_light", "chunk"),
     ("lithium", "Литий", "lithium_base", "lithium_light", "crystal_sparkle"),
     ("mercury", "Ртуть", "mercury_base", "mercury_accent", "bead"),
@@ -483,11 +486,11 @@ def draw_fiber(img, rng, cx, cy, base, light):
 
 
 def draw_bead(img, rng, cx, cy, base, accent):
-    r = rng.choice([1, 2])
-    ellipse(img, cx, cy, r, r, base, outline=OUTLINE)
-    blend_px(img, cx - 1, cy - 1, (255, 255, 255, 220))
-    blend_px(img, cx + 1, cy, accent)
-    blend_px(img, cx, cy + 1, accent)
+    # ртуть — жидкий металл: капля должна читаться серебристой, красноватый
+    # отблеск только намекает на ядовитость, а не красит каплю целиком
+    ellipse(img, cx, cy, 2, rng.choice([1, 2]), base, outline=OUTLINE)
+    blend_px(img, cx - 1, cy - 1, (255, 255, 255, 230))
+    blend_px(img, cx + 1, cy + 1, accent)
 
 
 def draw_glow(img, rng, cx, cy, core, glow):

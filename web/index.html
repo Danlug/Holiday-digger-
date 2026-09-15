@@ -1,0 +1,615 @@
+<title>Раскопки на каникулах</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --soil:#16120E;
+  --soil-2:#211A13;
+  --panel:#2A211895;
+  --edge:#3E3125;
+  --bone:#EADDC6;
+  --muted:#9D8B73;
+  --gold:#E0A93B;
+  --rust:#B85A52;
+  --moss:#8FA35C;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--soil);
+  color:var(--bone);
+  font-family:"Manrope",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+  touch-action:manipulation;
+}
+#app{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  max-width:520px;
+  margin:0 auto;
+  padding-inline:12px;
+  padding-block:8px;
+  gap:8px;
+}
+
+/* ── верхняя панель ── */
+.hud{
+  display:flex;
+  align-items:stretch;
+  gap:8px;
+  flex:0 0 auto;
+}
+.stat{
+  flex:1;
+  min-width:0;
+  background:var(--panel);
+  border:1px solid var(--edge);
+  padding:6px 8px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.stat .k{
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:10px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.stat .v{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:15px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+  line-height:1.1;
+}
+.stat.depth .v{color:var(--bone)}
+.stat.coins .v{color:var(--gold)}
+.stat.load .v{color:var(--moss)}
+.stat.load.over .v{color:var(--rust)}
+
+/* ── игровое поле ── */
+#stage{
+  flex:1 1 auto;
+  min-height:0;
+  position:relative;
+  border:1px solid var(--edge);
+  background:#0B0907;
+  overflow:hidden;
+}
+#screen{
+  display:block;
+  width:100%;
+  height:100%;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+}
+#toast{
+  position:absolute;
+  left:8px; right:8px; bottom:8px;
+  background:#120E0Bee;
+  border:1px solid var(--edge);
+  border-left:3px solid var(--gold);
+  padding:8px 10px;
+  font-size:13px;
+  line-height:1.35;
+  opacity:0;
+  transform:translateY(6px);
+  transition:opacity .25s, transform .25s;
+  pointer-events:none;
+}
+#toast.show{opacity:1;transform:none}
+#toast b{color:var(--gold);font-weight:800}
+
+/* ── полоски ── */
+.bars{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+.bar{display:flex;flex-direction:column;gap:3px}
+.bar .k{
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:9px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.track{height:7px;background:#0E0B08;border:1px solid var(--edge);overflow:hidden}
+.fill{height:100%;width:100%;transition:width .3s linear}
+.fill.hp{background:var(--rust)}
+.fill.food{background:#C98A3C}
+.fill.rest{background:#6E93A8}
+
+/* ── нижняя строка ── */
+.foot{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border-top:1px solid var(--edge);
+  padding-top:7px;
+}
+.tool{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+}
+.tool img{width:22px;height:22px;image-rendering:pixelated;flex:0 0 auto}
+.tool span{
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:12px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.hint{
+  font-size:11px;
+  color:var(--muted);
+  text-align:right;
+  line-height:1.3;
+  flex:0 0 auto;
+}
+button.reset{
+  font:inherit;
+  font-size:11px;
+  color:var(--muted);
+  background:none;
+  border:1px solid var(--edge);
+  padding:4px 8px;
+  cursor:pointer;
+}
+button.reset:hover{color:var(--bone);border-color:var(--muted)}
+button.reset:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important}
+}
+</style>
+
+<div id="app">
+  <div class="hud">
+    <div class="stat depth"><div class="k">Глубина</div><div class="v" id="v-depth">0</div></div>
+    <div class="stat coins"><div class="k">Монеты</div><div class="v" id="v-coins">0</div></div>
+    <div class="stat load" id="s-load"><div class="k">Груз, кг</div><div class="v" id="v-load">0 / 60</div></div>
+  </div>
+
+  <div id="stage">
+    <canvas id="screen"></canvas>
+    <div id="toast"></div>
+  </div>
+
+  <div class="bars">
+    <div class="bar"><div class="k">Здоровье</div><div class="track"><div class="fill hp" id="b-hp"></div></div></div>
+    <div class="bar"><div class="k">Голод</div><div class="track"><div class="fill food" id="b-food"></div></div></div>
+    <div class="bar"><div class="k">Бодрость</div><div class="track"><div class="fill rest" id="b-rest"></div></div></div>
+  </div>
+
+  <div class="foot">
+    <div class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></div>
+    <div class="hint">Тапни по клетке — герой пойдёт<br>и будет копать. Вверх нельзя.</div>
+    <button class="reset" id="reset" type="button">Заново</button>
+  </div>
+</div>
+
+<script>
+const TILE = 32, VIEW_W = 7;
+const cv = document.getElementById('screen');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const el = {
+  depth: document.getElementById('v-depth'),
+  coins: document.getElementById('v-coins'),
+  load: document.getElementById('v-load'),
+  loadBox: document.getElementById('s-load'),
+  hp: document.getElementById('b-hp'),
+  food: document.getElementById('b-food'),
+  rest: document.getElementById('b-rest'),
+  toolIcon: document.getElementById('tool-icon'),
+  toolName: document.getElementById('tool-name'),
+  toast: document.getElementById('toast'),
+};
+
+let W = null, sprites = {}, charSprites = {};
+let viewH = 15;
+
+const S = {
+  px: 20, py: 0,
+  tool: 'shovel',
+  coins: 0,
+  loadKg: 0,
+  hp: 100, food: 100, rest: 100,
+  maxDepth: 0,
+  fallFrom: null,
+  digging: null,          // {x,y,t,total}
+  stunUntil: 0,
+  target: null,
+  fogRelief: new Set(),
+  fogRes: new Set(),
+  reliefR: 2, resR: 1,
+  facing: 1,
+  anim: 0,
+  seenFoundation: false,
+  bag: new Map(),
+};
+
+const MAX_KG = 60;
+const DEMO_SPEED = 4;     // копка ускорена, чтобы демка была играбельна
+const STUN_MS = 3000;     // в игре буз-эффект длится минуту
+
+function key(x, y){ return y * W.width + x; }
+
+function tileAt(x, y){
+  if (y <= 0) return 'EMPTY';
+  if (x < 0 || x >= W.width || y > W.depth) return 'BEDROCK';
+  return W.tile_names[W.grid[(y - 1) * W.width + x]];
+}
+function setTile(x, y, name){
+  if (y <= 0 || y > W.depth) return;
+  W.grid[(y - 1) * W.width + x] = W.tile_names.indexOf(name);
+}
+function meta(name){
+  return W.meta[name] || { name: name, price: 0, weight: 0, tool: 'pickaxe', secs: 4 };
+}
+function solid(name){ return name !== 'EMPTY' && name !== 'BEDROCK'; }
+
+function canDig(name){
+  if (name === 'STAIRCASE' || name === 'BEDROCK') return false;
+  const p = W.tile_props[String(W.tile_names.indexOf(name))];
+  if (!p) return false;
+  return S.tool === 'shovel' ? p.shovel : (p.pickaxe || p.shovel);
+}
+
+function toast(html, ms = 2600){
+  el.toast.innerHTML = html;
+  el.toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.toast.classList.remove('show'), ms);
+}
+
+/* ── туман войны ── */
+function reveal(){
+  for (let dy = -S.reliefR; dy <= S.reliefR; dy++){
+    for (let dx = -S.reliefR; dx <= S.reliefR; dx++){
+      const d = Math.hypot(dx, dy);
+      if (d > S.reliefR + 0.35) continue;
+      const x = S.px + dx, y = S.py + dy;
+      if (x < 0 || x >= W.width || y < 0) continue;
+      S.fogRelief.add(key(x, y));
+      if (d <= S.resR + 0.35) S.fogRes.add(key(x, y));
+    }
+  }
+}
+
+/* ── физика ── */
+function fallStep(){
+  if (!solid(tileAt(S.px, S.py + 1))){
+    if (S.fallFrom === null) S.fallFrom = S.py;
+    S.py++;
+    reveal();
+    return true;
+  }
+  if (S.fallFrom !== null){
+    const h = S.py - S.fallFrom;
+    if (h >= 5){
+      const dmg = Math.round(0.154 * Math.pow(h, 2.16));
+      S.hp = Math.max(0, S.hp - dmg);
+      toast(`Падение с <b>${h}</b> клеток — минус <b>${dmg}</b> HP`);
+      if (S.hp === 0) die();
+    }
+    S.fallFrom = null;
+  }
+  return false;
+}
+
+function die(){
+  const lost = S.loadKg;
+  S.bag.clear();
+  S.loadKg = 0;
+  S.hp = 100; S.food = 100; S.rest = 100;
+  S.px = 20; S.py = 0;
+  S.target = null; S.digging = null;
+  toast(`Ты погиб. Минералы потеряны (<b>${lost.toFixed(1)}</b> кг). В игре уцелеет только чёрный ящик.`, 4200);
+}
+
+/* ── копка ── */
+function startDig(x, y){
+  const name = tileAt(x, y);
+  if (!solid(name)) return;
+
+  if (name === 'STAIRCASE'){
+    toast('Ступени не копаются — это единственный путь наверх, пока нет ранца.');
+    return;
+  }
+  if (S.tool === 'shovel' && y > 4 && name === 'FOUNDATION'){
+    if (!S.seenFoundation){
+      S.seenFoundation = true;
+      toast('Лопата упёрлась в старый фундамент. Нужно что-то покрепче — <b>в мастерскую!</b>', 3800);
+      setTimeout(givePickaxe, 1400);
+    }
+    return;
+  }
+  if (!canDig(name)){
+    S.stunUntil = performance.now() + STUN_MS;
+    S.digging = null;
+    S.target = null;
+    toast(`Лопата звенит о <b>${meta(name).name.toLowerCase()}</b>. Буз-эффект — руки трясутся.`);
+    return;
+  }
+  const secs = meta(name).secs / DEMO_SPEED;
+  S.digging = { x, y, t: 0, total: secs, name };
+}
+
+function finishDig(){
+  const d = S.digging;
+  S.digging = null;
+  const m = meta(d.name);
+  setTile(d.x, d.y, 'EMPTY');
+  S.fogRes.add(key(d.x, d.y));
+
+  if (m.weight > 0 && S.loadKg + m.weight > MAX_KG){
+    toast(`Рюкзак полон — <b>${m.name.toLowerCase()}</b> пришлось оставить.`);
+  } else if (m.price > 0 || m.weight > 0){
+    S.loadKg += m.weight;
+    S.coins += m.price;
+    S.bag.set(m.name, (S.bag.get(m.name) || 0) + 1);
+    if (m.price >= 100) toast(`<b>${m.name}!</b> +${m.price} монет`);
+  }
+
+  if (d.y > S.maxDepth){
+    S.maxDepth = d.y;
+    if (d.y === 80) toast('Алмаз замурован в камне. Дедова кирка трескается — <b>−25% скорости</b>.', 4000);
+  }
+  if (S.px === d.x && S.py === d.y - 1) S.target = null;
+}
+
+function givePickaxe(){
+  S.tool = 'pickaxe';
+  el.toolIcon.src = 'art/items/pickaxe_rusty.png';
+  el.toolName.textContent = 'Ржавая кирка дедушки';
+  toast('В мастерской деда, среди швабр и грабель — <b>кирка</b>. Теперь берётся камень и руда.', 4200);
+}
+
+/* ── шаг к цели ── */
+function stepToward(){
+  if (!S.target || S.digging) return;
+  const { x: tx, y: ty } = S.target;
+  if (tx === S.px && ty === S.py){ S.target = null; return; }
+
+  const dx = Math.sign(tx - S.px);
+  if (dx !== 0) S.facing = dx;
+
+  // вниз — если цель ниже и мы над ней или уже в колонке
+  if (ty > S.py && dx === 0){
+    const below = tileAt(S.px, S.py + 1);
+    if (solid(below)) startDig(S.px, S.py + 1);
+    return;
+  }
+  if (dx !== 0){
+    const side = tileAt(S.px + dx, S.py);
+    if (solid(side)){ startDig(S.px + dx, S.py); return; }
+    S.px += dx;
+    S.anim++;
+    reveal();
+    return;
+  }
+  if (ty < S.py){ S.target = null; toast('Вверх копать нельзя.'); }
+}
+
+/* ── отрисовка ── */
+function drawTile(name, sx, sy, resKnown){
+  if (!resKnown){
+    ctx.fillStyle = solid(name) ? '#2C241B' : '#100D0A';
+    ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.strokeStyle = '#00000040';
+    ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
+    return;
+  }
+  if (name === 'BEDROCK'){ ctx.fillStyle = '#050403'; ctx.fillRect(sx, sy, TILE, TILE); return; }
+  if (name === 'STAIRCASE'){
+    ctx.fillStyle = '#6B5B45'; ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = '#8A7657'; ctx.fillRect(sx, sy, TILE, 5);
+    return;
+  }
+  let file = W.art[name];
+  if (name === 'DIRT'){
+    const v = 1 + ((sx * 7 + sy * 13) >> 5) % 4;
+    file = 'dirt_' + v;
+  }
+  const img = sprites[file];
+  if (img && img.complete && img.naturalWidth) ctx.drawImage(img, sx, sy);
+  else { ctx.fillStyle = solid(name) ? '#4A3A2A' : '#0F0C09'; ctx.fillRect(sx, sy, TILE, TILE); }
+}
+
+function draw(){
+  const camX = Math.min(Math.max(S.px - 3, 0), W.width - VIEW_W);
+  const camY = Math.max(S.py - Math.floor(viewH / 2), -2);
+
+  ctx.fillStyle = '#0B0907';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  for (let r = 0; r < viewH; r++){
+    const y = camY + r;
+    for (let c = 0; c < VIEW_W; c++){
+      const x = camX + c;
+      const sx = c * TILE, sy = r * TILE;
+      if (y < 0){ ctx.fillStyle = '#1D2A33'; ctx.fillRect(sx, sy, TILE, TILE); continue; }
+      if (y === 0){
+        ctx.fillStyle = '#3E5A2E'; ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = '#4E6E38'; ctx.fillRect(sx, sy, TILE, 6);
+        continue;
+      }
+      const k = key(x, y);
+      if (!S.fogRelief.has(k)){ ctx.fillStyle = '#080605'; ctx.fillRect(sx, sy, TILE, TILE); continue; }
+      drawTile(tileAt(x, y), sx, sy, S.fogRes.has(k));
+    }
+  }
+
+  // ауры разведки
+  const pcx = (S.px - camX) * TILE + TILE / 2;
+  const pcy = (S.py - camY) * TILE + TILE / 2;
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.strokeStyle = '#EADDC6'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(pcx, pcy, (S.reliefR + 0.5) * TILE, 0, 7); ctx.stroke();
+  ctx.globalAlpha = 0.3;
+  ctx.strokeStyle = '#E0A93B';
+  ctx.beginPath(); ctx.arc(pcx, pcy, (S.resR + 0.5) * TILE, 0, 7); ctx.stroke();
+  ctx.restore();
+
+  // прогресс копки
+  if (S.digging){
+    const dx = (S.digging.x - camX) * TILE, dy = (S.digging.y - camY) * TILE;
+    const p = S.digging.t / S.digging.total;
+    ctx.fillStyle = '#00000070'; ctx.fillRect(dx, dy, TILE, TILE);
+    ctx.fillStyle = '#E0A93B'; ctx.fillRect(dx + 3, dy + TILE - 6, (TILE - 6) * p, 3);
+  }
+
+  // персонаж
+  const sheet = S.digging ? (S.tool === 'shovel' ? 'dig_shovel' : 'dig_pick')
+              : (S.fallFrom !== null ? 'fall' : (S.target ? 'walk' : 'idle'));
+  const img = charSprites[sheet];
+  const px = (S.px - camX) * TILE, py = (S.py - camY) * TILE;
+  if (img && img.complete && img.naturalWidth){
+    const frames = Math.max(1, Math.round(img.naturalWidth / TILE));
+    const f = frames > 1 ? Math.floor(S.anim / 6) % frames : 0;
+    ctx.save();
+    if (S.facing < 0){ ctx.translate(px + TILE, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(img, f * TILE, 0, TILE, 48, S.facing < 0 ? 0 : px, py - 16, TILE, 48);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#C9553F'; ctx.fillRect(px + 8, py + 4, 16, 26);
+  }
+
+  if (performance.now() < S.stunUntil){
+    ctx.fillStyle = '#E0A93B';
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 60);
+    ctx.fillRect(px + 6, py - 22, 20, 3);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function syncHud(){
+  el.depth.textContent = Math.max(0, S.py);
+  el.coins.textContent = S.coins.toLocaleString('ru-RU');
+  el.load.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG}`;
+  el.loadBox.classList.toggle('over', S.loadKg > MAX_KG * 0.85);
+  el.hp.style.width = S.hp + '%';
+  el.food.style.width = S.food + '%';
+  el.rest.style.width = S.rest + '%';
+}
+
+/* ── цикл ── */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+
+  if (now >= S.stunUntil){
+    if (!fallStep()){
+      if (S.digging){
+        S.digging.t += dt;
+        S.anim++;
+        if (S.digging.t >= S.digging.total) finishDig();
+      } else {
+        stepToward._acc = (stepToward._acc || 0) + dt;
+        if (stepToward._acc > 0.16){ stepToward._acc = 0; stepToward(); }
+      }
+    }
+  }
+
+  // полоски: в игре час до истощения, здесь ускорено, чтобы механика была видна
+  const drain = (S.digging ? 3 : 1) * dt * 0.35;
+  S.food = Math.max(0, S.food - drain);
+  S.rest = Math.max(0, S.rest - drain * 0.8);
+  if (S.food === 0 || S.rest === 0){
+    S.hp = Math.max(0, S.hp - dt * 4);
+    if (S.hp === 0) die();
+  }
+
+  draw();
+  syncHud();
+  requestAnimationFrame(loop);
+}
+
+/* ── ввод ── */
+function onTap(ev){
+  const r = cv.getBoundingClientRect();
+  const p = ev.touches ? ev.touches[0] : ev;
+  const sx = (p.clientX - r.left) / r.width * cv.width;
+  const sy = (p.clientY - r.top) / r.height * cv.height;
+  const camX = Math.min(Math.max(S.px - 3, 0), W.width - VIEW_W);
+  const camY = Math.max(S.py - Math.floor(viewH / 2), -2);
+  const x = camX + Math.floor(sx / TILE);
+  const y = camY + Math.floor(sy / TILE);
+  if (x < 0 || x >= W.width) return;
+
+  if (y < S.py && x === S.px){ toast('Вверх копать нельзя.'); return; }
+  if (S.tool === 'shovel' && y > 4){
+    toast('Лопатой глубже четвёртой клетки не достать.');
+  }
+  S.digging = null;
+  S.target = { x, y };
+}
+cv.addEventListener('pointerdown', onTap);
+
+function resize(){
+  const st = document.getElementById('stage');
+  viewH = Math.max(9, Math.min(19, Math.round(st.clientHeight / (st.clientWidth / VIEW_W))));
+  cv.width = VIEW_W * TILE;
+  cv.height = viewH * TILE;
+  ctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resize);
+
+document.getElementById('reset').addEventListener('click', () => {
+  S.px = 20; S.py = 0; S.coins = 0; S.loadKg = 0;
+  S.hp = S.food = S.rest = 100;
+  S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
+  S.fogRelief.clear(); S.fogRes.clear(); S.bag.clear();
+  S.target = null; S.digging = null; S.fallFrom = null;
+  el.toolIcon.src = 'art/items/shovel.png';
+  el.toolName.textContent = 'Лопата';
+  reveal();
+  toast('Бабка улетела в Таиланд. Огород твой.');
+});
+
+/* ── загрузка ── */
+function loadImg(src){
+  const i = new Image();
+  i.src = src;
+  return i;
+}
+
+fetch('world_dump.json').then(r => r.json()).then(data => {
+  W = data;
+  W.grid = Int16Array.from(W.grid);
+
+  for (const name of Object.keys(W.art)){
+    const f = W.art[name];
+    if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
+  }
+  for (let i = 1; i <= 4; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
+  for (const a of ['idle','walk','fall','dig_shovel','dig_pick'])
+    charSprites[a] = loadImg(`art/character/${a}.png`);
+  el.toolIcon.src = 'art/items/shovel.png';
+
+  resize();
+  reveal();
+  syncHud();
+  toast('Бабка улетела в Таиланд. Огород твой — <b>копай</b>.', 3600);
+  requestAnimationFrame(loop);
+});
+</script>

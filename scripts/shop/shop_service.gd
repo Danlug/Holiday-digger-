@@ -13,6 +13,27 @@ extends RefCounted
 ## решением игрока.
 
 # ---------------------------------------------------------------------------
+# Где вообще можно торговать и собирать
+# ---------------------------------------------------------------------------
+
+## Скупка и верстак работают только дома: мастерская стоит в подвале (ГДД
+## раздел 5), и весь смысл экономики в том, что лут надо ДОНЕСТИ наверх.
+## Если продавать можно со дна шахты, грузоподъёмность, риск смерти с полным
+## рюкзаком и сам подъём перестают что-либо значить. Дистанционная сдача лута
+## в ГДД есть, но это рекламная награда с лимитом 3 раза в день (раздел 15),
+## а не бесплатная кнопка.
+static func is_at_workshop() -> bool:
+	return GameState.house_is_indoors
+
+
+## Лавка и магазин долларов работают где угодно: доллары "доступны всегда и
+## везде" (ГДД раздел 15), а батончик по сценарию онбординга едят прямо в
+## шахте (раздел 9).
+static func can_shop_here() -> bool:
+	return true
+
+
+# ---------------------------------------------------------------------------
 # Продажа сырья (ГДД раздел 15)
 # ---------------------------------------------------------------------------
 
@@ -71,7 +92,10 @@ static func quote(items: Dictionary) -> Dictionary:
 ## Продажа. items: {mineral_id: количество}. Возвращает
 ## {ok, coins, count, weight, doubled}. Списывает ровно то, что продано, —
 ## рюкзак легчает на вес проданного.
-static func sell(items: Dictionary) -> Dictionary:
+## remote=true — сдача лута дистанционно (рекламная награда, лимит в ГДД).
+static func sell(items: Dictionary, remote: bool = false) -> Dictionary:
+	if not remote and not is_at_workshop():
+		return {"ok": false, "coins": 0, "count": 0, "weight": 0.0, "doubled": false}
 	var q := quote(items)
 	if int(q["count"]) <= 0:
 		return {"ok": false, "coins": 0, "count": 0, "weight": 0.0, "doubled": false}
@@ -101,11 +125,25 @@ static func sell(items: Dictionary) -> Dictionary:
 
 
 ## Продать всё, что мастерская принимает.
-static func sell_all() -> Dictionary:
+static func sell_all(remote: bool = false) -> Dictionary:
 	var items: Dictionary = {}
 	for row in sellable_stacks():
 		items[row["id"]] = row["count"]
-	return sell(items)
+	return sell(items, remote)
+
+
+## Рекламная награда "скинуть лут на продажу дистанционно" (ГДД раздел 15,
+## 3 раза в день): единственный способ продать, не поднимаясь наверх.
+static func remote_dump_loot() -> Dictionary:
+	if sellable_stacks().is_empty():
+		return {"ok": false, "message": "Скидывать нечего"}
+	if not GameState.try_use_ad_reward("remote_dump_loot_for_sale"):
+		return {"ok": false, "message": "На сегодня лимит дистанционных сдач исчерпан"}
+	var result := sell_all(true)
+	if not bool(result["ok"]):
+		return {"ok": false, "message": "Скидывать нечего"}
+	return {"ok": true, "message": "Скинуто %d шт: +%d монет, рюкзак легче на %.0f кг." % [
+		int(result["count"]), int(result["coins"]), float(result["weight"])]}
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +179,8 @@ static func invest(recipe_id: String) -> Dictionary:
 	var r := ShopCatalog.recipe(recipe_id)
 	if r.is_empty() or not is_project(recipe_id):
 		return {"ok": false, "moved": {}, "message": "Этот рецепт собирается сразу"}
+	if not is_at_workshop():
+		return {"ok": false, "moved": {}, "message": "Верстак дома, в подвале"}
 	if not is_recipe_unlocked(recipe_id):
 		return {"ok": false, "moved": {}, "message": "Рецепт ещё не открыт"}
 
@@ -171,6 +211,9 @@ static func check_craft(recipe_id: String) -> Dictionary:
 	var r := ShopCatalog.recipe(recipe_id)
 	if r.is_empty():
 		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false, "reason": "Нет такого рецепта"}
+	if not is_at_workshop():
+		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false,
+			"reason": "Верстак дома, в подвале"}
 	if not is_recipe_unlocked(recipe_id):
 		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": true,
 			"reason": "Откроется на глубине %d" % ShopCatalog.unlock_depth(recipe_id)}
@@ -361,8 +404,13 @@ static func claim_ad(ad_id: String) -> Dictionary:
 ## Дедова кирка не покупается и не крафтится — она находится среди швабр и
 ## грабель при первом спуске в мастерскую. Возвращает true, если кирку
 ## выдали именно сейчас (UI покажет это сообщением).
+##
+## Сюжетная система (scripts/story/) проигрывает сцену мастерской и выдаёт
+## кирку эффектом сцены; здесь — тот же результат для случая, когда игрок
+## дошёл до верстака мимо сцены. Повторно кирка не выдаётся: проверяется
+## список выданного, а не факт визита.
 static func visit_workshop() -> bool:
-	if GameState.workshop_visited:
+	if GameState.workshop_visited or not is_at_workshop():
 		return false
 	GameState.workshop_visited = true
 	# Смотрим именно на список выданного, а не на owns_tool(): дедова кирка

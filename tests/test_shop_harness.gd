@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_exchange_dollars()
 	_test_ad_double_sale()
 	_test_workshop_gives_rusty_pickaxe()
+	_test_cannot_sell_from_mine()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -52,6 +53,11 @@ func _fresh() -> void:
 	GameState.owned_tools = ["shovel"]
 	GameState.current_tool = "shovel"
 	GameState.max_depth_reached = 0
+	# Скупка и верстак работают только дома (ГДД раздел 5: мастерская в
+	# подвале). Большинство проверок — про саму арифметику, поэтому ставим
+	# героя домой; отдельная проверка ниже следит за тем, что из шахты
+	# продать нельзя.
+	GameState.house_is_indoors = true
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +278,45 @@ func _test_workshop_gives_rusty_pickaxe() -> void:
 	_fresh()
 	GameState.workshop_visited = false
 	GameState.owned_tools = ["shovel"]
+	GameState.house_is_indoors = false
+	check("из шахты мастерскую не 'посетить' — кирку так не получить",
+		not ShopService.visit_workshop())
+	GameState.house_is_indoors = true
 	check("первый визит в мастерскую выдаёт дедову кирку", ShopService.visit_workshop())
 	check("кирка записана в собственность", GameState.owned_tools.has("rusty_pickaxe"))
 	check("кирка сразу в руках", GameState.current_tool == "rusty_pickaxe")
 	check("второй визит кирку не дублирует", not ShopService.visit_workshop())
+
+
+# ---------------------------------------------------------------------------
+# Место: скупка и верстак — только дома (ГДД раздел 5)
+# ---------------------------------------------------------------------------
+
+func _test_cannot_sell_from_mine() -> void:
+	_fresh()
+	GameState.house_is_indoors = false
+	GameState.inventory["gold"] = 2
+	var result := ShopService.sell({"gold": 2})
+	check("из шахты продать нельзя — лут надо донести наверх",
+		not bool(result["ok"]) and GameState.coins == 0)
+	check("золото осталось в рюкзаке", GameState.get_item_count("gold") == 2)
+	check("вкладывать в проект из шахты тоже нельзя",
+		not bool(ShopService.invest("iron_pickaxe")["ok"]))
+
+	# Единственный способ продать со дна — рекламная награда "скинуть лут
+	# дистанционно" (ГДД раздел 15, лимит на день).
+	GameState.ad_daily_counts.clear()
+	var price := Balance.get_mineral_price("gold")
+	check("дистанционная сдача за ролик работает", bool(ShopService.remote_dump_loot()["ok"]))
+	check("монеты пришли по цене золота", GameState.coins == price * 2)
+	check("рюкзак опустел", GameState.get_item_count("gold") == 0)
+
+	var limit := Balance.get_ad_daily_limit("remote_dump_loot_for_sale")
+	GameState.ad_daily_counts.clear()
+	var used := 0
+	for i in range(limit + 2):
+		GameState.inventory["gold"] = 1
+		if bool(ShopService.remote_dump_loot()["ok"]):
+			used += 1
+	check("лимит дистанционных сдач на день соблюдён (%d)" % limit, used == limit)
+	GameState.house_is_indoors = true

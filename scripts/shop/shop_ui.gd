@@ -30,6 +30,8 @@ const BAD := Color8(0xB8, 0x5A, 0x52)
 static var instance: ShopUI = null
 
 var _tab: String = TAB_SELL
+## "sell" — обычная скупка дома, "remote" — дистанционная сдача за ролик.
+var _footer_mode: String = "sell"
 var _selected: Dictionary = {}   # mineral_id -> true, что отмечено к продаже
 
 var _root: Control
@@ -352,6 +354,13 @@ func _add_hint(text: String, color: Color = DIM) -> void:
 func _render_sell() -> void:
 	var rows := ShopService.sellable_stacks()
 	_footer.visible = true
+	# Скупка работает только дома. Иначе кнопка магазина превращается в
+	# "продать со дна шахты", и подъём с грузом — то самое решение игрока,
+	# ради которого монеты за копку и убраны, — перестаёт существовать.
+	_footer_mode = "sell" if ShopService.is_at_workshop() else "remote"
+	if _footer_mode == "remote":
+		_add_hint("Мастерская в подвале дома — сюда лут надо донести. Отсюда можно только скинуть его на продажу дистанционно, за ролик (ГДД раздел 15, %d раза в день)."
+			% Balance.get_ad_daily_limit("remote_dump_loot_for_sale"))
 	if rows.is_empty():
 		_add_hint("Продавать нечего. Мастерская принимает только руду и находки — земля и камень не добыча (ГДД раздел 4).")
 		_footer_total.text = "0 монет"
@@ -361,7 +370,15 @@ func _render_sell() -> void:
 		return
 
 	for row in rows:
-		_list.add_child(_make_sell_row(row))
+		var r := _make_sell_row(row)
+		# Вне дома строки показываем как прайс-лист: выбирать нечего, ролик
+		# скидывает весь лут целиком.
+		if _footer_mode == "remote":
+			# Вне дома это прайс-лист, а не выбор: галочки убираем, чтобы не
+			# обещать выбор, которого нет — ролик скидывает весь лут целиком.
+			r.disabled = true
+			r.button_pressed = false
+		_list.add_child(r)
 	_show_unsellable_hint()
 	_update_sell_footer()
 
@@ -447,14 +464,28 @@ func _make_sell_row(row: Dictionary) -> Button:
 ## Итог к продаже пересчитывается до подтверждения (ГДД раздел 15: "показ
 ## цен и итоговой суммы перед подтверждением").
 func _update_sell_footer() -> void:
-	var q := ShopService.quote(_selection_items())
+	var remote := _footer_mode == "remote"
+	var items := _selection_items() if not remote else _all_sellable_items()
+	var q := ShopService.quote(items)
 	var coins := int(q["coins"])
 	var text := "%d монет · %.0f кг" % [coins, float(q["weight"])]
 	if GameState.next_sale_doubled and coins > 0:
 		text = "%d монет (×2 по рекламе) · %.0f кг" % [coins * 2, float(q["weight"])]
 	_footer_total.text = text
-	_footer_button.text = "Продать"
-	_footer_button.disabled = coins <= 0
+	if remote:
+		var left := ShopService.ad_uses_left("remote_dump_loot_for_sale")
+		_footer_button.text = "Ролик %d/%d" % [left, Balance.get_ad_daily_limit("remote_dump_loot_for_sale")]
+		_footer_button.disabled = coins <= 0 or left <= 0
+	else:
+		_footer_button.text = "Продать"
+		_footer_button.disabled = coins <= 0
+
+
+func _all_sellable_items() -> Dictionary:
+	var items: Dictionary = {}
+	for row in ShopService.sellable_stacks():
+		items[row["id"]] = row["count"]
+	return items
 
 
 func _selection_items() -> Dictionary:
@@ -483,6 +514,8 @@ func _do_sell() -> void:
 
 func _render_craft() -> void:
 	_footer.visible = false
+	if not ShopService.is_at_workshop():
+		_add_hint("Верстак стоит в подвале дома (ГДД раздел 5) — вкладывать и собирать можно только там. Отсюда видно только, чего ещё не хватает.", GOLD)
 	_add_hint("Инструмент собирается по частям: железная кирка весит 160 кг материалов при рюкзаке в 60 — материал вкладывается в проект за несколько ходок и обратно не достаётся.")
 	for r in ShopCatalog.recipes():
 		_list.add_child(_make_craft_row(r))
@@ -681,7 +714,13 @@ func _make_ad_row(a: Dictionary) -> Control:
 # ---------------------------------------------------------------------------
 
 func _on_footer_pressed() -> void:
-	if _tab == TAB_SELL:
+	if _tab != TAB_SELL:
+		return
+	if _footer_mode == "remote":
+		var r := ShopService.remote_dump_loot()
+		notice(String(r["message"]), 3.4)
+		_render()
+	else:
 		_do_sell()
 
 

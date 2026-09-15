@@ -25,7 +25,8 @@ func _ready() -> void:
 	_sprite.centered = false
 	_sprite.region_enabled = true
 	add_child(_sprite)
-	for sheet: String in ["idle", "walk", "fall", "fly", "fly_jet", "dig_shovel", "dig_pick"]:
+	for sheet: String in ["idle", "walk", "fall", "fly", "fly_jet",
+			"dig_shovel", "dig_pick", "dig_pick_rusty"]:
 		var path: String = "res://art/character/" + sheet + ".png"
 		_sheets[sheet] = load(path) if ResourceLoader.exists(path) else null
 
@@ -37,7 +38,12 @@ func _process(_dt: float) -> void:
 
 	var sheet_name: String
 	if player.digging != null:
-		sheet_name = "dig_shovel" if GameState.current_tool == "shovel" else "dig_pick"
+		# Для каждого инструмента нарисована своя анимация: лопата, дедова
+		# ржавая кирка и стальная кирка машут по-разному.
+		match GameState.current_tool:
+			"shovel": sheet_name = "dig_shovel"
+			"rusty_pickaxe": sheet_name = "dig_pick_rusty"
+			_: sheet_name = "dig_pick"
 	elif not player.on_ground:
 		# Ранец и джетпак выглядят по-разному, и по кадру должно быть видно,
 		# на чём герой висит.

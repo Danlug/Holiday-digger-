@@ -818,7 +818,11 @@ function draw(){
     ctx.fillRect(dx + 3, dy + TILE - 6, (TILE - 6) * (S.digging.t / S.digging.total), 3);
   }
 
-  const sheet = S.digging ? (S.tool === 'shovel' ? 'dig_shovel' : 'dig_pick')
+  // Для каждого инструмента своя нарисованная анимация: лопата, дедова
+  // ржавая кирка и стальная кирка машут по-разному.
+  const digSheet = S.tool === 'shovel' ? 'dig_shovel'
+                 : S.tool === 'pickaxe' ? 'dig_pick_rusty' : 'dig_pick';
+  const sheet = S.digging ? digSheet
               : (!S.onGround
                   // ранец и джетпак выглядят по-разному — видно, на чём висишь
                   ? (S.thrust === 'jet' ? 'fly_jet' : S.thrust ? 'fly' : 'fall')
@@ -1096,7 +1100,7 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
     if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
   }
   for (let i = 1; i <= 4; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
-  for (const a of ['idle','walk','fall','fly','fly_jet','dig_shovel','dig_pick'])
+  for (const a of ['idle','walk','fall','fly','fly_jet','dig_shovel','dig_pick','dig_pick_rusty'])
     charSprites[a] = loadImg(`art/character/${a}.png`);
   el.toolIcon.src = 'art/items/shovel.png';
   el.gPack.src = 'art/items/backpack_propeller.png';

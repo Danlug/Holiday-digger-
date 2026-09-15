@@ -590,8 +590,7 @@ def save(img, rel):
 FULL = ("boy", "boy_gear", "grandpa", "grandpa_gear")
 
 # Полоса героя дублируется в art/character/ — там её ищут оба рендерера.
-HERO_SHEETS = ("idle", "walk", "fall", "fly", "fly_jet", "sleep",
-               "dig_shovel", "dig_pick")
+HERO_SHEETS = ("idle", "walk", "fall", "fly", "fly_jet", "sleep")
 
 
 def main(sheet_path):
@@ -643,7 +642,10 @@ def main(sheet_path):
             "fly": anim_fly(body, raws["backpack_propeller"], "prop"),
             "fly_jet": anim_fly(body, raws["jetpack"], "jet"),
         }
-        if slug in FULL:
+        # Копка героя приходит с отдельного листа (tools/import_dig.py) —
+        # там она нарисована покадрово и лучше во всём. Процедурная сборка
+        # из стоячей позы остаётся для тех, у кого нарисованных кадров нет.
+        if slug in FULL and slug != "boy":
             sets["dig_shovel"] = anim_dig(body, raws["shovel"])
             sets["dig_pick"] = anim_dig(body, raws["pickaxe_rusty"])
 

@@ -422,27 +422,23 @@ func _build_strip() -> void:
 	strip.add_child(shop_btn)
 	# --- конец блока экономики ---
 
-	# --- экономика: кнопка мастерской (scripts/shop/) ---
-	# Одна кнопка на всю экономику: шторка внутри сама делится на продажу,
-	# верстак и лавку. Из комнаты мастерской она же открывается вызовом
-	# ShopUI.open_workshop() — кнопка нужна, пока дома как сцены нет.
-	var shop_btn := _make_chip("")
-	if ResourceLoader.exists("res://art/ui/icon_coin.png"):
-		shop_btn.icon = load("res://art/ui/icon_coin.png")
-		shop_btn.expand_icon = true
-		shop_btn.custom_minimum_size = Vector2(24, STRIP_H)
-	else:
-		shop_btn.text = "Лавка"
-	shop_btn.tooltip_text = "Мастерская: продажа, верстак, лавка"
-	shop_btn.pressed.connect(func(): ShopUI.open_workshop())
-	strip.add_child(shop_btn)
-	# --- конец блока экономики ---
-
 	# --- прокачка и музей: кнопка экрана героя (scripts/progress/) ---
 	# Одна кнопка на три вкладки: прокачка, музей, рекорды. Витрина музея
 	# открывается и отдельно — ProgressScreen.open("museum").
 	strip.add_child(ProgressScreen.make_hud_button(_make_chip("")))
 	# --- конец блока прокачки ---
+
+	# --- дом: контекстная кнопка (scripts/house/) ---
+	# Одна кнопка на все действия у дома: войти в дверь, спуститься в люк,
+	# съесть еду в шахте. По умолчанию скрыта и занимает место в ряду только
+	# когда есть что сделать — постоянной кнопки ряд шириной 224 уже не
+	# выдерживает. Текст, видимость и обработку ведёт HouseSystem, поэтому
+	# кнопка кладётся в группу, а не связывается здесь.
+	var house_btn := _make_chip("Дом")
+	house_btn.visible = false
+	house_btn.add_to_group("house_button")
+	strip.add_child(house_btn)
+	# --- конец блока дома ---
 
 	_mode_button = _make_chip("")
 	_mode_button.pressed.connect(_on_mode_button_pressed)

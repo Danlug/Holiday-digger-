@@ -1,0 +1,111 @@
+class_name HouseConfig
+extends RefCounted
+## HouseConfig — числа системы дома из data/balance.json (блоки "house" и
+## "food"). Отдельный модуль, а не разбросанные по коду константы: всё, что
+## ещё не утверждено владельцем, лежит в JSON с пометкой proposed, и правка
+## баланса не должна требовать правки логики.
+##
+## Все геттеры имеют запасное значение: если блок в JSON затёрли или файл не
+## загрузился, дом обязан остаться проходимым — иначе игрок запирается в
+## огороде без еды и сна, то есть ровно в той дыре, ради которой этот модуль
+## и написан.
+
+static func _house() -> Dictionary:
+	return Balance.balance.get("house", {})
+
+
+static func _food() -> Dictionary:
+	return Balance.balance.get("food", {})
+
+
+static func _cell(node, fallback: Vector2i) -> Vector2i:
+	var v = Balance.unwrap(node)
+	if typeof(v) != TYPE_ARRAY or (v as Array).size() < 2:
+		return fallback
+	return Vector2i(int(v[0]), int(v[1]))
+
+
+## Клетка входной двери на поверхности (ГДД п.3 задаёт только диапазон дома
+## 0–14; конкретная клетка — предложение, см. note в balance.json).
+static func door_cell() -> Vector2i:
+	return _cell(_house().get("door_cell", null), Vector2i(12, 0))
+
+
+## Клетка люка В КООРДИНАТАХ ДВИЖКА. В ГДД он записан как (15, −6): там ось
+## направлена вверх, а в движке глубина растёт вниз, поэтому (15, 6).
+static func hatch_cell() -> Vector2i:
+	return _cell(_house().get("hatch_cell", null), Vector2i(15, 6))
+
+
+## Радиус, в котором появляется кнопка входа в дом/люк.
+static func interact_radius() -> float:
+	return float(Balance.unwrap(_house().get("interact_radius_cells", 1.2)))
+
+
+## Насколько должна просесть бодрость, чтобы кровать пустила спать.
+static func sleep_min_deficit_percent() -> float:
+	return float(Balance.unwrap(_house().get("sleep_min_deficit_percent", 10.0)))
+
+
+## Во сколько раз медленнее тратится голод во сне по сравнению с обычным
+## простоем (см. note в balance.json: 0 — кровать бесплатна, 1 — полный сон
+## убивает спящего).
+static func sleep_hunger_factor() -> float:
+	return float(Balance.unwrap(_house().get("sleep_hunger_factor", 0.5)))
+
+
+# ---------------------------------------------------------------------------
+# Еда
+# ---------------------------------------------------------------------------
+
+static func delivery_seconds() -> float:
+	return float(Balance.unwrap(_food().get("delivery_seconds", 5.0)))
+
+
+static func free_orders_per_day() -> int:
+	return int(Balance.unwrap(_food().get("free_orders_per_day", 3)))
+
+
+## Все расходники (доставка, магазин, донат) — id, эффект, цена.
+static func food_items() -> Array:
+	return _food().get("items", [])
+
+
+static func food_item(id: String) -> Dictionary:
+	for item in food_items():
+		if String(item.get("id", "")) == id:
+			return item
+	return {}
+
+
+## Только то, что можно заказать домой (ГДД п.7: заказ из дома, доставка к
+## входной двери). Допинги из магазина сюда не попадают — их продаёт магазин.
+static func delivery_menu() -> Array:
+	var out: Array = []
+	for item in food_items():
+		if String(item.get("source", "")) == "delivery":
+			out.append(item)
+	return out
+
+
+static func is_food(id: String) -> bool:
+	return not food_item(id).is_empty()
+
+
+static func food_name(id: String) -> String:
+	var item := food_item(id)
+	if item.has("name_ru"):
+		return String(item["name_ru"])
+	return String(Balance.get_mineral(id).get("name_ru", id))
+
+
+static func food_hunger_percent(id: String) -> float:
+	return float(Balance.unwrap(food_item(id).get("hunger_percent", 0.0)))
+
+
+static func food_stamina_percent(id: String) -> float:
+	return float(Balance.unwrap(food_item(id).get("stamina_percent", 0.0)))
+
+
+static func food_price_coins(id: String) -> int:
+	return int(Balance.unwrap(food_item(id).get("price_coins", 0)))

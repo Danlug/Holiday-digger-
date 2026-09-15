@@ -77,6 +77,24 @@ static func _serialize() -> Dictionary:
 		"world_seed": gs.world_seed,
 		"world": _serialize_world(gs),
 
+		# --- дом и выживание (scripts/house/) ---
+		# Сохраняется всё, что игрок уже "потратил" или получил: построенный
+		# Робертом люк, стадия обучения, оплаченная и ещё не забранная
+		# доставка. Без этого перезапуск игры возвращает люк в непостроенное
+		# состояние и съедает оплаченный заказ.
+		# house_is_indoors намеренно НЕ сохраняется: позиция героя между
+		# сессиями и так не сохраняется (см. main.gd:_position_from_save_or_start),
+		# и запуск игры внутри дома разошёлся бы с координатами в огороде.
+		"house": {
+			"room": gs.house_room,
+			"food_at_door": gs.house_food_at_door,
+			"free_orders_used_today": gs.house_free_orders_used_today,
+			"hatch_built": gs.house_hatch_built,
+			"garden_closed": gs.house_garden_closed,
+			"tutorial_stage": gs.house_tutorial_stage,
+			"dopings_shop_unlocked": gs.house_dopings_shop_unlocked,
+		},
+
 		# --- экономика (scripts/shop/) ---
 		# Купленные и скрафченные инструменты обязаны переживать перезапуск:
 		# без этого железная кирка, стоившая 25 железа, 10 бронзы, 30 свинца и
@@ -151,6 +169,16 @@ static func _apply(data: Dictionary) -> void:
 	gs.last_reset_utc_date = String(ads_data.get("last_reset_utc_date", gs.last_reset_utc_date))
 
 	gs.world_seed = int(data.get("world_seed", gs.world_seed))
+
+	# --- дом и выживание (scripts/house/) ---
+	var house_data: Dictionary = data.get("house", {})
+	gs.house_room = String(house_data.get("room", gs.house_room))
+	gs.house_food_at_door = house_data.get("food_at_door", {})
+	gs.house_free_orders_used_today = int(house_data.get("free_orders_used_today", 0))
+	gs.house_hatch_built = bool(house_data.get("hatch_built", false))
+	gs.house_garden_closed = bool(house_data.get("garden_closed", false))
+	gs.house_tutorial_stage = int(house_data.get("tutorial_stage", 0))
+	gs.house_dopings_shop_unlocked = bool(house_data.get("dopings_shop_unlocked", false))
 
 	var economy: Dictionary = data.get("economy", {})
 	# Старый сейв (до магазина) экономического блока не содержит: инструменты

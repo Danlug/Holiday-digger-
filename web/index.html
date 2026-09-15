@@ -76,7 +76,10 @@ body{
   font-size:12px;font-variant-numeric:tabular-nums;
   text-shadow:0 1px 2px #000A;
 }
+.purse .row{display:flex;align-items:center;gap:5px}
+.purse img{width:14px;height:14px;image-rendering:pixelated;flex:0 0 auto}
 .purse .coins{color:var(--gold);font-weight:600}
+.purse .dollars{color:#7FB86B;font-weight:600}
 .purse .load{color:var(--moss)}
 .purse .load.over{color:var(--rust)}
 
@@ -183,8 +186,9 @@ body{
       <div class="gauge"><img class="ico" id="i-rest" alt=""><div class="track"><div class="fill rest" id="b-rest"></div></div></div>
     </div>
     <div class="purse">
-      <div class="coins" id="v-coins">0</div>
-      <div class="load" id="v-load">0 / 60 кг</div>
+      <div class="row"><span class="coins" id="v-coins">0</span><img id="i-coin" alt="монеты"></div>
+      <div class="row"><span class="dollars" id="v-dollars">0</span><img id="i-dollar" alt="доллары"></div>
+      <div class="row"><span class="load" id="v-load">0 / 60 кг</span><img id="i-inv" alt="инвентарь"></div>
     </div>
     <div class="depth" id="depth"><span class="n" id="v-depth">0</span><span class="u">кл</span></div>
     <div id="toast"></div>
@@ -216,6 +220,7 @@ ctx.imageSmoothingEnabled = false;
 const el = {
   coins: document.getElementById('v-coins'),
   load: document.getElementById('v-load'),
+  dollars: document.getElementById('v-dollars'),
   depthBox: document.getElementById('depth'),
   depthN: document.getElementById('v-depth'),
   hp: document.getElementById('b-hp'),
@@ -263,6 +268,10 @@ const JET_SPEED = 20, JET_RAMP = 5;
 // (2/3 ≈ 0.7 кл/с²) не могла перебить тяготение в 16 кл/с²: нажатие вверх
 // в падении выглядело так, будто ранец вообще не включился.
 const THRUST_BRAKE = 26;
+// Отпустил тягу на подъёме — инерция гасится в разы резче, чем тянет
+// тяготение. Иначе джетпак на 20 кл/с уносит вверх ещё на десяток клеток
+// после того, как палец уже снят.
+const COAST_DECEL = G * 6;
 
 // Урон считается от СКОРОСТИ удара, а не от высоты: спуск на пропеллере
 // с семи клеток — это не падение с семи клеток, хотя высота та же.
@@ -286,7 +295,7 @@ const S = {
   vx: 0, vy: 0,
   onGround: false,
   tool: 'shovel',
-  coins: 0, loadKg: 0,
+  coins: 0, dollars: 0, loadKg: 0,
   hp: 100, food: 100, rest: 100,
   maxDepth: 0,
   digging: null,
@@ -300,6 +309,7 @@ const S = {
   seenFoundation: false,
   gear: { backpack: false, jetpack: false, drill: false },
   thrust: null,
+  coasting: false,
   fogRelief: new Set(),
   fogRes: new Set(),
   lastCell: '',
@@ -318,6 +328,9 @@ function setTile(x, y, name){
   if (y <= 0 || y > W.depth) return;
   W.grid[(y - 1) * W.width + x] = W.tile_names.indexOf(name);
 }
+const NOT_LOOT = new Set(['DIRT', 'STONE', 'FOUNDATION', 'STAIRCASE', 'EMPTY']);
+const LOOT = { has: n => !NOT_LOOT.has(n) };
+
 function meta(name){ return W.meta[name] || { name, price: 0, weight: 0, secs: 4 }; }
 function solid(name){ return name !== 'EMPTY' && name !== 'BEDROCK'; }
 function solidPt(wx, wy){ return solid(tileAt(Math.floor(wx), Math.floor(wy))); }
@@ -413,7 +426,8 @@ function moveY(dt){
     const accel = S.vy > 0 ? THRUST_BRAKE : maxUp / ramp;
     S.vy = Math.max(S.vy - accel * dt, -maxUp);
   } else {
-    S.vy = Math.min(S.vy + gravityNow() * dt, V_TERM);
+    const g = (S.coasting && S.vy < 0) ? COAST_DECEL : gravityNow();
+    S.vy = Math.min(S.vy + g * dt, V_TERM);
   }
   S.y += S.vy * dt;
   const left = S.x - HW + 0.02, right = S.x + HW - 0.02;
@@ -464,13 +478,21 @@ function land(){
 }
 
 function updateFlight(){
-  if (!S.hold.up || S.onGround || S.digging){ S.thrust = null; return; }
-  if (S.gear.jetpack){ S.thrust = 'jet'; return; }
-  S.thrust = S.gear.backpack ? 'prop' : null;
+  const was = S.thrust;
+  if (!S.hold.up || S.onGround || S.digging) S.thrust = null;
+  else if (S.gear.jetpack) S.thrust = 'jet';
+  else S.thrust = S.gear.backpack ? 'prop' : null;
+
+  if (was && !S.thrust && S.vy < 0) S.coasting = true;
+  if (S.thrust || S.vy >= 0 || S.onGround) S.coasting = false;
 }
 
 function checkUnlocks(){
-  const d = cellY();
+  // По текущей клетке открывать нельзя: достаточно на кадр подпрыгнуть или
+  // соскользнуть выше порога, и момент теряется. Считаем по самой глубокой
+  // точке, где герой вообще побывал.
+  S.maxDepth = Math.max(S.maxDepth, cellY());
+  const d = S.maxDepth;
   if (d >= PROP_DEPTH && !S.gear.backpack){
     S.gear.backpack = true;
     syncGear();
@@ -548,9 +570,13 @@ function finishDig(){
   const m = meta(d.name);
   setTile(d.x, d.y, 'EMPTY');
   S.fogRes.add(key(d.x, d.y));
-  if (m.weight > 0 && S.loadKg + m.weight > MAX_KG){
+  // Земля, камень и фундамент — не добыча: за них просто капают монеты,
+  // в рюкзак они не ложатся и вес не занимают.
+  if (!LOOT.has(d.name)){
+    S.coins += m.price;
+  } else if (S.loadKg + m.weight > MAX_KG){
     toast(`Рюкзак полон — <b>${m.name.toLowerCase()}</b> пришлось оставить.`);
-  } else if (m.price > 0 || m.weight > 0){
+  } else {
     S.loadKg += m.weight;
     S.coins += m.price;
     if (m.price >= 100) toast(`<b>${m.name}!</b> +${m.price} монет`);
@@ -715,6 +741,7 @@ function placeDepth(cam){
 
 function syncHud(){
   el.coins.textContent = S.coins.toLocaleString('ru-RU');
+  el.dollars.textContent = S.dollars;
   el.load.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG} кг`;
   el.load.classList.toggle('over', S.loadKg > MAX_KG * 0.85);
   el.hp.style.width = S.hp + '%';
@@ -854,7 +881,7 @@ document.getElementById('reset').addEventListener('click', () => {
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
   S.gear.backpack = S.gear.jetpack = S.gear.drill = false;
-  S.thrust = null;
+  S.thrust = null; S.coasting = false;
   syncGear();
   S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
   S.target = null; S.digging = null;
@@ -890,6 +917,9 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
   el.gPack.src = 'art/items/backpack_propeller.png';
   el.gJet.src = 'art/items/jetpack.png';
   syncGear();
+  document.getElementById('i-coin').src = 'art/ui/icon_coin.png';
+  document.getElementById('i-dollar').src = 'art/ui/icon_dollar.png';
+  document.getElementById('i-inv').src = 'art/ui/icon_inventory.png';
   document.getElementById('i-hp').src = 'art/ui/icon_hp.png';
   document.getElementById('i-food').src = 'art/ui/icon_hunger.png';
   document.getElementById('i-rest').src = 'art/ui/icon_stamina.png';

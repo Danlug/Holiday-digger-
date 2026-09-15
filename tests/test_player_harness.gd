@@ -27,7 +27,7 @@ func _ready() -> void:
 
 	_test_gravity_and_landing()
 	_test_resolve_dir_zones()
-	_test_dig_earth_earns_coin()
+	_test_dig_earth_gives_xp_not_coins()
 	_test_shovel_cannot_dig_stone()
 	_test_gear_unlock_by_depth()
 
@@ -98,7 +98,7 @@ func _test_resolve_dir_zones() -> void:
 	check("вектор почти строго вверх (>72° от горизонтали) -> чистый взлёт без шага", player.hold_up and player.hold_dx == 0)
 
 
-func _test_dig_earth_earns_coin() -> void:
+func _test_dig_earth_gives_xp_not_coins() -> void:
 	var cell := _find_tile(TileTypes.Type.DIRT)
 	check("нашлась клетка земли для теста копки", cell.x >= 0)
 	if cell.x < 0:
@@ -106,6 +106,7 @@ func _test_dig_earth_earns_coin() -> void:
 
 	GameState.current_tool = "shovel"
 	var coins_before := GameState.coins
+	var xp_before := GameState.xp
 	player.x = float(cell.x) - 1.0 + player.HW + 0.5
 	player.y = float(cell.y) + 0.5
 	player.vx = 0.0; player.vy = 0.0
@@ -120,7 +121,10 @@ func _test_dig_earth_earns_coin() -> void:
 			dug = true
 			break
 	check("клетка земли выкопана", dug)
-	check("монеты за землю начислены", GameState.coins > coins_before)
+	# Копка даёт опыт, но НЕ деньги: сырьё продаётся, а не превращается в
+	# монеты в момент удара (ГДД раздел 4).
+	check("опыт за землю начислен", GameState.xp > xp_before)
+	check("монеты за копку НЕ начислены", GameState.coins == coins_before)
 	check("земля НЕ попала в инвентарь (см. ГДД раздел 4)", not GameState.inventory.has("earth"))
 
 

@@ -19,7 +19,7 @@ func _ready() -> void:
 	_sprite.centered = false
 	_sprite.region_enabled = true
 	add_child(_sprite)
-	for sheet: String in ["idle", "walk", "fall", "fly", "dig_shovel", "dig_pick"]:
+	for sheet: String in ["idle", "walk", "fall", "fly", "fly_jet", "dig_shovel", "dig_pick"]:
 		var path: String = "res://art/character/" + sheet + ".png"
 		_sheets[sheet] = load(path) if ResourceLoader.exists(path) else null
 
@@ -33,7 +33,14 @@ func _process(_dt: float) -> void:
 	if player.digging != null:
 		sheet_name = "dig_shovel" if GameState.current_tool == "shovel" else "dig_pick"
 	elif not player.on_ground:
-		sheet_name = "fly" if player.thrust != "" else "fall"
+		# Ранец и джетпак выглядят по-разному, и по кадру должно быть видно,
+		# на чём герой висит.
+		if player.thrust == "jet":
+			sheet_name = "fly_jet"
+		elif player.thrust != "":
+			sheet_name = "fly"
+		else:
+			sheet_name = "fall"
 	else:
 		sheet_name = "walk" if player.vx != 0.0 else "idle"
 

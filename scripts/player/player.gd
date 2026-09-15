@@ -186,13 +186,13 @@ func physics_tick(dt: float) -> void:
 	_move_x(dt)
 	_move_y(dt)
 
+	# Счётчик кадров идёт ВСЕГДА. Пока он тикал только при копке и ходьбе,
+	# покой, падение и полёт стояли на первом кадре и выглядели статикой.
+	anim += 2.0
 	if digging != null:
 		digging.t += dt
-		anim += 2.0
 		if digging.t >= digging.total:
 			_finish_dig()
-	elif vx != 0.0:
-		anim += 2.0
 
 	GameState.is_digging = digging != null
 	_award_depth_milestones(GameState.max_depth_reached, cell_y())
@@ -500,11 +500,14 @@ func _finish_dig() -> void:
 	elif price > 0:
 		GameState.add_xp(int(round(float(price) / 5.0)))
 
+	# Монеты за копку НЕ начисляются: сырьё превращается в деньги только при
+	# продаже (ГДД раздел 15). Иначе шахта сама себя оплачивает, и подъём на
+	# поверхность с грузом перестаёт быть решением игрока.
 	var was_loot := MineralMap.is_loot(d.type)
 	if not was_loot:
-		# Земля, камень и фундамент — не добыча: капают монеты, в рюкзак не
-		# ложатся и вес не занимают (ГДД раздел 4, задание п.11).
-		GameState.add_coins(price)
+		# Земля, камень и фундамент — не добыча: в рюкзак не ложатся, вес не
+		# занимают и не стоят ничего (ГДД раздел 4).
+		pass
 	else:
 		var weight := Balance.get_mineral_weight(mineral_id)
 		var free_kg: float = GameState.get_max_carry_kg() - GameState.get_total_weight()
@@ -512,7 +515,6 @@ func _finish_dig() -> void:
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, 0)
 		else:
 			GameState.add_item(mineral_id, 1)
-			GameState.add_coins(price)
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, price)
 
 	if not was_loot:

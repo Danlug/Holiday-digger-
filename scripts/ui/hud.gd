@@ -51,8 +51,10 @@ var _toast_timer: Timer
 var _stick: Control
 var _knob: Control
 var _hold_hint: Label
-var _tool_icon: TextureRect
-var _tool_label: Label
+var _tool_button: Button
+var _tool_name_panel: PanelContainer
+var _tool_name_label: Label
+var _tool_name_timer: Timer
 var _gear_pack: TextureRect
 var _gear_jet: TextureRect
 var _mode_button: Button
@@ -560,6 +562,7 @@ func _build_strip() -> void:
 	# снаряжение остаются на виду, всё остальное уходит под «⋯». Прятать
 	# по важности, а не по алфавиту: игрок сидит в шахте, а не в меню.
 	var more_menu := _build_more_menu()
+	_build_tool_name_popup()
 
 	# Иконкой, а не словом: ряд шириной 224 не вмещает подпись «Инвентарь»
 	# вместе с названием инструмента, снаряжением, режимом и сбросом.
@@ -575,25 +578,27 @@ func _build_strip() -> void:
 	_inv_button.pressed.connect(_on_inv_button_pressed)
 	strip.add_child(_inv_button)
 
-	var tool_box := HBoxContainer.new()
-	_tool_icon = TextureRect.new()
-	_tool_icon.custom_minimum_size = Vector2(18, 18)
-	_tool_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_tool_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tool_box.add_child(_tool_icon)
-	_tool_label = Label.new()
-	_tool_label.add_theme_font_size_override("font_size", 9)
-	_tool_label.clip_text = true
-	_tool_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tool_box.add_child(_tool_label)
-	tool_box.custom_minimum_size = Vector2(30, 0)
-	tool_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	strip.add_child(tool_box)
+	# Инструмент — одна иконка без подписи. Название всплывает НАД полосой по
+	# нажатию (и подсказкой при наведении на компьютере): слово «Лопата»
+	# держало в ряду шириной 224 почти сорок точек, а нужно оно раз в час —
+	# когда игрок сам не помнит, чем копает.
+	_tool_button = _make_chip("")
+	_tool_button.custom_minimum_size = Vector2(26, STRIP_H)
+	_tool_button.expand_icon = true
+	_tool_button.pressed.connect(_show_tool_name)
+	strip.add_child(_tool_button)
 
 	var gear_box := HBoxContainer.new()
 	_gear_pack = _make_gear_icon(gear_box, "res://art/items/backpack_propeller.png")
 	_gear_jet = _make_gear_icon(gear_box, "res://art/items/jetpack.png")
 	strip.add_child(gear_box)
+
+	# Пустая распорка: слева — то, чем копают, справа — куда ходят. Раньше
+	# слабину ряда забирала подпись инструмента, теперь её держит она.
+	var spacer := Control.new()
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	strip.add_child(spacer)
 
 	# --- экономика: кнопка мастерской (scripts/shop/) ---
 	# Одна кнопка на всю экономику: шторка внутри сама делится на продажу,
@@ -703,6 +708,45 @@ func _build_more_menu() -> VBoxContainer:
 	box.add_theme_constant_override("separation", 3)
 	_more_panel.add_child(box)
 	return box
+
+
+## Всплывающая подпись инструмента: панелька над полосой, прижатая к левому
+## краю, гаснет сама через пару секунд. Отдельный узел, а не тост: тост
+## занимает всю ширину и перекрывает игровой экран, а тут нужно одно слово
+## ровно над кнопкой, по которой ткнули.
+func _build_tool_name_popup() -> void:
+	_tool_name_panel = PanelContainer.new()
+	_tool_name_panel.name = "ToolName"
+	_tool_name_panel.visible = false
+	_tool_name_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
+	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(4)
+	_tool_name_panel.add_theme_stylebox_override("panel", sb)
+	_tool_name_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_tool_name_panel.grow_horizontal = Control.GROW_DIRECTION_END
+	_tool_name_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_tool_name_panel.offset_bottom = -STRIP_H - 2
+	_tool_name_panel.offset_left = 4
+	add_child(_tool_name_panel)
+
+	_tool_name_label = Label.new()
+	_tool_name_label.add_theme_font_size_override("font_size", 11)
+	_tool_name_panel.add_child(_tool_name_label)
+
+	_tool_name_timer = Timer.new()
+	_tool_name_timer.one_shot = true
+	_tool_name_timer.wait_time = 2.0
+	_tool_name_timer.timeout.connect(func(): _tool_name_panel.visible = false)
+	add_child(_tool_name_timer)
+
+
+func _show_tool_name() -> void:
+	_tool_name_label.text = Balance.get_tool_name_ru(GameState.current_tool)
+	_tool_name_panel.visible = true
+	_tool_name_timer.start()
 
 
 func _toggle_more_menu() -> void:
@@ -843,10 +887,19 @@ func _sync_purse() -> void:
 
 func _sync_tool() -> void:
 	var tool_id := GameState.current_tool
-	_tool_label.text = Balance.get_tool_name_ru(tool_id)
+	var tool_name := Balance.get_tool_name_ru(tool_id)
+	_tool_button.tooltip_text = tool_name
 	var icon_path := "res://art/items/" + _tool_icon_file(tool_id) + ".png"
 	if ResourceLoader.exists(icon_path):
-		_tool_icon.texture = load(icon_path)
+		_tool_button.icon = load(icon_path)
+	else:
+		# Без картинки кнопка была бы пустым прямоугольником — тогда пусть
+		# уж подписью, как раньше.
+		_tool_button.text = tool_name
+	# Инструмент сменился сам (упёрлись в фундамент, дошли до глубины) —
+	# показываем название, не дожидаясь, пока игрок ткнёт в иконку.
+	if _tool_name_panel != null and _tool_name_panel.visible:
+		_tool_name_label.text = tool_name
 	if player != null:
 		_gear_pack.modulate = Color(1, 1, 1, 1.0 if player.has_backpack() else 0.22)
 		_gear_jet.modulate = Color(1, 1, 1, 1.0 if player.has_jetpack() else 0.22)
@@ -920,6 +973,7 @@ func _on_gear_unlocked(gear_id: String) -> void:
 
 func _on_tool_switched(tool_id: String) -> void:
 	_sync_tool()
+	_show_tool_name()
 	if tool_id == "rusty_pickaxe":
 		toast("Лопата упёрлась в старый фундамент. В мастерской нашлась дедова кирка.", 3.6)
 

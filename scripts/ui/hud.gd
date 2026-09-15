@@ -7,9 +7,15 @@ extends Control
 ## web/index.html).
 
 const TILE := 32
-const STRIP_H := 32.0
-const STICK_R := 59.0        # радиус джойстика (118px в web)
-const KNOB_R := 23.0
+const STRIP_H := 40.0
+# Джойстик задаётся долей ширины экрана, а не пикселями из web-демо: там
+# интерфейс живёт в пикселях устройства (118px на экране в 390), а здесь — в
+# проектных единицах вьюпорта (224 в ширину), и те же 118 занимали половину
+# экрана. 15% полуширины дают ту же долю экрана, что и в демо.
+const STICK_FRACTION := 0.15
+const STICK_R_MIN := 30.0
+var stick_r := 34.0
+var knob_r := 13.0
 const STICK_DEAD := 0.26
 
 var player: Node = null      # Player, назначает main.gd
@@ -58,7 +64,9 @@ var _inv_total_label: Label
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Якоря корня намеренно не растягивающие: размер выставляется вручную в
+	# _update_layout (Control под CanvasLayer не наследует размер вьюпорта).
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_build_ui()
 	_connect_game_state()
 	get_viewport().size_changed.connect(_update_layout)
@@ -236,16 +244,17 @@ func _build_toast(parent: Control) -> void:
 func _build_stick(parent: Control) -> void:
 	_stick = Control.new()
 	_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stick.custom_minimum_size = Vector2(STICK_R * 2, STICK_R * 2)
+	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
 	_stick.draw.connect(func():
-		_stick.draw_circle(Vector2(STICK_R, STICK_R), STICK_R, Color(0.11, 0.09, 0.07, 0.68))
-		_stick.draw_arc(Vector2(STICK_R, STICK_R), STICK_R, 0, TAU, 40, Color(0.42, 0.34, 0.25, 0.6), 1.0)
+		_stick.draw_circle(Vector2(stick_r, stick_r), stick_r, Color(0.11, 0.09, 0.07, 0.68))
+		_stick.draw_arc(Vector2(stick_r, stick_r), stick_r, 0, TAU, 40, Color(0.42, 0.34, 0.25, 0.6), 1.0)
 	)
 	parent.add_child(_stick)
 
 	var hint := Label.new()
 	hint.text = "ВВЕРХ — ПРЫЖОК"
-	hint.add_theme_font_size_override("font_size", 8)
+	# Кегль под уменьшившийся стик: при 8 подпись вылезала за круг.
+	hint.add_theme_font_size_override("font_size", 6)
 	hint.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
 	hint.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	hint.offset_top = 4
@@ -254,12 +263,12 @@ func _build_stick(parent: Control) -> void:
 
 	_knob = Control.new()
 	_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_knob.custom_minimum_size = Vector2(KNOB_R * 2, KNOB_R * 2)
-	_knob.position = Vector2(STICK_R - KNOB_R, STICK_R - KNOB_R)
+	_knob.custom_minimum_size = Vector2(knob_r * 2, knob_r * 2)
+	_knob.position = Vector2(stick_r - knob_r, stick_r - knob_r)
 	_knob.draw.connect(func():
 		var live: bool = hold_active()
-		_knob.draw_circle(Vector2(KNOB_R, KNOB_R), KNOB_R, Color8(0x3A, 0x2C, 0x20))
-		_knob.draw_arc(Vector2(KNOB_R, KNOB_R), KNOB_R - 1, 0, TAU, 32,
+		_knob.draw_circle(Vector2(knob_r, knob_r), knob_r, Color8(0x3A, 0x2C, 0x20))
+		_knob.draw_arc(Vector2(knob_r, knob_r), knob_r - 1, 0, TAU, 32,
 			Color8(0xE0, 0xA9, 0x3B) if live else Color8(0x9D, 0x8B, 0x73), 2.0)
 	)
 	_stick.add_child(_knob)
@@ -339,22 +348,40 @@ func _build_inventory_sheet(parent: Control) -> void:
 
 
 func _build_strip() -> void:
-	var strip := HBoxContainer.new()
-	strip.name = "Strip"
-	strip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	strip.offset_top = -STRIP_H
-	strip.add_theme_constant_override("separation", 6)
+	# Подложка — отдельный слой под рядом кнопок. Если положить Panel внутрь
+	# HBoxContainer, контейнер разложит её как обычный элемент ряда нулевой
+	# ширины, и фона у полосы не будет вовсе.
+	var root := Control.new()
+	root.name = "Strip"
+	root.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	root.offset_top = -STRIP_H
+	root.offset_bottom = 0
+	add_child(root)
+
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color8(0x16, 0x12, 0x0E)
 	var bg_panel := Panel.new()
 	bg_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg_panel.add_theme_stylebox_override("panel", sb)
 	bg_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	strip.add_child(bg_panel)
-	add_child(strip)
+	root.add_child(bg_panel)
 
-	_inv_button = Button.new()
-	_inv_button.text = "Инвентарь"
+	var strip := HBoxContainer.new()
+	strip.name = "Row"
+	strip.set_anchors_preset(Control.PRESET_FULL_RECT)
+	strip.add_theme_constant_override("separation", 6)
+	root.add_child(strip)
+
+	# Иконкой, а не словом: ряд шириной 224 не вмещает подпись «Инвентарь»
+	# вместе с названием инструмента, снаряжением, режимом и сбросом.
+	_inv_button = _make_chip("")
+	if ResourceLoader.exists("res://art/ui/icon_inventory.png"):
+		_inv_button.icon = load("res://art/ui/icon_inventory.png")
+		_inv_button.expand_icon = true
+		_inv_button.custom_minimum_size = Vector2(30, STRIP_H)
+	else:
+		_inv_button.text = "Инв"
+	_inv_button.tooltip_text = "Инвентарь"
 	_inv_button.toggle_mode = true
 	_inv_button.pressed.connect(_on_inv_button_pressed)
 	strip.add_child(_inv_button)
@@ -366,8 +393,11 @@ func _build_strip() -> void:
 	_tool_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tool_box.add_child(_tool_icon)
 	_tool_label = Label.new()
-	_tool_label.add_theme_font_size_override("font_size", 11)
+	_tool_label.add_theme_font_size_override("font_size", 9)
+	_tool_label.clip_text = true
+	_tool_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tool_box.add_child(_tool_label)
+	tool_box.custom_minimum_size = Vector2(36, 0)
 	tool_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	strip.add_child(tool_box)
 
@@ -376,16 +406,43 @@ func _build_strip() -> void:
 	_gear_jet = _make_gear_icon(gear_box, "res://art/items/jetpack.png")
 	strip.add_child(gear_box)
 
-	_mode_button = Button.new()
+	_mode_button = _make_chip("")
 	_mode_button.pressed.connect(_on_mode_button_pressed)
 	strip.add_child(_mode_button)
 
-	var reset_btn := Button.new()
-	reset_btn.text = "↺"
+	# Стрелка ↺ (U+21BA) отсутствует в шрифте темы по умолчанию и рисуется
+	# пустым квадратом — подписываем словом.
+	var reset_btn := _make_chip("Сброс")
 	reset_btn.pressed.connect(_on_reset_pressed)
 	strip.add_child(reset_btn)
 
 	_set_mode("stick")
+
+
+# Кнопка нижней полосы: у темы Godot по умолчанию минимальная высота около
+# 40px, а полоса ровно в одну кнопку толщиной (STRIP_H). Поджимаем отступы и
+# кегль, иначе ряд вылезает за нижний край экрана.
+func _make_chip(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.add_theme_font_size_override("font_size", 9)
+	b.custom_minimum_size = Vector2(0, STRIP_H)
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0)
+		sb.border_color = Color8(0x3E, 0x31, 0x25)
+		sb.set_border_width_all(1)
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		sb.content_margin_left = 6
+		sb.content_margin_right = 6
+		if state == "pressed" or state == "hover":
+			sb.border_color = Color8(0xE0, 0xA9, 0x3B)
+		b.add_theme_stylebox_override(state, sb)
+	b.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	b.add_theme_color_override("font_pressed_color", Color8(0xE0, 0xA9, 0x3B))
+	b.add_theme_color_override("font_hover_color", Color8(0xE0, 0xA9, 0x3B))
+	return b
 
 
 func _make_gear_icon(parent: Control, path: String) -> TextureRect:
@@ -406,9 +463,24 @@ func _make_gear_icon(parent: Control, path: String) -> TextureRect:
 
 func _update_layout() -> void:
 	var vp := get_viewport_rect().size
+	# Control, лежащий прямо в CanvasLayer, не наследует размер вьюпорта от
+	# родителя — якоря считаются от нулевого прямоугольника, и всё, что
+	# прижато к правому краю или к низу, уезжает за экран (кошелёк уходил на
+	# x=-100, нижняя полоса — на y=-32). Размер задаём явно.
+	position = Vector2.ZERO
+	size = vp
+	stick_r = maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
+	knob_r = stick_r * 0.39
 	stage_rect = Rect2(0, 0, vp.x, vp.y - STRIP_H)
-	_stick.position = Vector2(12, stage_rect.size.y - 12 - STICK_R * 2)
-	_stick_center = _stick.position + Vector2(STICK_R, STICK_R)
+	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
+	_stick.size = Vector2(stick_r * 2, stick_r * 2)
+	_knob.custom_minimum_size = Vector2(knob_r * 2, knob_r * 2)
+	_knob.size = Vector2(knob_r * 2, knob_r * 2)
+	_knob.position = Vector2(stick_r - knob_r, stick_r - knob_r)
+	_stick.position = Vector2(12, stage_rect.size.y - 12 - stick_r * 2)
+	_stick_center = _stick.position + Vector2(stick_r, stick_r)
+	_stick.queue_redraw()
+	_knob.queue_redraw()
 
 
 func get_view_cells() -> Vector2i:
@@ -630,7 +702,9 @@ func _set_mode(m: String) -> void:
 	if player != null:
 		player.release_control()
 	var is_stick := mode == "stick"
-	_mode_button.text = "Джойстик" if is_stick else "Удержание"
+	# Коротко: полная подпись («Джойстик»/«Удержание») не помещается в ряд
+	# шириной 224 вместе с инвентарём, инструментом и снаряжением.
+	_mode_button.text = "Стик" if is_stick else "Палец"
 	_stick.visible = is_stick
 	_hold_hint.visible = not is_stick
 
@@ -691,7 +765,7 @@ func _handle_stick_input(event: InputEvent) -> void:
 		"press":
 			if _stick_pointer != -100:
 				return
-			if e.pos.distance_to(_stick_center) > STICK_R * 1.6:
+			if e.pos.distance_to(_stick_center) > stick_r * 1.6:
 				return
 			_stick_pointer = e.pid
 			_apply_stick(e.pos)
@@ -707,7 +781,7 @@ func _handle_stick_input(event: InputEvent) -> void:
 
 
 func _apply_stick(screen_pos: Vector2) -> void:
-	var v: Vector2 = (screen_pos - _stick_center) / STICK_R
+	var v: Vector2 = (screen_pos - _stick_center) / stick_r
 	if v.length() > 1.0:
 		v = v.normalized()
 	var snap = player.resolve_dir(v.x, v.y, STICK_DEAD)
@@ -716,7 +790,7 @@ func _apply_stick(screen_pos: Vector2) -> void:
 
 
 func _position_knob(snap) -> void:
-	var base: Vector2 = Vector2(STICK_R - KNOB_R, STICK_R - KNOB_R)
+	var base: Vector2 = Vector2(stick_r - knob_r, stick_r - knob_r)
 	if snap == null:
 		_knob.position = base
 	else:

@@ -515,8 +515,8 @@ func _do_sell() -> void:
 func _render_craft() -> void:
 	_footer.visible = false
 	if not ShopService.is_at_workshop():
-		_add_hint("Верстак стоит в подвале дома (ГДД раздел 5) — вкладывать и собирать можно только там. Отсюда видно только, чего ещё не хватает.", GOLD)
-	_add_hint("Инструмент собирается по частям: железная кирка весит 160 кг материалов при рюкзаке в 60 — материал вкладывается в проект за несколько ходок и обратно не достаётся.")
+		_add_hint("Верстак стоит в подвале дома (ГДД раздел 5) — складывать и собирать можно только там. Отсюда видно только, чего ещё не хватает.", GOLD)
+	_add_hint("Материалы копятся на складе в мастерской: железная кирка весит 160 кг при рюкзаке в 60, за одну ходку её не принести. Верстак берёт со склада и из рюкзака.")
 	for r in ShopCatalog.recipes():
 		_list.add_child(_make_craft_row(r))
 
@@ -537,9 +537,12 @@ func _make_craft_row(r: Dictionary) -> Control:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 
+	# «На склад» — та же кнопка, что раньше была «Вложить», но теперь это
+	# тонкая обёртка над складом (ГДД п.14): переложить из рюкзака ровно то,
+	# чего рецепту не хватает. Со склада это можно забрать обратно.
 	if project and not bool(check["ok"]) and not bool(check["locked"]) and String(check["reason"]) != "Уже собрано":
-		var invest_btn := _make_button("Вложить")
-		invest_btn.custom_minimum_size = Vector2(48, 18)
+		var invest_btn := _make_button("На склад")
+		invest_btn.custom_minimum_size = Vector2(52, 18)
 		invest_btn.pressed.connect(func(): _do_invest(recipe_id))
 		head.add_child(invest_btn)
 

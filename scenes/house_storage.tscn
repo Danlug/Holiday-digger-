@@ -1,0 +1,225 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/house/house_storage_view.gd" id="1_5tquv"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jrfy3"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jrtos"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5x48q"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_q1t3m"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ucwr8"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_frn3t"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1owpx"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h5r7h"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_exa31"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cm4b2"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[node name="HouseStorageView" type="CanvasLayer"]
+script = ExtResource("1_5tquv")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Backdrop" type="ColorRect" parent="Root"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.0784314, 0.0588235, 0.0431373, 0.97)
+
+[node name="Head" type="HBoxContainer" parent="Root"]
+layout_mode = 0
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 6.0
+offset_right = -8.0
+offset_bottom = 28.0
+
+[node name="Title" type="Label" parent="Root/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.878431, 0.662745, 0.231373, 1)
+text = "СКЛАД"
+
+[node name="Close" type="Button" parent="Root/Head"]
+custom_minimum_size = Vector2(44, 22)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_jrfy3")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_jrtos")
+theme_override_styles/hover = SubResource("StyleBoxFlat_5x48q")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_q1t3m")
+theme_override_styles/focus = SubResource("StyleBoxFlat_ucwr8")
+theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
+theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_disabled_color = Color(0.419608, 0.356863, 0.270588, 1)
+theme_override_font_sizes/font_size = 9
+text = "Назад"
+
+[node name="Summary" type="Label" parent="Root"]
+layout_mode = 0
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 30.0
+offset_right = -8.0
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
+
+[node name="Hint" type="Label" parent="Root"]
+layout_mode = 0
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 44.0
+offset_right = -8.0
+offset_bottom = 70.0
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
+autowrap_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Root"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 72.0
+offset_right = -8.0
+offset_bottom = -34.0
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="Root/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="PutAll" type="Button" parent="Root"]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -30.0
+offset_right = -8.0
+offset_bottom = -6.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_frn3t")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_1owpx")
+theme_override_styles/hover = SubResource("StyleBoxFlat_h5r7h")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_exa31")
+theme_override_styles/focus = SubResource("StyleBoxFlat_cm4b2")
+theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
+theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_disabled_color = Color(0.419608, 0.356863, 0.270588, 1)
+theme_override_font_sizes/font_size = 9
+text = "Сложить весь рюкзак"

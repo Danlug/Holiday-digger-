@@ -93,6 +93,7 @@ static func _serialize() -> Dictionary:
 			"garden_closed": gs.house_garden_closed,
 			"tutorial_stage": gs.house_tutorial_stage,
 			"dopings_shop_unlocked": gs.house_dopings_shop_unlocked,
+			"storage": gs.house_storage,
 		},
 
 		# --- экономика (scripts/shop/) ---
@@ -179,6 +180,9 @@ static func _apply(data: Dictionary) -> void:
 	gs.house_garden_closed = bool(house_data.get("garden_closed", false))
 	gs.house_tutorial_stage = int(house_data.get("tutorial_stage", 0))
 	gs.house_dopings_shop_unlocked = bool(house_data.get("dopings_shop_unlocked", false))
+	# Склад обязан пережить перезапуск: в нём лежат материалы, которые игрок
+	# носил домой несколько ходок (ГДД п.14).
+	gs.house_storage = _as_int_counts(house_data.get("storage", {}))
 
 	var economy: Dictionary = data.get("economy", {})
 	# Старый сейв (до магазина) экономического блока не содержит: инструменты
@@ -197,6 +201,19 @@ static func _apply(data: Dictionary) -> void:
 			gs.fog_ref.load_save_data(world_data["fog"])
 	else:
 		gs.world_dug_cells = world_data.get("dug_cells", {})
+
+
+## JSON не различает int и float: количества, прочитанные из сейва, приходят
+## числами с плавающей точкой, а инвентарь и склад считают штуки целыми.
+static func _as_int_counts(raw) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(raw) != TYPE_DICTIONARY:
+		return out
+	for key in (raw as Dictionary).keys():
+		var n := int((raw as Dictionary)[key])
+		if n > 0:
+			out[String(key)] = n
+	return out
 
 
 ## Приводит сохранение произвольной старой версии к текущей SCHEMA_VERSION.

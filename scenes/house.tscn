@@ -576,7 +576,7 @@ custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 8
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Верстак деда и лавка (ГДД п.2, 15)."
+text = "Верстак деда, лавка и склад: сюда носят материалы на кирку (ГДД п.2, 14, 15)."
 autowrap_mode = 2
 
 [node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Workshop/Box"]

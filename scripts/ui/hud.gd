@@ -438,6 +438,21 @@ func _build_strip() -> void:
 	house_btn.visible = false
 	house_btn.add_to_group("house_button")
 	strip.add_child(house_btn)
+
+	# Склад (ГДД п.14) виден ОТКУДА УГОДНО, хоть со дна шахты, — но только
+	# на просмотр: игрок должен планировать вылазку, зная, чего не хватает до
+	# кирки. Поэтому кнопка постоянная, а не контекстная. Иконкой и без
+	# подписи: в ряду шириной 224 на восемь кнопок каждое слово на счету.
+	var storage_btn := _make_chip("")
+	if ResourceLoader.exists("res://art/ui/icon_blackbox.png"):
+		storage_btn.icon = load("res://art/ui/icon_blackbox.png")
+		storage_btn.expand_icon = true
+		storage_btn.custom_minimum_size = Vector2(22, STRIP_H)
+	else:
+		storage_btn.text = "Скл"
+	storage_btn.tooltip_text = "Склад в мастерской"
+	storage_btn.add_to_group("house_storage_button")
+	strip.add_child(storage_btn)
 	# --- конец блока дома ---
 
 	_mode_button = _make_chip("")

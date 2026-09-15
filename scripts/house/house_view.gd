@@ -42,7 +42,7 @@ const ROOMS := [
 		"desc": "Витрины под коллекцию артефактов (ГДД п.10)."},
 	{"id": "workshop", "floor": "Подвал", "title": "Мастерская",
 		"icon": "res://art/env/workbench.png",
-		"desc": "Верстак деда и лавка (ГДД п.2, 15)."},
+		"desc": "Верстак деда, лавка и склад: сюда носят материалы на кирку (ГДД п.2, 14, 15)."},
 	{"id": "peat_still", "floor": "Подвал", "title": "Торфоперегонка",
 		"icon": "res://art/ui/slot_frame.png",
 		"desc": "Торф → топливные блоки и удобрение (ГДД п.5)."},
@@ -326,6 +326,7 @@ func _wire_actions() -> void:
 	_add_button("hall", "Забрать", "take_delivery")
 	_add_button("hall", "На улицу", "exit_door")
 	_add_button("basement", "В шахту", "exit_hatch")
+	_add_button("workshop", "Склад", "storage")
 	for room_id in EXTERNAL_PANELS.keys():
 		_add_button(String(room_id), "Открыть", "open_panel:" + String(room_id))
 
@@ -426,6 +427,7 @@ func refresh() -> void:
 	_refresh_hall()
 	_refresh_basement()
 	_refresh_external_rooms()
+	_refresh_storage()
 	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
 		_notice.text = ""
 
@@ -549,12 +551,27 @@ func _refresh_basement() -> void:
 		note.text = "Люк ещё не построен: его строит Роберт, которого пришлёт бабка (ГДД п.9)."
 
 
+## Строка склада в мастерской: сколько там лежит и сколько это весит. Вес
+## важнее числа позиций — по нему видно, сколько ходок в эту кучу вложено.
+func _refresh_storage() -> void:
+	var note := _note("workshop")
+	note.visible = true
+	var items := HouseStorage.total_items()
+	if items <= 0:
+		note.text = "Склад пуст. Материалы на кирку копятся здесь: 160 кг за один рюкзак не принести."
+	else:
+		note.text = "На складе: %d шт, %.0f кг. Верстак берёт материалы отсюда." % [
+			items, HouseStorage.total_weight()]
+
+
 func _refresh_external_rooms() -> void:
 	for room_id in EXTERNAL_PANELS.keys():
 		var id := String(room_id)
 		var button := _button(id, "open_panel:" + id)
 		var available := has_external_panel(id)
 		button.visible = available
+		if id == "workshop":
+			continue  # у мастерской своя подпись — про склад, см. _refresh_storage
 		var note := _note(id)
 		note.visible = not available
 		note.text = "Комната есть, содержимого пока нет — место под систему, которая её наполнит."

@@ -20,6 +20,7 @@ const HOUSE_SPRITE := "res://art/env/house_exterior.png"
 const HATCH_SPRITE := "res://art/env/hatch.png"
 const VIEW_SCENE := "res://scenes/house.tscn"
 const PROMPT_SCENE := "res://scenes/house_prompt.tscn"
+const STORAGE_SCENE := "res://scenes/house_storage.tscn"
 
 ## Батончик, которым система учит есть при втором истощении (ГДД п.9).
 const TUTORIAL_FOOD := "energy_bar"
@@ -32,10 +33,12 @@ var world: WorldGen = null
 
 var _view: CanvasLayer = null
 var _prompt: CanvasLayer = null
+var _storage_view: CanvasLayer = null
 var _exterior: Sprite2D = null
 var _hatch: Sprite2D = null
 var _button: Button = null
 var _button_action: String = ""
+var _storage_button: Button = null
 var _prompt_action: String = ""
 var _story: Node = null
 
@@ -82,6 +85,10 @@ func _resolve_refs() -> void:
 			# Кнопку создаёт HUD (одна строка в его блоке), а связывает и
 			# ведёт дом: тексты и условия — знание дома, а не интерфейса.
 			_button.pressed.connect(on_hud_button)
+	if _storage_button == null:
+		_storage_button = get_tree().get_first_node_in_group("house_storage_button") as Button
+		if _storage_button != null and not _storage_button.pressed.is_connected(open_storage):
+			_storage_button.pressed.connect(open_storage)
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +143,13 @@ func _build_scenes() -> void:
 	add_child(_prompt)
 	_prompt.confirmed.connect(_on_prompt_confirmed)
 
+	if ResourceLoader.exists(STORAGE_SCENE):
+		_storage_view = (load(STORAGE_SCENE) as PackedScene).instantiate()
+	else:
+		_storage_view = load("res://scripts/house/house_storage_view.gd").new()
+	add_child(_storage_view)
+	_storage_view.closed.connect(_on_storage_closed)
+
 
 # ---------------------------------------------------------------------------
 # Кадр
@@ -148,6 +162,8 @@ func _process(_dt: float) -> void:
 	_update_hud_button()
 	if _view != null and _view.visible:
 		_view.refresh()
+	if _storage_view != null and _storage_view.visible:
+		_storage_view.refresh()
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +303,9 @@ func _update_hud_button() -> void:
 			_button.visible = false
 			return
 		_button_action = "eat:" + food
-		_button.text = "Съесть"
+		# Коротко: в ряду нижней полосы каждая буква — место, которого там
+		# уже не хватает (см. комментарий к кнопке в hud.gd).
+		_button.text = "Еда"
 	_button.visible = true
 
 
@@ -326,6 +344,13 @@ func _on_view_action(action: String, arg: String) -> void:
 		"exit_hatch":
 			if not exit_through_hatch():
 				_toast("Люка ещё нет — его построит Роберт.")
+		"storage":
+			# Тап пришёл из карточки мастерской, то есть герой уже подошёл к
+			# складу: фиксируем комнату, иначе панель откроется в режиме
+			# «только смотреть», хотя игрок стоит в двух шагах от полки.
+			GameState.house_room = HouseStorage.ROOM
+			_view.go_to_room(HouseStorage.ROOM)
+			open_storage()
 		"open_panel":
 			if not _view.open_external_panel(arg):
 				_toast("Комната пока пустая.")
@@ -451,6 +476,23 @@ func _on_prompt_confirmed() -> void:
 		GameState.house_dopings_shop_unlocked = true
 	_prompt_action = ""
 	_prompt.hide_prompt()
+	if not GameState.house_is_indoors:
+		_freeze_player(false)
+
+
+## Открыть панель склада. Снаружи она работает как витрина «что у меня дома»
+## (ГДД п.14: смотреть можно откуда угодно), у самого склада — как склад.
+func open_storage() -> void:
+	if _storage_view == null:
+		return
+	# Пока панель открыта, герой стоит: она может открыться прямо в шахте, а
+	# палец, нажимающий «Взять», под панелью попадает в джойстик и уводит
+	# героя копать вслепую.
+	_freeze_player(true)
+	_storage_view.open()
+
+
+func _on_storage_closed() -> void:
 	if not GameState.house_is_indoors:
 		_freeze_player(false)
 

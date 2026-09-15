@@ -43,6 +43,8 @@ func _ready() -> void:
 	_test_energy_bar_effect()
 	_test_enter_and_exit_keeps_state()
 	_test_hatch_transition()
+	_test_storage_access_rules()
+	_test_storage_survives_death_and_save()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -179,6 +181,78 @@ func _test_energy_bar_effect() -> void:
 	check("батончик съеден", bool(eaten["ok"]))
 	check_near("батончик дал 100% бодрости", GameState.stamina, 100.0, 0.001)
 	check_near("батончик дал 50% сытости", GameState.hunger, 50.0, 0.001)
+
+
+# ---------------------------------------------------------------------------
+# Склад в мастерской (ГДД п.14)
+# ---------------------------------------------------------------------------
+
+func _test_storage_access_rules() -> void:
+	GameState.house_storage.clear()
+	GameState.inventory.clear()
+	GameState.add_item("iron_ore", 10)
+
+	# Со дна шахты склад только виден.
+	GameState.house_is_indoors = false
+	GameState.house_room = "hall"
+	check("из шахты склада не достать", not HouseStorage.can_access())
+	check("из шахты на склад не положить", HouseStorage.put("iron_ore", 5) == 0)
+	check("отказ объяснён", not HouseStorage.access_reason().is_empty())
+	check("руда осталась в рюкзаке", GameState.get_item_count("iron_ore") == 10)
+
+	# Дома, но не в мастерской — тоже нельзя: склад стоит у верстака.
+	GameState.house_is_indoors = true
+	check("в прихожей склада нет", not HouseStorage.can_access())
+	check("из прихожей на склад не положить", HouseStorage.put("iron_ore", 5) == 0)
+
+	# Подошли к складу.
+	GameState.house_room = HouseStorage.ROOM
+	check("в мастерской склад доступен", HouseStorage.can_access())
+	check("положили 10 руды", HouseStorage.put("iron_ore", 10) == 10)
+	check("рюкзак пуст", GameState.get_item_count("iron_ore") == 0)
+	check("склад помнит 10 руды", HouseStorage.count("iron_ore") == 10)
+	check("вес склада посчитан",
+		is_equal_approx(HouseStorage.total_weight(), Balance.get_mineral_weight("iron_ore") * 10.0))
+
+	check("забрали 4 обратно", HouseStorage.take("iron_ore", 4) == 4)
+	check("в рюкзаке 4", GameState.get_item_count("iron_ore") == 4)
+	check("на складе осталось 6", HouseStorage.count("iron_ore") == 6)
+
+	# Верстак берёт со склада напрямую, мимо рюкзака (ГДД п.14).
+	check("верстак списал со склада 6", HouseStorage.consume("iron_ore", 6) == 6)
+	check("склад опустел", HouseStorage.count("iron_ore") == 0)
+
+	# Склад не ограничен грузоподъёмностью, а рюкзак ограничен: обратно
+	# всё сразу не уносится — в этом и разница между складом и рюкзаком.
+	GameState.inventory.clear()
+	HouseStorage.store_directly("lead", 100)
+	var max_by_weight := int(GameState.get_max_carry_kg() / Balance.get_mineral_weight("lead"))
+	var taken := HouseStorage.take("lead", 100)
+	check("рюкзак взял только то, что тянет", taken == max_by_weight and taken < 100)
+	check("остальное осталось на складе", HouseStorage.count("lead") == 100 - taken)
+
+
+func _test_storage_survives_death_and_save() -> void:
+	GameState.house_storage.clear()
+	GameState.inventory.clear()
+	GameState.house_is_indoors = true
+	GameState.house_room = HouseStorage.ROOM
+	HouseStorage.store_directly("gold", 7)
+	GameState.add_item("silver", 3)
+
+	# Смерть забирает рюкзак (ГДД п.7), но не дом: склад — это то, что уже
+	# донесено, и терять его дважды было бы наказанием за саму игру.
+	GameState.die()
+	check("смерть очистила рюкзак", GameState.get_item_count("silver") == 0)
+	check("склад смерть не тронула", HouseStorage.count("gold") == 7)
+	GameState.respawn()
+
+	# Перезапуск игры: склад обязан сохраниться.
+	SaveSystem.save_game()
+	GameState.house_storage.clear()
+	SaveSystem.load_game()
+	check("склад пережил перезапуск", HouseStorage.count("gold") == 7)
+	SaveSystem.delete_save()
 
 
 # ---------------------------------------------------------------------------

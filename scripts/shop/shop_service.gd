@@ -156,53 +156,50 @@ static func is_recipe_unlocked(recipe_id: String) -> bool:
 	return GameState.max_depth_reached >= ShopCatalog.unlock_depth(recipe_id)
 
 
-## Инструменты собираются ПО ЧАСТЯМ: материал вкладывается в проект за
-## несколько ходок и обратно не достаётся. Расходники (бронза, топливный
-## блок) плавятся сразу из рюкзака — их вход помещается в него целиком.
+## Инструменты собираются ИЗ СКЛАДА: железная кирка стоит 160 кг материалов
+## при рюкзаке в 60, и за одну ходку их не принести. Склад стоит в мастерской
+## рядом с верстаком (ГДД п.14), поэтому материал копится там, а не в
+## «проекте»: вложения обратно не доставались, а со склада взять можно.
 static func is_project(recipe_id: String) -> bool:
 	var r := ShopCatalog.recipe(recipe_id)
 	return not r.is_empty() and String(r["kind"]) == "tool"
 
 
-## Сколько единиц материала id уже лежит в проекте (для рецептов-расходников
-## проект не ведётся, там считается рюкзак).
-static func held_for(recipe_id: String, id: String) -> int:
-	if is_project(recipe_id):
-		return GameState.get_invested(recipe_id, id)
-	return GameState.get_item_count(id)
+## Сколько материала id доступно верстаку: склад ПЛЮС рюкзак. Считать только
+## склад было бы работой ради работы — заставлять игрока перекладывать руду
+## из рук на полку в двух шагах (ГДД п.14 прямо это и отменяет).
+static func held_for(_recipe_id: String, id: String) -> int:
+	return HouseStorage.count(id) + GameState.get_item_count(id)
 
 
-## Вложить в проект всё, что игрок принёс: по каждому материалу забирается
-## столько, сколько ещё нужно и сколько есть в рюкзаке. Возвращает
-## {ok, moved: {id: сколько}, message}.
+## «На склад»: переложить из рюкзака ровно то, чего рецепту не хватает.
+## Тонкая обёртка над складом — своей памяти у верстака больше нет.
+## Возвращает {ok, moved: {id: сколько}, message}.
 static func invest(recipe_id: String) -> Dictionary:
 	var r := ShopCatalog.recipe(recipe_id)
-	if r.is_empty() or not is_project(recipe_id):
-		return {"ok": false, "moved": {}, "message": "Этот рецепт собирается сразу"}
-	if not is_at_workshop():
-		return {"ok": false, "moved": {}, "message": "Верстак дома, в подвале"}
+	if r.is_empty():
+		return {"ok": false, "moved": {}, "message": "Нет такого рецепта"}
+	if not HouseStorage.can_access():
+		return {"ok": false, "moved": {}, "message": HouseStorage.access_reason()}
 	if not is_recipe_unlocked(recipe_id):
 		return {"ok": false, "moved": {}, "message": "Рецепт ещё не открыт"}
 
 	var moved: Dictionary = {}
 	for id in r["inputs"].keys():
-		var need: int = int(r["inputs"][id]) - GameState.get_invested(recipe_id, String(id))
+		var need: int = int(r["inputs"][id]) - HouseStorage.count(String(id))
 		if need <= 0:
 			continue
-		var take: int = mini(need, GameState.get_item_count(String(id)))
-		if take <= 0:
-			continue
-		GameState.remove_item(String(id), take)
-		GameState.add_invested(recipe_id, String(id), take)
-		moved[String(id)] = take
+		var put := HouseStorage.put(String(id), mini(need, GameState.get_item_count(String(id))))
+		if put > 0:
+			moved[String(id)] = put
 	if moved.is_empty():
-		return {"ok": false, "moved": {}, "message": "Нечего вкладывать"}
+		return {"ok": false, "moved": {}, "message": "Нечего складывать"}
 
 	var parts: Array = []
 	for id in moved.keys():
 		parts.append("%s ×%d" % [ShopCatalog.item_name(String(id)), int(moved[id])])
 	SaveSystem.save_game()
-	return {"ok": true, "moved": moved, "message": "В проект ушло: " + ", ".join(parts)}
+	return {"ok": true, "moved": moved, "message": "На склад ушло: " + ", ".join(parts)}
 
 
 ## Чего не хватает для рецепта: {"ok": bool, "missing": {id: сколько ещё},
@@ -223,7 +220,7 @@ static func check_craft(recipe_id: String) -> Dictionary:
 	var missing: Dictionary = {}
 	for id in r["inputs"].keys():
 		var need := int(r["inputs"][id])
-		var have := held_for(recipe_id, String(id))
+		var have := held_for(recipe_id, String(id))  # склад + рюкзак
 		if have < need:
 			missing[String(id)] = need - have
 	var missing_coins: int = maxi(0, int(r["coins"]) - GameState.coins)
@@ -253,18 +250,14 @@ static func craft(recipe_id: String) -> Dictionary:
 		return {"ok": false, "message": String(check["reason"])}
 
 	var r := ShopCatalog.recipe(recipe_id)
-	var project := is_project(recipe_id)
-	if not project:
-		for id in r["inputs"].keys():
-			if not GameState.remove_item(String(id), int(r["inputs"][id])):
-				# Сюда попасть нельзя (проверка выше), но если попали — лучше
-				# честно отказать, чем списать половину рецепта.
-				return {"ok": false, "message": "Материалы кончились"}
+	for id in r["inputs"].keys():
+		if not _consume_input(String(id), int(r["inputs"][id])):
+			# Сюда попасть нельзя (проверка выше), но если попали — лучше
+			# честно отказать, чем списать половину рецепта.
+			return {"ok": false, "message": "Материалы кончились"}
 	var coins := int(r["coins"])
 	if coins > 0 and not GameState.spend_coins(coins):
 		return {"ok": false, "message": "Не хватает монет"}
-	if project:
-		GameState.clear_invested(recipe_id)
 
 	var out_id := String(r["output"]["id"])
 	var out_count := int(r["output"]["count"])
@@ -281,6 +274,16 @@ static func craft(recipe_id: String) -> Dictionary:
 		message = "+%d %s" % [out_count, ShopCatalog.item_name(out_id)]
 	SaveSystem.save_game()
 	return {"ok": true, "message": message}
+
+
+## Списать материал на крафт: сначала со склада, потом из рюкзака. Порядок
+## именно такой — на складе лежит то, что уже донесено и никуда не денется, а
+## рюкзак игрок, скорее всего, хочет сохранить под обратную дорогу.
+static func _consume_input(id: String, amount: int) -> bool:
+	var left := amount - HouseStorage.consume(id, amount)
+	if left <= 0:
+		return true
+	return GameState.remove_item(id, left)
 
 
 static func _free_weight() -> float:

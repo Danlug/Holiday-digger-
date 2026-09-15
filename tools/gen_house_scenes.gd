@@ -17,6 +17,7 @@ extends Node
 func _ready() -> void:
 	_build("res://scripts/house/house_view.gd", "res://scenes/house.tscn", "House")
 	_build("res://scripts/house/house_prompt.gd", "res://scenes/house_prompt.tscn", "HousePrompt")
+	_build("res://scripts/house/house_storage_view.gd", "res://scenes/house_storage.tscn", "HouseStorageView")
 	get_tree().quit(0)
 
 

@@ -22,7 +22,7 @@ func _ready() -> void:
 	_test_craft_bronze()
 	_test_craft_fuel_block()
 	_test_craft_without_materials()
-	_test_iron_pickaxe_project()
+	_test_iron_pickaxe_from_storage()
 	_test_tool_requires_ownership()
 	_test_buy_spends_coins()
 	_test_exchange_dollars()
@@ -49,7 +49,7 @@ func _fresh() -> void:
 	GameState.coins = 0
 	GameState.dollars = 0
 	GameState.next_sale_doubled = false
-	GameState.craft_invested.clear()
+	GameState.house_storage.clear()
 	GameState.owned_tools = ["shovel"]
 	GameState.current_tool = "shovel"
 	GameState.max_depth_reached = 0
@@ -58,6 +58,9 @@ func _fresh() -> void:
 	# героя домой; отдельная проверка ниже следит за тем, что из шахты
 	# продать нельзя.
 	GameState.house_is_indoors = true
+	# Склад и верстак стоят в мастерской (ГДД п.14): класть материалы можно
+	# только подойдя к ним, поэтому герой сразу в нужной комнате.
+	GameState.house_room = "workshop"
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +151,9 @@ func _test_craft_without_materials() -> void:
 
 
 ## Железная кирка: 25 железа + 10 бронзы + 30 свинца + 200 монет (ГДД раздел 5).
-## 160 кг материалов при рюкзаке 60 кг — собирается за несколько ходок.
-func _test_iron_pickaxe_project() -> void:
+## 160 кг материалов при рюкзаке 60 кг — копятся на складе за несколько ходок
+## (ГДД раздел 14, «Склад в мастерской»).
+func _test_iron_pickaxe_from_storage() -> void:
 	_fresh()
 	var recipe := ShopCatalog.recipe("iron_pickaxe")
 	check("рецепт железной кирки из ГДД: 25 железа",  int(recipe["inputs"]["iron_ore"]) == 25)
@@ -160,22 +164,22 @@ func _test_iron_pickaxe_project() -> void:
 	var total_kg := 0.0
 	for id in recipe["inputs"].keys():
 		total_kg += Balance.get_mineral_weight(String(id)) * int(recipe["inputs"][id])
-	check("материалы кирки тяжелее одного рюкзака — проект нужен по делу",
+	check("материалы кирки тяжелее одного рюкзака — склад нужен по делу",
 		total_kg > GameState.get_max_carry_kg())
 
-	# Первая ходка: принесли часть железа.
+	# Первая ходка: принесли часть железа и сложили на склад.
 	GameState.inventory["iron_ore"] = 20
 	ShopService.invest("iron_pickaxe")
-	check("вложенное ушло из рюкзака", GameState.get_item_count("iron_ore") == 0)
-	check("вложенное записано в проект", GameState.get_invested("iron_pickaxe", "iron_ore") == 20)
-	check("неполный проект не собирается", not ShopService.can_craft("iron_pickaxe"))
+	check("сложенное ушло из рюкзака", GameState.get_item_count("iron_ore") == 0)
+	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == 20)
+	check("неполного рецепта не хватает на крафт", not ShopService.can_craft("iron_pickaxe"))
 
 	# Вторая ходка: остальное железо и свинец. Лишнее железо сверх рецепта
-	# остаётся в рюкзаке — проект берёт ровно столько, сколько нужно.
+	# остаётся в рюкзаке — на склад уходит ровно столько, сколько нужно.
 	GameState.inventory["iron_ore"] = 10
 	GameState.inventory["lead"] = 30
 	ShopService.invest("iron_pickaxe")
-	check("проект берёт ровно недостающее", GameState.get_invested("iron_pickaxe", "iron_ore") == 25)
+	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == 25)
 	check("излишек остался у игрока", GameState.get_item_count("iron_ore") == 5)
 
 	# Третья ходка: бронза и монеты.
@@ -184,11 +188,13 @@ func _test_iron_pickaxe_project() -> void:
 	GameState.coins = 199
 	check("без монет кирка не собирается", not ShopService.can_craft("iron_pickaxe"))
 	GameState.coins = 250
-	check("собранный проект даёт крафт", bool(ShopService.craft("iron_pickaxe")["ok"]))
+	check("набранного склада хватает на крафт", bool(ShopService.craft("iron_pickaxe")["ok"]))
 	check("монеты списаны ровно по рецепту", GameState.coins == 50)
 	check("кирка в собственности", GameState.owned_tools.has("iron_pickaxe"))
 	check("кирка взята в руки", GameState.current_tool == "iron_pickaxe")
-	check("вложения проекта израсходованы", GameState.get_invested("iron_pickaxe", "iron_ore") == 0)
+	check("склад опустел ровно на рецепт", HouseStorage.count("iron_ore") == 0
+		and HouseStorage.count("lead") == 0 and HouseStorage.count("bronze") == 0)
+	check("излишек из рюкзака крафт не тронул", GameState.get_item_count("iron_ore") == 5)
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +306,7 @@ func _test_cannot_sell_from_mine() -> void:
 	check("из шахты продать нельзя — лут надо донести наверх",
 		not bool(result["ok"]) and GameState.coins == 0)
 	check("золото осталось в рюкзаке", GameState.get_item_count("gold") == 2)
-	check("вкладывать в проект из шахты тоже нельзя",
+	check("класть на склад из шахты тоже нельзя",
 		not bool(ShopService.invest("iron_pickaxe")["ok"]))
 
 	# Единственный способ продать со дна — рекламная награда "скинуть лут

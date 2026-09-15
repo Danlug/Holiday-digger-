@@ -248,18 +248,29 @@ const APEX_V = 2.0;    // |vy| ниже этого порога — зона з�
 const APEX_G = 0.45;   // насколько слабее тяготение в этой зоне
 const WALK = 4.2;      // клеток/с по земле
 const AIR_CTRL = 0.82; // насколько слушается руля в воздухе
-const V_TERM = 17;     // предел скорости падения
+// Предел скорости падения. Достигается примерно с 16 клетки, поэтому
+// короткие падения он не трогает — их задаёт только G. Занижать нельзя:
+// урон считается от скорости удара, и низкий потолок обрезал бы его.
+const V_TERM = 32;
 const HW = 0.38, HH = 0.46;
 
 // Снаряжение открывается по глубине (ГДД раздел 5)
 const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100;
-const PROP_SPEED = 2, PROP_RAMP = 3;
+const PROP_SPEED = 2.5, PROP_RAMP = 3;
 const JET_SPEED = 20, JET_RAMP = 5;
 // Пока герой ещё падает, тяга работает тормозом и гасит скорость намного
 // резче, чем потом разгоняет вверх. Без этого подъёмная сила ранца
 // (2/3 ≈ 0.7 кл/с²) не могла перебить тяготение в 16 кл/с²: нажатие вверх
 // в падении выглядело так, будто ранец вообще не включился.
 const THRUST_BRAKE = 26;
+
+// Урон считается от СКОРОСТИ удара, а не от высоты: спуск на пропеллере
+// с семи клеток — это не падение с семи клеток, хотя высота та же.
+// Коэффициенты выведены из опорных точек ГДД так, что свободное падение
+// даёт ровно прежние числа: 5 клеток = 5 HP, 20 клеток = 100 HP.
+const FALL_POW = 2.16 * 2;
+const FALL_K = 0.154 / Math.pow(2 * G, 2.16);
+const SAFE_SPEED = Math.sqrt(2 * G * 5);   // скорость, набираемая за 5 клеток
 const DRILL_MULT = 0.45;   // ручной бур заметно быстрее кирки
 // Физические углы тайлов слегка «скруглены»: если персонаж цепляется за угол
 // меньше чем на столько, его обводит мимо, а не останавливает. Визуально
@@ -274,7 +285,6 @@ const S = {
   x: 20.5, y: 0.5,
   vx: 0, vy: 0,
   onGround: false,
-  apexY: 0.5,
   tool: 'shovel',
   coins: 0, loadKg: 0,
   hp: 100, food: 100, rest: 100,
@@ -440,19 +450,17 @@ function moveY(dt){
     const b = S.y + HH + 0.02;
     S.onGround = S.vy === 0 && (solidPt(left, b) || solidPt(right, b));
   }
-  if (S.y < S.apexY) S.apexY = S.y;
 }
 
 
 function land(){
-  const h = Math.round(S.y - S.apexY);
-  S.apexY = S.y;
-  if (h >= 5){
-    const dmg = Math.round(0.154 * Math.pow(h, 2.16));
-    S.hp = Math.max(0, S.hp - dmg);
-    toast(`Падение с <b>${h}</b> клеток — минус <b>${dmg}</b> HP`);
-    if (S.hp === 0) die();
-  }
+  const v = S.vy;
+  if (v <= SAFE_SPEED) return;
+  const dmg = Math.round(FALL_K * Math.pow(v, FALL_POW));
+  if (dmg < 1) return;
+  S.hp = Math.max(0, S.hp - dmg);
+  toast(`Удар на скорости <b>${v.toFixed(1)}</b> кл/с — минус <b>${dmg}</b> HP`);
+  if (S.hp === 0) die();
 }
 
 function updateFlight(){
@@ -490,7 +498,6 @@ function jump(){
   if (solidPt(S.x, S.y - HH - 0.1)){ toast('Над головой порода — не подпрыгнуть.'); return; }
   S.vy = -JUMP_V;
   S.onGround = false;
-  S.apexY = S.y;
 }
 
 // Верхний слой земли зарастает: иначе игрок, погибший под своей же шахтой,
@@ -504,7 +511,7 @@ function die(){
   restoreTopSoil();
   S.loadKg = 0;
   S.hp = S.food = S.rest = 100;
-  S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0; S.apexY = 0.5;
+  S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
   S.target = null; S.digging = null;
   toast(`Ты погиб. Минералы потеряны (<b>${lost.toFixed(1)}</b> кг). В игре уцелел бы только чёрный ящик.`, 4200);
 }
@@ -842,7 +849,7 @@ cv.addEventListener('pointerdown', ev => {
 });
 
 document.getElementById('reset').addEventListener('click', () => {
-  S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0; S.apexY = 0.5;
+  S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
   S.coins = 0; S.loadKg = 0;
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;

@@ -51,6 +51,10 @@ var _peat_seam_y_max: int = 455
 var _diamond_x: int = -1
 var _diamond_y: int = -1
 var _diamond_guards: Array = []  # [Vector2i, ...] относительно клетки алмаза
+# Сценарная добыча первых уровней (обучающий круг, ГДД п.9). Словарь, а не
+# массив: _permanent_feature_type зовут на каждую клетку экрана, и линейный
+# перебор списка там обошёлся бы дороже самой генерации.
+var _scripted_loot: Dictionary = {}  # "x,y" -> TileTypes.Type
 
 
 func _init(p_world_seed: int) -> void:
@@ -114,6 +118,17 @@ func _apply_layers() -> void:
 	_diamond_guards.clear()
 	for off in dia.get("guard_offsets", []):
 		_diamond_guards.append(Vector2i(int(off[0]), int(off[1])))
+
+	_scripted_loot.clear()
+	var loot: Dictionary = layers.get("scripted_loot", {})
+	for cell in loot.get("cells", []):
+		# Запасное значение — EMPTY, а не камень по умолчанию: опечатка в
+		# имени тайла должна пропасть из мира, а не заложить камень поперёк
+		# обучающего ряда.
+		var t := TileTypes.from_name(String(cell.get("tile", "")), TileTypes.Type.EMPTY)
+		if t == TileTypes.Type.EMPTY:
+			continue
+		_scripted_loot[_key(int(cell.get("x", -1)), int(cell.get("y", -1)))] = t
 
 	_shallow_layers = layers.get("shallow_layers", [])
 	_deep = layers.get("deep", {})
@@ -231,6 +246,10 @@ func _permanent_feature_type(x: int, y: int) -> int:
 			return TileTypes.Type.STAIRCASE
 	if y >= _peat_seam_y_min and y <= _peat_seam_y_max:
 		return TileTypes.Type.PEAT
+	if not _scripted_loot.is_empty():
+		var loot_key := _key(x, y)
+		if _scripted_loot.has(loot_key):
+			return int(_scripted_loot[loot_key])
 	if _diamond_x >= 0:
 		if x == _diamond_x and y == _diamond_y:
 			return TileTypes.Type.DIAMOND

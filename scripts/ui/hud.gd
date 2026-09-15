@@ -61,6 +61,12 @@ var _inv_sheet: Control
 var _inv_list: VBoxContainer
 var _inv_load_label: Label
 var _inv_total_label: Label
+var _drop_panel: Control
+var _drop_title: Label
+var _drop_slider: HSlider
+var _drop_field: LineEdit
+var _drop_id: String = ""
+var _drop_max: int = 0
 
 
 func _ready() -> void:
@@ -362,6 +368,153 @@ func _build_inventory_sheet(parent: Control) -> void:
 	_inv_total_label = Label.new()
 	_inv_total_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
 	foot.add_child(_inv_total_label)
+
+	_build_drop_panel(_inv_sheet)
+
+
+## Окно «выбросить N штук»: ползунок и то же число полем ввода — на телефоне
+## ползунком трудно попасть в «ровно 7 из 240», а руками неудобно набирать
+## «120». Поле открывает цифровую клавиатуру, буквы в нём не принимаются.
+func _build_drop_panel(parent: Control) -> void:
+	_drop_panel = Control.new()
+	_drop_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_drop_panel.visible = false
+	parent.add_child(_drop_panel)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_drop_panel.add_child(dim)
+
+	var card := PanelContainer.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	card.custom_minimum_size = Vector2(196, 0)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
+	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(8)
+	card.add_theme_stylebox_override("panel", sb)
+	_drop_panel.add_child(card)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	card.add_child(box)
+
+	_drop_title = Label.new()
+	_drop_title.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_drop_title.add_theme_font_size_override("font_size", 11)
+	box.add_child(_drop_title)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	box.add_child(row)
+
+	_drop_slider = HSlider.new()
+	_drop_slider.min_value = 1
+	_drop_slider.step = 1
+	_drop_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_drop_slider.value_changed.connect(_on_drop_slider_changed)
+	row.add_child(_drop_slider)
+
+	_drop_field = LineEdit.new()
+	_drop_field.custom_minimum_size = Vector2(46, 0)
+	_drop_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_drop_field.max_length = 6
+	# Только цифровая клавиатура: количество — всегда целое, буквам тут
+	# делать нечего (то же, что inputmode="numeric" в web-демо).
+	_drop_field.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+	_drop_field.text_changed.connect(_on_drop_field_changed)
+	_drop_field.text_submitted.connect(func(_t): _apply_drop())
+	row.add_child(_drop_field)
+
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 6)
+	box.add_child(buttons)
+
+	var all_btn := Button.new()
+	all_btn.text = "Всё"
+	all_btn.add_theme_font_size_override("font_size", 10)
+	all_btn.pressed.connect(func(): _drop_slider.value = _drop_max)
+	buttons.add_child(all_btn)
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Отмена"
+	cancel_btn.add_theme_font_size_override("font_size", 10)
+	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cancel_btn.pressed.connect(_close_drop)
+	buttons.add_child(cancel_btn)
+
+	var ok_btn := Button.new()
+	ok_btn.text = "Выбросить"
+	ok_btn.add_theme_font_size_override("font_size", 10)
+	ok_btn.add_theme_color_override("font_color", Color8(0xC4, 0x70, 0x6A))
+	ok_btn.pressed.connect(_apply_drop)
+	buttons.add_child(ok_btn)
+
+
+func _open_drop(id: String, count: int) -> void:
+	if count <= 0:
+		return
+	_drop_id = id
+	_drop_max = count
+	_drop_title.text = "Выбросить «%s» (в рюкзаке %d)" % [
+		String(Balance.get_mineral(id).get("name_ru", id)), count]
+	_drop_slider.max_value = count
+	_drop_slider.value = count
+	_drop_field.text = str(count)
+	_drop_panel.visible = true
+
+
+func _close_drop() -> void:
+	_drop_panel.visible = false
+	_drop_id = ""
+
+
+func _drop_amount() -> int:
+	return clampi(int(_drop_slider.value), 1, maxi(1, _drop_max))
+
+
+func _on_drop_slider_changed(v: float) -> void:
+	var n := clampi(int(v), 1, maxi(1, _drop_max))
+	if _drop_field.text != str(n):
+		_drop_field.text = str(n)
+
+
+func _on_drop_field_changed(t: String) -> void:
+	# Чистим ввод на месте: на телефоне цифровая клавиатура всё равно может
+	# отдать минус или запятую, а каретку при этом терять нельзя.
+	var digits := ""
+	for ch in t:
+		if ch >= "0" and ch <= "9":
+			digits += ch
+	if digits != t:
+		var caret := _drop_field.caret_column - (t.length() - digits.length())
+		_drop_field.text = digits
+		_drop_field.caret_column = maxi(0, caret)
+	if digits.is_empty():
+		return
+	var n := clampi(int(digits), 1, maxi(1, _drop_max))
+	if int(_drop_slider.value) != n:
+		_drop_slider.set_value_no_signal(n)
+	if str(n) != digits:
+		_drop_field.text = str(n)
+		_drop_field.caret_column = _drop_field.text.length()
+
+
+func _apply_drop() -> void:
+	if _drop_id.is_empty():
+		return
+	var n := _drop_amount()
+	var id := _drop_id
+	GameState.remove_item(id, n)
+	_close_drop()
+	_render_inventory()
+	_sync_purse()
+	toast("Выброшено: %s ×%d" % [
+		String(Balance.get_mineral(id).get("name_ru", id)), n], 2.0)
 
 
 var _more_panel: PanelContainer
@@ -786,6 +939,7 @@ func open_inventory() -> void:
 
 
 func close_inventory() -> void:
+	_close_drop()
 	_inv_sheet.visible = false
 	_inv_button.button_pressed = false
 
@@ -835,6 +989,17 @@ func _render_inventory() -> void:
 			sum_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			sum_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
 			line.add_child(sum_label)
+			# Выбросить: рюкзак заполняется задолго до подъёма, и без этого
+			# единственный способ освободить место под алмаз — идти домой.
+			var drop_btn := Button.new()
+			drop_btn.text = "✕"
+			drop_btn.tooltip_text = "Выбросить"
+			drop_btn.add_theme_font_size_override("font_size", 10)
+			drop_btn.custom_minimum_size = Vector2(22, 20)
+			var rid: String = row.id
+			var rcount: int = row.count
+			drop_btn.pressed.connect(func(): _open_drop(rid, rcount))
+			line.add_child(drop_btn)
 			_inv_list.add_child(line)
 		_inv_total_label.text = str(total)
 

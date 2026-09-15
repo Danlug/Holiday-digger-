@@ -336,3 +336,33 @@ func test_collapse_and_earthquake() -> void:
 	# зафиксированные клетки остаются зафиксированными и после землетрясения
 	check("фундамент остаётся FOUNDATION после землетрясения", w2.get_tile(3, 5) == TileTypes.Type.FOUNDATION)
 	check("торфяной пласт остаётся PEAT после землетрясения", w2.get_tile(3, 452) == TileTypes.Type.PEAT)
+
+	# Сценарная добыча обучающего круга (ГДД п.9): без неё первые три ряда
+	# огорода при части сидов не дают ничего продаваемого, и обучение
+	# «копаешь → продаёшь → заказываешь еду» упирается в пустой рюкзак.
+	var w3 := WorldGen.new(1)
+	var w4 := WorldGen.new(999999)
+	check("сценарная добыча лежит там же при любом сиде",
+		w3.get_tile(19, 1) == TileTypes.Type.SCRAP_METAL
+		and w4.get_tile(19, 1) == TileTypes.Type.SCRAP_METAL)
+	check("сценарная добыча зафиксирована (обвал её не трогает)",
+		w3.is_permanent_feature(19, 1))
+	check("сценарной добычи хватает на первый обед (40 монет)",
+		_scripted_loot_count(w3) * 5 >= 40)
+	w3.dig_cell(19, 1)
+	check("выкопанная сценарная добыча не отрастает", w3.get_tile(19, 1) == TileTypes.Type.EMPTY)
+	var rng3 := RandomNumberGenerator.new()
+	rng3.seed = 11
+	CollapseEvents.trigger_earthquake(w3, FogOfWar.new(), rng3)
+	check("землетрясение не возвращает выкопанную сценарную добычу",
+		w3.get_tile(19, 1) == TileTypes.Type.EMPTY)
+
+
+func _scripted_loot_count(w: WorldGen) -> int:
+	var n := 0
+	for y in range(1, 4):
+		for x in range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH):
+			if w.get_tile(x, y) == TileTypes.Type.SCRAP_METAL:
+				n += 1
+	return n
+

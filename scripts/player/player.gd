@@ -150,6 +150,12 @@ func release_control() -> void:
 # ---------------------------------------------------------------------------
 
 func has_backpack() -> bool:
+	# Ранец вручает сцена «Ранец» (data/story.json, эффект backpack_owned) —
+	# её флаг главнее глубины: иначе пропеллер появляется у героя за миг до
+	# того, как ролик про него показан. Глубина остаётся запасным признаком
+	# для сейвов, где сюжет уже пройден, отключён или сброшен.
+	if StoryState.has_flag("backpack_owned"):
+		return true
 	return GameState.max_depth_reached >= PROP_DEPTH
 
 

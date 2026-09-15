@@ -57,6 +57,7 @@ AUTHORED = (
     "env/workbench.png",
     "env/bed.png",
     "env/drill_mobile.png",
+    "tiles/",
 )
 
 

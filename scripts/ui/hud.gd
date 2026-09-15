@@ -710,8 +710,8 @@ func _build_more_menu() -> VBoxContainer:
 	return box
 
 
-## Всплывающая подпись инструмента: панелька над полосой, прижатая к левому
-## краю, гаснет сама через пару секунд. Отдельный узел, а не тост: тост
+## Всплывающая подпись инструмента: панелька над полосой, по центру, гаснет
+## сама через пару секунд. Отдельный узел, а не тост: тост
 ## занимает всю ширину и перекрывает игровой экран, а тут нужно одно слово
 ## ровно над кнопкой, по которой ткнули.
 func _build_tool_name_popup() -> void:
@@ -725,11 +725,12 @@ func _build_tool_name_popup() -> void:
 	sb.set_border_width_all(1)
 	sb.set_content_margin_all(4)
 	_tool_name_panel.add_theme_stylebox_override("panel", sb)
-	_tool_name_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_tool_name_panel.grow_horizontal = Control.GROW_DIRECTION_END
+	# По центру, а не над самой кнопкой: слева внизу лежит джойстик, и
+	# подпись садилась ему на край — ровно туда, где в этот момент палец.
+	_tool_name_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_tool_name_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_tool_name_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_tool_name_panel.offset_bottom = -STRIP_H - 2
-	_tool_name_panel.offset_left = 4
+	_tool_name_panel.offset_bottom = -STRIP_H - 4
 	add_child(_tool_name_panel)
 
 	_tool_name_label = Label.new()

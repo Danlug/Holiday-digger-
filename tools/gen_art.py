@@ -141,7 +141,8 @@ PALETTE = [
     ("parchment_border",  "#A4835A", "UI", "рамка панели"),
     ("ui_dark_bg",          "#241E2C", "UI", "тёмный фон слота инвентаря"),
     ("slot_border",          "#4A3F5C", "UI", "рамка слота"),
-    ("hunger_wheat",          "#D9A34A", "UI", "цвет колоса/хлеба для иконки голода"),
+    ("stomach_base",          "#C4706A", "UI", "стенка желудка для иконки голода"),
+    ("stomach_light",          "#E6A09A", "UI", "блик на желудке"),
 
     # --- Окружение (сверх переиспользуемых тонов) ---
     ("grass_field", "#4F7A34", "Окружение", "трава двора"),
@@ -891,11 +892,23 @@ def draw_icon_heart():
 
 def draw_icon_hunger():
     img = item_canvas()
-    # хлебный каравай
-    poly(img, [(6, 20), (8, 12), (16, 8), (24, 12), (26, 20), (16, 24)], C("hunger_wheat"))
-    line(img, [(11, 13), (21, 13)], shade(C("hunger_wheat"), 0.7), 1)
-    line(img, [(10, 17), (22, 17)], shade(C("hunger_wheat"), 0.7), 1)
-    blend_px(img, 10, 12, (255, 255, 255, 90))
+    base = C("stomach_base")
+    fold = shade(base, 0.72)
+    # желудок: широкий свод слева вверху, сужение к выходу справа внизу
+    line(img, [(11, 3), (11, 9)], base, 4)          # пищевод
+    ellipse(img, 14, 15, 8, 7, base, outline=OUTLINE)
+    ellipse(img, 18, 21, 6, 6, base, outline=OUTLINE)
+    # те же эллипсы на пиксель меньше и без обводки — затирают шов там,
+    # где они перекрываются, оставляя только внешний контур
+    ellipse(img, 14, 15, 7, 6, base)
+    ellipse(img, 18, 21, 5, 5, base)
+    line(img, [(22, 25), (27, 28)], base, 4)        # выход в кишку
+    # складки стенки
+    line(img, [(8, 17), (12, 19)], fold, 1)
+    line(img, [(9, 13), (12, 14)], fold, 1)
+    line(img, [(15, 24), (19, 25)], fold, 1)
+    blend_px(img, 11, 11, C("stomach_light"))
+    blend_px(img, 12, 10, C("stomach_light"))
     save(img, "ui/icon_hunger.png")
 
 

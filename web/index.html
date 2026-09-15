@@ -235,7 +235,9 @@ let viewH = 15;
    проваливался по клетке за кадр, и ни повернуть, ни разглядеть это было
    невозможно. */
 const G = 16;          // клеток/с²
-const JUMP_V = 8;      // v²/2g = 2 клетки подъёма
+const JUMP_V = 8.1;    // с учётом зависания даёт ровно 2.2 клетки подъёма
+const APEX_V = 2.0;    // |vy| ниже этого порога — зона зависания
+const APEX_G = 0.45;   // насколько слабее тяготение в этой зоне
 const WALK = 4.2;      // клеток/с по земле
 const AIR_CTRL = 0.82; // насколько слушается руля в воздухе
 const V_TERM = 17;     // предел скорости падения
@@ -328,8 +330,16 @@ function moveX(dt){
   S.x = Math.min(Math.max(S.x, HW), W.width - HW);
 }
 
+// Возле вершины прыжка и в момент смены знака скорости тяготение
+// ослабляется: скорость набирается и гасится по параболе, и без этой паузы
+// верхняя точка проскакивается мгновенно. Тем же местом потом гасится
+// падение при включении пропеллеров.
+function gravityNow(){
+  return Math.abs(S.vy) < APEX_V ? G * APEX_G : G;
+}
+
 function moveY(dt){
-  S.vy = Math.min(S.vy + G * dt, V_TERM);
+  S.vy = Math.min(S.vy + gravityNow() * dt, V_TERM);
   S.y += S.vy * dt;
   const left = S.x - HW + 0.02, right = S.x + HW - 0.02;
   S.onGround = false;
@@ -375,8 +385,15 @@ function jump(){
   S.apexY = S.y;
 }
 
+// Верхний слой земли зарастает: иначе игрок, погибший под своей же шахтой,
+// возрождается прямо над дырой и падает насмерть снова и снова.
+function restoreTopSoil(){
+  for (let x = 0; x < W.width; x++) W.grid[x] = W.pristine[x];
+}
+
 function die(){
   const lost = S.loadKg;
+  restoreTopSoil();
   S.loadKg = 0;
   S.hp = S.food = S.rest = 100;
   S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0; S.apexY = 0.5;
@@ -715,6 +732,7 @@ document.getElementById('reset').addEventListener('click', () => {
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
   S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
   S.target = null; S.digging = null;
+  if (W) W.grid.set(W.pristine);
   el.toolIcon.src = 'art/items/shovel.png';
   el.toolName.textContent = 'Лопата';
   reveal();
@@ -734,6 +752,7 @@ const loadImg = src => { const i = new Image(); i.src = src; return i; };
 fetch('world_dump.json').then(r => r.json()).then(data => {
   W = data;
   W.grid = Int16Array.from(W.grid);
+  W.pristine = Int16Array.from(W.grid);
   for (const name of Object.keys(W.art)){
     const f = W.art[name];
     if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);

@@ -105,12 +105,25 @@ func _build_gauges(parent: Control) -> void:
 	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
 
-	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52))
-	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A))
-	_stamina_fill = _make_gauge_row(box, Color8(0x6E, 0x93, 0xA8))
+	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
+	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
+	_stamina_fill = _make_gauge_row(box, Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
 
 
-func _make_gauge_row(parent: Control, fill_color: Color) -> ColorRect:
+func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> ColorRect:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 5)
+	parent.add_child(row)
+
+	if ResourceLoader.exists(icon_path):
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(13, 13)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = load(icon_path)
+		row.add_child(icon)
+
 	var track := Panel.new()
 	track.custom_minimum_size = Vector2(72, 8)
 	var sb := StyleBoxFlat.new()
@@ -118,7 +131,7 @@ func _make_gauge_row(parent: Control, fill_color: Color) -> ColorRect:
 	sb.border_color = Color(0, 0, 0, 0.55)
 	sb.set_border_width_all(1)
 	track.add_theme_stylebox_override("panel", sb)
-	parent.add_child(track)
+	row.add_child(track)
 
 	var fill := ColorRect.new()
 	fill.color = fill_color
@@ -137,17 +150,31 @@ func _build_purse(parent: Control) -> void:
 	box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	parent.add_child(box)
 
-	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B))
-	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B))
-	_load_label = _make_purse_row(box, Color8(0x8F, 0xA3, 0x5C))
+	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B), "res://art/ui/icon_coin.png")
+	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B), "res://art/ui/icon_dollar.png")
+	_load_label = _make_purse_row(box, Color8(0x8F, 0xA3, 0x5C), "res://art/ui/icon_inventory.png")
 
 
-func _make_purse_row(parent: Control, color: Color) -> Label:
+func _make_purse_row(parent: Control, color: Color, icon_path: String) -> Label:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 5)
+	parent.add_child(row)
+
 	var l := Label.new()
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", 12)
-	parent.add_child(l)
+	row.add_child(l)
+
+	if ResourceLoader.exists(icon_path):
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(14, 14)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = load(icon_path)
+		row.add_child(icon)
 	return l
 
 
@@ -425,8 +452,8 @@ func _sync_all() -> void:
 
 
 func _sync_purse() -> void:
-	_coins_label.text = str(GameState.coins) + " ⛁"
-	_dollars_label.text = str(GameState.dollars) + " $"
+	_coins_label.text = str(GameState.coins)
+	_dollars_label.text = str(GameState.dollars)
 	var load_kg := GameState.get_total_weight()
 	var max_kg := GameState.get_max_carry_kg()
 	_load_label.text = "%.1f / %.0f кг" % [load_kg, max_kg]

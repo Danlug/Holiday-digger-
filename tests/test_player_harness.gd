@@ -156,3 +156,20 @@ func _test_gear_unlock_by_depth() -> void:
 	GameState.max_depth_reached = player.JET_DEPTH
 	check("на глубине 100 открывается джетпак", player.has_jetpack())
 	check("на глубине 100 открывается ручной бур", player.has_hand_drill())
+	check("буровой машины на глубине 100 ещё нет", not player.has_drill_rig())
+	GameState.max_depth_reached = player.RIG_DEPTH - 1
+	check("на клетку выше порога буровой машины ещё нет", not player.has_drill_rig())
+	GameState.max_depth_reached = player.RIG_DEPTH
+	check("на глубине 1000 открывается буровая машина", player.has_drill_rig())
+
+	# Ступень должна не только открыться, но и включиться: сама машина в руках
+	# героя — это другой инструмент с другой скоростью копки. Владение выдаём
+	# руками: смена инструмента проходит через GameState.set_current_tool, а
+	# он требует, чтобы машина была куплена или скрафчена (ГДД п.5).
+	GameState.grant_tool("drill_rig")
+	player._announced_rig = false
+	player._check_gear_unlocks()
+	check("буровая машина становится текущим инструментом",
+			GameState.current_tool == "drill_rig")
+	check("буровая машина копает втрое быстрее кирки",
+			is_equal_approx(Balance.get_tool_speed_multiplier("drill_rig"), 3.0))

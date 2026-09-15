@@ -36,6 +36,9 @@ const CORNER := 5.0 / 32.0     # скругление углов коллизи�
 # --- снаряжение открывается по глубине (ГДД раздел 5/6) ---
 const PROP_DEPTH := 10
 const JET_DEPTH := 100
+# Буровая машина — следующая ступень после ручного бура. Глубина взята той
+# же логикой, что и остальные ступени: на порядок глубже предыдущей.
+const RIG_DEPTH := 1000
 
 # --- ранец с пропеллерами ---
 const PROP_SPEED := 2.5
@@ -85,6 +88,7 @@ var rusty_pickaxe_cracked: bool = false
 var _seen_foundation: bool = false
 var _announced_backpack: bool = false
 var _announced_jetpack: bool = false
+var _announced_rig: bool = false
 
 var frozen: bool = false       # true во время сцены смерти/катсцен — герой не управляется
 
@@ -92,6 +96,7 @@ var frozen: bool = false       # true во время сцены смерти/к
 func _ready() -> void:
 	_announced_backpack = has_backpack()
 	_announced_jetpack = has_jetpack()
+	_announced_rig = has_drill_rig()
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +161,13 @@ func has_hand_drill() -> bool:
 	return GameState.max_depth_reached >= JET_DEPTH
 
 
+## Буровая машина. Полной механики транспорта из ГДД раздела 5 (посадка в
+## кабину и высадка, топливо, перегрев, своя физика движения) здесь нет —
+## машина заведена как СТУПЕНЬ ИНСТРУМЕНТА: свой вид и своя скорость копки.
+func has_drill_rig() -> bool:
+	return GameState.max_depth_reached >= RIG_DEPTH
+
+
 func _check_gear_unlocks() -> void:
 	if has_backpack() and not _announced_backpack:
 		_announced_backpack = true
@@ -166,6 +178,12 @@ func _check_gear_unlocks() -> void:
 		if GameState.current_tool != "hand_drill":
 			GameState.set_current_tool("hand_drill")
 			tool_auto_switched.emit("hand_drill")
+	if has_drill_rig() and not _announced_rig:
+		_announced_rig = true
+		gear_unlocked.emit("drill_rig")
+		if GameState.current_tool != "drill_rig":
+			GameState.set_current_tool("drill_rig")
+			tool_auto_switched.emit("drill_rig")
 
 
 # ---------------------------------------------------------------------------

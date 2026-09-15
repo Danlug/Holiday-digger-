@@ -406,6 +406,22 @@ func _build_strip() -> void:
 	_gear_jet = _make_gear_icon(gear_box, "res://art/items/jetpack.png")
 	strip.add_child(gear_box)
 
+	# --- экономика: кнопка мастерской (scripts/shop/) ---
+	# Одна кнопка на всю экономику: шторка внутри сама делится на продажу,
+	# верстак и лавку. Из комнаты мастерской она же открывается вызовом
+	# ShopUI.open_workshop() — кнопка нужна, пока дома как сцены нет.
+	var shop_btn := _make_chip("")
+	if ResourceLoader.exists("res://art/ui/icon_coin.png"):
+		shop_btn.icon = load("res://art/ui/icon_coin.png")
+		shop_btn.expand_icon = true
+		shop_btn.custom_minimum_size = Vector2(24, STRIP_H)
+	else:
+		shop_btn.text = "Лавка"
+	shop_btn.tooltip_text = "Мастерская: продажа, верстак, лавка"
+	shop_btn.pressed.connect(func(): ShopUI.open_workshop())
+	strip.add_child(shop_btn)
+	# --- конец блока экономики ---
+
 	_mode_button = _make_chip("")
 	_mode_button.pressed.connect(_on_mode_button_pressed)
 	strip.add_child(_mode_button)
@@ -550,6 +566,9 @@ func _tool_icon_file(tool_id: String) -> String:
 		"rusty_pickaxe": return "pickaxe_rusty_cracked" if (player != null and player.rusty_pickaxe_cracked) else "pickaxe_rusty"
 		"iron_pickaxe": return "pickaxe_iron"
 		"hand_drill": return "hand_drill"
+		# Своей иконки у буровой машины нет — на полосе остаётся бур: машина
+		# и есть бур, только с кабиной и гусеницами.
+		"drill_rig": return "hand_drill"
 		_: return "shovel"
 
 
@@ -603,6 +622,8 @@ func _on_gear_unlocked(gear_id: String) -> void:
 		toast("Глубина 10. Пригодился ранец с пропеллерами — держи стик вверх в воздухе.", 5.0)
 	elif gear_id == "jetpack":
 		toast("Глубина 100. Собраны джетпак и ручной бур.", 5.0)
+	elif gear_id == "drill_rig":
+		toast("Глубина 1000. Собрана буровая машина — копает втрое быстрее бура.", 5.0)
 
 
 func _on_tool_switched(tool_id: String) -> void:

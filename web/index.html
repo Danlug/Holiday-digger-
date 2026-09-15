@@ -1,4 +1,3 @@
-<meta charset="utf-8">
 <title>Раскопки на каникулах</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -304,6 +303,13 @@ body{
 <script>
 const TILE = 32, VIEW_W = 7;
 const CHAR_W = 48, CHAR_H = 48;   // кадр персонажа шире клетки — см. draw()
+const GROUND_Y = 46;              // линия земли внутри кадра: подошва стоит здесь
+// Листы с кадром не 48×48: имя -> [ширина, высота, линия земли]. Бурмобиль по
+// ГДД п.5 занимает две клетки в ширину (64 px) и в кадр 48 не влезает, а
+// ужимать его нельзя — вместе с машиной ужимается герой в кабине. Лишняя
+// высота уходит ВНИЗ, под линию земли: бур, копающий вниз, входит в клетку
+// под машиной.
+const SHEET_FRAME = { dig_rig_down: [80, 56, 50], dig_rig_side: [80, 56, 50] };
 const cv = document.getElementById('screen');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -361,7 +367,7 @@ const V_TERM = 32;
 const HW = 0.38, HH = 0.46;
 
 // Снаряжение открывается по глубине (ГДД раздел 5)
-const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100;
+const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100, RIG_DEPTH = 1000;
 const PROP_SPEED = 2.5, PROP_RAMP = 3;
 const JUMP_TO_FLY_MS = 300;   // пауза между прыжком и включением тяги
 const JET_SPEED = 20, JET_RAMP = 5;
@@ -383,6 +389,7 @@ const FALL_POW = 2.16 * 2;
 const FALL_K = 0.154 / Math.pow(2 * G, 2.16);
 const SAFE_SPEED = Math.sqrt(2 * G * 5);   // скорость, набираемая за 5 клеток
 const DRILL_MULT = 0.45;   // ручной бур заметно быстрее кирки
+const RIG_MULT = 0.33;     // буровая машина: tools.drill_rig.speed_multiplier = 3.0
 // Физические углы тайлов слегка «скруглены»: если персонаж цепляется за угол
 // меньше чем на столько, его обводит мимо, а не останавливает. Визуально
 // тайлы не меняются — это только коллизии.
@@ -412,7 +419,7 @@ const S = {
   facing: 1,
   anim: 0,
   seenFoundation: false,
-  gear: { backpack: false, jetpack: false, drill: false },
+  gear: { backpack: false, jetpack: false, drill: false, rig: false },
   thrust: null,
   coasting: false,
   bag: new Map(),        // имя тайла -> количество; только добыча, земля и камень не в счёт
@@ -619,6 +626,15 @@ function checkUnlocks(){
     syncGear();
     toast('Глубина 100. Собраны <b>джетпак</b> и <b>ручной бур</b> — летишь без остановки и буришь вдвое быстрее.', 5200);
   }
+  // Буровая машина — ступень ИНСТРУМЕНТА, а не транспорт: меняются вид и
+  // скорость копки, посадки в кабину и топлива в демо нет (см. отчёт).
+  if (d >= RIG_DEPTH && !S.gear.rig){
+    S.gear.rig = true;
+    S.tool = 'rig';
+    el.toolIcon.src = 'art/items/hand_drill.png';
+    el.toolName.textContent = 'Буровая машина';
+    toast('Глубина 1000. Собрана <b>буровая машина</b> — копает втрое быстрее кирки.', 5200);
+  }
 }
 
 function syncGear(){
@@ -677,7 +693,7 @@ function startDig(x, y){
     toast(`Лопата звенит о <b>${meta(name).name.toLowerCase()}</b>. Буз-эффект — руки трясутся.`);
     return;
   }
-  const mult = S.tool === 'drill' ? DRILL_MULT : 1;
+  const mult = S.tool === 'rig' ? RIG_MULT : S.tool === 'drill' ? DRILL_MULT : 1;
   S.digging = { x, y, t: 0, total: meta(name).secs * mult / DEMO_SPEED, name };
 }
 
@@ -883,9 +899,16 @@ function draw(){
   }
 
   // Для каждого инструмента своя нарисованная анимация: лопата, дедова
-  // ржавая кирка и стальная кирка машут по-разному.
-  const digSheet = S.tool === 'shovel' ? 'dig_shovel'
-                 : S.tool === 'pickaxe' ? 'dig_pick_rusty' : 'dig_pick';
+  // ржавая кирка и стальная кирка машут по-разному. У бура и бурмобиля своя
+  // анимация ещё и на каждое НАПРАВЛЕНИЕ: копка вниз и копка вбок нарисованы
+  // отдельно. Направление берём из самой копаемой клетки — она либо прямо под
+  // героем, либо сбоку. У кирки и лопаты набор один на оба направления.
+  const digBase = S.tool === 'shovel' ? 'dig_shovel'
+                : S.tool === 'pickaxe' ? 'dig_pick_rusty'
+                : S.tool === 'rig' ? 'dig_rig'
+                : S.tool === 'drill' ? 'dig_drill' : 'dig_pick';
+  const digDir = S.digging && S.digging.y === cellY() + 1 ? '_down' : '_side';
+  const digSheet = charSprites[digBase + digDir] ? digBase + digDir : digBase;
   const sheet = S.digging ? digSheet
               : (!S.onGround
                   // ранец и джетпак выглядят по-разному — видно, на чём висишь
@@ -895,13 +918,19 @@ function draw(){
   // Кадр персонажа шире клетки: при 32 px замах киркой и винты ранца не
   // помещались, и спрайт приходилось ужимать — герой худел, стоило ему
   // начать копать. Тело по-прежнему ~20 px, вокруг просто есть поле.
-  const dx0 = Math.round(pcx - CHAR_W / 2), dy0 = Math.round(pcy - HH * TILE - 16);
+  // Размер кадра и линия земли — свои у каждого листа (см. SHEET_FRAME).
+  // Линия земли листа обязана лечь туда же, куда ложится подошва у кадра
+  // 48×48, иначе высокий кадр повиснет над землёй.
+  const [FW, FH, FG] = SHEET_FRAME[sheet] || [CHAR_W, CHAR_H, GROUND_Y];
+  const dx0 = Math.round(pcx - FW / 2);
+  const dy0 = Math.round(pcy - HH * TILE - 16 + (GROUND_Y - FG));
   if (img && img.complete && img.naturalWidth){
-    const frames = Math.max(1, Math.round(img.naturalWidth / CHAR_W));
+    const frames = Math.max(1, Math.round(img.naturalWidth / FW));
     const f = frames > 1 ? Math.floor(S.anim / 7) % frames : 0;
     ctx.save();
-    if (S.facing < 0){ ctx.translate(dx0 * 2 + CHAR_W, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(img, f * CHAR_W, 0, CHAR_W, CHAR_H, dx0, dy0, CHAR_W, CHAR_H);
+    // при отражении сдвиг зависит от ширины кадра, а она теперь разная
+    if (S.facing < 0){ ctx.translate(dx0 * 2 + FW, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(img, f * FW, 0, FW, FH, dx0, dy0, FW, FH);
     ctx.restore();
   } else {
     ctx.fillStyle = '#C9553F'; ctx.fillRect(dx0 + 8, dy0 + 18, 16, 26);
@@ -910,7 +939,7 @@ function draw(){
   if (performance.now() < S.stunUntil){
     ctx.fillStyle = '#E0A93B';
     ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 60);
-    ctx.fillRect(dx0 + 6, dy0 - 6, 20, 3);
+    ctx.fillRect(Math.round(pcx - CHAR_W / 2) + 6, dy0 - 6, 20, 3);
     ctx.globalAlpha = 1;
   }
 
@@ -1201,7 +1230,7 @@ document.getElementById('reset').addEventListener('click', () => {
   S.bag.clear(); closeInv();
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
-  S.gear.backpack = S.gear.jetpack = S.gear.drill = false;
+  S.gear.backpack = S.gear.jetpack = S.gear.drill = S.gear.rig = false;
   S.thrust = null; S.coasting = false;
   syncGear();
   S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
@@ -1232,7 +1261,8 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
     if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
   }
   for (let i = 1; i <= DIRT_VARIANTS; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
-  for (const a of ['idle','walk','fall','fly','fly_jet','dig_shovel','dig_pick','dig_pick_rusty'])
+  for (const a of ['idle','walk','fall','fly','fly_jet','dig_shovel','dig_pick','dig_pick_rusty',
+                   'dig_drill_down','dig_drill_side','dig_rig_down','dig_rig_side'])
     charSprites[a] = loadImg(`art/character/${a}.png`);
   el.toolIcon.src = 'art/items/shovel.png';
   el.gPack.src = 'art/items/backpack_propeller.png';

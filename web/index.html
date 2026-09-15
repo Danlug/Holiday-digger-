@@ -116,26 +116,66 @@ body{
 #toast.show{opacity:1;transform:none}
 #toast b{color:var(--gold);font-weight:800}
 
-.strip{flex:0 0 auto;display:flex;align-items:center;gap:8px}
-.tool{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
-.tool img{width:20px;height:20px;image-rendering:pixelated;flex:0 0 auto}
+.strip{flex:0 0 auto;display:flex;align-items:stretch;gap:6px;height:34px}
+.tool{
+  display:flex;align-items:center;gap:5px;min-width:0;flex:1;
+  padding-inline:2px;
+}
+.tool img{width:18px;height:18px;image-rendering:pixelated;flex:0 0 auto}
 .tool span{
   font-family:"Pixelify Sans","Manrope",sans-serif;
-  font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.gear{display:flex;align-items:center;gap:5px;flex:0 0 auto}
-.gear img{width:19px;height:19px;image-rendering:pixelated;opacity:.22;transition:opacity .3s}
+.gear{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.gear img{width:17px;height:17px;image-rendering:pixelated;opacity:.22;transition:opacity .3s}
 .chip{
+  display:flex;align-items:center;gap:5px;
   font-family:"Pixelify Sans","Manrope",sans-serif;font-size:11px;
   color:var(--muted);background:none;
-  border:1px solid var(--edge);padding:5px 9px;cursor:pointer;white-space:nowrap;
+  border:1px solid var(--edge);padding-inline:9px;cursor:pointer;white-space:nowrap;
 }
+.chip.inv{color:var(--bone);border-color:var(--muted)}
+.chip.inv img{width:15px;height:15px;image-rendering:pixelated}
+
+/* лист инвентаря */
+.sheet{
+  position:absolute;inset:0;
+  background:#120E0BF2;
+  display:flex;flex-direction:column;
+  font-size:13px;
+}
+.sheet[hidden]{display:none}
+.sheet-head{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 10px;border-bottom:1px solid var(--edge);
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+}
+.sheet-load{margin-left:auto;color:var(--moss);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.sheet-x{
+  background:none;border:1px solid var(--edge);color:var(--muted);
+  font:inherit;font-size:12px;line-height:1;padding:4px 7px;cursor:pointer;
+}
+.sheet-body{flex:1;overflow-y:auto;padding:6px 10px}
+.sheet-row{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 0;border-bottom:1px solid #FFFFFF10;
+}
+.sheet-row img{width:20px;height:20px;image-rendering:pixelated;flex:0 0 auto}
+.sheet-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-row .ct{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--bone)}
+.sheet-row .pr{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--gold);width:64px;text-align:right}
+.sheet-empty{color:var(--muted);padding:14px 0;text-align:center;line-height:1.5}
+.sheet-foot{
+  padding:9px 10px;border-top:1px solid var(--edge);
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+}
+.sheet-foot b{color:var(--gold)}
 .chip[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
 .chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 .controls{
   flex:0 0 auto;
-  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+  display:flex;align-items:flex-end;justify-content:flex-start;gap:12px;
   height:132px;
 }
 #stick{
@@ -192,22 +232,31 @@ body{
     </div>
     <div class="depth" id="depth"><span class="n" id="v-depth">0</span><span class="u">кл</span></div>
     <div id="toast"></div>
+    <div class="sheet" id="inv" hidden>
+      <div class="sheet-head">
+        <span>Инвентарь</span>
+        <span class="sheet-load" id="inv-load"></span>
+        <button class="sheet-x" id="inv-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="sheet-body" id="inv-list"></div>
+      <div class="sheet-foot">К продаже: <b id="inv-total">0</b> монет</div>
+    </div>
   </div>
 
   <div class="strip">
-    <div class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></div>
+    <button class="chip inv" id="inv-open" type="button"><img id="i-invbtn" alt="">Инвентарь</button>
+    <span class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></span>
     <span class="gear">
-      <img id="g-pack" alt="Ранец с пропеллерами" title="Ранец с пропеллерами — глубина 10">
+      <img id="g-pack" alt="Ранец" title="Ранец с пропеллерами — глубина 10">
       <img id="g-jet" alt="Джетпак" title="Джетпак — глубина 100">
     </span>
     <button class="chip" id="mode" type="button" aria-pressed="true">Джойстик</button>
-    <button class="chip" id="reset" type="button">Заново</button>
+    <button class="chip" id="reset" type="button">↺</button>
   </div>
 
   <div class="controls" id="controls">
     <div id="stick"><div class="up">ВВЕРХ — ПРЫЖОК</div><div id="knob"></div></div>
     <div class="taphint" id="taphint" hidden>Тапни по клетке —<br>герой пойдёт и будет копать</div>
-    <button class="abtn" id="b-dig" type="button">Копать</button>
   </div>
 </div>
 
@@ -234,7 +283,11 @@ const el = {
   knob: document.getElementById('knob'),
   taphint: document.getElementById('taphint'),
   mode: document.getElementById('mode'),
-  dig: document.getElementById('b-dig'),
+  invBtn: document.getElementById('inv-open'),
+  invSheet: document.getElementById('inv'),
+  invList: document.getElementById('inv-list'),
+  invLoad: document.getElementById('inv-load'),
+  invTotal: document.getElementById('inv-total'),
   gPack: document.getElementById('g-pack'),
   gJet: document.getElementById('g-jet'),
 };
@@ -310,6 +363,7 @@ const S = {
   gear: { backpack: false, jetpack: false, drill: false },
   thrust: null,
   coasting: false,
+  bag: new Map(),        // имя тайла -> количество; только добыча, земля и камень не в счёт
   fogRelief: new Set(),
   fogRes: new Set(),
   lastCell: '',
@@ -532,6 +586,8 @@ function die(){
   const lost = S.loadKg;
   restoreTopSoil();
   S.loadKg = 0;
+  S.bag.clear();
+  closeInv();
   S.hp = S.food = S.rest = 100;
   S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
   S.target = null; S.digging = null;
@@ -579,6 +635,8 @@ function finishDig(){
   } else {
     S.loadKg += m.weight;
     S.coins += m.price;
+    S.bag.set(d.name, (S.bag.get(d.name) || 0) + 1);
+    if (!el.invSheet.hidden) renderInv();
     if (m.price >= 100) toast(`<b>${m.name}!</b> +${m.price} монет`);
   }
   if (d.y > S.maxDepth){
@@ -606,7 +664,9 @@ function readTapIntent(){
 }
 
 function applyIntent(dt){
-  if (S.mode === 'tap') readTapIntent();
+  // пока открыт инвентарь, герой не бежит и не копает
+  if (!el.invSheet.hidden){ S.hold.dx = 0; S.hold.up = false; S.hold.down = false; }
+  else if (S.mode === 'tap') readTapIntent();
 
   if (S.digging){ S.vx = 0; return; }
 
@@ -822,18 +882,56 @@ el.stick.addEventListener('pointermove', e => {
 for (const t of ['pointerup','pointercancel','lostpointercapture'])
   el.stick.addEventListener(t, e => { if (e.pointerId === stickId) releaseStick(); });
 
-/* ── кнопка копать ── */
-function digPress(e){
-  e.preventDefault();
-  el.dig.classList.add('down');
-  const cx = cellX(), cy = cellY();
-  if (S.hold.down) startDig(cx, cy + 1);
-  else if (S.hold.dx !== 0) startDig(cx + S.hold.dx, cy);
-  else startDig(cx + S.facing, cy);
+/* ── инвентарь ──
+   Отдельной кнопки «копать» нет: герой сам вгрызается в породу, когда
+   упирается в неё джойстиком (см. applyIntent). Нижняя полоса свелась к
+   одной строке, и освободившееся место занял инвентарь. */
+function renderInv(){
+  const rows = [...S.bag.entries()].filter(([, n]) => n > 0);
+  // дороже — выше: игрок смотрит в рюкзак, чтобы понять, что он унёс
+  rows.sort((a, b) => meta(b[0]).price * b[1] - meta(a[0]).price * a[1]);
+
+  el.invLoad.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG} кг`;
+  el.invLoad.style.color = S.loadKg > MAX_KG * 0.85 ? 'var(--rust)' : '';
+
+  if (!rows.length){
+    el.invList.innerHTML = '<div class="sheet-empty">Рюкзак пуст.<br>Земля и камень в него не кладутся — только руда и находки.</div>';
+    el.invTotal.textContent = '0';
+    return;
+  }
+
+  let total = 0;
+  const html = [];
+  for (const [name, n] of rows){
+    const m = meta(name);
+    const sum = m.price * n;
+    total += sum;
+    const file = W.art[name];
+    const icon = file ? `<img src="art/tiles/${file}.png" alt="">` : '<img alt="">';
+    html.push(
+      `<div class="sheet-row">${icon}` +
+      `<span class="nm">${m.name}</span>` +
+      `<span class="ct">×${n}</span>` +
+      `<span class="pr">${sum.toLocaleString('ru-RU')}</span></div>`
+    );
+  }
+  el.invList.innerHTML = html.join('');
+  el.invTotal.textContent = total.toLocaleString('ru-RU');
 }
-el.dig.addEventListener('pointerdown', digPress);
-for (const t of ['pointerup','pointercancel','pointerleave'])
-  el.dig.addEventListener(t, () => el.dig.classList.remove('down'));
+
+function openInv(){
+  releaseStick();          // иначе джойстик останется «зажатым» под шторкой
+  S.digging = null;
+  renderInv();
+  el.invSheet.hidden = false;
+  el.invBtn.setAttribute('aria-pressed', 'true');
+}
+function closeInv(){
+  el.invSheet.hidden = true;
+  el.invBtn.setAttribute('aria-pressed', 'false');
+}
+el.invBtn.addEventListener('click', () => el.invSheet.hidden ? openInv() : closeInv());
+document.getElementById('inv-close').addEventListener('click', closeInv);
 
 /* ── клавиатура для проверки с компьютера ── */
 const K = {};
@@ -843,7 +941,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { K[e.code] = false; syncKeys(); });
 function syncKeys(){
-  if (S.mode !== 'stick') return;
+  if (S.mode !== 'stick' || !el.invSheet.hidden) return;
   const l = K.ArrowLeft || K.KeyA, r = K.ArrowRight || K.KeyD;
   S.hold.dx = (r ? 1 : 0) - (l ? 1 : 0);
   S.hold.up = !!(K.ArrowUp || K.KeyW || K.Space);
@@ -860,12 +958,11 @@ function setMode(m){
   el.mode.setAttribute('aria-pressed', String(stick));
   el.stick.style.display = stick ? '' : 'none';
   el.taphint.hidden = stick;
-  el.dig.style.visibility = stick ? '' : 'hidden';
 }
 el.mode.addEventListener('click', () => setMode(S.mode === 'stick' ? 'tap' : 'stick'));
 
 cv.addEventListener('pointerdown', ev => {
-  if (S.mode !== 'tap') return;
+  if (S.mode !== 'tap' || !el.invSheet.hidden) return;
   const r = cv.getBoundingClientRect();
   const cam = camera();
   const x = Math.floor(cam.x + (ev.clientX - r.left) / r.width * cv.width / TILE);
@@ -878,6 +975,7 @@ cv.addEventListener('pointerdown', ev => {
 document.getElementById('reset').addEventListener('click', () => {
   S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
   S.coins = 0; S.loadKg = 0;
+  S.bag.clear(); closeInv();
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
   S.gear.backpack = S.gear.jetpack = S.gear.drill = false;
@@ -920,6 +1018,7 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
   document.getElementById('i-coin').src = 'art/ui/icon_coin.png';
   document.getElementById('i-dollar').src = 'art/ui/icon_dollar.png';
   document.getElementById('i-inv').src = 'art/ui/icon_inventory.png';
+  document.getElementById('i-invbtn').src = 'art/ui/icon_inventory.png';
   document.getElementById('i-hp').src = 'art/ui/icon_hp.png';
   document.getElementById('i-food').src = 'art/ui/icon_hunger.png';
   document.getElementById('i-rest').src = 'art/ui/icon_stamina.png';

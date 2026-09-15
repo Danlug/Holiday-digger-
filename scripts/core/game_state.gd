@@ -190,6 +190,7 @@ func reset_progress() -> void:
 	completed_branches.clear()
 	game_clock_hours = 0.0
 	world_dug_cells.clear()
+	reset_economy()
 	hp_changed.emit(hp, get_max_hp())
 	stamina_changed.emit(stamina)
 	hunger_changed.emit(hunger)
@@ -423,6 +424,13 @@ func remove_from_black_box(id: String, count: int) -> bool:
 # ---------------------------------------------------------------------------
 
 func set_current_tool(tool_id: String) -> void:
+	# Ступени инструментов покупаются и крафтятся (ГДД п.5), а не выдаются по
+	# глубине: иначе кирка и бур приходят сами, и весь смысл копить сырьё
+	# исчезает. Владение проверяется здесь, в единственной точке смены
+	# инструмента, — см. блок "экономика" в конце файла.
+	if not owns_tool(tool_id):
+		tool_purchase_required.emit(tool_id)
+		return
 	current_tool = tool_id
 	tool_changed.emit(tool_id)
 
@@ -539,3 +547,119 @@ func get_dug_cells() -> Dictionary:
 
 func load_dug_cells(cells: Dictionary) -> void:
 	world_dug_cells = cells
+# ---------------------------------------------------------------------------
+# --- экономика ---
+# Блок системы магазина/мастерской (scripts/shop/): владение инструментами,
+# первый визит в мастерскую, одноразовое удвоение продажи с рекламы и счётчик
+# заработанного. Поля добавлены отдельным блоком в конец файла; существующие
+# поля выше не переименованы и не переставлены. Здесь только СОСТОЯНИЕ — вся
+# логика продажи и крафта живёт в scripts/shop/shop_service.gd, чтобы
+# GameState оставался загружаемым в headless-тестах без сцены магазина.
+# ---------------------------------------------------------------------------
+
+## Инструмент, за который надо платить, попросили надеть, не купив его.
+## Сигнал нужен магазину: он объясняет игроку, что ступень инструмента теперь
+## собирается на верстаке, а не выдаётся по глубине.
+signal tool_purchase_required(tool_id: String)
+
+## Инструменты, которые игрок реально получил. Лопата есть с самого начала
+## (ГДД п.5: "acquired: старт игры"), дедова кирка приходит квестом мастерской,
+## остальное — покупка и крафт.
+var owned_tools: Array = ["shovel"]
+
+## Игрок уже спускался в мастерскую. Первый спуск — сюжетная сцена с дедовой
+## киркой среди швабр и грабель (ГДД п.2), поэтому её нельзя выдать дважды.
+var workshop_visited: bool = false
+
+## Реклама "удвоить доход при продаже" (ГДД п.15) заряжена на ОДНУ сделку.
+## Хранится в состоянии, а не в UI: игрок смотрит ролик в магазине долларов,
+## а продаёт потом, уже в другой вкладке.
+var next_sale_doubled: bool = false
+
+## Сколько монет всего принесла продажа сырья. Нужно не для баланса, а для
+## лидерборда "топ по богатству" (ГДД п.17) и для проверки экономики на
+## живых цифрах: монеты тратятся, и по текущему кошельку не видно, сколько
+## шахта принесла на самом деле.
+var lifetime_coins_from_sales: int = 0
+
+
+## Есть ли инструмент на руках. Бесплатные ступени (лопата, дедова кирка)
+## владением не гейтятся: они приходят по сюжету, а не из магазина, — иначе
+## герой остался бы под фундаментом с одной лопатой, пока не найдёт монеты.
+func owns_tool(tool_id: String) -> bool:
+	if owned_tools.has(tool_id):
+		return true
+	return is_tool_free(tool_id)
+
+
+## Инструмент ничего не стоит (нет статьи cost или в ней одни нули).
+func is_tool_free(tool_id: String) -> bool:
+	var cost = Balance.unwrap(Balance.get_tool(tool_id).get("cost", {}))
+	if typeof(cost) != TYPE_DICTIONARY:
+		return true
+	for key in cost.keys():
+		if int(Balance.unwrap(cost[key])) > 0:
+			return false
+	return true
+
+
+## Выдать инструмент (крафт на верстаке, покупка, сюжетная находка).
+func grant_tool(tool_id: String) -> void:
+	if owned_tools.has(tool_id):
+		return
+	owned_tools.append(tool_id)
+
+
+## Материалы, вложенные в конкретный рецепт верстака:
+## recipe_id -> {item_id: количество}.
+##
+## Нужны потому, что железная кирка по ГДД п.5 стоит 25 железа, 10 бронзы и
+## 30 свинца — это 160 кг при грузоподъёмности 60 кг, и принести их за одну
+## ходку невозможно физически. Общего склада в игре нет и быть не должно
+## (ГДД п.14: сундук на поверхности отменён), поэтому материал кладётся не
+## "на склад", а В САМ ПРОЕКТ: вложенное назад не достаётся и продать его
+## нельзя, так что хранилищем это не работает.
+var craft_invested: Dictionary = {}
+
+
+## Сколько материала id уже вложено в рецепт recipe_id.
+func get_invested(recipe_id: String, item_id: String) -> int:
+	return int(Dictionary(craft_invested.get(recipe_id, {})).get(item_id, 0))
+
+
+func add_invested(recipe_id: String, item_id: String, count: int) -> void:
+	if count <= 0:
+		return
+	var project: Dictionary = craft_invested.get(recipe_id, {})
+	project[item_id] = int(project.get(item_id, 0)) + count
+	craft_invested[recipe_id] = project
+
+
+## Проект собран — вложенное израсходовано.
+func clear_invested(recipe_id: String) -> void:
+	craft_invested.erase(recipe_id)
+
+
+## Сброс экономической части прогресса. Вызывается из reset_progress(), чтобы
+## кнопка "Сброс" не оставляла игроку купленные кирки в новом огороде.
+func reset_economy() -> void:
+	owned_tools = ["shovel"]
+	workshop_visited = false
+	next_sale_doubled = false
+	lifetime_coins_from_sales = 0
+	craft_invested.clear()
+
+
+# ---------------------------------------------------------------------------
+# --- сюжет ---
+# Память катсцен и обучения (см. scripts/story/). Живёт здесь, а не в самом
+# сюжетном модуле, чтобы дом, магазин и игрок читали её одной строкой —
+# GameState.story_flags.get("hatch_built") и подобное — не подключая к себе
+# режиссёра. Пишет и читает эти поля StoryState, он же дублирует их на диск
+# в user://story.json (в общий сейв они не идут: катсцену надо запоминать в
+# момент показа, а не на ближайшем автосейве через минуту).
+# ---------------------------------------------------------------------------
+
+var story_flags: Dictionary = {}   # id флага -> true
+var story_seen: Array = []         # id уже показанных катсцен
+var story_queue: Array = []        # id сцен, которые ждут показа

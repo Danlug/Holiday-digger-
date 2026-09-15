@@ -422,6 +422,22 @@ func _build_strip() -> void:
 	strip.add_child(shop_btn)
 	# --- конец блока экономики ---
 
+	# --- экономика: кнопка мастерской (scripts/shop/) ---
+	# Одна кнопка на всю экономику: шторка внутри сама делится на продажу,
+	# верстак и лавку. Из комнаты мастерской она же открывается вызовом
+	# ShopUI.open_workshop() — кнопка нужна, пока дома как сцены нет.
+	var shop_btn := _make_chip("")
+	if ResourceLoader.exists("res://art/ui/icon_coin.png"):
+		shop_btn.icon = load("res://art/ui/icon_coin.png")
+		shop_btn.expand_icon = true
+		shop_btn.custom_minimum_size = Vector2(24, STRIP_H)
+	else:
+		shop_btn.text = "Лавка"
+	shop_btn.tooltip_text = "Мастерская: продажа, верстак, лавка"
+	shop_btn.pressed.connect(func(): ShopUI.open_workshop())
+	strip.add_child(shop_btn)
+	# --- конец блока экономики ---
+
 	_mode_button = _make_chip("")
 	_mode_button.pressed.connect(_on_mode_button_pressed)
 	strip.add_child(_mode_button)

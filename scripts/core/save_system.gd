@@ -76,6 +76,20 @@ static func _serialize() -> Dictionary:
 		},
 		"world_seed": gs.world_seed,
 		"world": _serialize_world(gs),
+
+		# --- экономика (scripts/shop/) ---
+		# Купленные и скрафченные инструменты обязаны переживать перезапуск:
+		# без этого железная кирка, стоившая 25 железа, 10 бронзы, 30 свинца и
+		# 200 монет, пропадает, а current_tool указывает на инструмент, которым
+		# игрок больше не владеет. Заряженное рекламой удвоение продажи тоже
+		# сохраняется — ролик уже просмотрен, и терять его при выходе нечестно.
+		"economy": {
+			"owned_tools": gs.owned_tools,
+			"workshop_visited": gs.workshop_visited,
+			"next_sale_doubled": gs.next_sale_doubled,
+			"lifetime_coins_from_sales": gs.lifetime_coins_from_sales,
+			"craft_invested": gs.craft_invested,
+		},
 	}
 
 
@@ -137,6 +151,16 @@ static func _apply(data: Dictionary) -> void:
 	gs.last_reset_utc_date = String(ads_data.get("last_reset_utc_date", gs.last_reset_utc_date))
 
 	gs.world_seed = int(data.get("world_seed", gs.world_seed))
+
+	var economy: Dictionary = data.get("economy", {})
+	# Старый сейв (до магазина) экономического блока не содержит: инструменты
+	# там не записаны, и восстановить их можно только по текущему инструменту —
+	# иначе игрок, уже собравший бур, теряет его при первой же загрузке.
+	gs.owned_tools = economy.get("owned_tools", ["shovel", gs.current_tool])
+	gs.workshop_visited = bool(economy.get("workshop_visited", gs.workshop_visited))
+	gs.next_sale_doubled = bool(economy.get("next_sale_doubled", false))
+	gs.lifetime_coins_from_sales = int(economy.get("lifetime_coins_from_sales", 0))
+	gs.craft_invested = economy.get("craft_invested", {})
 
 	var world_data: Dictionary = data.get("world", {})
 	if world_data.has("gen") and gs.world_ref != null:

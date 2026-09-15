@@ -72,6 +72,10 @@ func _ready() -> void:
 	_collapse_timer.timeout.connect(_on_collapse_tick)
 	add_child(_collapse_timer)
 
+	# --- подключение модулей (одна строка на модуль) ---
+	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
+	# --- конец блока подключения ---
+
 	hud.toast("Бабка улетела в Таиланд. Огород твой — копай.", 3.6)
 
 

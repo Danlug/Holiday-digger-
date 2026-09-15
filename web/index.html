@@ -105,7 +105,8 @@ body{
 
 #toast{
   position:absolute;
-  left:8px;right:8px;bottom:8px;
+  /* поднят над джойстиком: тот теперь лежит поверх экрана слева внизу */
+  left:8px;right:8px;bottom:140px;
   background:#120E0BEE;
   border:1px solid var(--edge);border-left:3px solid var(--gold);
   padding:8px 10px;font-size:13px;line-height:1.35;
@@ -136,6 +137,41 @@ body{
 }
 .chip.inv{color:var(--bone);border-color:var(--muted)}
 .chip.inv img{width:15px;height:15px;image-rendering:pixelated}
+
+/* Джойстик лежит поверх игрового экрана, а не отдельной панелью под ним:
+   так экрану достаётся вся высота, а большой палец остаётся там же, где
+   держит телефон. */
+#stick{
+  position:absolute;left:12px;bottom:12px;
+  width:118px;height:118px;
+  border-radius:50%;
+  background:radial-gradient(circle at 50% 50%, #241C15C0 0%, #1A140FA8 70%, transparent 71%);
+  border:1px solid #6A563FA0;
+  touch-action:none;
+}
+#stick::before,#stick::after{content:"";position:absolute;background:#6A563F60}
+#stick::before{left:12%;right:12%;top:calc(50% - 1px);height:1px}
+#stick::after{top:12%;bottom:12%;left:calc(50% - 1px);width:1px}
+#knob{
+  position:absolute;width:46px;height:46px;left:36px;top:36px;
+  border-radius:50%;
+  background:#3A2C20;border:2px solid var(--muted);
+  box-shadow:0 2px 0 #0007;
+  transition:transform .05s linear, border-color .12s;
+}
+#knob.live{border-color:var(--gold)}
+#stick .up{
+  position:absolute;top:7px;left:50%;transform:translateX(-50%);
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:9px;color:var(--moss);letter-spacing:.06em;pointer-events:none;
+  white-space:nowrap;
+}
+.holdhint{
+  position:absolute;left:10px;right:10px;bottom:12px;
+  text-align:center;font-size:11px;color:var(--muted);line-height:1.45;
+  text-shadow:0 1px 3px #000;pointer-events:none;
+}
+.holdhint[hidden]{display:none}
 
 /* лист инвентаря */
 .sheet{
@@ -173,47 +209,6 @@ body{
 .chip[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
 .chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
-.controls{
-  flex:0 0 auto;
-  display:flex;align-items:flex-end;justify-content:flex-start;gap:12px;
-  height:132px;
-}
-#stick{
-  position:relative;
-  width:124px;height:124px;flex:0 0 auto;
-  border-radius:50%;
-  background:radial-gradient(circle at 50% 50%, #241C1580 0%, #1A140F80 70%, transparent 71%);
-  border:1px solid var(--edge);
-  touch-action:none;
-}
-#stick::before,#stick::after{content:"";position:absolute;background:var(--edge)}
-#stick::before{left:10%;right:10%;top:calc(50% - 1px);height:1px}
-#stick::after{top:10%;bottom:10%;left:calc(50% - 1px);width:1px}
-#knob{
-  position:absolute;width:48px;height:48px;left:38px;top:38px;
-  border-radius:50%;
-  background:#3A2C20;border:2px solid var(--muted);
-  box-shadow:0 2px 0 #0007;
-  transition:transform .06s linear;
-}
-#stick .up{
-  position:absolute;top:6px;left:50%;transform:translateX(-50%);
-  font-family:"Pixelify Sans","Manrope",sans-serif;
-  font-size:9px;color:var(--moss);letter-spacing:.06em;pointer-events:none;
-}
-.abtn{
-  width:84px;height:60px;
-  font-family:"Pixelify Sans","Manrope",sans-serif;font-size:14px;
-  color:var(--gold);background:#2A2018;
-  border:1px solid var(--edge);border-bottom-width:3px;
-  cursor:pointer;touch-action:none;
-}
-.abtn.down{background:#3A2C20;border-bottom-width:1px;transform:translateY(2px)}
-.abtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.taphint{
-  flex:1;align-self:center;text-align:center;
-  font-size:12px;color:var(--muted);line-height:1.4;
-}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -232,6 +227,8 @@ body{
     </div>
     <div class="depth" id="depth"><span class="n" id="v-depth">0</span><span class="u">кл</span></div>
     <div id="toast"></div>
+    <div id="stick"><div class="up">ВВЕРХ — ПРЫЖОК</div><div id="knob"></div></div>
+    <div class="holdhint" id="holdhint" hidden>Зажми экран в нужную сторону — герой пойдёт туда и будет копать.<br>Отпустил — остановился.</div>
     <div class="sheet" id="inv" hidden>
       <div class="sheet-head">
         <span>Инвентарь</span>
@@ -252,11 +249,6 @@ body{
     </span>
     <button class="chip" id="mode" type="button" aria-pressed="true">Джойстик</button>
     <button class="chip" id="reset" type="button">↺</button>
-  </div>
-
-  <div class="controls" id="controls">
-    <div id="stick"><div class="up">ВВЕРХ — ПРЫЖОК</div><div id="knob"></div></div>
-    <div class="taphint" id="taphint" hidden>Тапни по клетке —<br>герой пойдёт и будет копать</div>
   </div>
 </div>
 
@@ -281,7 +273,7 @@ const el = {
   stage: document.getElementById('stage'),
   stick: document.getElementById('stick'),
   knob: document.getElementById('knob'),
-  taphint: document.getElementById('taphint'),
+  hint: document.getElementById('holdhint'),
   mode: document.getElementById('mode'),
   invBtn: document.getElementById('inv-open'),
   invSheet: document.getElementById('inv'),
@@ -315,6 +307,7 @@ const HW = 0.38, HH = 0.46;
 // Снаряжение открывается по глубине (ГДД раздел 5)
 const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100;
 const PROP_SPEED = 2.5, PROP_RAMP = 3;
+const JUMP_TO_FLY_MS = 300;   // пауза между прыжком и включением тяги
 const JET_SPEED = 20, JET_RAMP = 5;
 // Пока герой ещё падает, тяга работает тормозом и гасит скорость намного
 // резче, чем потом разгоняет вверх. Без этого подъёмная сила ранца
@@ -356,6 +349,9 @@ const S = {
   hold: { dx: 0, up: false, down: false },
   target: null,
   mode: 'stick',
+  dirZone: null,         // 'side' | 'up' | 'down' — залипание вектора управления
+  touch: null,           // удержание пальца на экране в режиме без джойстика
+  flyArmAt: 0,           // раньше этого момента тяга не включается — сначала прыжок
   reliefR: 2, resR: 1,
   facing: 1,
   anim: 0,
@@ -533,9 +529,15 @@ function land(){
 
 function updateFlight(){
   const was = S.thrust;
-  if (!S.hold.up || S.onGround || S.digging) S.thrust = null;
-  else if (S.gear.jetpack) S.thrust = 'jet';
-  else S.thrust = S.gear.backpack ? 'prop' : null;
+  let want = null;
+  if (S.hold.up && !S.onGround && !S.digging)
+    want = S.gear.jetpack ? 'jet' : (S.gear.backpack ? 'prop' : null);
+
+  // Тяга включается не раньше, чем через JUMP_TO_FLY_MS после толчка И
+  // только когда прыжок перешёл в падение (vy >= 0). Иначе прыжок с земли
+  // мгновенно превращался во взлёт, и подпрыгнуть было нечем.
+  if (want && !was && (performance.now() < S.flyArmAt || S.vy < 0)) want = null;
+  S.thrust = want;
 
   if (was && !S.thrust && S.vy < 0) S.coasting = true;
   if (S.thrust || S.vy >= 0 || S.onGround) S.coasting = false;
@@ -574,6 +576,9 @@ function jump(){
   if (solidPt(S.x, S.y - HH - 0.1)){ toast('Над головой порода — не подпрыгнуть.'); return; }
   S.vy = -JUMP_V;
   S.onGround = false;
+  // Прыжок и взлёт больше не сливаются в одно движение: пока прыжок не
+  // выдохся, ранец молчит. Отсчёт идёт от толчка.
+  S.flyArmAt = performance.now() + JUMP_TO_FLY_MS;
 }
 
 // Верхний слой земли зарастает: иначе игрок, погибший под своей же шахтой,
@@ -590,7 +595,7 @@ function die(){
   closeInv();
   S.hp = S.food = S.rest = 100;
   S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
-  S.target = null; S.digging = null;
+  S.digging = null;
   toast(`Ты погиб. Минералы потеряны (<b>${lost.toFixed(1)}</b> кг). В игре уцелел бы только чёрный ящик.`, 4200);
 }
 
@@ -612,7 +617,7 @@ function startDig(x, y){
   if (S.tool === 'shovel' && y > 4){ toast('Лопатой глубже четвёртой клетки не достать.'); return; }
   if (!canDig(name)){
     S.stunUntil = performance.now() + STUN_MS;
-    S.digging = null; S.target = null;
+    S.digging = null;
     toast(`Лопата звенит о <b>${meta(name).name.toLowerCase()}</b>. Буз-эффект — руки трясутся.`);
     return;
   }
@@ -653,20 +658,64 @@ function givePickaxe(){
 }
 
 /* ── намерение игрока ── */
-function readTapIntent(){
-  S.hold.dx = 0; S.hold.up = false; S.hold.down = false;
-  if (!S.target) return;
-  const cx = cellX(), cy = cellY();
-  if (S.target.x === cx && S.target.y === cy){ S.target = null; return; }
-  if (S.target.x !== cx) S.hold.dx = Math.sign(S.target.x - cx);
-  else if (S.target.y > cy) S.hold.down = true;
-  else if (S.target.y < cy) S.hold.up = true;
+/* ── магнетизм управления ──
+   Раньше любое отклонение стика вниз читалось как «копать», а вверх — как
+   «прыгать», и шаг вбок превращался в яму под ногами от одного неточного
+   миллиметра. Теперь направление решается по УГЛУ, а не по осям: пока
+   вектор ближе к горизонтали, это всегда шаг. Вверх и вниз включаются
+   только за 45° — то есть намеренным движением, а не дрожью пальца.
+   Пороги разные на вход и на выход (45° / 33°), чтобы на самой границе
+   режим не мигал. */
+const ANG_ON = 45, ANG_OFF = 33;   // градусы от горизонтали
+const ANG_PURE = 72;               // круче — чистая вертикаль, без шага вбок
+
+// Возвращает нормированный вектор «залипания» для отрисовки ручки стика.
+function resolveDir(vx, vy, dead){
+  const len = Math.hypot(vx, vy);
+  if (len < dead){
+    S.dirZone = null;
+    S.hold.dx = 0; S.hold.up = false; S.hold.down = false;
+    return null;
+  }
+  const ang = Math.atan2(-vy, Math.abs(vx)) * 180 / Math.PI;   // -90..90
+  const z = S.dirZone;
+  let zone;
+  if (z === 'up') zone = ang > ANG_OFF ? 'up' : (ang < -ANG_ON ? 'down' : 'side');
+  else if (z === 'down') zone = ang < -ANG_OFF ? 'down' : (ang > ANG_ON ? 'up' : 'side');
+  else zone = ang > ANG_ON ? 'up' : (ang < -ANG_ON ? 'down' : 'side');
+  S.dirZone = zone;
+
+  const side = vx === 0 ? 0 : Math.sign(vx);
+  if (zone === 'side'){
+    S.hold.dx = side; S.hold.up = false; S.hold.down = false;
+    return { x: side, y: 0 };
+  }
+  if (zone === 'up'){
+    // до 72° можно бежать и прыгать одновременно, круче — чистый взлёт
+    S.hold.dx = ang < ANG_PURE ? side : 0;
+    S.hold.up = true; S.hold.down = false;
+    return { x: S.hold.dx * 0.55, y: -1 };
+  }
+  // вниз копаем строго под собой: это всегда осознанное действие
+  S.hold.dx = 0; S.hold.up = false; S.hold.down = true;
+  return { x: 0, y: 1 };
+}
+
+/* Удержание пальца: герой идёт (или копает) в ту сторону, где палец
+   относительно него, и останавливается, как только палец отпущен. */
+function readHoldIntent(){
+  if (!S.touch){ resolveDir(0, 0, 1); return; }
+  const r = cv.getBoundingClientRect();
+  const cam = camera();
+  const wx = cam.x + (S.touch.x - r.left) / r.width * cv.width / TILE;
+  const wy = cam.y + (S.touch.y - r.top) / r.height * cv.height / TILE;
+  resolveDir(wx - S.x, wy - S.y, 0.45);
 }
 
 function applyIntent(dt){
   // пока открыт инвентарь, герой не бежит и не копает
   if (!el.invSheet.hidden){ S.hold.dx = 0; S.hold.up = false; S.hold.down = false; }
-  else if (S.mode === 'tap') readTapIntent();
+  else if (S.mode === 'hold') readHoldIntent();
 
   if (S.digging){ S.vx = 0; return; }
 
@@ -844,7 +893,7 @@ function loop(now){
 
 /* ── джойстик ── */
 let stickId = null;
-const DEAD = 0.3;
+const DEAD = 0.26;   // мёртвая зона по радиусу; направление решает угол
 function stickVec(ev){
   const r = el.stick.getBoundingClientRect();
   let vx = (ev.clientX - r.left - r.width / 2) / (r.width / 2);
@@ -854,21 +903,33 @@ function stickVec(ev){
   return { vx, vy };
 }
 function applyStick(v){
-  el.knob.style.transform = `translate(${v.vx * 34}px, ${v.vy * 34}px)`;
-  // оси читаются независимо: можно держать вбок и одновременно прыгнуть
-  S.hold.dx = Math.abs(v.vx) > DEAD ? Math.sign(v.vx) : 0;
-  S.hold.up = v.vy < -DEAD;
-  S.hold.down = v.vy > DEAD && Math.abs(v.vx) <= DEAD;
-  if (S.digging){
-    const wrongSide = S.hold.dx && S.digging.x !== cellX() + S.hold.dx;
-    const leftDown = !S.hold.down && S.digging.y === cellY() + 1;
-    if (wrongSide || (leftDown && S.hold.dx)) S.digging = null;
+  const snap = resolveDir(v.vx, v.vy, DEAD);
+  // Ручка притягивается к распознанному направлению, а не идёт за пальцем:
+  // так сразу видно, что игра поняла — шаг, прыжок или копка.
+  if (snap){
+    el.knob.style.transform = `translate(${snap.x * 34}px, ${snap.y * 34}px)`;
+    el.knob.classList.add('live');
+  } else {
+    el.knob.style.transform = '';
+    el.knob.classList.remove('live');
   }
+  cancelWrongDig();
 }
+
+// Копка отменяется, если игрок увёл управление с той клетки, которую копал.
+function cancelWrongDig(){
+  if (!S.digging) return;
+  const wrongSide = S.hold.dx && S.digging.x !== cellX() + S.hold.dx;
+  const leftDown = !S.hold.down && S.digging.y === cellY() + 1;
+  if (wrongSide || (leftDown && S.hold.dx)) S.digging = null;
+}
+
 function releaseStick(){
   stickId = null;
+  S.dirZone = null;
   S.hold.dx = 0; S.hold.up = false; S.hold.down = false;
   el.knob.style.transform = '';
+  el.knob.classList.remove('live');
 }
 el.stick.addEventListener('pointerdown', e => {
   e.preventDefault();
@@ -921,6 +982,7 @@ function renderInv(){
 
 function openInv(){
   releaseStick();          // иначе джойстик останется «зажатым» под шторкой
+  S.touch = null;
   S.digging = null;
   renderInv();
   el.invSheet.hidden = false;
@@ -941,36 +1003,49 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { K[e.code] = false; syncKeys(); });
 function syncKeys(){
-  if (S.mode !== 'stick' || !el.invSheet.hidden) return;
+  if (!el.invSheet.hidden) return;
   const l = K.ArrowLeft || K.KeyA, r = K.ArrowRight || K.KeyD;
   S.hold.dx = (r ? 1 : 0) - (l ? 1 : 0);
   S.hold.up = !!(K.ArrowUp || K.KeyW || K.Space);
   S.hold.down = !!(K.ArrowDown || K.KeyS) && S.hold.dx === 0;
+  cancelWrongDig();
 }
 
 /* ── режим управления ── */
 function setMode(m){
   S.mode = m;
-  S.target = null;
   releaseStick();
+  S.touch = null;
   const stick = m === 'stick';
-  el.mode.textContent = stick ? 'Джойстик' : 'Тап по клетке';
+  el.mode.textContent = stick ? 'Джойстик' : 'Удержание';
   el.mode.setAttribute('aria-pressed', String(stick));
   el.stick.style.display = stick ? '' : 'none';
-  el.taphint.hidden = stick;
+  el.hint.hidden = stick;
 }
-el.mode.addEventListener('click', () => setMode(S.mode === 'stick' ? 'tap' : 'stick'));
+el.mode.addEventListener('click', () => setMode(S.mode === 'stick' ? 'hold' : 'stick'));
 
+/* ── удержание пальца на экране ──
+   Не «тап по клетке с автопоходом», а именно удержание: пока палец на
+   экране, герой идёт или копает в его сторону; отпустил — встал. */
+let touchId = null;
 cv.addEventListener('pointerdown', ev => {
-  if (S.mode !== 'tap' || !el.invSheet.hidden) return;
-  const r = cv.getBoundingClientRect();
-  const cam = camera();
-  const x = Math.floor(cam.x + (ev.clientX - r.left) / r.width * cv.width / TILE);
-  const y = Math.floor(cam.y + (ev.clientY - r.top) / r.height * cv.height / TILE);
-  if (x < 0 || x >= W.width) return;
-  S.digging = null;
-  S.target = { x, y };
+  if (S.mode !== 'hold' || !el.invSheet.hidden) return;
+  ev.preventDefault();
+  touchId = ev.pointerId;
+  cv.setPointerCapture(ev.pointerId);
+  S.touch = { x: ev.clientX, y: ev.clientY };
 });
+cv.addEventListener('pointermove', ev => {
+  if (ev.pointerId === touchId) S.touch = { x: ev.clientX, y: ev.clientY };
+});
+for (const t of ['pointerup','pointercancel','lostpointercapture'])
+  cv.addEventListener(t, ev => {
+    if (ev.pointerId !== touchId) return;
+    touchId = null;
+    S.touch = null;
+    S.dirZone = null;
+    S.digging = null;
+  });
 
 document.getElementById('reset').addEventListener('click', () => {
   S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
@@ -982,7 +1057,7 @@ document.getElementById('reset').addEventListener('click', () => {
   S.thrust = null; S.coasting = false;
   syncGear();
   S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
-  S.target = null; S.digging = null;
+  S.digging = null;
   if (W) W.grid.set(W.pristine);
   el.toolIcon.src = 'art/items/shovel.png';
   el.toolName.textContent = 'Лопата';

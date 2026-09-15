@@ -333,17 +333,23 @@ func _build_inventory_sheet(parent: Control) -> void:
 
 	var title := Label.new()
 	title.text = "Инвентарь"
+	title.add_theme_font_size_override("font_size", 12)
 	head.add_child(title)
 
 	_inv_load_label = Label.new()
 	_inv_load_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_inv_load_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_inv_load_label.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
+	_inv_load_label.add_theme_font_size_override("font_size", 10)
 	head.add_child(_inv_load_label)
 
 	var close_btn := Button.new()
-	close_btn.text = "✕"
-	close_btn.custom_minimum_size = Vector2(24, 24)
+	# Именно × (U+00D7), а не ✕ (U+2715): последнего в шрифте темы по
+	# умолчанию нет, и он рисуется пустым квадратом (та же ловушка, что со
+	# стрелкой ↺ на кнопке сброса).
+	close_btn.text = "×"
+	close_btn.add_theme_font_size_override("font_size", 10)
+	close_btn.custom_minimum_size = Vector2(20, 20)
 	close_btn.pressed.connect(close_inventory)
 	head.add_child(close_btn)
 
@@ -364,9 +370,11 @@ func _build_inventory_sheet(parent: Control) -> void:
 	_inv_sheet.add_child(foot)
 	var foot_label := Label.new()
 	foot_label.text = "К продаже:"
+	foot_label.add_theme_font_size_override("font_size", 11)
 	foot.add_child(foot_label)
 	_inv_total_label = Label.new()
 	_inv_total_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	_inv_total_label.add_theme_font_size_override("font_size", 11)
 	foot.add_child(_inv_total_label)
 
 	_build_drop_panel(_inv_sheet)
@@ -959,6 +967,7 @@ func _render_inventory() -> void:
 	if rows.is_empty():
 		var empty := Label.new()
 		empty.text = "Рюкзак пуст.\nЗемля и камень в него не кладутся — только руда и находки."
+		empty.add_theme_font_size_override("font_size", 10)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_inv_list.add_child(empty)
@@ -969,7 +978,7 @@ func _render_inventory() -> void:
 			total += row.sum
 			var line := HBoxContainer.new()
 			var icon := TextureRect.new()
-			icon.custom_minimum_size = Vector2(20, 20)
+			icon.custom_minimum_size = Vector2(16, 16)
 			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			var tex := TileArt.texture_for(MineralMap.tile_type_for(row.id), 0, 0)
@@ -978,21 +987,25 @@ func _render_inventory() -> void:
 			line.add_child(icon)
 			var name_label := Label.new()
 			name_label.text = String(Balance.get_mineral(row.id).get("name_ru", row.id))
+			name_label.add_theme_font_size_override("font_size", 10)
+			name_label.clip_text = true
 			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			line.add_child(name_label)
 			var count_label := Label.new()
 			count_label.text = "×%d" % row.count
+			count_label.add_theme_font_size_override("font_size", 10)
 			line.add_child(count_label)
 			var sum_label := Label.new()
 			sum_label.text = str(row.sum)
-			sum_label.custom_minimum_size = Vector2(56, 0)
+			sum_label.add_theme_font_size_override("font_size", 10)
+			sum_label.custom_minimum_size = Vector2(34, 0)
 			sum_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			sum_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
 			line.add_child(sum_label)
 			# Выбросить: рюкзак заполняется задолго до подъёма, и без этого
 			# единственный способ освободить место под алмаз — идти домой.
 			var drop_btn := Button.new()
-			drop_btn.text = "✕"
+			drop_btn.text = "×"  # ✕ (U+2715) в шрифте темы отсутствует, см. выше
 			drop_btn.tooltip_text = "Выбросить"
 			drop_btn.add_theme_font_size_override("font_size", 10)
 			drop_btn.custom_minimum_size = Vector2(22, 20)

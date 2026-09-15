@@ -18,6 +18,7 @@
 Запуск:  python3 tools/import_art.py <путь-к-листу.jpg>
 """
 
+import math
 import os
 import sys
 from collections import deque
@@ -27,7 +28,10 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TILE = 32
-FRAME_H = 48          # кадр персонажа 32×48 — под него написаны оба рендерера
+FRAME_W = 48          # кадр персонажа 48×48. Шире клетки намеренно: в 32 px
+FRAME_H = 48          # не помещались ни замах киркой, ни винты ранца, и весь
+                      # спрайт приходилось ужимать под ширину — герой худел,
+                      # стоило ему начать копать
 BODY_H = 40           # рост героя в игровых пикселях (авторская метка 20×40)
 FOOT_PAD = 2          # отступ от низа кадра до подошвы
 
@@ -232,7 +236,7 @@ def compose_src(body, dy_body=0, legs=None, pad=None):
     return out
 
 
-def shrink_set(frames, body_src_h):
+def shrink_set(frames, body_src_h, fit_height=True):
     """Уменьшить набор кадров ОДНИМ масштабом и по ОБЩЕЙ рамке.
 
     Общая рамка обязательна: если резать каждый кадр по своему содержимому,
@@ -244,13 +248,15 @@ def shrink_set(frames, body_src_h):
     x1 = max(b[2] for b in boxes); y1 = max(b[3] for b in boxes)
     w, h = x1 - x0, y1 - y0
 
-    k = min(BODY_H / body_src_h, TILE / w, (FRAME_H - FOOT_PAD) / h)
+    k = min(BODY_H / body_src_h, FRAME_W / w)
+    if fit_height:
+        k = min(k, (FRAME_H - FOOT_PAD) / h)
     size = (max(1, round(w * k)), max(1, round(h * k)))
     return [shrink(f.crop((x0, y0, x1, y1)), size) for f in frames]
 
 
-def strip(frames, frame_w=TILE, frame_h=FRAME_H, bottom_pad=FOOT_PAD):
-    """Горизонтальная полоса кадров 32×48 — формат, который читают оба рендерера."""
+def strip(frames, frame_w=FRAME_W, frame_h=FRAME_H, bottom_pad=FOOT_PAD):
+    """Горизонтальная полоса кадров 48×48 — формат, который читают оба рендерера."""
     sheet = Image.new("RGBA", (frame_w * len(frames), frame_h), (0, 0, 0, 0))
     for i, f in enumerate(frames):
         x = i * frame_w + (frame_w - f.size[0]) // 2
@@ -299,56 +305,144 @@ def anim_sleep(body):
 
 
 # --- полёт со снаряжением --------------------------------------------------
+#
+# Персонаж нарисован анфас: ранец, положенный целиком за спину, не виден
+# вовсе — туловище закрывает его полностью. Поэтому ранец разбирается на две
+# части. Мешок уходит за спину, а винты поднимаются НАД ГОЛОВОЙ на мачте:
+# только так сразу понятно, что герой висит на пропеллерах, а не сам по себе.
 
-# Снаряжение на спине: (ширина в долях тела, где низ ранца по росту).
-# Персонаж нарисован анфас, поэтому ранец целиком за спиной не виден вообще —
-# читаются только те части, что выходят за силуэт. Ранцу дана ширина больше
-# тела, чтобы винты торчали по бокам на уровне плеч; джетпак опущен к ногам,
-# чтобы из-за них были видны сопла.
-GEAR_FIT = {
-    "backpack_propeller": (1.45, 0.62),
-    "jetpack": (1.25, 0.78),
-}
+BAR_SHARE = 0.28      # какая доля высоты ранца сверху — это винты
+BAG_WIDE = 1.35       # мешок в долях ширины тела (уже тела — и его не
+                      # видно вовсе: спрятан за корпусом)
+BLADE_SPAN = 2.4      # размах винта в долях ширины тела
+BAR_ABOVE = 0.15      # насколько винт выше макушки, в долях роста
+MAST_W = 0.09         # толщина мачты в долях ширины тела
 
 
-def anim_fly(body, gear=None, gear_name=""):
-    """Ранец или джетпак виден за спиной: без него персонаж просто висит в
-    воздухе без всякой причины."""
-    poses = [
+def _split_pack(gear):
+    h = gear.size[1]
+    cut_y = round(h * BAR_SHARE)
+    return gear.crop((0, 0, gear.size[0], cut_y)), gear.crop((0, cut_y, gear.size[0], h))
+
+
+def _dark_of(img):
+    """Самый тёмный непрозрачный цвет — им красим мачту, чтобы она читалась
+    как часть ранца, а не как посторонняя палка."""
+    p = img.load()
+    best, score = (60, 48, 38, 255), 1e9
+    for y in range(img.size[1]):
+        for x in range(img.size[0]):
+            c = p[x, y]
+            if c[3] and sum(c[:3]) < score:
+                score, best = sum(c[:3]), c
+    return best
+
+
+def _scaled(img, w):
+    k = w / img.size[0]
+    return img.resize((max(1, round(w)), max(1, round(img.size[1] * k))), Image.LANCZOS)
+
+
+def _bar(w, h, color):
+    return Image.new("RGBA", (max(1, round(w)), max(1, round(h))), color)
+
+
+def anim_fly_poses(body):
+    return [
         compose_src(body, dy_body=-1, legs=(0.05, -0.04, -0.05, -0.04)),
         compose_src(body, dy_body=-3, legs=(0.06, -0.06, -0.06, -0.06)),
         compose_src(body, dy_body=-2, legs=(0.05, -0.05, -0.05, -0.05)),
     ]
-    if gear is None:
-        return poses
 
+
+def anim_fly(body, gear, kind):
+    """kind: 'prop' — мешок за спиной и винт над головой на мачте;
+             'jet'  — баки по бокам корпуса, сопла из-за ног."""
+    poses = anim_fly_poses(body)
     w, body_h = body.size
     pad_top = (poses[0].size[1] - body_h) // 2
     frames = []
+
+    if kind == "jet":
+        for i, pose in enumerate(poses):
+            g = _scaled(gear, w * 1.25)
+            out = Image.new("RGBA", pose.size, (0, 0, 0, 0))
+            gy = pad_top + round(body_h * 0.78) - g.size[1] - (i % 2)
+            out.alpha_composite(g, ((pose.size[0] - g.size[0]) // 2, gy))
+            out.alpha_composite(pose)
+            frames.append(out)
+        return frames
+
+    # Винт рисуется сплошными прямоугольниками, а НЕ берётся картинкой из
+    # листа. Нарисованные лопасти шириной в пиксель после уменьшения до 40 px
+    # роста осыпаются в редкие точки — вместо винта получается сор над
+    # головой. Сплошная планка переживает уменьшение.
+    bar_src, bag_src = _split_pack(gear)
+    metal = _dark_of(bag_src)
+    # Лопасти — светлая сталь: умножать тёмный цвет ранца бесполезно, он
+    # так и остаётся чёрной палкой на тёмном фоне пещеры.
+    blade = tuple(round(c * 0.25 + s * 0.75) for c, s in zip(metal[:3], (198, 202, 208))) + (255,)
+
+    mast_w = max(3, round(w * MAST_W))
+    blade_h = max(3, round(body_h * 0.022))
+    hub = max(4, round(w * 0.14))
+
     for i, pose in enumerate(poses):
-        wide, bottom = GEAR_FIT.get(gear_name, (1.2, 0.70))
-        g = gear.copy()
-        k = (w * wide) / g.size[0]
-        g = g.resize((max(1, round(g.size[0] * k)), max(1, round(g.size[1] * k))),
-                     Image.LANCZOS)
-        out = Image.new("RGBA", pose.size, (0, 0, 0, 0))
-        gx = (pose.size[0] - g.size[0]) // 2
-        gy = pad_top + round(body_h * bottom) - g.size[1] - (i % 2)
-        out.alpha_composite(g, (gx, gy))
-        out.alpha_composite(pose)
+        bob = -(i % 2)
+        bag = _scaled(bag_src, w * BAG_WIDE)
+        # лопасти «крутятся»: размах то полный, то поджатый — на 40 px роста
+        # это единственный читаемый способ показать вращение
+        span = round(w * BLADE_SPAN * (1.0, 0.45, 0.78)[i])
+
+        # Холст расширяется и вверх: винт уходит выше макушки, а PIL молча
+        # обрезает всё, что вышло за край — из-за этого лопасти пропадали
+        # целиком, оставляя торчать один хаб.
+        bar_y0 = pad_top - round(body_h * BAR_ABOVE) + bob
+        up = max(0, blade_h - bar_y0 + round(body_h * 0.02))
+        extra = max(0, (span - pose.size[0]) // 2 + 3)
+        size = (pose.size[0] + extra * 2, pose.size[1] + up)
+        out = Image.new("RGBA", size, (0, 0, 0, 0))
+        cx = size[0] // 2
+
+        bag_y = up + pad_top + round(body_h * 0.56) - bag.size[1] + bob
+        bar_y = up + bar_y0
+
+        mast_top = bar_y + blade_h
+        mast_bot = bag_y + round(bag.size[1] * 0.35)
+        if mast_bot > mast_top:
+            out.alpha_composite(_bar(mast_w, mast_bot - mast_top, metal),
+                                (cx - mast_w // 2, mast_top))
+        out.alpha_composite(bag, (cx - bag.size[0] // 2, bag_y))
+        out.alpha_composite(pose, (extra, up))
+        out.alpha_composite(_bar(span, blade_h, blade), (cx - span // 2, bar_y))
+        out.alpha_composite(_bar(hub, blade_h * 2, metal),
+                            (cx - hub // 2, bar_y - blade_h // 2))
         frames.append(out)
     return frames
 
 
 # --- копка -----------------------------------------------------------------
 #
-# Инструмент держит РУКА. Раньше кирка висела в воздухе рядом с телом и
-# проворачивалась сама по себе. Теперь рука вырезается из тела, дыра на её
-# месте затягивается цветом туловища, а рука вместе с инструментом
-# поворачивается вокруг плеча как одно целое.
+# Рука из ДВУХ звеньев. Одно жёсткое звено, повёрнутое от плеча, выглядит как
+# палка с киркой на конце: человек так не машет. Плечо поворачивается от
+# плечевого сустава, предплечье — от локтя, а инструмент закреплён в кисти и
+# едет вместе с предплечьем.
+#
+# Углы отсчитываются от «рука висит вниз», по часовой стрелке (вперёд).
+# Предплечье задано ОТНОСИТЕЛЬНО плеча — так поза читается как сгиб локтя,
+# а не как два независимых поворота.
+SWING = (
+    # (плечо, локоть относительно плеча, наклон корпуса)
+    (-95, -65, 0),    # занёс за голову, локоть сложен
+    (-70, -45, 0),    # начал разгон
+    (-25, -15, 0),    # рука распрямляется
+    (8, -5, -1),      # идёт вниз
+    (38, 0, -2),      # удар: рука прямая, кирка в земле
+    (-20, -50, -1),   # отвод назад, локоть снова сгибается
+)
 
-SWING = (-55, -30, 0, 25, 45, 15)    # градусы от вертикали вниз
-SWING_LEAN = (0, 0, 0, -1, -2, -1)   # корпус подаётся вперёд на ударе
+ELBOW = 0.46          # где локоть по длине руки
+TOOL_LEN = 0.40       # длина инструмента в долях РОСТА
 
 
 def take_arm(body):
@@ -356,8 +450,7 @@ def take_arm(body):
 
     Рука — это крайние пиксели силуэта, а не прямоугольник: если резать
     прямоугольником, вместе с рукой уходит край туловища и тело выглядит
-    разрезанным. Идём по строкам и забираем последние ARM_W ширины тела
-    непрозрачных пикселей. Тело после этого честно становится у́же на руку.
+    разрезанным.
     """
     w, h = body.size
     y0, y1 = round(h * ARM_Y0), round(h * ARM_Y1)
@@ -376,57 +469,112 @@ def take_arm(body):
                 break
         if right is None:
             continue
-        start = max(0, right - arm_w + 1)
-        left_edge = min(left_edge, start)
-        for i, x in enumerate(range(start, right + 1)):
+        start_x = max(0, right - arm_w + 1)
+        left_edge = min(left_edge, start_x)
+        for i, x in enumerate(range(start_x, right + 1)):
             ap[i, y - y0] = tp[x, y]
             tp[x, y] = (0, 0, 0, 0)
     return torso, arm, (left_edge, y0)
 
 
-def limb_with_tool(arm, tool, body_w):
-    """Рука + инструмент как одна деталь. Черенок ложится в кисть."""
-    k = (body_w * 0.75) / max(tool.size)
-    t = tool.resize((max(1, round(tool.size[0] * k)),
-                     max(1, round(tool.size[1] * k))), Image.LANCZOS)
+def normalize_tool(tool):
+    """Поставить инструмент черенком вверх, бойком вниз.
 
-    pad_x = t.size[0]
-    pad_y = t.size[1]
-    out = Image.new("RGBA", (arm.size[0] + pad_x * 2, arm.size[1] + pad_y),
-                    (0, 0, 0, 0))
-    ax = pad_x
-    out.alpha_composite(arm, (ax, 0))
-    # кисть — низ руки; инструмент от неё вниз-вперёд
-    hx = ax + arm.size[0] // 2 - t.size[0] // 2 + round(arm.size[0] * 0.2)
-    hy = arm.size[1] - round(t.size[1] * 0.25)
-    out.alpha_composite(t, (max(0, hx), max(0, hy)))
-    # плечо — верх исходной руки, в координатах получившейся детали
-    pivot = (ax + arm.size[0] // 2, round(arm.size[1] * 0.08))
-    return out, pivot
+    На листе инструменты нарисованы по диагонали и каждый под своим углом.
+    Чтобы класть их в кисть одинаково, находим главную ось по облаку
+    непрозрачных пикселей и разворачиваем её вертикально. Тяжёлый конец
+    (боёк, полотно лопаты) уводим ВНИЗ — в замахе он должен смотреть от
+    тела, а не в лицо.
+    """
+    p = tool.load()
+    pts = [(x, y) for y in range(tool.size[1]) for x in range(tool.size[0])
+           if p[x, y][3]]
+    n = len(pts)
+    mx = sum(q[0] for q in pts) / n
+    my = sum(q[1] for q in pts) / n
+    sxx = sum((q[0] - mx) ** 2 for q in pts) / n
+    syy = sum((q[1] - my) ** 2 for q in pts) / n
+    sxy = sum((q[0] - mx) * (q[1] - my) for q in pts) / n
+    ang = 0.5 * math.atan2(2 * sxy, sxx - syy)     # главная ось
+    out = tool.rotate(math.degrees(ang) - 90, expand=True,
+                      resample=Image.BICUBIC, fillcolor=(0, 0, 0, 0))
+    out = out.crop(out.getbbox())
+
+    op = out.load()
+    half = out.size[1] // 2
+    top = sum(1 for y in range(half) for x in range(out.size[0]) if op[x, y][3])
+    bot = sum(1 for y in range(half, out.size[1]) for x in range(out.size[0])
+              if op[x, y][3])
+    if top > bot:                      # тяжёлый конец оказался сверху
+        out = out.rotate(180, expand=True)
+    return out
+
+
+def _rotate_about(img, pivot, deg, canvas):
+    """Повернуть деталь вокруг её точки pivot. Возвращает холст, в центре
+    которого остался pivot."""
+    big = Image.new("RGBA", canvas, (0, 0, 0, 0))
+    c = (canvas[0] // 2, canvas[1] // 2)
+    big.alpha_composite(img, (c[0] - pivot[0], c[1] - pivot[1]))
+    return big.rotate(deg, resample=Image.BICUBIC, center=c), c
 
 
 def anim_dig(body, tool):
     torso, arm, (ax, ay) = take_arm(body)
-    limb, pivot = limb_with_tool(arm, tool, body.size[0])
+    aw, ah = arm.size
+    el = round(ah * ELBOW)
+
+    upper = arm.crop((0, 0, aw, el))
+    fore = arm.crop((0, el, aw, ah))
+
+    t = normalize_tool(tool)
+    t_h = max(6, round(body.size[1] * TOOL_LEN))
+    t = t.resize((max(2, round(t.size[0] * t_h / t.size[1])), t_h), Image.LANCZOS)
+
+    # предплечье + инструмент как одна деталь; локоть — верх детали
+    lw = max(fore.size[0], t.size[0]) * 3
+    lh = fore.size[1] + t.size[1] + 4
+    limb = Image.new("RGBA", (lw, lh), (0, 0, 0, 0))
+    limb.alpha_composite(fore, (lw // 2 - fore.size[0] // 2, 0))
+    # черенок заходит под кисть, чтобы было видно, что инструмент в руке
+    limb.alpha_composite(t, (lw // 2 - t.size[0] // 2,
+                             max(0, fore.size[1] - round(t.size[1] * 0.12))))
+    elbow_pivot = (lw // 2, 0)
+
+    canvas = (max(lw, lh) * 2 + 8,) * 2
+    up_canvas = (upper.size[0] * 6 + 8, upper.size[1] * 6 + 8)
+    shoulder_pivot = (upper.size[0] // 2, 0)
 
     frames = []
-    for ang, lean in zip(SWING, SWING_LEAN):
-        # поворот вокруг плеча: сдвигаем деталь так, чтобы плечо было в
-        # центре холста, крутим, возвращаем на место
-        big = Image.new("RGBA", (limb.size[0] * 3, limb.size[1] * 3), (0, 0, 0, 0))
-        cx, cy = big.size[0] // 2, big.size[1] // 2
-        big.alpha_composite(limb, (cx - pivot[0], cy - pivot[1]))
-        big = big.rotate(-ang, resample=Image.BICUBIC, center=(cx, cy))
+    for a_up, a_fore, lean in SWING:
+        rot_up, c_up = _rotate_about(upper, shoulder_pivot, a_up, up_canvas)
+        rot_limb, c_lb = _rotate_about(limb, elbow_pivot, a_up + a_fore, canvas)
 
         pose = compose_src(torso, dy_body=lean)
+        # Холст с запасом: замах уводит руку с инструментом далеко за габарит
+        # тела, а PIL молча обрезает всё, что вышло за край. Именно поэтому
+        # на кадре удара инструмент пропадал целиком.
+        bw = torso.size[0] * 4
+        bh = torso.size[1] * 2
+        out = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+        px = (bw - pose.size[0]) // 2
+        py = bh - pose.size[1]
+        out.alpha_composite(pose, (px, py))
+
         pad = (pose.size[0] - torso.size[0]) // 2
-        # плечо в координатах кадра
-        sx = pad + ax + arm.size[0] // 2
-        sy = pad + ay + round(arm.size[1] * 0.08) + lean
-        out = pose.copy()
-        out.alpha_composite(big, (sx - cx, sy - cy))
+        sx = px + pad + ax + aw // 2             # плечо в координатах холста
+        sy = py + pad + ay + lean
+        # локоть = плечо плюс повёрнутый вектор длины el, смотрящий вниз
+        r = math.radians(a_up)
+        ex = sx + round(math.sin(r) * el)
+        ey = sy + round(math.cos(r) * el)
+
+        out.alpha_composite(rot_up, (sx - c_up[0], sy - c_up[1]))
+        out.alpha_composite(rot_limb, (ex - c_lb[0], ey - c_lb[1]))
         frames.append(out)
     return frames
+
+
 # ---------------------------------------------------------------------------
 # Сборка
 # ---------------------------------------------------------------------------
@@ -492,21 +640,22 @@ def main(sheet_path):
             "idle": anim_idle(body),
             "walk": anim_walk(body),
             "fall": anim_fall(body),
-            "fly": anim_fly(body, raws["backpack_propeller"], "backpack_propeller"),
-            "fly_jet": anim_fly(body, raws["jetpack"], "jetpack"),
+            "fly": anim_fly(body, raws["backpack_propeller"], "prop"),
+            "fly_jet": anim_fly(body, raws["jetpack"], "jet"),
         }
         if slug in FULL:
             sets["dig_shovel"] = anim_dig(body, raws["shovel"])
             sets["dig_pick"] = anim_dig(body, raws["pickaxe_rusty"])
 
         for name, frames in sets.items():
-            written.append(save(strip(shrink_set(frames, bh)),
+            fit_h = not name.startswith("fly")
+            written.append(save(strip(shrink_set(frames, bh, fit_h)),
                                 f"character/{slug}/{name}"))
 
         # сон — отдельным масштабом: лежачая поза шире стоячей
         lying = anim_sleep(body)[0]
         k = BODY_H / bh
-        lw = min(TILE, max(1, round(lying.size[0] * k)))
+        lw = min(FRAME_W, max(1, round(lying.size[0] * k)))
         lh = max(1, round(lying.size[1] * lw / lying.size[0]))
         written.append(save(strip([shrink(lying, (lw, lh))], bottom_pad=FOOT_PAD),
                             f"character/{slug}/sleep"))

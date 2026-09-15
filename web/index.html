@@ -255,6 +255,7 @@ body{
 
 <script>
 const TILE = 32, VIEW_W = 7;
+const CHAR_W = 48, CHAR_H = 48;   // кадр персонажа шире клетки — см. draw()
 const cv = document.getElementById('screen');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -823,13 +824,16 @@ function draw(){
                   ? (S.thrust === 'jet' ? 'fly_jet' : S.thrust ? 'fly' : 'fall')
                   : (S.vx !== 0 ? 'walk' : 'idle'));
   const img = charSprites[sheet];
-  const dx0 = Math.round(pcx - TILE / 2), dy0 = Math.round(pcy - HH * TILE - 16);
+  // Кадр персонажа шире клетки: при 32 px замах киркой и винты ранца не
+  // помещались, и спрайт приходилось ужимать — герой худел, стоило ему
+  // начать копать. Тело по-прежнему ~20 px, вокруг просто есть поле.
+  const dx0 = Math.round(pcx - CHAR_W / 2), dy0 = Math.round(pcy - HH * TILE - 16);
   if (img && img.complete && img.naturalWidth){
-    const frames = Math.max(1, Math.round(img.naturalWidth / TILE));
+    const frames = Math.max(1, Math.round(img.naturalWidth / CHAR_W));
     const f = frames > 1 ? Math.floor(S.anim / 7) % frames : 0;
     ctx.save();
-    if (S.facing < 0){ ctx.translate(dx0 * 2 + TILE, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(img, f * TILE, 0, TILE, 48, dx0, dy0, TILE, 48);
+    if (S.facing < 0){ ctx.translate(dx0 * 2 + CHAR_W, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(img, f * CHAR_W, 0, CHAR_W, CHAR_H, dx0, dy0, CHAR_W, CHAR_H);
     ctx.restore();
   } else {
     ctx.fillStyle = '#C9553F'; ctx.fillRect(dx0 + 8, dy0 + 18, 16, 26);

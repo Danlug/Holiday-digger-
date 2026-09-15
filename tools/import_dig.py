@@ -14,6 +14,17 @@
      герой прыгает внутри клетки. Опора — рост в спокойной позе (ряд 3,
      кадр 1) и низ содержимого ряда, то есть земля под ногами.
 
+  1а. По ГОРИЗОНТАЛИ якорь — голова (import_art.head_x), а не клетка листа.
+     Художник ставил фигуру в каждой клетке по-своему: центры содержимого в
+     ряду шли 87, 195, ... — не на равномерной сетке, и привязка к середине
+     клетки переносила этот разнобой в игру как дрожание героя вбок (до 18 px
+     при росте 40). Рамка содержимого якорем тоже не годится: её растягивают
+     кирка в замахе, куча камней и разлетающаяся порода. Голова же есть в
+     каждом кадре и при работе почти не ходит в стороны. Голова ставится в
+     середину кадра — туда же, куда её ставит import_art для всех остальных
+     наборов, поэтому герой не прыгает вбок при переходе с ходьбы на копку;
+     середина кадра — ещё и ось отражения при развороте.
+
   2. Фон вычитается заливкой от краёв, а не по порогу яркости: у персонажа
      чёрная обводка, и порог выел бы её вместе с фоном.
 
@@ -30,7 +41,8 @@ import sys
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from import_art import BODY_H, FOOT_PAD, FRAME_H, FRAME_W, shrink  # noqa: E402
+from import_art import (BODY_H, FOOT_PAD, FRAME_H, FRAME_W,  # noqa: E402
+                        head_x, shrink)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -153,29 +165,54 @@ def main(path):
     k = BODY_H / ref_h
     print(f"рост в спокойной позе: {ref_h} px исходника -> {BODY_H} px, масштаб {k:.4f}")
 
+    # ось кадра: середина 48 px. Именно она — ось отражения при развороте,
+    # и именно на неё import_art ставит голову во всех прочих наборах.
+    axis = FRAME_W / 2.0 - 0.5
+
     for r, ((y0, y1), name) in enumerate(ROWS):
         # 3. земля ряда — самый низ содержимого по всем кадрам ряда
         ground = max(content_box(cells[(r, i)])[3] for i in range(FRAMES))
         sheet_out = Image.new("RGBA", (FRAME_W * FRAMES, FRAME_H), (0, 0, 0, 0))
+        heads = []
 
         for i in range(FRAMES):
             cell = cells[(r, i)]
             b = content_box(cell)
             if b is None:
                 continue
-            piece = cell.crop(b)
+            hx = head_x(cell, ref_h)
+
+            # Голову надо поставить на ось кадра, а вставлять картинку можно
+            # только по целому пикселю: остаток до половины пикселя и есть
+            # дрожание на единицу. Гасим его фазой нарезки — левый край куска
+            # сдвигаем на 0..1/k пикселей ИСХОДНИКА (шаг исходника — это k
+            # игрового пикселя, то есть треть), и берём тот сдвиг, при котором
+            # голова ложится на ось точнее всего.
+            best = None
+            for pad in range(0, max(1, round(1.0 / k)) + 1):
+                x0 = max(0, b[0] - pad)
+                off = (hx - x0) * k          # голова внутри уменьшенного куска
+                dx = round(axis - off)
+                err = abs(axis - off - dx)
+                if best is None or err < best[0]:
+                    best = (err, x0, dx)
+            _, x0, dx = best
+
+            piece = cell.crop((x0, b[1], b[2], b[3]))
             tw = max(1, round(piece.size[0] * k))
             th = max(1, round(piece.size[1] * k))
             small = shrink(piece, (tw, th), colors=28)
 
-            # якорь: середина клетки по X, земля ряда по Y
-            dx = round((b[0] - CELL_W / 2.0) * k) + FRAME_W // 2
+            # якорь: голова на оси кадра по X, земля ряда по Y
             dy = FRAME_H - FOOT_PAD - round((ground - b[1]) * k)
             sheet_out.alpha_composite(small, (i * FRAME_W + dx, dy))
+            heads.append(dx + (hx - x0) * k)
 
         out = os.path.join(ROOT, "art", "character", "boy", name + ".png")
         sheet_out.save(out)
-        print(f"  {name:16s} <- ряд {r + 1}, земля y={ground}")
+        span = max(heads) - min(heads)
+        print(f"  {name:16s} <- ряд {r + 1}, земля y={ground}, "
+              f"голова гуляет на {span:.2f} px")
 
     # герой ищется рендерерами в art/character/
     for _, name in ROWS:

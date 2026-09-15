@@ -23,7 +23,7 @@ import os
 import sys
 from collections import deque
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -236,23 +236,164 @@ def compose_src(body, dy_body=0, legs=None, pad=None):
     return out
 
 
-def shrink_set(frames, body_src_h, fit_height=True):
-    """Уменьшить набор кадров ОДНИМ масштабом и по ОБЩЕЙ рамке.
+# ---------------------------------------------------------------------------
+# Якорь кадра: голова
+# ---------------------------------------------------------------------------
+#
+# Кадры набора сводятся ПО ГОЛОВЕ, а не по рамке содержимого. Рамку
+# растягивают инструмент в замахе, лопасти винта, мачта ранца и разлетающаяся
+# порода, причём в каждом кадре по-своему: её середина гуляет сама по себе, и
+# персонаж, собранный по рамке, шатается вправо-влево. Голова же есть в
+# каждом кадре, компактна и при работе почти не ходит в стороны — ноги для
+# этого не годятся (они и должны двигаться), а рамка тем более.
 
-    Общая рамка обязательна: если резать каждый кадр по своему содержимому,
-    персонаж прыгает внутри клетки от кадра к кадру. Масштаб тоже один на
-    набор — иначе герой то толстеет, то худеет по ходу анимации.
+HEAD_ERODE = 0.03     # насколько сужать силуэт, в долях роста
+HEAD_BAND = 0.10      # высота головы, в долях роста
+HEAD_MIN_AREA = 0.25  # доля от самого крупного массива, ниже — не тело
+
+
+def _rows_of_runs(img):
+    """Горизонтальные пробеги непрозрачных пикселей по строкам."""
+    w, h = img.size
+    data = img.tobytes()
+    rows = []
+    for y in range(h):
+        line = data[y * w:(y + 1) * w]
+        rr, x = [], 0
+        while True:
+            a = line.find(b"\xff", x)
+            if a < 0:
+                break
+            b = line.find(b"\x00", a)
+            if b < 0:
+                b = w
+            rr.append((a, b - 1))
+            x = b
+        rows.append(rr)
+    return rows
+
+
+def _blobs(rows):
+    """Связные массивы из пробегов. Возвращает список (площадь, верх, пробеги)."""
+    parent = []
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(a, b):
+        a, b = find(a), find(b)
+        if a != b:
+            parent[b] = a
+
+    ids, prev, prev_ids = [], [], []
+    for rr in rows:
+        cur = []
+        for a, b in rr:
+            parent.append(len(parent))
+            i = len(parent) - 1
+            for j, (pa, pb) in enumerate(prev):
+                if pa <= b + 1 and a <= pb + 1:      # касаются, в том числе углом
+                    union(prev_ids[j], i)
+            cur.append(i)
+        ids.append(cur)
+        prev, prev_ids = rr, cur
+
+    out = {}
+    for y, (rr, cur) in enumerate(zip(rows, ids)):
+        for (a, b), i in zip(rr, cur):
+            g = out.setdefault(find(i), [0, y, []])
+            g[0] += b - a + 1
+            g[2].append((y, a, b))
+    return list(out.values())
+
+
+def head_x(img, body_src_h):
+    """X-координата середины головы в координатах img."""
+    return head_anchor(img, body_src_h)[0]
+
+
+def head_anchor(img, body_src_h):
+    """Голова в координатах img: (X середины, Y макушки).
+
+    Y макушки нужен там, где кадры сводятся по вертикали не по низу
+    содержимого: в кадрах полёта ниже ступней нарисовано пламя, и низ
+    содержимого — уже не подошва.
+
+    Силуэт сужается на HEAD_ERODE роста — отваливается всё тонкое: черенок
+    инструмента, мачта ранца, лопасть винта, крошка породы. Остаются плотные
+    массивы: тело и, отдельно, крупный реквизит (боёк кирки, куча камней).
+    Из них берётся самый ВЕРХНИЙ среди достаточно крупных — боёк после
+    сужения мелкий и отсеивается по площади, а камни лежат ниже головы.
+    Верхние строки выбранного массива и есть голова.
+    """
+    box = img.getbbox()
+    if box is None:
+        return img.size[0] / 2.0, 0
+    r = max(1, round(body_src_h * HEAD_ERODE))
+    band = max(1, round(body_src_h * HEAD_BAND))
+
+    solid = img.getchannel("A").point(lambda v: 255 if v else 0)
+    for _ in range(r):                    # сужение на 1 px, r раз: одно большое
+        solid = solid.filter(ImageFilter.MinFilter(3))   # ядро PIL считает долго
+    blobs = _blobs(_rows_of_runs(solid))
+    if not blobs:
+        return (box[0] + box[2] - 1) / 2.0, box[1]
+
+    big = max(b[0] for b in blobs)
+    body = min((b for b in blobs if b[0] >= big * HEAD_MIN_AREA),
+               key=lambda b: b[1])
+    top = body[1]
+    xs = [(a, b) for y, a, b in body[2] if y < top + band]
+    n = sum(b - a + 1 for a, b in xs)
+    return sum((a + b) * (b - a + 1) / 2.0 for a, b in xs) / n, top
+
+
+def shrink_set(frames, body_src_h, fit_height=True):
+    """Уменьшить набор кадров ОДНИМ масштабом, сведя их по голове.
+
+    Масштаб один на набор — иначе персонаж то толстеет, то худеет по ходу
+    анимации.
+
+    По ГОРИЗОНТАЛИ кадры сводятся по голове (см. head_x выше) и кладутся на
+    симметричный относительно неё холст. Симметричный — чтобы strip(), который
+    центрирует картинку в клетке, ставил голову ровно в середину кадра: тогда
+    наборы не разъезжаются между собой (герой не прыгает вбок при переходе с
+    ходьбы на копку), а при развороте по facing голова не уезжает — середина
+    кадра и есть ось отражения.
+
+    По ВЕРТИКАЛИ кадры сводятся по низу своего холста: сборщики поз
+    (compose_src, anim_dig, anim_fly) кладут тело на низ холста, так что это
+    общая линия земли. По низу СОДЕРЖИМОГО равнять нельзя — тогда пропадут
+    приседание, подскок и шаг.
     """
     boxes = [f.getbbox() for f in frames]
-    x0 = min(b[0] for b in boxes); y0 = min(b[1] for b in boxes)
-    x1 = max(b[2] for b in boxes); y1 = max(b[3] for b in boxes)
-    w, h = x1 - x0, y1 - y0
+    heads = [head_x(f, body_src_h) for f in frames]
+
+    # полуширина: как далеко содержимое уходит от головы в самую дальнюю сторону
+    half = max(1, math.ceil(max(max(hx - b[0], b[2] - hx)
+                                for b, hx in zip(boxes, heads))))
+    tops = [f.size[1] - b[1] for f, b in zip(frames, boxes)]
+    top = max(tops)
+    bot = min(f.size[1] - b[3] for f, b in zip(frames, boxes))
+    w, h = half * 2, top - bot
 
     k = min(BODY_H / body_src_h, FRAME_W / w)
     if fit_height:
         k = min(k, (FRAME_H - FOOT_PAD) / h)
-    size = (max(1, round(w * k)), max(1, round(h * k)))
-    return [shrink(f.crop((x0, y0, x1, y1)), size) for f in frames]
+    # ширина ЧЁТНАЯ: только тогда центрирование в strip() попадает в середину
+    # кадра ровно, а не на полпикселя вбок — а полпикселя после округления
+    # и есть дрожание на единицу
+    size = (max(2, 2 * round(half * k)), max(1, round(h * k)))
+
+    out = []
+    for f, b, hx, t in zip(frames, boxes, heads, tops):
+        canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        canvas.alpha_composite(f.crop(b), (half - round(hx - b[0]), top - t))
+        out.append(shrink(canvas, size))
+    return out
 
 
 def strip(frames, frame_w=FRAME_W, frame_h=FRAME_H, bottom_pad=FOOT_PAD):

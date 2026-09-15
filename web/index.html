@@ -5,8 +5,7 @@
 <style>
 :root{
   --soil:#16120E;
-  --soil-2:#211A13;
-  --panel:#2A211895;
+  --panel:#231B14E0;
   --edge:#3E3125;
   --bone:#EADDC6;
   --muted:#9D8B73;
@@ -24,7 +23,9 @@ body{
   font-family:"Manrope",system-ui,-apple-system,sans-serif;
   -webkit-font-smoothing:antialiased;
   overflow:hidden;
-  touch-action:manipulation;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
 }
 #app{
   height:100%;
@@ -32,51 +33,12 @@ body{
   flex-direction:column;
   max-width:520px;
   margin:0 auto;
-  padding-inline:12px;
+  padding-inline:10px;
   padding-block:8px;
   gap:8px;
 }
 
-/* ── верхняя панель ── */
-.hud{
-  display:flex;
-  align-items:stretch;
-  gap:8px;
-  flex:0 0 auto;
-}
-.stat{
-  flex:1;
-  min-width:0;
-  background:var(--panel);
-  border:1px solid var(--edge);
-  padding:6px 8px;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-.stat .k{
-  font-family:"Pixelify Sans","Manrope",sans-serif;
-  font-size:10px;
-  letter-spacing:.09em;
-  text-transform:uppercase;
-  color:var(--muted);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.stat .v{
-  font-family:"IBM Plex Mono",ui-monospace,monospace;
-  font-size:15px;
-  font-weight:600;
-  font-variant-numeric:tabular-nums;
-  line-height:1.1;
-}
-.stat.depth .v{color:var(--bone)}
-.stat.coins .v{color:var(--gold)}
-.stat.load .v{color:var(--moss)}
-.stat.load.over .v{color:var(--rust)}
-
-/* ── игровое поле ── */
+/* ── экран ── */
 #stage{
   flex:1 1 auto;
   min-height:0;
@@ -85,17 +47,85 @@ body{
   background:#0B0907;
   overflow:hidden;
 }
-#screen{
-  display:block;
-  width:100%;
-  height:100%;
-  image-rendering:pixelated;
-  image-rendering:crisp-edges;
+#screen{display:block;width:100%;height:100%;image-rendering:pixelated}
+
+/* полоски поверх экрана, слева сверху */
+.gauges{
+  position:absolute;
+  top:8px; left:8px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  pointer-events:none;
 }
+.gauge{display:flex;align-items:center;gap:5px}
+.gauge .ico{
+  width:12px;height:12px;flex:0 0 auto;
+  image-rendering:pixelated;
+}
+.track{
+  width:72px;height:8px;
+  background:#0B0907C0;
+  border:1px solid #00000090;
+  box-shadow:0 0 0 1px #FFFFFF14;
+  overflow:hidden;
+}
+.fill{height:100%;width:100%;transition:width .25s linear}
+.fill.hp{background:var(--rust)}
+.fill.food{background:#C98A3C}
+.fill.rest{background:#6E93A8}
+
+/* кошелёк справа сверху */
+.purse{
+  position:absolute;
+  top:8px; right:8px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:3px;
+  pointer-events:none;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+  text-shadow:0 1px 2px #000A;
+}
+.purse .coins{color:var(--gold);font-weight:600}
+.purse .load{color:var(--moss)}
+.purse .load.over{color:var(--rust)}
+
+/* глубина — на уровне героя, у правого края */
+.depth{
+  position:absolute;
+  right:0;
+  transform:translateY(-50%);
+  display:none;
+  align-items:center;
+  gap:5px;
+  padding:3px 7px 3px 9px;
+  background:#120E0BD8;
+  border:1px solid var(--edge);
+  border-right:none;
+  pointer-events:none;
+}
+.depth.on{display:flex}
+.depth .n{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:14px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+  line-height:1;
+}
+.depth .u{
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:9px;
+  color:var(--muted);
+  letter-spacing:.06em;
+}
+
 #toast{
   position:absolute;
   left:8px; right:8px; bottom:8px;
-  background:#120E0Bee;
+  background:#120E0BEE;
   border:1px solid var(--edge);
   border-left:3px solid var(--gold);
   padding:8px 10px;
@@ -109,97 +139,131 @@ body{
 #toast.show{opacity:1;transform:none}
 #toast b{color:var(--gold);font-weight:800}
 
-/* ── полоски ── */
-.bars{
+/* ── строка инструмента и режима ── */
+.strip{
   flex:0 0 auto;
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
+  display:flex;
+  align-items:center;
   gap:8px;
 }
-.bar{display:flex;flex-direction:column;gap:3px}
-.bar .k{
-  font-family:"Pixelify Sans","Manrope",sans-serif;
-  font-size:9px;
-  letter-spacing:.09em;
-  text-transform:uppercase;
-  color:var(--muted);
-}
-.track{height:7px;background:#0E0B08;border:1px solid var(--edge);overflow:hidden}
-.fill{height:100%;width:100%;transition:width .3s linear}
-.fill.hp{background:var(--rust)}
-.fill.food{background:#C98A3C}
-.fill.rest{background:#6E93A8}
-
-/* ── нижняя строка ── */
-.foot{
-  flex:0 0 auto;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  border-top:1px solid var(--edge);
-  padding-top:7px;
-}
-.tool{
-  display:flex;
-  align-items:center;
-  gap:7px;
-  min-width:0;
-}
-.tool img{width:22px;height:22px;image-rendering:pixelated;flex:0 0 auto}
+.tool{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.tool img{width:20px;height:20px;image-rendering:pixelated;flex:0 0 auto}
 .tool span{
   font-family:"Pixelify Sans","Manrope",sans-serif;
   font-size:12px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.hint{
-  font-size:11px;
-  color:var(--muted);
-  text-align:right;
-  line-height:1.3;
-  flex:0 0 auto;
-}
-button.reset{
-  font:inherit;
-  font-size:11px;
+.chip{
+  font:inherit;font-size:11px;
+  font-family:"Pixelify Sans","Manrope",sans-serif;
   color:var(--muted);
   background:none;
   border:1px solid var(--edge);
-  padding:4px 8px;
+  padding:5px 9px;
   cursor:pointer;
+  white-space:nowrap;
 }
-button.reset:hover{color:var(--bone);border-color:var(--muted)}
-button.reset:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.chip[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
+.chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
-@media (prefers-reduced-motion:reduce){
-  *{transition:none!important}
+/* ── управление ── */
+.controls{
+  flex:0 0 auto;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+  height:132px;
 }
+.controls.hidden{visibility:hidden}
+#stick{
+  position:relative;
+  width:124px;height:124px;flex:0 0 auto;
+  border-radius:50%;
+  background:radial-gradient(circle at 50% 50%, #241C1580 0%, #1A140F80 70%, transparent 71%);
+  border:1px solid var(--edge);
+  touch-action:none;
+}
+#stick::before,#stick::after{
+  content:"";position:absolute;background:var(--edge);
+}
+#stick::before{left:10%;right:10%;top:calc(50% - 1px);height:1px}
+#stick::after{top:10%;bottom:10%;left:calc(50% - 1px);width:1px}
+#knob{
+  position:absolute;
+  width:48px;height:48px;
+  left:38px;top:38px;
+  border-radius:50%;
+  background:#3A2C20;
+  border:2px solid var(--muted);
+  box-shadow:0 2px 0 #0007;
+  transition:transform .08s linear;
+}
+.actions{display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.abtn{
+  width:76px;height:52px;
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:13px;
+  color:var(--bone);
+  background:#2A2018;
+  border:1px solid var(--edge);
+  border-bottom-width:3px;
+  cursor:pointer;
+  touch-action:none;
+}
+.abtn:active,.abtn.down{
+  background:#3A2C20;
+  border-bottom-width:1px;
+  transform:translateY(2px);
+}
+.abtn.jump{color:var(--moss)}
+.abtn.dig{color:var(--gold)}
+.abtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.taphint{
+  flex:1;
+  align-self:center;
+  text-align:center;
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.4;
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
 <div id="app">
-  <div class="hud">
-    <div class="stat depth"><div class="k">Глубина</div><div class="v" id="v-depth">0</div></div>
-    <div class="stat coins"><div class="k">Монеты</div><div class="v" id="v-coins">0</div></div>
-    <div class="stat load" id="s-load"><div class="k">Груз, кг</div><div class="v" id="v-load">0 / 60</div></div>
-  </div>
-
   <div id="stage">
     <canvas id="screen"></canvas>
+
+    <div class="gauges">
+      <div class="gauge"><img class="ico" id="i-hp" alt=""><div class="track"><div class="fill hp" id="b-hp"></div></div></div>
+      <div class="gauge"><img class="ico" id="i-food" alt=""><div class="track"><div class="fill food" id="b-food"></div></div></div>
+      <div class="gauge"><img class="ico" id="i-rest" alt=""><div class="track"><div class="fill rest" id="b-rest"></div></div></div>
+    </div>
+
+    <div class="purse">
+      <div class="coins" id="v-coins">0</div>
+      <div class="load" id="v-load">0 / 60 кг</div>
+    </div>
+
+    <div class="depth" id="depth"><span class="n" id="v-depth">0</span><span class="u">кл</span></div>
     <div id="toast"></div>
   </div>
 
-  <div class="bars">
-    <div class="bar"><div class="k">Здоровье</div><div class="track"><div class="fill hp" id="b-hp"></div></div></div>
-    <div class="bar"><div class="k">Голод</div><div class="track"><div class="fill food" id="b-food"></div></div></div>
-    <div class="bar"><div class="k">Бодрость</div><div class="track"><div class="fill rest" id="b-rest"></div></div></div>
+  <div class="strip">
+    <div class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></div>
+    <button class="chip" id="mode" type="button" aria-pressed="true">Джойстик</button>
+    <button class="chip" id="reset" type="button">Заново</button>
   </div>
 
-  <div class="foot">
-    <div class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></div>
-    <div class="hint">Тапни по клетке — герой пойдёт<br>и будет копать. Вверх нельзя.</div>
-    <button class="reset" id="reset" type="button">Заново</button>
+  <div class="controls" id="controls">
+    <div id="stick"><div id="knob"></div></div>
+    <div class="taphint" id="taphint" hidden>Тапни по клетке —<br>герой пойдёт и будет копать</div>
+    <div class="actions">
+      <button class="abtn jump" id="b-jump" type="button">Прыжок</button>
+      <button class="abtn dig" id="b-dig" type="button">Копать</button>
+    </div>
   </div>
 </div>
 
@@ -210,47 +274,56 @@ const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 const el = {
-  depth: document.getElementById('v-depth'),
   coins: document.getElementById('v-coins'),
   load: document.getElementById('v-load'),
-  loadBox: document.getElementById('s-load'),
+  depthBox: document.getElementById('depth'),
+  depthN: document.getElementById('v-depth'),
   hp: document.getElementById('b-hp'),
   food: document.getElementById('b-food'),
   rest: document.getElementById('b-rest'),
   toolIcon: document.getElementById('tool-icon'),
   toolName: document.getElementById('tool-name'),
   toast: document.getElementById('toast'),
+  stage: document.getElementById('stage'),
+  controls: document.getElementById('controls'),
+  stick: document.getElementById('stick'),
+  knob: document.getElementById('knob'),
+  taphint: document.getElementById('taphint'),
+  mode: document.getElementById('mode'),
 };
 
 let W = null, sprites = {}, charSprites = {};
 let viewH = 15;
 
+const MAX_KG = 60;
+const DEMO_SPEED = 4;
+const STUN_MS = 3000;
+const STEP_MS = 150;
+const JUMP_MAX = 2;      // ГДД: прыжок максимум на 2 клетки
+
 const S = {
   px: 20, py: 0,
   tool: 'shovel',
-  coins: 0,
-  loadKg: 0,
+  coins: 0, loadKg: 0,
   hp: 100, food: 100, rest: 100,
   maxDepth: 0,
   fallFrom: null,
-  digging: null,          // {x,y,t,total}
+  digging: null,
   stunUntil: 0,
+  hold: { dx: 0, dy: 0 },
   target: null,
-  fogRelief: new Set(),
-  fogRes: new Set(),
+  mode: 'stick',
   reliefR: 2, resR: 1,
   facing: 1,
   anim: 0,
+  hopT: 0,
+  stepAcc: 0,
   seenFoundation: false,
-  bag: new Map(),
+  fogRelief: new Set(),
+  fogRes: new Set(),
 };
 
-const MAX_KG = 60;
-const DEMO_SPEED = 4;     // копка ускорена, чтобы демка была играбельна
-const STUN_MS = 3000;     // в игре буз-эффект длится минуту
-
 function key(x, y){ return y * W.width + x; }
-
 function tileAt(x, y){
   if (y <= 0) return 'EMPTY';
   if (x < 0 || x >= W.width || y > W.depth) return 'BEDROCK';
@@ -261,17 +334,15 @@ function setTile(x, y, name){
   W.grid[(y - 1) * W.width + x] = W.tile_names.indexOf(name);
 }
 function meta(name){
-  return W.meta[name] || { name: name, price: 0, weight: 0, tool: 'pickaxe', secs: 4 };
+  return W.meta[name] || { name, price: 0, weight: 0, tool: 'pickaxe', secs: 4 };
 }
 function solid(name){ return name !== 'EMPTY' && name !== 'BEDROCK'; }
-
 function canDig(name){
   if (name === 'STAIRCASE' || name === 'BEDROCK') return false;
   const p = W.tile_props[String(W.tile_names.indexOf(name))];
   if (!p) return false;
   return S.tool === 'shovel' ? p.shovel : (p.pickaxe || p.shovel);
 }
-
 function toast(html, ms = 2600){
   el.toast.innerHTML = html;
   el.toast.classList.add('show');
@@ -279,9 +350,8 @@ function toast(html, ms = 2600){
   toast._t = setTimeout(() => el.toast.classList.remove('show'), ms);
 }
 
-/* ── туман войны ── */
 function reveal(){
-  for (let dy = -S.reliefR; dy <= S.reliefR; dy++){
+  for (let dy = -S.reliefR; dy <= S.reliefR; dy++)
     for (let dx = -S.reliefR; dx <= S.reliefR; dx++){
       const d = Math.hypot(dx, dy);
       if (d > S.reliefR + 0.35) continue;
@@ -290,12 +360,13 @@ function reveal(){
       S.fogRelief.add(key(x, y));
       if (d <= S.resR + 0.35) S.fogRes.add(key(x, y));
     }
-  }
 }
 
-/* ── физика ── */
+/* ── падение и прыжок ── */
+function grounded(){ return solid(tileAt(S.px, S.py + 1)); }
+
 function fallStep(){
-  if (!solid(tileAt(S.px, S.py + 1))){
+  if (!grounded()){
     if (S.fallFrom === null) S.fallFrom = S.py;
     S.py++;
     reveal();
@@ -314,31 +385,53 @@ function fallStep(){
   return false;
 }
 
+function jump(){
+  if (S.digging || S.fallFrom !== null || !grounded()) return;
+  if (performance.now() < S.stunUntil) return;
+
+  let up = 0;
+  while (up < JUMP_MAX && !solid(tileAt(S.px, S.py - up - 1))) up++;
+  if (up === 0){ toast('Над головой порода — не подпрыгнуть.'); return; }
+
+  S.py -= up;
+  // при зажатом вбок — перенос на клетку в сторону, если там свободно
+  if (S.hold.dx !== 0 && !solid(tileAt(S.px + S.hold.dx, S.py))){
+    S.px += S.hold.dx;
+    S.facing = S.hold.dx;
+  }
+  S.hopT = 0.26;
+  reveal();
+}
+
 function die(){
   const lost = S.loadKg;
-  S.bag.clear();
   S.loadKg = 0;
-  S.hp = 100; S.food = 100; S.rest = 100;
+  S.hp = S.food = S.rest = 100;
   S.px = 20; S.py = 0;
-  S.target = null; S.digging = null;
-  toast(`Ты погиб. Минералы потеряны (<b>${lost.toFixed(1)}</b> кг). В игре уцелеет только чёрный ящик.`, 4200);
+  S.target = null; S.digging = null; S.fallFrom = null;
+  toast(`Ты погиб. Минералы потеряны (<b>${lost.toFixed(1)}</b> кг). В игре уцелел бы только чёрный ящик.`, 4200);
 }
 
 /* ── копка ── */
 function startDig(x, y){
   const name = tileAt(x, y);
   if (!solid(name)) return;
+  if (S.digging && S.digging.x === x && S.digging.y === y) return;
 
   if (name === 'STAIRCASE'){
     toast('Ступени не копаются — это единственный путь наверх, пока нет ранца.');
     return;
   }
-  if (S.tool === 'shovel' && y > 4 && name === 'FOUNDATION'){
+  if (S.tool === 'shovel' && name === 'FOUNDATION'){
     if (!S.seenFoundation){
       S.seenFoundation = true;
       toast('Лопата упёрлась в старый фундамент. Нужно что-то покрепче — <b>в мастерскую!</b>', 3800);
       setTimeout(givePickaxe, 1400);
     }
+    return;
+  }
+  if (S.tool === 'shovel' && y > 4){
+    toast('Лопатой глубже четвёртой клетки не достать.');
     return;
   }
   if (!canDig(name)){
@@ -348,8 +441,7 @@ function startDig(x, y){
     toast(`Лопата звенит о <b>${meta(name).name.toLowerCase()}</b>. Буз-эффект — руки трясутся.`);
     return;
   }
-  const secs = meta(name).secs / DEMO_SPEED;
-  S.digging = { x, y, t: 0, total: secs, name };
+  S.digging = { x, y, t: 0, total: meta(name).secs / DEMO_SPEED, name };
 }
 
 function finishDig(){
@@ -364,15 +456,12 @@ function finishDig(){
   } else if (m.price > 0 || m.weight > 0){
     S.loadKg += m.weight;
     S.coins += m.price;
-    S.bag.set(m.name, (S.bag.get(m.name) || 0) + 1);
     if (m.price >= 100) toast(`<b>${m.name}!</b> +${m.price} монет`);
   }
-
   if (d.y > S.maxDepth){
     S.maxDepth = d.y;
     if (d.y === 80) toast('Алмаз замурован в камне. Дедова кирка трескается — <b>−25% скорости</b>.', 4000);
   }
-  if (S.px === d.x && S.py === d.y - 1) S.target = null;
 }
 
 function givePickaxe(){
@@ -382,22 +471,13 @@ function givePickaxe(){
   toast('В мастерской деда, среди швабр и грабель — <b>кирка</b>. Теперь берётся камень и руда.', 4200);
 }
 
-/* ── шаг к цели ── */
-function stepToward(){
-  if (!S.target || S.digging) return;
-  const { x: tx, y: ty } = S.target;
-  if (tx === S.px && ty === S.py){ S.target = null; return; }
+/* ── шаг по удержанию направления ── */
+function actOnHold(){
+  const { dx, dy } = S.hold;
+  if (dx === 0 && dy <= 0) return;
 
-  const dx = Math.sign(tx - S.px);
-  if (dx !== 0) S.facing = dx;
-
-  // вниз — если цель ниже и мы над ней или уже в колонке
-  if (ty > S.py && dx === 0){
-    const below = tileAt(S.px, S.py + 1);
-    if (solid(below)) startDig(S.px, S.py + 1);
-    return;
-  }
   if (dx !== 0){
+    S.facing = dx;
     const side = tileAt(S.px + dx, S.py);
     if (solid(side)){ startDig(S.px + dx, S.py); return; }
     S.px += dx;
@@ -405,7 +485,30 @@ function stepToward(){
     reveal();
     return;
   }
-  if (ty < S.py){ S.target = null; toast('Вверх копать нельзя.'); }
+  if (dy > 0){
+    const below = tileAt(S.px, S.py + 1);
+    if (solid(below)) startDig(S.px, S.py + 1);
+  }
+}
+
+/* ── шаг к цели (режим тапа) ── */
+function stepToward(){
+  if (!S.target) return;
+  const { x: tx, y: ty } = S.target;
+  if (tx === S.px && ty === S.py){ S.target = null; return; }
+  const dx = Math.sign(tx - S.px);
+  if (dx !== 0){
+    S.facing = dx;
+    const side = tileAt(S.px + dx, S.py);
+    if (solid(side)){ startDig(S.px + dx, S.py); return; }
+    S.px += dx; S.anim++; reveal(); return;
+  }
+  if (ty > S.py){
+    const below = tileAt(S.px, S.py + 1);
+    if (solid(below)) startDig(S.px, S.py + 1);
+    return;
+  }
+  S.target = null;
 }
 
 /* ── отрисовка ── */
@@ -413,8 +516,6 @@ function drawTile(name, sx, sy, resKnown){
   if (!resKnown){
     ctx.fillStyle = solid(name) ? '#2C241B' : '#100D0A';
     ctx.fillRect(sx, sy, TILE, TILE);
-    ctx.strokeStyle = '#00000040';
-    ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
     return;
   }
   if (name === 'BEDROCK'){ ctx.fillStyle = '#050403'; ctx.fillRect(sx, sy, TILE, TILE); return; }
@@ -424,27 +525,28 @@ function drawTile(name, sx, sy, resKnown){
     return;
   }
   let file = W.art[name];
-  if (name === 'DIRT'){
-    const v = 1 + ((sx * 7 + sy * 13) >> 5) % 4;
-    file = 'dirt_' + v;
-  }
+  if (name === 'DIRT') file = 'dirt_' + (1 + ((sx * 7 + sy * 13) >> 5) % 4);
   const img = sprites[file];
   if (img && img.complete && img.naturalWidth) ctx.drawImage(img, sx, sy);
   else { ctx.fillStyle = solid(name) ? '#4A3A2A' : '#0F0C09'; ctx.fillRect(sx, sy, TILE, TILE); }
 }
 
-function draw(){
-  const camX = Math.min(Math.max(S.px - 3, 0), W.width - VIEW_W);
-  const camY = Math.max(S.py - Math.floor(viewH / 2), -2);
+function camera(){
+  return {
+    x: Math.min(Math.max(S.px - 3, 0), W.width - VIEW_W),
+    y: Math.max(S.py - Math.floor(viewH / 2), -2),
+  };
+}
 
+function draw(){
+  const cam = camera();
   ctx.fillStyle = '#0B0907';
   ctx.fillRect(0, 0, cv.width, cv.height);
 
   for (let r = 0; r < viewH; r++){
-    const y = camY + r;
+    const y = cam.y + r;
     for (let c = 0; c < VIEW_W; c++){
-      const x = camX + c;
-      const sx = c * TILE, sy = r * TILE;
+      const x = cam.x + c, sx = c * TILE, sy = r * TILE;
       if (y < 0){ ctx.fillStyle = '#1D2A33'; ctx.fillRect(sx, sy, TILE, TILE); continue; }
       if (y === 0){
         ctx.fillStyle = '#3E5A2E'; ctx.fillRect(sx, sy, TILE, TILE);
@@ -457,31 +559,29 @@ function draw(){
     }
   }
 
-  // ауры разведки
-  const pcx = (S.px - camX) * TILE + TILE / 2;
-  const pcy = (S.py - camY) * TILE + TILE / 2;
+  const hop = S.hopT > 0 ? -Math.sin((1 - S.hopT / 0.26) * Math.PI) * 10 : 0;
+  const pcx = (S.px - cam.x) * TILE + TILE / 2;
+  const pcy = (S.py - cam.y) * TILE + TILE / 2 + hop;
+
   ctx.save();
-  ctx.globalAlpha = 0.16;
-  ctx.strokeStyle = '#EADDC6'; ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.16; ctx.strokeStyle = '#EADDC6'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(pcx, pcy, (S.reliefR + 0.5) * TILE, 0, 7); ctx.stroke();
-  ctx.globalAlpha = 0.3;
-  ctx.strokeStyle = '#E0A93B';
+  ctx.globalAlpha = 0.3; ctx.strokeStyle = '#E0A93B';
   ctx.beginPath(); ctx.arc(pcx, pcy, (S.resR + 0.5) * TILE, 0, 7); ctx.stroke();
   ctx.restore();
 
-  // прогресс копки
   if (S.digging){
-    const dx = (S.digging.x - camX) * TILE, dy = (S.digging.y - camY) * TILE;
-    const p = S.digging.t / S.digging.total;
+    const dx = (S.digging.x - cam.x) * TILE, dy = (S.digging.y - cam.y) * TILE;
     ctx.fillStyle = '#00000070'; ctx.fillRect(dx, dy, TILE, TILE);
-    ctx.fillStyle = '#E0A93B'; ctx.fillRect(dx + 3, dy + TILE - 6, (TILE - 6) * p, 3);
+    ctx.fillStyle = '#E0A93B';
+    ctx.fillRect(dx + 3, dy + TILE - 6, (TILE - 6) * (S.digging.t / S.digging.total), 3);
   }
 
-  // персонаж
   const sheet = S.digging ? (S.tool === 'shovel' ? 'dig_shovel' : 'dig_pick')
-              : (S.fallFrom !== null ? 'fall' : (S.target ? 'walk' : 'idle'));
+              : (S.fallFrom !== null || S.hopT > 0 ? 'fall'
+              : ((S.hold.dx !== 0 || S.target) ? 'walk' : 'idle'));
   const img = charSprites[sheet];
-  const px = (S.px - camX) * TILE, py = (S.py - camY) * TILE;
+  const px = (S.px - cam.x) * TILE, py = (S.py - cam.y) * TILE + hop;
   if (img && img.complete && img.naturalWidth){
     const frames = Math.max(1, Math.round(img.naturalWidth / TILE));
     const f = frames > 1 ? Math.floor(S.anim / 6) % frames : 0;
@@ -499,13 +599,22 @@ function draw(){
     ctx.fillRect(px + 6, py - 22, 20, 3);
     ctx.globalAlpha = 1;
   }
+
+  placeDepth(cam, hop);
+}
+
+function placeDepth(cam, hop){
+  if (S.py <= 0){ el.depthBox.classList.remove('on'); return; }
+  el.depthBox.classList.add('on');
+  el.depthN.textContent = S.py;
+  const scale = el.stage.clientHeight / cv.height;
+  el.depthBox.style.top = (((S.py - cam.y) * TILE + TILE / 2 + hop) * scale) + 'px';
 }
 
 function syncHud(){
-  el.depth.textContent = Math.max(0, S.py);
   el.coins.textContent = S.coins.toLocaleString('ru-RU');
-  el.load.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG}`;
-  el.loadBox.classList.toggle('over', S.loadKg > MAX_KG * 0.85);
+  el.load.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG} кг`;
+  el.load.classList.toggle('over', S.loadKg > MAX_KG * 0.85);
   el.hp.style.width = S.hp + '%';
   el.food.style.width = S.food + '%';
   el.rest.style.width = S.rest + '%';
@@ -516,21 +625,23 @@ let last = performance.now();
 function loop(now){
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  if (S.hopT > 0) S.hopT = Math.max(0, S.hopT - dt);
 
-  if (now >= S.stunUntil){
+  if (now >= S.stunUntil && S.hopT === 0){
     if (!fallStep()){
       if (S.digging){
-        S.digging.t += dt;
-        S.anim++;
+        S.digging.t += dt; S.anim++;
         if (S.digging.t >= S.digging.total) finishDig();
       } else {
-        stepToward._acc = (stepToward._acc || 0) + dt;
-        if (stepToward._acc > 0.16){ stepToward._acc = 0; stepToward(); }
+        S.stepAcc += dt * 1000;
+        if (S.stepAcc >= STEP_MS){
+          S.stepAcc = 0;
+          if (S.mode === 'stick') actOnHold(); else stepToward();
+        }
       }
     }
   }
 
-  // полоски: в игре час до истощения, здесь ускорено, чтобы механика была видна
   const drain = (S.digging ? 3 : 1) * dt * 0.35;
   S.food = Math.max(0, S.food - drain);
   S.rest = Math.max(0, S.rest - drain * 0.8);
@@ -544,41 +655,110 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 
-/* ── ввод ── */
-function onTap(ev){
-  const r = cv.getBoundingClientRect();
-  const p = ev.touches ? ev.touches[0] : ev;
-  const sx = (p.clientX - r.left) / r.width * cv.width;
-  const sy = (p.clientY - r.top) / r.height * cv.height;
-  const camX = Math.min(Math.max(S.px - 3, 0), W.width - VIEW_W);
-  const camY = Math.max(S.py - Math.floor(viewH / 2), -2);
-  const x = camX + Math.floor(sx / TILE);
-  const y = camY + Math.floor(sy / TILE);
-  if (x < 0 || x >= W.width) return;
-
-  if (y < S.py && x === S.px){ toast('Вверх копать нельзя.'); return; }
-  if (S.tool === 'shovel' && y > 4){
-    toast('Лопатой глубже четвёртой клетки не достать.');
+/* ── джойстик ── */
+let stickId = null;
+function stickVec(ev){
+  const r = el.stick.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let vx = (ev.clientX - cx) / (r.width / 2);
+  let vy = (ev.clientY - cy) / (r.height / 2);
+  const len = Math.hypot(vx, vy);
+  if (len > 1){ vx /= len; vy /= len; }
+  return { vx, vy, len: Math.min(1, len) };
+}
+function applyStick(v){
+  const DEAD = 0.34;
+  el.knob.style.transform = `translate(${v.vx * 34}px, ${v.vy * 34}px)`;
+  // по горизонтали ходим и копаем вбок, вниз — копаем под собой, вверх не делаем ничего
+  if (Math.abs(v.vx) >= Math.abs(v.vy)){
+    S.hold.dx = Math.abs(v.vx) > DEAD ? Math.sign(v.vx) : 0;
+    S.hold.dy = 0;
+  } else {
+    S.hold.dx = 0;
+    S.hold.dy = v.vy > DEAD ? 1 : 0;
   }
+  if (S.digging){
+    const wantX = S.hold.dx && S.digging.x !== S.px + S.hold.dx;
+    const wantY = S.hold.dy && S.digging.y !== S.py + 1;
+    if (wantX || wantY) S.digging = null;   // смена направления отменяет копку
+  }
+}
+function releaseStick(){
+  stickId = null;
+  S.hold.dx = 0; S.hold.dy = 0;
+  el.knob.style.transform = '';
+}
+el.stick.addEventListener('pointerdown', e => {
+  stickId = e.pointerId;
+  el.stick.setPointerCapture(e.pointerId);
+  applyStick(stickVec(e));
+});
+el.stick.addEventListener('pointermove', e => {
+  if (e.pointerId !== stickId) return;
+  applyStick(stickVec(e));
+});
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture'])
+  el.stick.addEventListener(t, e => { if (e.pointerId === stickId) releaseStick(); });
+
+/* ── кнопки ── */
+document.getElementById('b-jump').addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
+const digBtn = document.getElementById('b-dig');
+function digPress(e){
+  e.preventDefault();
+  digBtn.classList.add('down');
+  if (S.hold.dy > 0) startDig(S.px, S.py + 1);
+  else if (S.hold.dx !== 0) startDig(S.px + S.hold.dx, S.py);
+  else startDig(S.px + S.facing, S.py);
+}
+digBtn.addEventListener('pointerdown', digPress);
+for (const t of ['pointerup', 'pointercancel', 'pointerleave'])
+  digBtn.addEventListener(t, () => digBtn.classList.remove('down'));
+
+/* ── клавиатура, чтобы удобно проверять с компьютера ── */
+const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowDown: 'd', KeyS: 'd' };
+addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW'){ e.preventDefault(); jump(); return; }
+  const k = KEYMAP[e.code];
+  if (!k) return;
+  e.preventDefault();
+  if (k === 'l') { S.hold.dx = -1; S.hold.dy = 0; }
+  if (k === 'r') { S.hold.dx = 1; S.hold.dy = 0; }
+  if (k === 'd') { S.hold.dx = 0; S.hold.dy = 1; }
+});
+addEventListener('keyup', e => { if (KEYMAP[e.code]) { S.hold.dx = 0; S.hold.dy = 0; } });
+
+/* ── режим управления ── */
+function setMode(m){
+  S.mode = m;
+  S.target = null;
+  releaseStick();
+  const stick = m === 'stick';
+  el.mode.textContent = stick ? 'Джойстик' : 'Тап по клетке';
+  el.mode.setAttribute('aria-pressed', String(stick));
+  el.stick.hidden = !stick;
+  el.stick.style.display = stick ? '' : 'none';
+  el.taphint.hidden = stick;
+  document.getElementById('b-dig').style.visibility = stick ? '' : 'hidden';
+}
+el.mode.addEventListener('click', () => setMode(S.mode === 'stick' ? 'tap' : 'stick'));
+
+cv.addEventListener('pointerdown', ev => {
+  if (S.mode !== 'tap') return;
+  const r = cv.getBoundingClientRect();
+  const cam = camera();
+  const x = cam.x + Math.floor((ev.clientX - r.left) / r.width * cv.width / TILE);
+  const y = cam.y + Math.floor((ev.clientY - r.top) / r.height * cv.height / TILE);
+  if (x < 0 || x >= W.width) return;
+  if (y < S.py && x === S.px){ toast('Вверх копать нельзя — но можно прыгнуть.'); return; }
   S.digging = null;
   S.target = { x, y };
-}
-cv.addEventListener('pointerdown', onTap);
-
-function resize(){
-  const st = document.getElementById('stage');
-  viewH = Math.max(9, Math.min(19, Math.round(st.clientHeight / (st.clientWidth / VIEW_W))));
-  cv.width = VIEW_W * TILE;
-  cv.height = viewH * TILE;
-  ctx.imageSmoothingEnabled = false;
-}
-window.addEventListener('resize', resize);
+});
 
 document.getElementById('reset').addEventListener('click', () => {
   S.px = 20; S.py = 0; S.coins = 0; S.loadKg = 0;
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
-  S.fogRelief.clear(); S.fogRes.clear(); S.bag.clear();
+  S.fogRelief.clear(); S.fogRes.clear();
   S.target = null; S.digging = null; S.fallFrom = null;
   el.toolIcon.src = 'art/items/shovel.png';
   el.toolName.textContent = 'Лопата';
@@ -586,17 +766,20 @@ document.getElementById('reset').addEventListener('click', () => {
   toast('Бабка улетела в Таиланд. Огород твой.');
 });
 
-/* ── загрузка ── */
-function loadImg(src){
-  const i = new Image();
-  i.src = src;
-  return i;
+function resize(){
+  viewH = Math.max(9, Math.min(19, Math.round(el.stage.clientHeight / (el.stage.clientWidth / VIEW_W))));
+  cv.width = VIEW_W * TILE;
+  cv.height = viewH * TILE;
+  ctx.imageSmoothingEnabled = false;
 }
+addEventListener('resize', resize);
+
+/* ── загрузка ── */
+const loadImg = src => { const i = new Image(); i.src = src; return i; };
 
 fetch('world_dump.json').then(r => r.json()).then(data => {
   W = data;
   W.grid = Int16Array.from(W.grid);
-
   for (const name of Object.keys(W.art)){
     const f = W.art[name];
     if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
@@ -605,8 +788,12 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
   for (const a of ['idle','walk','fall','dig_shovel','dig_pick'])
     charSprites[a] = loadImg(`art/character/${a}.png`);
   el.toolIcon.src = 'art/items/shovel.png';
+  document.getElementById('i-hp').src = 'art/ui/icon_hp.png';
+  document.getElementById('i-food').src = 'art/ui/icon_hunger.png';
+  document.getElementById('i-rest').src = 'art/ui/icon_stamina.png';
 
   resize();
+  setMode('stick');
   reveal();
   syncHud();
   toast('Бабка улетела в Таиланд. Огород твой — <b>копай</b>.', 3600);

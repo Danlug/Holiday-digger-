@@ -15,11 +15,7 @@
 				"percent_min": 100,
 				"percent_max": 100
 			},
-			"weight_kg": {
-				"value": 1.0,
-				"proposed": true,
-				"note": "вес не задан в GDD; 1кг даёт интуитивную связь с грузоподъёмностью 60кг"
-			},
+			"weight_kg": 0.0,
 			"max_stack": 99,
 			"tool_required": "shovel",
 			"hazard": [],
@@ -64,11 +60,7 @@
 					}
 				]
 			},
-			"weight_kg": {
-				"value": 1.5,
-				"proposed": true,
-				"note": "вес не задан; камень не является ресурсом, но может подбираться как хлам"
-			},
+			"weight_kg": 0.0,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -96,11 +88,7 @@
 				"proposed": true,
 				"note": "плотность не задана в GDD; невысокая, чтобы не конкурировать с железом"
 			},
-			"weight_kg": {
-				"value": 1.2,
-				"proposed": true,
-				"note": "вес не задан в GDD"
-			},
+			"weight_kg": 1.0,
 			"max_stack": 99,
 			"tool_required": {
 				"value": "shovel",
@@ -161,11 +149,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 2.0,
-				"proposed": true,
-				"note": "вес не задан в GDD"
-			},
+			"weight_kg": 1.0,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -193,11 +177,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 3.0,
-				"proposed": true,
-				"note": "вес не задан в GDD; свинец — плотный металл"
-			},
+			"weight_kg": 3.0,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -225,11 +205,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 2.5,
-				"proposed": true,
-				"note": "вес не задан в GDD"
-			},
+			"weight_kg": 1.2,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -257,11 +233,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 2.2,
-				"proposed": true,
-				"note": "вес не задан в GDD"
-			},
+			"weight_kg": 1.0,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -281,11 +253,7 @@
 			"sellable": true,
 			"depth_min": 150,
 			"depth_max": null,
-			"weight_kg": {
-				"value": 0.8,
-				"proposed": true,
-				"note": "лёгкий металл, легче железа"
-			},
+			"weight_kg": 0.5,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -323,11 +291,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 3.5,
-				"proposed": true,
-				"note": "вес не задан в GDD; золото плотное"
-			},
+			"weight_kg": 3.0,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -356,11 +320,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 0.5,
-				"proposed": true,
-				"note": "вес не задан в GDD; алмаз — маленький и лёгкий камень"
-			},
+			"weight_kg": 0.1,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -391,11 +351,7 @@
 				"percent_end": 20,
 				"note": "после depth_end плотность держится на percent_end"
 			},
-			"weight_kg": {
-				"value": 4.0,
-				"proposed": true,
-				"note": "вес не задан в GDD; топливо объёмное"
-			},
+			"weight_kg": 1.0,
 			"max_stack": 99,
 			"tool_required": {
 				"value": "shovel",
@@ -415,11 +371,7 @@
 			"id": "coal",
 			"name_ru": "Каменный уголь",
 			"category": "fuel",
-			"price_coins": {
-				"value": 3,
-				"proposed": true,
-				"note": "цена не задана; чуть выше торфа как более энергоёмкое топливо"
-			},
+			"price_coins": 20,
 			"depth_min": 1000,
 			"depth_max": null,
 			"density": {
@@ -432,11 +384,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 3.5,
-				"proposed": true,
-				"note": "вес не задан в GDD"
-			},
+			"weight_kg": 3.0,
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -596,7 +544,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": 2.0,
+			"weight_kg": 4.0,
 			"max_stack": 1,
 			"tool_required": "hand_drill",
 			"hazard": [
@@ -604,7 +552,7 @@
 				"poison"
 			],
 			"requires_container": "mercury_bottle",
-			"notes": "нужна металлическая бутылка (1 ртуть, 2кг, не стакается — см. GDD п.13). Без сбора: стекает вниз 2с (если пустота снизу), испаряется через 1 мин, облако на 8 клеток на 5 минут",
+			"notes": "вес указан вместе со стеклянной банкой, в которой ртуть только и можно нести",
 			"sellable": true,
 			"drill_seconds": {
 				"value": 6.0,
@@ -629,11 +577,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 1.0,
-				"proposed": true,
-				"note": "вес самого урана за соту не задан в GDD напрямую (задан только вес контейнера целиком — 10кг на 9кг свинца+1кг урана, см. п.13); 1кг — доля урана"
-			},
+			"weight_kg": 10.0,
 			"max_stack": 1,
 			"tool_required": "drill_rig",
 			"hazard": [
@@ -641,7 +585,7 @@
 				"radioactive"
 			],
 			"requires_container": "lead_container",
-			"notes": "свинцовый контейнер: 10кг (9кг свинец + 1кг уран), 4 соты, не стакается (см. GDD п.13). Топливный апгрейд для буровой скважины и буровой машины",
+			"notes": "вес указан вместе со свинцовым контейнером",
 			"sellable": true,
 			"drill_seconds": {
 				"value": 12.0,
@@ -765,11 +709,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 0.3,
-				"proposed": true,
-				"note": "вес не задан в GDD; самоцвет лёгкий"
-			},
+			"weight_kg": 0.1,
 			"max_stack": 99,
 			"tool_required": "drill_rig",
 			"hazard": [],
@@ -798,11 +738,7 @@
 				"proposed": true,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": {
-				"value": 0.3,
-				"proposed": true,
-				"note": "вес не задан в GDD"
-			},
+			"weight_kg": 0.1,
 			"max_stack": 99,
 			"tool_required": "drill_rig",
 			"hazard": [],

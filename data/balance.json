@@ -16,11 +16,7 @@
 			15,
 			-6
 		],
-		"max_depth_cells": {
-			"value": 6500,
-			"proposed": true,
-			"note": "GDD говорит 'до 4000+', точный потолок не задан; выбран потолок, вмещающий всю лестницу редкости вплоть до божественного сердца (см. minerals.json)"
-		},
+		"max_depth_cells": 10000,
 		"tile_size_px": 32,
 		"viewport_px": [
 			224,
@@ -40,7 +36,12 @@
 		"fixed_peat_layer_depth_range": [
 			450,
 			455
-		]
+		],
+		"raid_boss_depth": {
+			"value": 10000,
+			"proposed": true,
+			"note": "владелец: на дне рейдбосс; механика боя ещё не описана"
+		}
 	},
 	"digging": {
 		"base_seconds_per_cell": 3.0,
@@ -116,12 +117,10 @@
 			"note": "расход голода идентичен бодрости по GDD п.7 ('то же')"
 		},
 		"hp_drain_on_depletion": {
-			"hp_per_second_per_empty_bar": {
-				"value": 1.0,
-				"proposed": true,
-				"note": "скорость утечки HP при истощении голода/бодрости не задана в GDD (только факт утечки, п.7); если пусты обе полоски — урон складывается (×2)"
-			},
-			"note": "начинается когда голод ИЛИ бодрость достигают 0; ведёт к смерти"
+			"hunger_hp_per_second": 1.0,
+			"stamina_hp_per_second": 0.0,
+			"both_empty_hp_per_second": 2.0,
+			"note": "решение владельца: пустая бодрость HP не трогает вовсе, она даёт штраф к скорости и расходу голода (см. exhausted_penalty). Убивает только голод."
 		},
 		"death": {
 			"loses_all_minerals_except_black_box": true,
@@ -154,6 +153,18 @@
 					"note": "качественная заметка, не числовой параметр"
 				}
 			}
+		},
+		"exhausted_penalty": {
+			"speed_multiplier": 0.5,
+			"hunger_drain_multiplier_while_working": 1.2,
+			"note": "решение владельца: бодрость на нуле — −50% ко всем скоростям и +20% к расходу голода при работе. Усталость гонит домой спать, а не убивает, и наказывает сама себя."
+		},
+		"warnings": {
+			"notice_percent": 25,
+			"severe_percent": 10,
+			"severe_shake": true,
+			"severe_red_flash_seconds": 2.0,
+			"note": "решение владельца: на 25% предупреждение на экране, на 10% — сотрясение и 2 секунды красного мигания. Предупреждать надо ДО того, как поздно: игрок должен успеть подняться."
 		}
 	},
 	"game_time": {
@@ -479,11 +490,7 @@
 			"premium_currency"
 		],
 		"premium_currency_name_ru": "доллары",
-		"coins_per_premium_currency_unit": {
-			"value": 100,
-			"proposed": true,
-			"note": "курс доллары<->монеты не задан в GDD (п.18); 1 доллар = 100 монет — алмаз (500 монет) эквивалентен 5 премиум-валюте, ощущается как честная глубокая находка"
-		},
+		"coins_per_premium_currency_unit": 1000,
 		"known_mineral_prices_ref": "см. minerals.json -> price_coins"
 	},
 	"monetization": {
@@ -583,7 +590,7 @@
 	},
 	"reset_events": {
 		"chunk_collapse": {
-			"frequency": "medium",
+			"frequency": "решение владельца",
 			"sizes": [
 				[
 					5,
@@ -601,11 +608,15 @@
 					10,
 					32
 				]
-			]
+			],
+			"check_every_seconds": 300,
+			"chance_percent": 7
 		},
 		"mine_earthquake": {
-			"frequency": "very_rare",
-			"effect": "resets_and_randomizes_all_unfixed_cells"
+			"frequency": "решение владельца",
+			"effect": "resets_and_randomizes_all_unfixed_cells",
+			"check_every_seconds": 600,
+			"chance_percent": 3
 		},
 		"permanently_fixed": [
 			"fixed_staircase",

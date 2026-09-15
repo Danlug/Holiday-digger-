@@ -36,6 +36,7 @@ var stage_rect: Rect2 = Rect2()
 var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd каждый кадр (см. camera() в web-демо)
 
 # --- узлы ---
+var _gauges_box: Control
 var _hp_fill: ColorRect
 var _hunger_fill: ColorRect
 var _stamina_fill: ColorRect
@@ -74,6 +75,20 @@ func _ready() -> void:
 	_sync_all()
 
 
+## Три полоски выживания (HP/голод/усталость) вводятся не сразу: до сцены
+## смерти их на экране нет (ГДД п.9), прячет их режиссура сюжета. Метод нужен
+## именно ей: без него story_director искал коробку, шагая вверх по дереву от
+## заливки HP, промахивался на один уровень и гасил ВЕСЬ игровой слой —
+## вместе с джойстиком, кошельком, глубиной и шторкой инвентаря.
+func set_gauges_visible(v: bool) -> void:
+	if _gauges_box != null:
+		_gauges_box.visible = v
+
+
+func are_gauges_visible() -> bool:
+	return _gauges_box != null and _gauges_box.visible
+
+
 func set_player(p: Node) -> void:
 	player = p
 	player.fell.connect(_on_fell)
@@ -108,10 +123,12 @@ func _build_ui() -> void:
 
 func _build_gauges(parent: Control) -> void:
 	var box := VBoxContainer.new()
+	box.name = "Gauges"
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.position = Vector2(8, 8)
 	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
+	_gauges_box = box
 
 	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
 	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
@@ -347,6 +364,10 @@ func _build_inventory_sheet(parent: Control) -> void:
 	foot.add_child(_inv_total_label)
 
 
+var _more_panel: PanelContainer
+var _more_button: Button
+
+
 func _build_strip() -> void:
 	# Подложка — отдельный слой под рядом кнопок. Если положить Panel внутрь
 	# HBoxContainer, контейнер разложит её как обычный элемент ряда нулевой
@@ -369,8 +390,15 @@ func _build_strip() -> void:
 	var strip := HBoxContainer.new()
 	strip.name = "Row"
 	strip.set_anchors_preset(Control.PRESET_FULL_RECT)
-	strip.add_theme_constant_override("separation", 6)
+	strip.add_theme_constant_override("separation", 5)
 	root.add_child(strip)
+
+	# Систем стало пять, и каждая честно попросила себе кнопку — в ряду
+	# шириной 224 их девять, а нужно им около 315. Ряд делится по тому,
+	# нужна ли кнопка ВО ВРЕМЯ КОПКИ: инвентарь, склад, инструмент и
+	# снаряжение остаются на виду, всё остальное уходит под «⋯». Прятать
+	# по важности, а не по алфавиту: игрок сидит в шахте, а не в меню.
+	var more_menu := _build_more_menu()
 
 	# Иконкой, а не словом: ряд шириной 224 не вмещает подпись «Инвентарь»
 	# вместе с названием инструмента, снаряжением, режимом и сбросом.
@@ -378,7 +406,7 @@ func _build_strip() -> void:
 	if ResourceLoader.exists("res://art/ui/icon_inventory.png"):
 		_inv_button.icon = load("res://art/ui/icon_inventory.png")
 		_inv_button.expand_icon = true
-		_inv_button.custom_minimum_size = Vector2(30, STRIP_H)
+		_inv_button.custom_minimum_size = Vector2(26, STRIP_H)
 	else:
 		_inv_button.text = "Инв"
 	_inv_button.tooltip_text = "Инвентарь"
@@ -397,7 +425,7 @@ func _build_strip() -> void:
 	_tool_label.clip_text = true
 	_tool_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tool_box.add_child(_tool_label)
-	tool_box.custom_minimum_size = Vector2(36, 0)
+	tool_box.custom_minimum_size = Vector2(30, 0)
 	tool_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	strip.add_child(tool_box)
 
@@ -419,13 +447,18 @@ func _build_strip() -> void:
 		shop_btn.text = "Лавка"
 	shop_btn.tooltip_text = "Мастерская: продажа, верстак, лавка"
 	shop_btn.pressed.connect(func(): ShopUI.open_workshop())
-	strip.add_child(shop_btn)
+	shop_btn.text = "Мастерская"
+	shop_btn.custom_minimum_size = Vector2(0, STRIP_H)
+	more_menu.add_child(shop_btn)
 	# --- конец блока экономики ---
 
 	# --- прокачка и музей: кнопка экрана героя (scripts/progress/) ---
 	# Одна кнопка на три вкладки: прокачка, музей, рекорды. Витрина музея
 	# открывается и отдельно — ProgressScreen.open("museum").
-	strip.add_child(ProgressScreen.make_hud_button(_make_chip("")))
+	var hero_btn := ProgressScreen.make_hud_button(_make_chip(""))
+	if hero_btn.text.is_empty():
+		hero_btn.text = "Герой"
+	more_menu.add_child(hero_btn)
 	# --- конец блока прокачки ---
 
 	# --- дом: контекстная кнопка (scripts/house/) ---
@@ -447,7 +480,7 @@ func _build_strip() -> void:
 	if ResourceLoader.exists("res://art/ui/icon_blackbox.png"):
 		storage_btn.icon = load("res://art/ui/icon_blackbox.png")
 		storage_btn.expand_icon = true
-		storage_btn.custom_minimum_size = Vector2(22, STRIP_H)
+		storage_btn.custom_minimum_size = Vector2(20, STRIP_H)
 	else:
 		storage_btn.text = "Скл"
 	storage_btn.tooltip_text = "Склад в мастерской"
@@ -457,15 +490,80 @@ func _build_strip() -> void:
 
 	_mode_button = _make_chip("")
 	_mode_button.pressed.connect(_on_mode_button_pressed)
-	strip.add_child(_mode_button)
+	more_menu.add_child(_mode_button)
 
 	# Стрелка ↺ (U+21BA) отсутствует в шрифте темы по умолчанию и рисуется
 	# пустым квадратом — подписываем словом.
 	var reset_btn := _make_chip("Сброс")
 	reset_btn.pressed.connect(_on_reset_pressed)
-	strip.add_child(reset_btn)
+	more_menu.add_child(reset_btn)
+
+	# «⋯» встаёт последним, чтобы контекстная кнопка дома, появляясь и
+	# исчезая, не сдвигала его под пальцем.
+	_more_button = _make_chip("•••")
+	_more_button.tooltip_text = "Ещё"
+	_more_button.custom_minimum_size = Vector2(26, STRIP_H)
+	_more_button.pressed.connect(_toggle_more_menu)
+	strip.add_child(_more_button)
+
+	# Любой пункт меню закрывает меню: иначе шторка мастерской открывается
+	# поверх ещё раскрытого списка, и он ждёт игрока под ней.
+	for item in more_menu.get_children():
+		if item is Button:
+			(item as Button).pressed.connect(close_more_menu)
 
 	_set_mode("stick")
+
+
+## Меню «⋯»: то, что нужно на поверхности, а не в шахте.
+##
+## Всплывает НАД полосой и прижато к правому краю, к своей кнопке. Пока оно
+## открыто, ввод в мир глушится (см. _input и update_hold_intent) — иначе
+## палец, метящий в пункт меню, попадает в джойстик под ним и герой копает
+## под открытым меню.
+func _build_more_menu() -> VBoxContainer:
+	_more_panel = PanelContainer.new()
+	_more_panel.name = "MoreMenu"
+	_more_panel.visible = false
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
+	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(4)
+	_more_panel.add_theme_stylebox_override("panel", sb)
+	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_more_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_more_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_more_panel.offset_bottom = -STRIP_H - 2
+	_more_panel.offset_right = -4
+	add_child(_more_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 3)
+	_more_panel.add_child(box)
+	return box
+
+
+func _toggle_more_menu() -> void:
+	_more_panel.visible = not _more_panel.visible
+	if _more_panel.visible:
+		# Иначе палец, уже «зажавший» мир, остаётся зажатым под открытым меню:
+		# в режиме стика — ручка, в режиме пальца — удержание.
+		_release_stick()
+		_touch_pointer = -100
+		_has_touch = false
+		if player != null:
+			player.release_control()
+			player.digging = null
+
+
+func close_more_menu() -> void:
+	if _more_panel != null:
+		_more_panel.visible = false
+
+
+func is_more_menu_open() -> bool:
+	return _more_panel != null and _more_panel.visible
 
 
 # Кнопка нижней полосы: у темы Godot по умолчанию минимальная высота около
@@ -782,7 +880,7 @@ func _on_reset_pressed() -> void:
 # ---------------------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
-	if player == null or _inv_sheet.visible or ProgressScreen.is_open():
+	if player == null or _inv_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
 		return
 
 	if mode == "stick":
@@ -886,7 +984,7 @@ func _handle_hold_input(event: InputEvent) -> void:
 ## Пересчитывает намерение удержания каждый физический кадр (см.
 ## readHoldIntent в web-демо) — вызывается из main.gd перед player.physics_tick.
 func update_hold_intent() -> void:
-	if mode != "hold" or player == null or ProgressScreen.is_open():
+	if mode != "hold" or player == null or ProgressScreen.is_open() or is_more_menu_open():
 		return
 	if not _has_touch:
 		player.resolve_dir(0.0, 0.0, 1.0)

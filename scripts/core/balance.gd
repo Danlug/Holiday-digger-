@@ -380,8 +380,43 @@ func get_bar_depletion_rate_per_second(bar: String, is_digging: bool) -> float:
 	return 1.0 / total_seconds
 
 
-func get_hp_drain_per_second_when_depleted() -> float:
-	return float(_v(balance.get("survival", {}).get("hp_drain_on_depletion", {}).get("hp_per_second_per_empty_bar", 1.0)))
+## Утечка HP при пустых полосках (ГДД раздел 7, решение владельца).
+##
+## Голод и бодрость наказывают ПО-РАЗНОМУ, и в этом весь смысл: голод убивает,
+## усталость — мешает. Поэтому здесь не «столько-то за каждую пустую полоску»,
+## а три отдельных случая.
+func get_hp_drain_per_second(hunger_empty: bool, stamina_empty: bool) -> float:
+	var d: Dictionary = balance.get("survival", {}).get("hp_drain_on_depletion", {})
+	if hunger_empty and stamina_empty:
+		return float(_v(d.get("both_empty_hp_per_second", 2.0)))
+	if hunger_empty:
+		return float(_v(d.get("hunger_hp_per_second", 1.0)))
+	if stamina_empty:
+		return float(_v(d.get("stamina_hp_per_second", 0.0)))
+	return 0.0
+
+
+## Штраф за пустую бодрость: множитель ко всем скоростям и к расходу голода.
+## Обессиленный герой копает вдвое медленнее и ест вдвое больше — усталость
+## наказывает сама себя, не отнимая ни единицы HP.
+func get_exhausted_speed_multiplier() -> float:
+	return float(_v(balance.get("survival", {}).get("exhausted_penalty", {}).get("speed_multiplier", 0.5)))
+
+
+func get_exhausted_hunger_multiplier() -> float:
+	return float(_v(balance.get("survival", {}).get("exhausted_penalty", {}).get(
+		"hunger_drain_multiplier_while_working", 1.2)))
+
+
+## Пороги предупреждений: предупреждать надо ДО того, как поздно — игрок
+## должен успеть подняться, а не обнаружить проблему на дне с полным рюкзаком.
+func get_warning_percent(severe: bool) -> float:
+	var w: Dictionary = balance.get("survival", {}).get("warnings", {})
+	return float(_v(w.get("severe_percent", 10.0) if severe else w.get("notice_percent", 25.0)))
+
+
+func get_warning_red_flash_seconds() -> float:
+	return float(_v(balance.get("survival", {}).get("warnings", {}).get("severe_red_flash_seconds", 2.0)))
 
 
 ## Восстановление бодрости за игровой час сна: 12.5% за игровой час.

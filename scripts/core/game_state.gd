@@ -95,20 +95,67 @@ func _start_autosave_timer() -> void:
 # Выживание: расход полосок, утечка HP, смерть (см. GDD раздел 7)
 # ---------------------------------------------------------------------------
 
+signal exhausted_changed(exhausted: bool)
+signal survival_warning(bar: String, severe: bool)
+
+var is_exhausted: bool = false
+# Что уже показали, чтобы не мигать красным каждый кадр. Сбрасывается, когда
+# полоска поднимется выше порога — предупреждение должно прийти снова, если
+# игрок снова довёл себя до того же.
+var _warned: Dictionary = {}
+
+
 func _tick_survival(delta: float) -> void:
 	var stamina_rate := Balance.get_bar_depletion_rate_per_second("stamina", is_digging)
 	var hunger_rate := Balance.get_bar_depletion_rate_per_second("hunger", is_digging)
+
+	# Обессиленный ест больше: усталость не убивает сама, но ускоряет голод,
+	# который убивает. Штраф считается по состоянию НА НАЧАЛО кадра, иначе
+	# полоска, упавшая в ноль этим же кадром, штрафует задним числом.
+	var was_exhausted := stamina <= 0.0
+	if was_exhausted and is_digging:
+		hunger_rate *= Balance.get_exhausted_hunger_multiplier()
+
 	set_stamina(stamina - stamina_rate * 100.0 * delta)
 	set_hunger(hunger - hunger_rate * 100.0 * delta)
 
-	var empty_bars := 0
-	if stamina <= 0.0:
-		empty_bars += 1
-	if hunger <= 0.0:
-		empty_bars += 1
-	if empty_bars > 0:
-		var drain_per_sec := Balance.get_hp_drain_per_second_when_depleted() * empty_bars
-		take_damage(drain_per_sec * delta, "starvation")
+	_update_exhausted()
+	_check_survival_warnings()
+
+	# Голод и бодрость наказывают по-разному (ГДД раздел 7): голод убивает,
+	# усталость мешает. Пустая бодрость сама по себе HP не трогает.
+	var drain := Balance.get_hp_drain_per_second(hunger <= 0.0, stamina <= 0.0)
+	if drain > 0.0:
+		take_damage(drain * delta, "starvation")
+
+
+func _update_exhausted() -> void:
+	var now := stamina <= 0.0
+	if now == is_exhausted:
+		return
+	is_exhausted = now
+	exhausted_changed.emit(now)
+
+
+## Множитель ко всем скоростям героя. Копка, ходьба и полёт спрашивают его
+## сами — так штраф нельзя забыть применить в одном из трёх мест.
+func get_speed_multiplier() -> float:
+	return Balance.get_exhausted_speed_multiplier() if is_exhausted else 1.0
+
+
+func _check_survival_warnings() -> void:
+	for bar in ["hunger", "stamina"]:
+		var value: float = hunger if bar == "hunger" else stamina
+		for severe in [true, false]:
+			var key: String = bar + ("_severe" if severe else "_notice")
+			var threshold := Balance.get_warning_percent(severe)
+			if value <= threshold and not _warned.get(key, false):
+				_warned[key] = true
+				survival_warning.emit(bar, severe)
+			# Порог отпускается с запасом, иначе дрожание вокруг него
+			# устроит мигание на каждом кадре.
+			elif value > threshold + 5.0 and _warned.get(key, false):
+				_warned[key] = false
 
 
 func set_stamina(value: float) -> void:

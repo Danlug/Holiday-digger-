@@ -114,20 +114,13 @@ func _connect_signals() -> void:
 
 
 ## Три полоски выживания до сцены смерти не показываются вовсе: понятие
-## усталости вводится только после неё (ГДД раздел 9). Ищем их у HUD через
-## заливку HP — это временная связка, пока в HUD нет своего set_bars_visible.
+## усталости вводится только после неё (ГДД раздел 9). Прячет их сам HUD —
+## у него для этого есть set_gauges_visible(). Раньше коробку искали, шагая
+## вверх по дереву от заливки HP, и промахивались на уровень: гасился весь
+## игровой слой разом — джойстик, кошелёк, глубина, тосты и шторка инвентаря.
 func _find_gauges() -> void:
-	if hud == null or not ("_hp_fill" in hud):
-		return
-	var fill = hud._hp_fill
-	if fill == null:
-		return
-	var box = fill.get_parent()
-	for _i in range(3):
-		if box == null:
-			return
-		box = box.get_parent()
-	_gauges = box as Control
+	if hud != null and hud.has_method("set_gauges_visible"):
+		_gauges = hud
 
 
 func _queue_intro_if_new_game() -> void:
@@ -160,8 +153,8 @@ func _process(_dt: float) -> void:
 ## файл ради обучающего периода нельзя.
 func _apply_no_fatigue_period() -> void:
 	var introduced := StoryState.has_flag("bars_introduced")
-	if _gauges != null and _gauges.visible != introduced:
-		_gauges.visible = introduced
+	if _gauges != null and _gauges.are_gauges_visible() != introduced:
+		_gauges.set_gauges_visible(introduced)
 	if introduced:
 		return
 	if GameState.stamina < 100.0:

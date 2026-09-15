@@ -289,7 +289,7 @@ func _prop_ramp() -> float:
 func _move_y(dt: float) -> void:
 	if thrust != "":
 		var jet := thrust == "jet"
-		var max_up: float = JET_SPEED if jet else PROP_SPEED
+		var max_up: float = (JET_SPEED if jet else PROP_SPEED) * GameState.get_speed_multiplier()
 		var ramp: float = JET_RAMP if jet else _prop_ramp()
 		var accel: float = THRUST_BRAKE if vy > 0.0 else max_up / ramp
 		vy = maxf(vy - accel * dt, -max_up)
@@ -392,7 +392,10 @@ func _apply_intent(dt: float) -> void:
 		vx = 0.0
 		return
 
-	var speed: float = WALK * (1.0 if on_ground else AIR_CTRL)
+	# Обессиленный герой медленнее во всём (ГДД раздел 7). Множитель берётся
+	# из GameState, а не считается здесь, чтобы штраф нельзя было забыть
+	# применить в одном из трёх мест — ходьбе, копке или полёте.
+	var speed: float = WALK * (1.0 if on_ground else AIR_CTRL) * GameState.get_speed_multiplier()
 	vx = float(hold_dx) * speed
 	if hold_dx != 0:
 		facing = hold_dx
@@ -492,6 +495,8 @@ func _start_dig(tx: int, ty: int) -> void:
 		else float(Balance.unwrap(Balance.balance.get("digging", {}).get("base_seconds_per_cell", 3.0)))
 	var stage := GameState.get_skill_stage("dig_speed")
 	var total: float = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier()
+	# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
+	total /= GameState.get_speed_multiplier()
 
 	digging = {"x": tx, "y": ty, "t": 0.0, "total": maxf(total, 0.05), "type": type}
 	dig_started.emit(tx, ty, type)

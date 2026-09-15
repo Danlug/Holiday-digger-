@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_dig_earth_gives_xp_not_coins()
 	_test_shovel_cannot_dig_stone()
 	_test_gear_unlock_by_depth()
+	_test_exhaustion_penalty()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -173,3 +174,47 @@ func _test_gear_unlock_by_depth() -> void:
 			GameState.current_tool == "drill_rig")
 	check("буровая машина копает втрое быстрее кирки",
 			is_equal_approx(Balance.get_tool_speed_multiplier("drill_rig"), 3.0))
+
+
+# ---------------------------------------------------------------------------
+# Пустая бодрость не убивает, а мешает (ГДД раздел 7, решение владельца)
+# ---------------------------------------------------------------------------
+
+func _test_exhaustion_penalty() -> void:
+	GameState.reset_progress()
+	GameState.set_hunger(80.0)
+
+	GameState.set_stamina(50.0)
+	GameState._update_exhausted()
+	check("с бодростью герой не обессилен", not GameState.is_exhausted)
+	check("множитель скорости без штрафа = 1", is_equal_approx(GameState.get_speed_multiplier(), 1.0))
+
+	GameState.set_stamina(0.0)
+	GameState._update_exhausted()
+	check("пустая бодрость -> обессилен", GameState.is_exhausted)
+	check("множитель скорости со штрафом = 0.5", is_equal_approx(GameState.get_speed_multiplier(), 0.5))
+
+	# Голод полон, бодрость пуста — HP трогать НЕЛЬЗЯ.
+	var hp_before: float = GameState.hp
+	GameState._tick_survival(1.0)
+	check("пустая бодрость сама по себе HP не отнимает", GameState.hp >= hp_before - 0.001)
+
+	# Пустой голод убивает по 1 HP/сек, обе пустые — по 2.
+	check("голод пуст -> 1 HP/сек", is_equal_approx(Balance.get_hp_drain_per_second(true, false), 1.0))
+	check("бодрость пуста -> 0 HP/сек", is_equal_approx(Balance.get_hp_drain_per_second(false, true), 0.0))
+	check("обе пусты -> 2 HP/сек", is_equal_approx(Balance.get_hp_drain_per_second(true, true), 2.0))
+
+	# Предупреждения приходят до того, как станет поздно.
+	var seen: Array = []
+	var cb := func(bar: String, severe: bool): seen.append([bar, severe])
+	GameState.survival_warning.connect(cb)
+	GameState.reset_progress()
+	GameState._warned.clear()
+	GameState.set_hunger(24.0)
+	GameState._check_survival_warnings()
+	check("на 25% голода приходит предупреждение", seen.any(func(e): return e[0] == "hunger" and not e[1]))
+	GameState.set_hunger(9.0)
+	GameState._check_survival_warnings()
+	check("на 10% голода приходит серьёзное предупреждение", seen.any(func(e): return e[0] == "hunger" and e[1]))
+	GameState.survival_warning.disconnect(cb)
+	GameState.reset_progress()

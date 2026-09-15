@@ -15,6 +15,11 @@
 (голова / корпус / ноги) и полосы смещаются покадрово. Для 20×40 этого
 достаточно: на таком размере читается сам факт шага, а не его анатомия.
 
+У ГЕРОЯ так собирается только покой: движение (ходьба, падение, оба полёта)
+нарезается из авторского листа в tools/import_move.py, копка — в
+tools/import_dig.py. Нарисованные кадры лучше собранных, и там, где они
+есть, процедурная сборка не запускается вовсе.
+
 Запуск:  python3 tools/import_art.py <путь-к-листу.jpg>
 """
 
@@ -731,7 +736,9 @@ def save(img, rel):
 FULL = ("boy", "boy_gear", "grandpa", "grandpa_gear")
 
 # Полоса героя дублируется в art/character/ — там её ищут оба рендерера.
-HERO_SHEETS = ("idle", "walk", "fall", "fly", "fly_jet", "sleep")
+# Только то, что собирается здесь: ходьбу, падение и оба полёта кладёт туда
+# import_move.py, копку — import_dig.py, каждый со своего листа.
+HERO_SHEETS = ("idle", "sleep")
 
 
 def main(sheet_path):
@@ -776,16 +783,18 @@ def main(sheet_path):
         body = cut(sheet, mask, box)       # исходное разрешение, не трогаем
         bh = body.size[1]
 
-        sets = {
-            "idle": anim_idle(body),
-            "walk": anim_walk(body),
-            "fall": anim_fall(body),
-            "fly": anim_fly(body, raws["backpack_propeller"], "prop"),
-            "fly_jet": anim_fly(body, raws["jetpack"], "jet"),
-        }
-        # Копка героя приходит с отдельного листа (tools/import_dig.py) —
-        # там она нарисована покадрово и лучше во всём. Процедурная сборка
-        # из стоячей позы остаётся для тех, у кого нарисованных кадров нет.
+        sets = {"idle": anim_idle(body)}
+        # Движение и копка героя приходят с отдельных листов
+        # (tools/import_move.py и tools/import_dig.py) — там они нарисованы
+        # покадрово и лучше во всём: в ходьбе видна работа корпуса, в полёте
+        # винт нарисован, а не собран из прямоугольников. Процедурная сборка
+        # остаётся для тех, у кого нарисованных кадров нет, — для деда и
+        # бабок; для них она и писалась.
+        if slug != "boy":
+            sets["walk"] = anim_walk(body)
+            sets["fall"] = anim_fall(body)
+            sets["fly"] = anim_fly(body, raws["backpack_propeller"], "prop")
+            sets["fly_jet"] = anim_fly(body, raws["jetpack"], "jet")
         if slug in FULL and slug != "boy":
             sets["dig_shovel"] = anim_dig(body, raws["shovel"])
             sets["dig_pick"] = anim_dig(body, raws["pickaxe_rusty"])

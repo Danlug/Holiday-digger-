@@ -1,0 +1,752 @@
+class_name CutscenePlayer
+extends CanvasLayer
+## Проигрыватель катсцен: читает список кадров из StoryData и показывает их
+## поверх игры.
+##
+## Своя сцена, а не зум игровой камеры. Игровой мир нарисован тайлами 32×32 и
+## показывает ровно семь клеток в ширину — деда, бабку и дом в него не
+## поставить, а сцены интро происходят за три года до начала игры, когда
+## никакого игрового мира ещё нет. Поэтому катсцена рисует собственный
+## задник, землю и актёров, и ей не нужно, чтобы мир был загружен вообще.
+##
+## Тап работает в две ступени: первый дописывает реплику целиком, второй
+## переводит на следующий кадр. Это стандарт жанра и он же спасает от
+## случайного пролистывания текста двойным нажатием.
+##
+## Пропуск обязателен (см. задание): кнопка "Пропустить" мгновенно доигрывает
+## сцену до конца. Побочные эффекты сцены (выдать кирку, поставить флаг) в
+## кадрах НЕ живут — они лежат в scene.effects и применяются директором один
+## раз по окончании, одинаково и при честном просмотре, и при пропуске.
+
+signal finished(scene_id: String)
+
+const LAYER := 100
+const STAGE_TOP := 0.06        # доля высоты, где начинается "небо" сцены
+const GROUND_LINE := 0.56      # доля высоты, на которой проходит линия земли
+const BOX_H := 108.0           # высота реплики: шесть строк, длинные фразы не режутся
+const CHAR_FRAME := 48
+const TYPE_CHARS_PER_SEC := 42.0
+const ANIM_FPS := 7.0
+
+var scene_id: String = ""
+var is_playing: bool = false
+
+var _beats: Array = []
+var _index: int = 0
+var _beat_timer: float = 0.0     # сколько ещё держать кадр с автопереходом
+var _waiting_tap: bool = false
+var _typing: bool = false
+var _anim_time: float = 0.0
+
+# --- узлы ---
+var _root: Control
+var _sky: ColorRect
+var _ground: TextureRect
+var _stage: Control
+var _card: Label
+var _box: Panel
+var _speaker: Label
+var _line: Label
+var _next_hint: Label
+var _skip_btn: Button
+var _fade: ColorRect
+var _item_card: Control
+var _item_icon: TextureRect
+var _item_name: Label
+var _item_text: Label
+var _tap_target: Control
+
+var _actors: Dictionary = {}     # actor_id -> {node: TextureRect, frames:int, pose:String}
+var _props: Dictionary = {}      # prop_id  -> TextureRect
+var _moves: Array = []           # активные сдвиги актёров: {node, left, per_sec}
+var _shake_left: float = 0.0
+var _daynight_left: float = 0.0
+var _daynight_step: float = 0.0
+var _daynight_idx: int = 0
+var _mood_id: String = "dark"
+var _last_vp: Vector2 = Vector2.ZERO
+
+
+func _init() -> void:
+	layer = LAYER
+	# Катсцена показывается и когда всё остальное поставлено на паузу
+	# (сцена смерти останавливает игровой цикл), иначе текст замирает.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+
+func _ready() -> void:
+	_build()
+	_root.visible = false
+
+
+# ---------------------------------------------------------------------------
+# Построение интерфейса сцены
+# ---------------------------------------------------------------------------
+
+func _build() -> void:
+	_root = Control.new()
+	_root.name = "Cutscene"
+	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_root)
+
+	_sky = ColorRect.new()
+	_sky.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sky.color = Color8(0x0B, 0x08, 0x06)
+	_sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_sky)
+
+	# Землю мостим настоящим тайлом земли: катсцена должна выглядеть из той же
+	# игры, а не как отдельная презентация со сплошной заливкой.
+	_ground = TextureRect.new()
+	_ground.stretch_mode = TextureRect.STRETCH_TILE
+	_ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if ResourceLoader.exists("res://art/tiles/dirt_1.png"):
+		_ground.texture = load("res://art/tiles/dirt_1.png")
+	_root.add_child(_ground)
+
+	_stage = Control.new()
+	_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_stage)
+	# Земля рисуется ПОВЕРХ актёров: так проваливающийся в яму дед уходит под
+	# грунт, а не съезжает по нему. Стоящих это не задевает — ступни лежат
+	# ровно на линии земли, ниже в кадре только прозрачный запас.
+	_root.move_child(_ground, _stage.get_index() + 1)
+
+	_card = Label.new()
+	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_card.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_card.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_card.add_theme_font_size_override("font_size", 15)
+	_card.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
+	_card.visible = false
+	_root.add_child(_card)
+
+	_build_item_card()
+	_build_box()
+	_build_tap_target()
+
+	_fade = ColorRect.new()
+	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade.color = Color(0, 0, 0, 0)
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_fade)
+
+	_skip_btn = Button.new()
+	_skip_btn.text = StoryText.get_text("ui.skip")
+	_skip_btn.add_theme_font_size_override("font_size", 9)
+	_skip_btn.pressed.connect(skip)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.55)
+	sb.border_color = Color8(0x9D, 0x8B, 0x73)
+	sb.set_border_width_all(1)
+	sb.content_margin_left = 7
+	sb.content_margin_right = 7
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	for state in ["normal", "hover", "pressed", "focus"]:
+		_skip_btn.add_theme_stylebox_override(state, sb)
+	_skip_btn.add_theme_color_override("font_color", Color8(0xC8, 0xB8, 0x9A))
+	_root.add_child(_skip_btn)
+
+
+func _build_box() -> void:
+	_box = Panel.new()
+	_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.043, 0.035, 0.027, 0.94)
+	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
+	sb.border_width_left = 3
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.border_width_right = 1
+	_box.add_theme_stylebox_override("panel", sb)
+	_root.add_child(_box)
+
+	_speaker = Label.new()
+	_speaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_speaker.position = Vector2(9, 4)
+	_speaker.add_theme_font_size_override("font_size", 10)
+	_speaker.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	_box.add_child(_speaker)
+
+	_line = Label.new()
+	_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_line.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_line.add_theme_font_size_override("font_size", 11)
+	_line.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
+	_box.add_child(_line)
+
+	_next_hint = Label.new()
+	_next_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_next_hint.text = StoryText.get_text("ui.tap_to_continue")
+	_next_hint.add_theme_font_size_override("font_size", 8)
+	_next_hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	_next_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_box.add_child(_next_hint)
+
+
+func _build_item_card() -> void:
+	_item_card = Control.new()
+	_item_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_item_card.visible = false
+	_root.add_child(_item_card)
+
+	var panel := Panel.new()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.09, 0.07, 0.05, 0.96)
+	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
+	sb.set_border_width_all(2)
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_item_card.add_child(panel)
+
+	_item_icon = TextureRect.new()
+	_item_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_item_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_item_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_item_card.add_child(_item_icon)
+
+	_item_name = Label.new()
+	_item_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_item_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_item_name.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_item_name.add_theme_font_size_override("font_size", 13)
+	_item_name.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	_item_card.add_child(_item_name)
+
+	_item_text = Label.new()
+	_item_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_item_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_item_text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_item_text.add_theme_font_size_override("font_size", 10)
+	_item_text.add_theme_color_override("font_color", Color8(0xC8, 0xB8, 0x9A))
+	_item_card.add_child(_item_text)
+
+
+## Подсветка цели обязательного тапа (кровать, батончик). Обучение действием:
+## игрок должен сам нажать, а не прочитать "нажми кровать" и пойти дальше.
+func _build_tap_target() -> void:
+	_tap_target = Control.new()
+	_tap_target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tap_target.visible = false
+	_tap_target.draw.connect(func():
+		var r := Rect2(Vector2.ZERO, _tap_target.size)
+		var pulse: float = 0.45 + 0.35 * sin(float(Time.get_ticks_msec()) / 180.0)
+		_tap_target.draw_rect(r, Color(0.88, 0.66, 0.23, 0.12 * pulse), true)
+		_tap_target.draw_rect(r, Color(0.88, 0.66, 0.23, pulse), false, 2.0)
+	)
+	_root.add_child(_tap_target)
+
+
+# ---------------------------------------------------------------------------
+# Раскладка (портрет 224×480, но размер вьюпорта в вебе плавает)
+# ---------------------------------------------------------------------------
+
+func _relayout_if_resized() -> void:
+	if get_viewport().get_visible_rect().size != _last_vp:
+		_layout()
+
+
+func _layout() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	_last_vp = vp
+	_root.size = vp
+	_root.position = Vector2.ZERO
+
+	var ground_y: float = vp.y * GROUND_LINE
+	_ground.position = Vector2(0, ground_y)
+	_ground.size = Vector2(vp.x, vp.y - ground_y)
+
+	_stage.position = Vector2(0, vp.y * STAGE_TOP)
+	_stage.size = Vector2(vp.x, ground_y - vp.y * STAGE_TOP)
+
+	var box_h: float = BOX_H
+	_box.position = Vector2(6, vp.y - box_h - 6)
+	_box.size = Vector2(vp.x - 12, box_h)
+	_line.position = Vector2(9, 21)
+	_line.size = Vector2(_box.size.x - 18, box_h - 34)
+	_next_hint.position = Vector2(_box.size.x - 52, box_h - 15)
+	_next_hint.size = Vector2(44, 12)
+
+	_card.position = Vector2(18, vp.y * 0.28)
+	_card.size = Vector2(vp.x - 36, vp.y * 0.34)
+
+	_item_card.position = Vector2(16, vp.y * 0.20)
+	_item_card.size = Vector2(vp.x - 32, vp.y * 0.48)
+	_item_icon.position = Vector2(_item_card.size.x / 2.0 - 24, 14)
+	_item_icon.size = Vector2(48, 48)
+	_item_name.position = Vector2(8, 68)
+	_item_name.size = Vector2(_item_card.size.x - 16, 34)
+	_item_text.position = Vector2(8, 104)
+	_item_text.size = Vector2(_item_card.size.x - 16, _item_card.size.y - 112)
+
+	_skip_btn.position = Vector2(vp.x - 72, 8)
+	_skip_btn.size = Vector2(64, 20)
+
+	_place_all()
+
+
+## Левый край объекта шириной w, поставленного центром в center_x, но так,
+## чтобы он целиком остался на экране.
+func _fit_x(center_x: float, w: float) -> float:
+	if w >= _stage.size.x:
+		return (_stage.size.x - w) / 2.0
+	return clampf(center_x - w / 2.0, 0.0, _stage.size.x - w)
+
+
+func _stage_x(at: String) -> float:
+	var w := _stage.size.x
+	match at:
+		"far_left": return w * 0.10
+		"left": return w * 0.26
+		"center": return w * 0.50
+		"right": return w * 0.74
+		"far_right": return w * 0.90
+	return w * 0.5
+
+
+# ---------------------------------------------------------------------------
+# Публичное API
+# ---------------------------------------------------------------------------
+
+func play(id: String) -> void:
+	scene_id = id
+	_beats = StoryData.beats(id)
+	_index = 0
+	_beat_timer = 0.0
+	_waiting_tap = false
+	_typing = false
+	_shake_left = 0.0
+	_daynight_left = 0.0
+	_moves.clear()
+	_clear_stage()
+	_fade.color = Color(0, 0, 0, 0)
+	_skip_btn.text = StoryText.get_text("ui.skip")
+	is_playing = true
+	_root.visible = true
+	_layout()
+	_advance()
+
+
+## Мгновенно доигрывает сцену: все оставшиеся кадры пропускаются, сигнал
+## finished приходит как при обычном конце. Директор применит эффекты сцены
+## сам — они не в кадрах, поэтому пропустить их нельзя даже случайно.
+func skip() -> void:
+	if not is_playing:
+		return
+	_finish()
+
+
+## Прерывание без сигнала finished: сцена не считается показанной и её
+## эффекты не применяются. Нужно кнопке "Сброс", которая обнуляет весь сюжет.
+func abort() -> void:
+	is_playing = false
+	_root.visible = false
+	_clear_stage()
+
+
+func _finish() -> void:
+	is_playing = false
+	_root.visible = false
+	_clear_stage()
+	finished.emit(scene_id)
+
+
+# ---------------------------------------------------------------------------
+# Ход сцены
+# ---------------------------------------------------------------------------
+
+func _process(dt: float) -> void:
+	if not is_playing:
+		return
+	_relayout_if_resized()
+	_anim_time += dt
+	_tick_actor_frames()
+	_tick_moves(dt)
+	_tick_shake(dt)
+	_tick_daynight(dt)
+	_next_hint.visible = _waiting_tap and not _typing and int(_anim_time * 2.0) % 2 == 0
+
+	if _typing:
+		_line.visible_ratio = min(1.0, _line.visible_ratio + (TYPE_CHARS_PER_SEC * dt) / maxf(1.0, float(_line.text.length())))
+		if _line.visible_ratio >= 1.0:
+			_typing = false
+		return
+
+	if _waiting_tap:
+		return
+
+	if _beat_timer > 0.0:
+		_beat_timer -= dt
+		if _beat_timer <= 0.0:
+			_advance()
+
+
+## Тап: первый — дописать реплику, второй — следующий кадр. Карточки с
+## автопереходом тап тоже листает: ждать три секунды титра, который уже
+## прочитан, скучно.
+func _input(event: InputEvent) -> void:
+	if not is_playing:
+		return
+	var pressed := false
+	var pos := Vector2.ZERO
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		pressed = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
+		pos = mb.position
+	elif event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		pressed = st.pressed
+		pos = st.position
+	if not pressed:
+		return
+
+	if _skip_btn.get_global_rect().has_point(pos):
+		return  # кнопку обрабатывает сама кнопка
+	get_viewport().set_input_as_handled()
+
+	if _typing:
+		_line.visible_ratio = 1.0
+		_typing = false
+		return
+	if _tap_target.visible:
+		# Обязательный тап засчитывается только по подсвеченной цели.
+		if _tap_target.get_global_rect().has_point(pos):
+			_tap_target.visible = false
+			_waiting_tap = false
+			_advance()
+		return
+	_waiting_tap = false
+	_beat_timer = 0.0
+	_advance()
+
+
+func _advance() -> void:
+	while _index < _beats.size():
+		var beat: Dictionary = _beats[_index]
+		_index += 1
+		if _run_beat(beat):
+			return  # кадр взял управление (ждёт тапа/таймера)
+	_finish()
+
+
+## Возвращает true, если кадр удерживает сцену (ждёт тапа или времени).
+func _run_beat(beat: Dictionary) -> bool:
+	match String(beat.get("t", "")):
+		"card":
+			_show_card(StoryText.get_text(String(beat.get("text", ""))))
+			_beat_timer = float(beat.get("sec", 3.0))
+			return true
+		"narr":
+			_show_line("", StoryText.get_text(String(beat.get("text", ""))))
+			return true
+		"say":
+			var who := String(beat.get("who", ""))
+			_show_line(StoryText.get_text(StoryData.actor_speaker_key(who)),
+				StoryText.get_text(String(beat.get("text", ""))))
+			return true
+		"show":
+			_show_actor(beat)
+			return false
+		"hide":
+			_hide_actor(String(beat.get("actor", "")))
+			return false
+		"prop":
+			_show_prop(beat)
+			return false
+		"clear":
+			_clear_stage()
+			return false
+		"mood":
+			_set_mood(String(beat.get("id", "dark")))
+			return false
+		"wait":
+			_hide_text()
+			_beat_timer = float(beat.get("sec", 0.5))
+			return true
+		"fade":
+			_start_fade(String(beat.get("dir", "out")), float(beat.get("sec", 0.8)))
+			return true
+		"item":
+			_show_item(beat)
+			return true
+		"tap":
+			_show_tap_target(beat)
+			return true
+		"move":
+			_start_move(beat)
+			return false
+		"shake":
+			_shake_left = float(beat.get("sec", 0.4))
+			return false
+		"daynight":
+			_daynight_step = float(beat.get("sec", 0.7))
+			_daynight_left = _daynight_step * float(beat.get("cycles", 3)) * 2.0
+			_beat_timer = _daynight_left
+			return true
+	return false
+
+
+# ---------------------------------------------------------------------------
+# Кадры
+# ---------------------------------------------------------------------------
+
+func _show_card(text: String) -> void:
+	_card.text = text
+	_card.visible = true
+	_box.visible = false
+	_item_card.visible = false
+
+
+func _show_line(speaker: String, text: String) -> void:
+	_card.visible = false
+	_item_card.visible = false
+	_box.visible = true
+	_speaker.text = speaker
+	_speaker.visible = not speaker.is_empty()
+	_line.position.y = 21.0 if not speaker.is_empty() else 10.0
+	_line.text = text
+	_line.visible_ratio = 0.0
+	_typing = true
+	_waiting_tap = true
+
+
+func _hide_text() -> void:
+	_card.visible = false
+	_box.visible = false
+	_item_card.visible = false
+
+
+func _show_item(beat: Dictionary) -> void:
+	_card.visible = false
+	var icon_path := String(beat.get("icon", ""))
+	_item_icon.texture = load(icon_path) if ResourceLoader.exists(icon_path) else null
+	_item_name.text = StoryText.get_text(String(beat.get("name", "")))
+	_item_text.text = StoryText.get_text(String(beat.get("text", "")))
+	_item_card.visible = true
+	_box.visible = false
+	_waiting_tap = true
+
+
+func _show_tap_target(beat: Dictionary) -> void:
+	var prop_id := String(beat.get("prop", ""))
+	var rect := Rect2(_root.size.x / 2.0 - 40, _root.size.y * 0.30, 80, 80)
+	if _props.has(prop_id):
+		var node: TextureRect = _props[prop_id]
+		rect = Rect2(node.position + _stage.position - Vector2(6, 6), node.size + Vector2(12, 12))
+	elif _item_card.visible:
+		rect = Rect2(_item_card.position, _item_card.size)
+	_tap_target.position = rect.position
+	_tap_target.size = rect.size
+	_tap_target.visible = true
+	_show_line("", StoryText.get_text(String(beat.get("text", ""))))
+	_typing = false
+	_line.visible_ratio = 1.0
+	_waiting_tap = true
+
+
+func _start_fade(dir: String, sec: float) -> void:
+	_hide_text()
+	var to_black := dir == "out"
+	var tween := create_tween()
+	_fade.color = Color(0, 0, 0, 0.0 if to_black else 1.0)
+	tween.tween_property(_fade, "color", Color(0, 0, 0, 1.0 if to_black else 0.0), sec)
+	_beat_timer = sec
+
+
+func _start_move(beat: Dictionary) -> void:
+	var id := String(beat.get("actor", ""))
+	if not _actors.has(id):
+		return
+	var sec: float = maxf(0.05, float(beat.get("sec", 0.8)))
+	_moves.append({
+		"actor": id,
+		"left": sec,
+		"per_sec": float(beat.get("dy", 0)) / sec,
+	})
+
+
+# ---------------------------------------------------------------------------
+# Актёры и реквизит
+# ---------------------------------------------------------------------------
+
+func _show_actor(beat: Dictionary) -> void:
+	var id := String(beat.get("actor", ""))
+	var pose := String(beat.get("pose", "idle"))
+	var path := StoryData.actor_sheet_path(id, pose)
+	if path.is_empty() or not ResourceLoader.exists(path):
+		# Спрайта нет (Роберт, родители) — реплика идёт голосом за кадром.
+		return
+	var tex: Texture2D = load(path)
+	var frames: int = maxi(1, int(round(tex.get_width() / float(CHAR_FRAME))))
+	var node: TextureRect
+	if _actors.has(id):
+		node = _actors[id].node
+	else:
+		node = TextureRect.new()
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_stage.add_child(node)
+
+	var atlas := AtlasTexture.new()
+	atlas.atlas = tex
+	var frame_w: float = tex.get_width() / float(frames)
+	atlas.region = Rect2(0, 0, frame_w, tex.get_height())
+	node.texture = atlas
+	node.flip_h = bool(beat.get("flip", false))
+	_actors[id] = {
+		"node": node,
+		"frames": frames,
+		"frame_w": frame_w,
+		"tex_h": tex.get_height(),
+		"at": String(beat.get("at", "center")),
+		"scale": float(beat.get("scale", 2.0)),
+		"dy": 0.0,
+	}
+	_place_actor(id)
+
+
+func _hide_actor(id: String) -> void:
+	if not _actors.has(id):
+		return
+	_actors[id].node.queue_free()
+	_actors.erase(id)
+
+
+func _show_prop(beat: Dictionary) -> void:
+	var id := String(beat.get("id", ""))
+	var def := StoryData.prop(id)
+	var path := String(def.get("tex", ""))
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return
+	var node: TextureRect
+	if _props.has(id):
+		node = _props[id]
+	else:
+		node = TextureRect.new()
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_stage.add_child(node)
+		# Реквизит уходит под актёров: дом и забор — задник, герой перед ними.
+		_stage.move_child(node, 0)
+	var tex: Texture2D = load(path)
+	node.texture = tex
+	node.set_meta("at", String(beat.get("at", "center")))
+	node.set_meta("scale", float(beat.get("scale", def.get("scale", 1.0))))
+	_props[id] = node
+	_place_prop(id)
+
+
+func _clear_stage() -> void:
+	for id in _actors.keys():
+		_actors[id].node.queue_free()
+	_actors.clear()
+	for id in _props.keys():
+		_props[id].queue_free()
+	_props.clear()
+	_moves.clear()
+	_tap_target.visible = false
+
+
+func _place_all() -> void:
+	for id in _actors.keys():
+		_place_actor(id)
+	for id in _props.keys():
+		_place_prop(id)
+
+
+func _place_actor(id: String) -> void:
+	var a: Dictionary = _actors[id]
+	var node: TextureRect = a.node
+	var s: float = a.scale
+	var w: float = a.frame_w * s
+	var h: float = a.tex_h * s
+	node.size = Vector2(w, h)
+	# Актёр стоит НА земле: низ кадра совпадает с линией земли сцены, иначе
+	# фигура висит в воздухе, и сцена перестаёт читаться как место.
+	node.position = Vector2(_fit_x(_stage_x(a.at), w), _stage.size.y - h + float(a.dy))
+
+
+func _place_prop(id: String) -> void:
+	var node: TextureRect = _props[id]
+	var s: float = float(node.get_meta("scale", 1.0))
+	var tex: Texture2D = node.texture
+	if tex == null:
+		return
+	var w: float = tex.get_width() * s
+	var h: float = tex.get_height() * s
+	node.size = Vector2(w, h)
+	node.position = Vector2(_fit_x(_stage_x(String(node.get_meta("at", "center"))), w), _stage.size.y - h)
+
+
+func _tick_actor_frames() -> void:
+	var frame_idx := int(_anim_time * ANIM_FPS)
+	for id in _actors.keys():
+		var a: Dictionary = _actors[id]
+		if a.frames <= 1:
+			continue
+		var atlas: AtlasTexture = a.node.texture
+		if atlas == null:
+			continue
+		atlas.region = Rect2((frame_idx % a.frames) * a.frame_w, 0, a.frame_w, a.tex_h)
+
+
+func _tick_moves(dt: float) -> void:
+	if _moves.is_empty():
+		return
+	var still: Array = []
+	for m in _moves:
+		var id: String = m.actor
+		if _actors.has(id):
+			_actors[id].dy += m.per_sec * minf(dt, m.left)
+			_place_actor(id)
+		m.left -= dt
+		if m.left > 0.0:
+			still.append(m)
+	_moves = still
+
+
+func _tick_shake(dt: float) -> void:
+	if _shake_left <= 0.0:
+		if _stage.position.x != 0.0:
+			_stage.position.x = 0.0
+		return
+	_shake_left -= dt
+	_stage.position.x = randf_range(-2.5, 2.5) if _shake_left > 0.0 else 0.0
+
+
+## Ускоренные сутки в сцене смерти: небо гонит день-ночь втрое быстрее
+## обычного, и по одному этому видно, что прошло не пять минут.
+func _tick_daynight(dt: float) -> void:
+	if _daynight_left <= 0.0:
+		return
+	_daynight_left -= dt
+	var phase := int(_daynight_left / maxf(0.05, _daynight_step)) % 2
+	if phase != _daynight_idx:
+		_daynight_idx = phase
+		_apply_mood_colors("night" if phase == 0 else "day")
+	if _daynight_left <= 0.0:
+		_apply_mood_colors(_mood_id)
+
+
+func _set_mood(id: String) -> void:
+	_mood_id = id
+	_apply_mood_colors(id)
+	# Смена обстановки — это новая сцена, а затемнение от предыдущей на ней
+	# уже не нужно: иначе титр после "fade out" рисовался бы под чёрным.
+	_fade.color = Color(0, 0, 0, 0)
+
+
+func _apply_mood_colors(id: String) -> void:
+	var m := StoryData.mood(id)
+	_sky.color = Color(String(m.get("sky", "#0b0806")))
+	var ground := Color(String(m.get("ground", "#241c14")))
+	# Тайл земли тонируется, а не заменяется: один и тот же грунт должен
+	# выглядеть ночным, подвальным и дневным.
+	_ground.modulate = ground * 2.0
+	_ground.modulate.a = 1.0

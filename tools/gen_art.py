@@ -80,8 +80,8 @@ PALETTE = [
     # --- Руды: освоенные металлы (тёплые/нейтральные, неглубокие) ---
     ("iron_base",   "#8B4A3A", "Руда:Железо",   "ржаво-бурые вкрапления"),
     ("iron_light",   "#BC6A4C", "Руда:Железо",   "блик на вкраплении"),
-    ("lead_base",    "#4A4F58", "Руда:Свинец",   "тусклый сине-серый"),
-    ("lead_light",    "#6E7480", "Руда:Свинец",   "блик свинца"),
+    ("lead_base",    "#33394A", "Руда:Свинец",   "тяжёлый тёмно-синий, темнее камня"),
+    ("lead_light",    "#9AA6BC", "Руда:Свинец",   "холодный стальной блик на слитке"),
     ("silver_base",   "#C7CDD6", "Руда:Серебро",  "холодный светлый металл"),
     ("silver_light",   "#F4F7FA", "Руда:Серебро",  "яркий блик серебра"),
     ("copper_base",    "#C2703A", "Руда:Медь",     "оранжево-рыжий металл"),
@@ -94,12 +94,12 @@ PALETTE = [
     # --- Руды: редкие/технологичные (холоднее) ---
     ("diamond_base",  "#6FE0D8", "Руда:Алмаз",    "бирюзовый кристалл"),
     ("diamond_light",  "#FFFFFF", "Руда:Алмаз",    "белая искра алмаза"),
-    ("nickel_base",     "#A3B79E", "Руда:Никель",   "бледно-зелёный металл"),
-    ("nickel_light",     "#CBDFC4", "Руда:Никель",   "блик никеля"),
-    ("platinum_base",     "#A9C4E0", "Руда:Платина",  "светлый сине-серый металл"),
-    ("platinum_light",     "#DCEBFA", "Руда:Платина",  "яркий блик платины"),
-    ("aluminium_base",      "#9FB8C4", "Руда:Алюминий", "матовый бледно-бирюзовый металл"),
-    ("aluminium_light",      "#C8DDE6", "Руда:Алюминий", "мягкий блик алюминия"),
+    ("nickel_base",     "#7FA868", "Руда:Никель",   "насыщенный оливково-зелёный металл"),
+    ("nickel_light",     "#B8DC98", "Руда:Никель",   "блик никеля"),
+    ("platinum_base",     "#BFDCFA", "Руда:Платина",  "яркий бело-голубой драгоценный металл"),
+    ("platinum_light",     "#FFFFFF", "Руда:Платина",  "ослепительный блик платины"),
+    ("aluminium_base",      "#8B99A2", "Руда:Алюминий", "матовый нейтрально-серый металл, без блеска"),
+    ("aluminium_light",      "#B8C4C8", "Руда:Алюминий", "приглушённый блик алюминия"),
     ("titanium_base",       "#A996C4", "Руда:Титан",    "холодный сиреневый металл"),
     ("titanium_light",       "#D2C2EE", "Руда:Титан",    "блик титана"),
 
@@ -343,66 +343,113 @@ def poly(img, pts, color, outline=None):
 def draw_empty_tile():
     img = canvas(TILE, TILE)
     rng = random.Random("empty")
-    fill_dither(img, C("void_base"), C("void_far"), rng, prob=0.35, bottom_shade=0.25)
-    # риммлайт по верхнему/левому краю полости — намёк на объём пустой клетки
-    for x in range(TILE):
-        blend_px(img, x, 0, C("void_rim", 90))
-    for y in range(TILE):
-        blend_px(img, 0, y, C("void_rim", 60))
-    # несколько случайных бликов на "стенках" полости
-    for _ in range(6):
-        x, y = rng.randint(2, TILE - 3), rng.randint(2, TILE - 3)
-        blend_px(img, x, y, C("void_rim", 120))
+    # Никакого направленного градиента и краевых риммлайтов: клетка пустоты
+    # мостится вплотную с соседними такими же клетками, любая привязка к
+    # краю (верх/лево) даёт на стыках повторяющуюся световую решётку.
+    fill_dither(img, C("void_base"), C("void_far"), rng, prob=0.35)
+    # блики раскиданы по всей площади без привязки к краю — тайл остаётся
+    # бесшовным, но не выглядит совсем плоским
+    for _ in range(7):
+        x, y = rng.randint(0, TILE - 1), rng.randint(0, TILE - 1)
+        blend_px(img, x, y, C("void_rim", 110))
     save(img, "tiles/empty.png")
 
 
+def _dirt_base(img, rng):
+    """Общая порода-подложка: один и тот же тон/дизеринг для всех вариантов
+    земли, без направленного градиента и краевых засветок — иначе тайлы не
+    стыкуются бесшовно. Разнообразие вариантов даёт только оверлей поверх."""
+    fill_dither(img, C("soil_base"), C("soil_shadow"), rng, prob=0.30)
+    # редкая тёплая крошка, равномерно по площади (не у края) — держит
+    # землю живой без привязки к направлению
+    for _ in range(rng.randint(10, 16)):
+        x, y = rng.randint(0, TILE - 1), rng.randint(0, TILE - 1)
+        blend_px(img, x, y, C("soil_warm", 130))
+
+
 def draw_dirt_tile(n, seed):
+    """Четыре варианта земли с одним и тем же базовым тоном, но разным
+    почерком поверх — камешки, трещины, корешки, комья — чтобы поле не
+    читалось как один повторяющийся тайл, оставаясь одной породой."""
     img = canvas(TILE, TILE)
     rng = random.Random(seed)
-    fill_dither(img, C("soil_base"), C("soil_shadow"), rng, prob=0.32,
-                top_light=0.16, bottom_shade=0.18)
-    # комья/камушки помельче
-    for _ in range(rng.randint(5, 8)):
-        x, y = rng.randint(2, TILE - 3), rng.randint(2, TILE - 3)
-        c = C("soil_light") if rng.random() < 0.7 else C("soil_warm")
-        ellipse(img, x, y, rng.choice([1, 1, 2]), rng.choice([1, 1, 2]), c)
-    # редкие корешки/травинки у самых верхних слоёв
-    if rng.random() < 0.6:
-        for _ in range(rng.randint(1, 3)):
+    _dirt_base(img, rng)
+
+    if n == 1:
+        # «камешки»: россыпь мелкой круглой гальки разного размера
+        for _ in range(rng.randint(7, 10)):
+            x, y = rng.randint(2, TILE - 3), rng.randint(2, TILE - 3)
+            r = rng.choice([1, 1, 1, 2])
+            c = C("soil_light") if rng.random() < 0.75 else C("stone_light")
+            ellipse(img, x, y, r, r, c)
+            if r == 2:
+                blend_px(img, x - 1, y - 1, C("soil_warm"))
+    elif n == 2:
+        # «трещины»: сухая растрескавшаяся земля, галька почти не видна
+        for _ in range(rng.randint(3, 5)):
             x = rng.randint(3, TILE - 4)
-            y0 = rng.randint(1, 4)
-            line(img, [(x, y0), (x + rng.choice([-1, 1]), y0 + 3)], C("soil_warm"), 1)
-    irregular_edge_shadow(img, rng, C("soil_shadow", 90))
+            y = rng.randint(3, TILE - 4)
+            pts = [(x, y)]
+            for _ in range(rng.randint(2, 4)):
+                x += rng.randint(-3, 3)
+                y += rng.randint(-3, 3)
+                x = max(1, min(TILE - 2, x))
+                y = max(1, min(TILE - 2, y))
+                pts.append((x, y))
+            line(img, pts, C("soil_shadow"), 1)
+        for _ in range(rng.randint(2, 3)):
+            x, y = rng.randint(2, TILE - 3), rng.randint(2, TILE - 3)
+            ellipse(img, x, y, 1, 1, C("soil_light"))
+    elif n == 3:
+        # «корешки»: сухие травинки и корни, галька редкая
+        for _ in range(rng.randint(3, 5)):
+            x = rng.randint(3, TILE - 4)
+            y0 = rng.randint(0, TILE - 6)
+            length = rng.randint(3, 6)
+            bend = rng.choice([-2, -1, 1, 2])
+            line(img, [(x, y0), (x + bend, y0 + length)], C("soil_warm"), 1)
+            blend_px(img, x, y0, C("soil_light"))
+        for _ in range(rng.randint(2, 4)):
+            x, y = rng.randint(2, TILE - 3), rng.randint(2, TILE - 3)
+            ellipse(img, x, y, 1, 1, C("soil_light"))
+    else:
+        # «комья»: крупные слежавшиеся комки, малой галечной крошки нет
+        for _ in range(rng.randint(4, 6)):
+            x, y = rng.randint(3, TILE - 4), rng.randint(3, TILE - 4)
+            rx, ry = rng.choice([2, 3]), rng.choice([2, 3])
+            ellipse(img, x, y, rx, ry, shade(C("soil_base"), 0.85))
+            ellipse(img, x - 1, y - 1, max(1, rx - 2), max(1, ry - 2), C("soil_light"))
+            blend_px(img, x + rx - 1, y + ry - 1, C("soil_shadow"))
+
     save(img, f"tiles/dirt_{n}.png")
 
 
 def draw_stone_tile():
     img = canvas(TILE, TILE)
     rng = random.Random("stone")
-    fill_dither(img, C("stone_base"), C("stone_shadow"), rng, prob=0.34,
-                top_light=0.12, bottom_shade=0.16)
-    # трещины
+    fill_dither(img, C("stone_base"), C("stone_shadow"), rng, prob=0.34)
+    # трещины — держим подальше от края, чтобы соседний тайл не обрубал линию
     for _ in range(rng.randint(2, 4)):
-        x = rng.randint(4, TILE - 5)
-        y = rng.randint(4, TILE - 5)
+        x = rng.randint(5, TILE - 6)
+        y = rng.randint(5, TILE - 6)
         pts = [(x, y)]
         for _ in range(rng.randint(2, 4)):
             x += rng.randint(-3, 3)
             y += rng.randint(-2, 3)
+            x = max(2, min(TILE - 3, x))
+            y = max(2, min(TILE - 3, y))
             pts.append((x, y))
         line(img, pts, C("stone_shadow"), 1)
     for _ in range(4):
         x, y = rng.randint(2, TILE - 3), rng.randint(2, TILE - 3)
         blend_px(img, x, y, C("stone_light", 200))
-    irregular_edge_shadow(img, rng, C("stone_shadow", 90))
     save(img, "tiles/stone.png")
 
 
 def draw_foundation_tile():
     img = canvas(TILE, TILE)
     rng = random.Random("foundation")
-    fill_dither(img, C("concrete_base"), C("concrete_shadow"), rng, prob=0.22,
-                top_light=0.1, bottom_shade=0.12)
+    fill_dither(img, C("concrete_base"), C("concrete_shadow"), rng, prob=0.22)
     # арматурный крест по центру
     cx, cy = TILE // 2, TILE // 2
     rect(img, cx - 1, 2, cx + 1, TILE - 3, C("rebar_dark"))
@@ -412,7 +459,6 @@ def draw_foundation_tile():
         blend_px(img, x1, y1, C("rebar_rust", 220))
     # трещины в бетоне
     line(img, [(4, 6), (8, 10), (6, 15)], C("concrete_shadow"), 1)
-    irregular_edge_shadow(img, rng, C("concrete_shadow", 100))
     save(img, "tiles/foundation.png")
 
 
@@ -420,17 +466,17 @@ def draw_foundation_tile():
 
 ORES = [
     ("iron", "Железо", "iron_base", "iron_light", "nugget"),
-    ("lead", "Свинец", "lead_base", "lead_light", "chunk_dull"),
+    ("lead", "Свинец", "lead_base", "lead_light", "ingot"),
     ("silver", "Серебро", "silver_base", "silver_light", "nugget_sparkle"),
     ("copper", "Медь", "copper_base", "copper_light", "nugget"),
     ("gold", "Золото", "gold_base", "gold_light", "nugget_sparkle"),
     ("diamond", "Алмаз", "diamond_base", "diamond_light", "crystal_sparkle"),
-    ("nickel", "Никель", "nickel_base", "nickel_light", "chunk_dull"),
+    ("nickel", "Никель", "nickel_base", "nickel_light", "pebble_cluster"),
     ("peat", "Торф", "peat_base", "peat_light", "fiber"),
     ("coal", "Каменный уголь", "coal_base", "coal_light", "chunk_sparkle"),
-    ("platinum", "Платина", "platinum_base", "platinum_light", "nugget_sparkle"),
-    ("aluminium", "Алюминий", "aluminium_base", "aluminium_light", "chunk_dull"),
-    ("titanium", "Титан", "titanium_base", "titanium_light", "chunk"),
+    ("platinum", "Платина", "platinum_base", "platinum_light", "facet"),
+    ("aluminium", "Алюминий", "aluminium_base", "aluminium_light", "bar"),
+    ("titanium", "Титан", "titanium_base", "titanium_light", "crystal_sparkle"),
     ("lithium", "Литий", "lithium_base", "lithium_light", "crystal_sparkle"),
     ("mercury", "Ртуть", "mercury_base", "mercury_accent", "bead"),
     ("uranium", "Уран", "uranium_core", "uranium_glow", "glow"),
@@ -487,12 +533,75 @@ def draw_fiber(img, rng, cx, cy, base, light):
     blend_px(img, mid[0], mid[1], light)
 
 
+def draw_ingot(img, rng, cx, cy, base, light):
+    # свинец: тяжёлый тусклый слиток-брусок, почти без блеска — плотная
+    # прямоугольная масса читается как "тяжёлый металл", а не как крапинка
+    w = rng.choice([3, 3, 4])
+    h = rng.choice([2, 2, 3])
+    rect(img, cx - w, cy - h, cx + w, cy + h, base)
+    line(img, [(cx - w, cy - h), (cx + w, cy - h), (cx + w, cy + h),
+               (cx - w, cy + h), (cx - w, cy - h)], OUTLINE, 1)
+    # одна тонкая холодная грань сверху — единственный блик, тусклый металл
+    line(img, [(cx - w + 1, cy - h + 1), (cx + w - 1, cy - h + 1)], light, 1)
+    blend_px(img, cx - w + 1, cy + h - 1, shade(base, 0.6))
+
+
+def draw_pebble_cluster(img, rng, cx, cy, base, light):
+    # никель: тесная гроздь мелких округлых узелков-конкреций (не один
+    # кусок, а слипшиеся горошины) — силуэт заметно отличается от слитка
+    offs = [(0, 0), (2, 1), (-2, 1), (1, -2), (-1, 2)]
+    n = rng.choice([3, 4])
+    for dx, dy in offs[:n]:
+        r = rng.choice([1, 1, 2])
+        ellipse(img, cx + dx, cy + dy, r, r, base, outline=OUTLINE)
+    blend_px(img, cx - 1, cy - 1, light)
+    blend_px(img, cx + offs[n - 1][0], cy + offs[n - 1][1], shade(base, 0.6))
+
+
+def draw_facet(img, rng, cx, cy, base, light):
+    # платина: широкий гранёный самородок-"кабошон" с крестовым бликом —
+    # плоский шестиугольник, а не круглая капля и не вертикальный кристалл
+    w = rng.choice([3, 4])
+    h = 2
+    pts = [(cx - w, cy), (cx - w // 2, cy - h), (cx + w // 2, cy - h),
+           (cx + w, cy), (cx + w // 2, cy + h), (cx - w // 2, cy + h)]
+    poly(img, pts, base, outline=OUTLINE)
+    blend_px(img, cx, cy - h, light)
+    blend_px(img, cx - 1, cy, light)
+    blend_px(img, cx + 1, cy, (255, 255, 255, 160))
+
+
+def draw_bar(img, rng, cx, cy, base, light):
+    # алюминий: узкая рифлёная пластина-брусок с двумя заклёпками —
+    # силуэт вытянутый и плоский, принципиально не круглый и не гранёный
+    vertical = rng.random() < 0.5
+    if vertical:
+        x0, y0, x1, y1 = cx - 1, cy - 4, cx + 1, cy + 4
+    else:
+        x0, y0, x1, y1 = cx - 4, cy - 1, cx + 4, cy + 1
+    rect(img, x0, y0, x1, y1, base)
+    line(img, [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)], OUTLINE, 1)
+    if vertical:
+        line(img, [(x0 + 1, y0), (x0 + 1, y1)], light, 1)
+        blend_px(img, cx, cy - 2, shade(base, 0.7))
+        blend_px(img, cx, cy + 2, shade(base, 0.7))
+    else:
+        line(img, [(x0, y0 + 1), (x1, y0 + 1)], light, 1)
+        blend_px(img, cx - 2, cy, shade(base, 0.7))
+        blend_px(img, cx + 2, cy, shade(base, 0.7))
+
+
 def draw_bead(img, rng, cx, cy, base, accent):
-    # ртуть — жидкий металл: капля должна читаться серебристой, красноватый
-    # отблеск только намекает на ядовитость, а не красит каплю целиком
-    ellipse(img, cx, cy, 2, rng.choice([1, 2]), base, outline=OUTLINE)
-    blend_px(img, cx - 1, cy - 1, (255, 255, 255, 230))
-    blend_px(img, cx + 1, cy + 1, accent)
+    # ртуть — жидкий металл: каплевидный силуэт со спутником-брызгом рядом
+    # явно читается как "жидкость", не как ещё один круглый самородок
+    # (с которым её иначе легко перепутать издали)
+    poly(img, [(cx - 2, cy - 1), (cx - 1, cy - 2), (cx + 1, cy - 2), (cx + 2, cy - 1),
+               (cx + 1, cy + 2), (cx, cy + 3), (cx - 1, cy + 2)], base, outline=OUTLINE)
+    dx, dy = rng.choice([(-3, 2), (3, 2), (-3, -1), (3, -1)])
+    ellipse(img, cx + dx, cy + dy, 1, 1, base, outline=OUTLINE)
+    blend_px(img, cx - 1, cy - 1, (255, 255, 255, 235))
+    blend_px(img, cx, cy - 1, (255, 255, 255, 150))
+    blend_px(img, cx, cy + 2, accent)
 
 
 def draw_glow(img, rng, cx, cy, core, glow):
@@ -506,22 +615,27 @@ def draw_glow(img, rng, cx, cy, core, glow):
 
 
 def draw_debris(img, rng, cx, cy, base, rust):
-    # маленькая пластина + заклёпка/болт — читается как хлам, не порода
-    rect(img, cx - 2, cy - 1, cx + 2, cy + 1, base)
-    line(img, [(cx - 2, cy - 1), (cx + 2, cy - 1), (cx + 2, cy + 1),
-               (cx - 2, cy + 1), (cx - 2, cy - 1)], OUTLINE, 1)
+    # металлолом: погнутая пластина с заклёпками и пятном ржавчины — явно
+    # рукотворный хлам, крупнее и контрастнее соседних руд, чтобы не
+    # сливаться с фоновым камнем того же серого тона
+    rect(img, cx - 3, cy - 2, cx + 3, cy + 2, base)
+    line(img, [(cx - 3, cy - 2), (cx + 3, cy - 2), (cx + 3, cy + 2),
+               (cx - 3, cy + 2), (cx - 3, cy - 2)], OUTLINE, 1)
+    blend_px(img, cx - 3, cy - 2, shade(base, 1.5))
     blend_px(img, cx - 2, cy - 1, shade(base, 1.3))
-    blend_px(img, cx, cy, rust)
-    if rng.random() < 0.5:
-        ellipse(img, cx + 3, cy + 2, 1, 1, rust, outline=OUTLINE)
+    rect(img, cx - 1, cy - 1, cx + 1, cy + 1, rust)
+    ellipse(img, cx - 2, cy + 1, 0, 0, OUTLINE)
+    blend_px(img, cx - 2, cy + 1, (20, 20, 22, 255))
+    blend_px(img, cx + 2, cy - 1, (20, 20, 22, 255))
+    if rng.random() < 0.6:
+        ellipse(img, cx + 4, cy + 3, 1, 1, rust, outline=OUTLINE)
 
 
 def draw_ore_tile(key, ru, base_key, light_key, style):
     img = canvas(TILE, TILE)
     rng = random.Random(f"ore_{key}")
     # фон-порода: нейтральный камень с лёгким затемнением понизу
-    fill_dither(img, C("stone_base"), C("stone_shadow"), rng, prob=0.30,
-                top_light=0.08, bottom_shade=0.14)
+    fill_dither(img, C("stone_base"), C("stone_shadow"), rng, prob=0.30)
     base = C(base_key)
     light = C(light_key)
     positions = []
@@ -529,7 +643,8 @@ def draw_ore_tile(key, ru, base_key, light_key, style):
     count = {
         "nugget": 5, "nugget_sparkle": 5, "chunk": 4, "chunk_dull": 4,
         "chunk_sparkle": 4, "crystal_sparkle": 4, "fiber": 6, "bead": 3,
-        "glow": 3, "debris": 4,
+        "glow": 3, "debris": 4, "ingot": 3, "pebble_cluster": 4,
+        "facet": 4, "bar": 3,
     }[style]
     while len(positions) < count and attempts < 60:
         attempts += 1
@@ -558,13 +673,20 @@ def draw_ore_tile(key, ru, base_key, light_key, style):
             draw_glow(img, rng, x, y, base, light)
         elif style == "debris":
             draw_debris(img, rng, x, y, base, light)
+        elif style == "ingot":
+            draw_ingot(img, rng, x, y, base, light)
+        elif style == "pebble_cluster":
+            draw_pebble_cluster(img, rng, x, y, base, light)
+        elif style == "facet":
+            draw_facet(img, rng, x, y, base, light)
+        elif style == "bar":
+            draw_bar(img, rng, x, y, base, light)
 
-    if style in ("nugget_sparkle", "chunk_sparkle", "crystal_sparkle"):
+    if style in ("nugget_sparkle", "chunk_sparkle", "crystal_sparkle", "facet"):
         for _ in range(2):
             x, y = rng.randint(3, TILE - 4), rng.randint(3, TILE - 4)
             blend_px(img, x, y, light)
 
-    irregular_edge_shadow(img, rng, C("stone_shadow", 90))
     save(img, f"tiles/ore_{key}.png")
 
 
@@ -753,101 +875,175 @@ def item_canvas():
 
 def draw_shovel():
     img = item_canvas()
-    line(img, [(9, 27), (20, 7)], C("wood"), 2)
-    blend_px(img, 9, 27, C("wood_dark"))
-    poly(img, [(17, 4), (26, 8), (22, 16), (14, 12)], C("steel_blue"))
-    poly(img, [(17, 4), (26, 8), (24, 10), (17, 7)], (255, 255, 255, 60))
+    # черенок с Т-образной рукоятью наверху — силуэт однозначно "лопата"
+    line(img, [(10, 27), (18, 10)], C("wood"), 2)
+    blend_px(img, 10, 27, C("wood_dark"))
+    line(img, [(15, 8), (21, 11)], C("wood"), 2)
+    # широкий совок с заострённым носком и ребром жёсткости
+    poly(img, [(16, 8), (26, 11), (24, 21), (18, 26), (12, 19)], C("steel_blue"))
+    line(img, [(16, 8), (26, 11), (24, 21), (18, 26), (12, 19), (16, 8)], OUTLINE, 1)
+    poly(img, [(16, 8), (26, 11), (22, 13), (17, 11)], (255, 255, 255, 70))
+    line(img, [(18, 12), (19, 22)], shade(C("steel_blue"), 0.7), 1)
     save(img, "items/shovel.png")
 
 
-def _pickaxe(cracked=False):
+def _pickaxe_head(img, base, cracked=False):
+    # крестовидный оголовок кирки: два сужающихся к концам клина от
+    # места насадки на черенок — читается как "кирка", а не ромб/флаг
+    hinge = (17, 13)
+    if not cracked:
+        pts = [hinge, (12, 8), (5, 15), (11, 17),
+               hinge, (23, 5), (29, 9), (22, 16)]
+        poly(img, pts, base, outline=OUTLINE)
+        blend_px(img, 8, 12, (255, 255, 255, 60))
+        blend_px(img, 24, 8, (255, 255, 255, 90))
+    else:
+        # левый клин цел, правый — треснул и отвалился отдельным осколком
+        left = [hinge, (12, 8), (5, 15), (11, 17)]
+        poly(img, left, shade(base, 0.85), outline=OUTLINE)
+        stub = [hinge, (21, 8), (18, 15)]
+        poly(img, stub, shade(base, 0.7), outline=OUTLINE)
+        shard = [(25, 6), (30, 9), (26, 14), (22, 11)]
+        poly(img, shard, shade(base, 0.6), outline=OUTLINE)
+        # трещина, разбегающаяся от места скола
+        line(img, [(19, 10), (16, 13), (18, 16)], C("silver_base"), 1)
+        blend_px(img, 19, 10, (255, 255, 255, 210))
+        blend_px(img, 8, 12, (255, 255, 255, 40))
+    return hinge
+
+
+def _pickaxe(color_key, cracked=False):
     img = item_canvas()
-    line(img, [(9, 27), (18, 12)], C("wood"), 2)
+    hinge = _pickaxe_head(img, C(color_key), cracked)
+    line(img, [(9, 27), hinge], C("wood"), 2)
     blend_px(img, 9, 27, C("wood_dark"))
-    poly(img, [(6, 9), (18, 5), (26, 10), (18, 13)], C("rust_tool"))
-    blend_px(img, 18, 6, (255, 255, 255, 50))
-    if cracked:
-        line(img, [(13, 7), (17, 10), (14, 12)], C("silver_base"), 1)
-        # скол: маленький отсутствующий треугольник в оголовье
-        poly(img, [(24, 8), (27, 9), (25, 11)], (0, 0, 0, 0))
     return img
 
 
 def draw_pickaxe_rusty():
-    save(_pickaxe(False), "items/pickaxe_rusty.png")
+    save(_pickaxe("rust_tool", False), "items/pickaxe_rusty.png")
 
 
 def draw_pickaxe_rusty_cracked():
-    save(_pickaxe(True), "items/pickaxe_rusty_cracked.png")
+    save(_pickaxe("rust_tool", True), "items/pickaxe_rusty_cracked.png")
 
 
 def draw_pickaxe_iron():
-    img = item_canvas()
-    line(img, [(9, 27), (18, 12)], C("wood"), 2)
-    blend_px(img, 9, 27, C("wood_dark"))
-    poly(img, [(6, 9), (18, 5), (26, 10), (18, 13)], C("iron_tool"))
-    blend_px(img, 18, 6, (255, 255, 255, 90))
-    blend_px(img, 10, 9, (255, 255, 255, 70))
-    save(img, "items/pickaxe_iron.png")
+    save(_pickaxe("iron_tool", False), "items/pickaxe_iron.png")
 
 
 def draw_hand_drill():
+    # ручной бур-мотобур: моторный блок с боковой рукоятью для упора и
+    # длинный винтовой шнек, торчащий вперёд — силуэт мгновенно читается
+    # как электроинструмент, а не как непонятная клякса
     img = item_canvas()
-    # рукоять/корпус мотора
-    rect(img, 6, 18, 15, 26, C("wood_dark"))
-    rect(img, 14, 14, 22, 22, C("steel_blue"))
-    blend_px(img, 15, 15, (255, 255, 255, 70))
-    # бур (винтовое сверло) по диагонали
-    for i in range(7):
-        x = 20 + i
-        y = 16 - i
-        c = C("iron_tool") if i % 2 == 0 else C("stone_light")
-        line(img, [(x, y), (x + 2, y - 2)], c, 2)
-    ellipse(img, 27, 8, 2, 2, C("silver_light"))
+    # боковая упорная рукоять слева
+    rect(img, 2, 17, 9, 20, C("wood_dark"))
+    ellipse(img, 3, 18, 1, 1, (255, 255, 255, 50))
+    # корпус мотора — гранёный кожух с вентиляционными рёбрами
+    rect(img, 8, 12, 20, 23, C("steel_blue"))
+    rect(img, 8, 12, 20, 14, shade(C("steel_blue"), 1.3))
+    for y in (16, 18, 20):
+        line(img, [(9, y), (14, y)], C("stone_shadow"), 1)
+    blend_px(img, 9, 13, (255, 255, 255, 90))
+    # пистолетная рукоять снизу с курком
+    rect(img, 10, 23, 14, 29, C("wood_dark"))
+    blend_px(img, 11, 25, C("wood"))
+    # патрон-цанга, из которого выходит бур
+    rect(img, 19, 14, 24, 20, shade(C("steel_blue"), 0.8))
+    # винтовой шнек по прямой вправо-вверх — чередующиеся витки читаются
+    # как резьба сверла, а не как случайные штрихи
+    bx, by = 23, 16
+    for i in range(6):
+        x = bx + i * 2
+        y = by - i * 2
+        w = max(1, 4 - i // 2)
+        c = C("iron_tool") if i % 2 == 0 else shade(C("iron_tool"), 0.7)
+        line(img, [(x, y + w), (x + 3, y - w)], c, 2)
+    poly(img, [(x + 2, y - w - 1), (x + 6, y - 2), (x + 3, y + 1)], C("silver_light"))
+    blend_px(img, x + 5, y - 3, (255, 255, 255, 220))
     save(img, "items/hand_drill.png")
+
+
+def _prop_disc(img, cx, cy, color):
+    """Пропеллер как плоский диск размытия вращения — читается однозначно,
+    в отличие от тонких лопастей, которые на 32×32 превращаются в кашу."""
+    ellipse(img, cx, cy, 5, 2, color, outline=OUTLINE)
+    blend_px(img, cx - 3, cy, (255, 255, 255, 90))
+    ellipse(img, cx, cy, 1, 1, C("iron_tool"), outline=OUTLINE)
 
 
 def draw_backpack_propeller():
     img = item_canvas()
-    rect(img, 9, 12, 22, 27, C("wood"))
-    rect(img, 9, 12, 11, 27, C("wood_dark"))
-    line(img, [(11, 15), (20, 15)], C("wood_dark"), 1)
-    line(img, [(11, 20), (20, 20)], C("wood_dark"), 1)
-    for cx in (12, 19):
-        rect(img, cx - 2, 8, cx + 2, 12, C("steel_blue"))
-        line(img, [(cx - 4, 7), (cx + 4, 7)], C("stone_light", 220), 1)
-        line(img, [(cx - 3, 5), (cx + 3, 9)], C("stone_light", 160), 1)
-        ellipse(img, cx, 7, 1, 1, C("iron_tool"))
+    # скруглённый рюкзак-мешок вместо ящика — форма явно "носимая"
+    poly(img, [(10, 13), (21, 13), (23, 16), (23, 25), (19, 28), (12, 28),
+               (8, 25), (8, 16)], C("wood"))
+    poly(img, [(10, 13), (8, 16), (8, 25), (12, 28), (12, 15)], C("wood_dark"))
+    # клапан сверху и передний карман с пряжкой — читается как рюкзак,
+    # а не как бочка с обручами
+    rect(img, 9, 13, 22, 16, shade(C("wood"), 1.2))
+    rect(img, 12, 19, 19, 25, shade(C("wood"), 0.82))
+    line(img, [(12, 19), (19, 19), (19, 25), (12, 25), (12, 19)], C("wood_dark"), 1)
+    ellipse(img, 15, 21, 1, 1, C("iron_tool"))
+    # плечевые лямки
+    line(img, [(9, 15), (5, 11)], C("hair"), 2)
+    line(img, [(22, 15), (26, 11)], C("hair"), 2)
+    # две мачты с дисками пропеллеров наверху, разнесённые в стороны,
+    # чтобы силуэты не сливались в один
+    for cx in (10, 21):
+        line(img, [(cx, 13), (cx, 7)], C("stone_shadow"), 2)
+        _prop_disc(img, cx, 5, C("stone_light"))
     save(img, "items/backpack_propeller.png")
 
 
 def draw_jetpack():
     img = item_canvas()
-    rect(img, 8, 8, 23, 24, C("iron_tool"))
-    rect(img, 8, 8, 11, 24, C("steel_blue"))
-    rect(img, 20, 8, 23, 24, C("steel_blue"))
-    blend_px(img, 12, 10, (255, 255, 255, 60))
+    # корпус баллона сужается кверху — читается как реактивный ранец
+    poly(img, [(11, 6), (21, 6), (24, 10), (24, 24), (20, 27), (12, 27),
+               (8, 24), (8, 10)], C("iron_tool"))
+    poly(img, [(11, 6), (8, 10), (8, 24), (12, 27), (12, 8)], C("steel_blue"))
+    rect(img, 19, 9, 22, 24, C("steel_blue"))
+    blend_px(img, 12, 9, (255, 255, 255, 70))
     line(img, [(13, 12), (18, 12)], C("stone_shadow"), 1)
     line(img, [(13, 16), (18, 16)], C("stone_shadow"), 1)
-    # сопла снизу
-    rect(img, 9, 24, 13, 28, C("stone_shadow"))
-    rect(img, 18, 24, 22, 28, C("stone_shadow"))
+    line(img, [(13, 20), (18, 20)], C("stone_shadow"), 1)
+    # плечевые лямки
+    line(img, [(10, 8), (4, 13)], C("hair"), 2)
+    line(img, [(22, 8), (28, 13)], C("hair"), 2)
+    # сопла снизу с пламенем
+    rect(img, 9, 25, 13, 29, C("stone_shadow"))
+    rect(img, 18, 25, 22, 29, C("stone_shadow"))
+    poly(img, [(9, 29), (13, 29), (11, 32)], C("gold_light"))
+    poly(img, [(18, 29), (22, 29), (20, 32)], C("gold_light"))
     ellipse(img, 11, 27, 1, 1, C("gold_light"))
     ellipse(img, 20, 27, 1, 1, C("gold_light"))
     save(img, "items/jetpack.png")
 
 
 def draw_mercury_bottle():
+    # герметичная металлическая фляга с круглым смотровым окошком — внутри
+    # видна тяжёлая блестящая жидкость. Круглый иллюминатор в нижней трети
+    # (а не окно во всю переднюю грань) не даёт силуэту читаться как лицо.
     img = item_canvas()
-    rect(img, 12, 8, 19, 11, C("iron_tool"))  # горлышко
-    poly(img, [(9, 12), (22, 12), (24, 25), (7, 25)], C("steel_blue"))
-    poly(img, [(9, 12), (22, 12), (24, 25), (7, 25)], (0, 0, 0, 0))
-    rect(img, 9, 14, 22, 23, C("mercury_base"))
-    blend_px(img, 11, 16, (255, 255, 255, 180))
-    blend_px(img, 12, 16, (255, 255, 255, 120))
-    for _ in range(4):
-        pass
-    line(img, [(9, 22), (22, 22)], C("mercury_accent"), 1)
+    body = [(11, 9), (21, 9), (24, 14), (24, 24), (20, 27), (12, 27), (8, 24), (8, 14)]
+    poly(img, body, C("steel_blue"), outline=OUTLINE)
+    poly(img, [(11, 9), (8, 14), (8, 24), (12, 27), (12, 11)], shade(C("steel_blue"), 0.75))
+    # горлышко с завинченной пробкой
+    rect(img, 13, 4, 19, 9, C("iron_tool"))
+    line(img, [(13, 4), (19, 4)], (255, 255, 255, 70), 1)
+    rect(img, 12, 3, 20, 5, shade(C("iron_tool"), 0.8))
+    # круглый иллюминатор, залитый ртутью до краёв (жидкость тяжёлая,
+    # заполняет сосуд плотно) — читается как "смотровое окно", не как лицо
+    ellipse(img, 16, 19, 6, 6, shade(C("steel_blue"), 0.55), outline=OUTLINE)
+    ellipse(img, 16, 19, 5, 5, C("mercury_base"), outline=OUTLINE)
+    ellipse(img, 16, 17, 4, 2, shade(C("mercury_base"), 1.35))
+    blend_px(img, 14, 17, (255, 255, 255, 235))
+    blend_px(img, 15, 17, (255, 255, 255, 235))
+    blend_px(img, 13, 18, (255, 255, 255, 150))
+    ellipse(img, 18, 21, 1, 1, C("mercury_accent"))
+    # капля, просочившаяся наружу снизу — намёк на опасную утечку
+    ellipse(img, 10, 29, 1, 2, C("mercury_base"), outline=OUTLINE)
+    blend_px(img, 10, 28, (255, 255, 255, 200))
     save(img, "items/mercury_bottle.png")
 
 
@@ -856,7 +1052,8 @@ def draw_uranium_container():
     rect(img, 6, 9, 25, 25, C("hatch"))
     rect(img, 6, 9, 25, 11, C("hatch_light"))
     rect(img, 6, 9, 8, 25, shade(C("hatch"), 0.8))
-    cells = [(12, 14), (19, 14), (12, 20), (19, 20)]
+    line(img, [(6, 9), (25, 9), (25, 25), (6, 25), (6, 9)], OUTLINE, 1)
+    cells = [(11, 14), (18, 14), (11, 20), (18, 20)]
     for (cx, cy) in cells:
         poly(img, [(cx, cy - 3), (cx + 3, cy - 1), (cx + 3, cy + 1),
                     (cx, cy + 3), (cx - 3, cy + 1), (cx - 3, cy - 1)], C("uranium_glow"))
@@ -864,6 +1061,14 @@ def draw_uranium_container():
         for dx, dy in [(-3, -1), (-3, 1), (3, -1), (3, 1), (0, -3), (0, 3)]:
             blend_px(img, cx + dx, cy + dy, (C("uranium_glow")[0], C("uranium_glow")[1],
                                               C("uranium_glow")[2], 60))
+    # предупреждающий трилистник радиации — узнаваем без подписи
+    rcx, rcy, rr = 24, 22, 3
+    ellipse(img, rcx, rcy, rr, rr, C("gold_base"), outline=OUTLINE)
+    for a in (90, 210, 330):
+        x = rcx + math.cos(math.radians(a)) * 1.6
+        y = rcy + math.sin(math.radians(a)) * 1.6
+        blend_px(img, int(x), int(y), (20, 20, 20, 255))
+    blend_px(img, rcx, rcy, (20, 20, 20, 255))
     save(img, "items/uranium_container.png")
 
 

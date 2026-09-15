@@ -120,6 +120,8 @@ body{
   font-family:"Pixelify Sans","Manrope",sans-serif;
   font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+.gear{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.gear img{width:19px;height:19px;image-rendering:pixelated;opacity:.22;transition:opacity .3s}
 .chip{
   font-family:"Pixelify Sans","Manrope",sans-serif;font-size:11px;
   color:var(--muted);background:none;
@@ -190,6 +192,10 @@ body{
 
   <div class="strip">
     <div class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></div>
+    <span class="gear">
+      <img id="g-pack" alt="Ранец с пропеллерами" title="Ранец с пропеллерами — глубина 10">
+      <img id="g-jet" alt="Джетпак" title="Джетпак — глубина 100">
+    </span>
     <button class="chip" id="mode" type="button" aria-pressed="true">Джойстик</button>
     <button class="chip" id="reset" type="button">Заново</button>
   </div>
@@ -224,6 +230,8 @@ const el = {
   taphint: document.getElementById('taphint'),
   mode: document.getElementById('mode'),
   dig: document.getElementById('b-dig'),
+  gPack: document.getElementById('g-pack'),
+  gJet: document.getElementById('g-jet'),
 };
 
 let W = null, sprites = {}, charSprites = {};
@@ -242,6 +250,12 @@ const WALK = 4.2;      // клеток/с по земле
 const AIR_CTRL = 0.82; // насколько слушается руля в воздухе
 const V_TERM = 17;     // предел скорости падения
 const HW = 0.38, HH = 0.46;
+
+// Снаряжение открывается по глубине (ГДД раздел 5)
+const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100;
+const PROP_SPEED = 3, PROP_RAMP = 3, PROP_MAX_RISE = 10, PROP_COOLDOWN = 10;
+const JET_SPEED = 20, JET_RAMP = 5;
+const DRILL_MULT = 0.45;   // ручной бур заметно быстрее кирки
 // Физические углы тайлов слегка «скруглены»: если персонаж цепляется за угол
 // меньше чем на столько, его обводит мимо, а не останавливает. Визуально
 // тайлы не меняются — это только коллизии.
@@ -269,6 +283,9 @@ const S = {
   facing: 1,
   anim: 0,
   seenFoundation: false,
+  gear: { backpack: false, jetpack: false, drill: false },
+  thrust: null,
+  flight: { startY: 0, cooldownUntil: 0 },
   fogRelief: new Set(),
   fogRes: new Set(),
   lastCell: '',
@@ -303,19 +320,37 @@ function toast(html, ms = 2600){
   toast._t = setTimeout(() => el.toast.classList.remove('show'), ms);
 }
 
+// Доля площади клетки, накрытая кругом обзора. Считается пробами по сетке:
+// точная формула пересечения круга и квадрата тут не нужна, а 16 проб дают
+// погрешность заметно меньше половины клетки — порога раскрытия.
+function coverage(cx, cy, radius){
+  const N = 4, r2 = radius * radius;
+  let inside = 0;
+  for (let i = 0; i < N; i++){
+    const sy = cy + (i + 0.5) / N - S.y;
+    for (let j = 0; j < N; j++){
+      const sx = cx + (j + 0.5) / N - S.x;
+      if (sx * sx + sy * sy <= r2) inside++;
+    }
+  }
+  return inside / (N * N);
+}
+
+// Клетка раскрывается, когда круг накрывает её не меньше чем наполовину.
+// По расстоянию между центрами диагональные клетки отсекались, хотя круг
+// заметно на них заходил — и в них было видно пустоту там, где рельеф
+// нарисован.
 function reveal(){
+  const rRelief = S.reliefR + 0.5, rRes = S.resR + 0.5;
+  const span = Math.ceil(rRelief);
   const cx = cellX(), cy = cellY();
-  const tag = cx + ':' + cy;
-  if (tag === S.lastCell) return;
-  S.lastCell = tag;
-  for (let dy = -S.reliefR; dy <= S.reliefR; dy++)
-    for (let dx = -S.reliefR; dx <= S.reliefR; dx++){
-      const d = Math.hypot(dx, dy);
-      if (d > S.reliefR + 0.35) continue;
+  for (let dy = -span; dy <= span; dy++)
+    for (let dx = -span; dx <= span; dx++){
       const x = cx + dx, y = cy + dy;
       if (x < 0 || x >= W.width || y < 0) continue;
+      if (coverage(x, y, rRelief) < 0.5) continue;
       S.fogRelief.add(key(x, y));
-      if (d <= S.resR + 0.35) S.fogRes.add(key(x, y));
+      if (coverage(x, y, rRes) >= 0.5) S.fogRes.add(key(x, y));
     }
 }
 
@@ -352,8 +387,21 @@ function gravityNow(){
   return Math.abs(S.vy) < APEX_V ? G * APEX_G : G;
 }
 
+// Разгон ранца падает с грузом (ГДД: 3 / 0.85^(груз/20) секунд),
+// потолок скорости при этом не меняется.
+function propRamp(){ return PROP_RAMP / Math.pow(0.85, S.loadKg / 20); }
+
 function moveY(dt){
-  S.vy = Math.min(S.vy + gravityNow() * dt, V_TERM);
+  if (S.thrust){
+    const jet = S.thrust === 'jet';
+    const maxUp = jet ? JET_SPEED : PROP_SPEED;
+    const ramp = jet ? JET_RAMP : propRamp();
+    // тяга сперва гасит падение и только потом поднимает — отдельного
+    // «торможения» не нужно, это тот же интеграл
+    S.vy = Math.max(S.vy - (maxUp / ramp) * dt, -maxUp);
+  } else {
+    S.vy = Math.min(S.vy + gravityNow() * dt, V_TERM);
+  }
   S.y += S.vy * dt;
   const left = S.x - HW + 0.02, right = S.x + HW - 0.02;
   S.onGround = false;
@@ -404,6 +452,46 @@ function land(){
   }
 }
 
+function endProp(){
+  if (S.thrust === 'prop') S.flight.cooldownUntil = performance.now() + PROP_COOLDOWN * 1000;
+  S.thrust = null;
+}
+
+function updateFlight(){
+  if (!S.hold.up || S.onGround || S.digging){ endProp(); return; }
+  if (S.gear.jetpack){ S.thrust = 'jet'; return; }
+  if (!S.gear.backpack){ S.thrust = null; return; }
+  if (S.thrust !== 'prop'){
+    if (performance.now() < S.flight.cooldownUntil) return;
+    S.thrust = 'prop';
+    S.flight.startY = S.y;
+  }
+  if (S.flight.startY - S.y >= PROP_MAX_RISE) endProp();
+}
+
+function checkUnlocks(){
+  const d = cellY();
+  if (d >= PROP_DEPTH && !S.gear.backpack){
+    S.gear.backpack = true;
+    syncGear();
+    toast('Глубина 10. Из подвала пригодился <b>ранец с пропеллерами</b> — держи стик вверх в воздухе, поднимет на 10 клеток, потом перезарядка.', 5200);
+  }
+  if (d >= JET_DEPTH && !S.gear.jetpack){
+    S.gear.jetpack = true;
+    S.gear.drill = true;
+    S.tool = 'drill';
+    el.toolIcon.src = 'art/items/hand_drill.png';
+    el.toolName.textContent = 'Ручной бур';
+    syncGear();
+    toast('Глубина 100. Собраны <b>джетпак</b> и <b>ручной бур</b> — летишь без остановки и буришь вдвое быстрее.', 5200);
+  }
+}
+
+function syncGear(){
+  el.gPack.style.opacity = S.gear.backpack ? '1' : '.22';
+  el.gJet.style.opacity = S.gear.jetpack ? '1' : '.22';
+}
+
 function jump(){
   if (!S.onGround || S.digging) return;
   if (performance.now() < S.stunUntil) return;
@@ -451,7 +539,8 @@ function startDig(x, y){
     toast(`Лопата звенит о <b>${meta(name).name.toLowerCase()}</b>. Буз-эффект — руки трясутся.`);
     return;
   }
-  S.digging = { x, y, t: 0, total: meta(name).secs / DEMO_SPEED, name };
+  const mult = S.tool === 'drill' ? DRILL_MULT : 1;
+  S.digging = { x, y, t: 0, total: meta(name).secs * mult / DEMO_SPEED, name };
 }
 
 function finishDig(){
@@ -500,7 +589,8 @@ function applyIntent(dt){
   S.vx = S.hold.dx * speed;
   if (S.hold.dx) S.facing = S.hold.dx;
 
-  if (S.hold.up) jump();
+  if (S.hold.up && S.onGround) jump();
+  updateFlight();
 
   if (!S.onGround) return;
 
@@ -591,7 +681,7 @@ function draw(){
   }
 
   const sheet = S.digging ? (S.tool === 'shovel' ? 'dig_shovel' : 'dig_pick')
-              : (!S.onGround ? 'fall' : (S.vx !== 0 ? 'walk' : 'idle'));
+              : (!S.onGround ? (S.thrust ? 'fly' : 'fall') : (S.vx !== 0 ? 'walk' : 'idle'));
   const img = charSprites[sheet];
   const dx0 = Math.round(pcx - TILE / 2), dy0 = Math.round(pcy - HH * TILE - 16);
   if (img && img.complete && img.naturalWidth){
@@ -645,6 +735,7 @@ function loop(now){
   moveX(dt);
   moveY(dt);
   reveal();
+  checkUnlocks();
 
   if (S.digging){
     S.digging.t += dt;
@@ -763,6 +854,9 @@ document.getElementById('reset').addEventListener('click', () => {
   S.coins = 0; S.loadKg = 0;
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
+  S.gear.backpack = S.gear.jetpack = S.gear.drill = false;
+  S.thrust = null; S.flight.cooldownUntil = 0;
+  syncGear();
   S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
   S.target = null; S.digging = null;
   if (W) W.grid.set(W.pristine);
@@ -791,9 +885,12 @@ fetch('world_dump.json').then(r => r.json()).then(data => {
     if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
   }
   for (let i = 1; i <= 4; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
-  for (const a of ['idle','walk','fall','dig_shovel','dig_pick'])
+  for (const a of ['idle','walk','fall','fly','dig_shovel','dig_pick'])
     charSprites[a] = loadImg(`art/character/${a}.png`);
   el.toolIcon.src = 'art/items/shovel.png';
+  el.gPack.src = 'art/items/backpack_propeller.png';
+  el.gJet.src = 'art/items/jetpack.png';
+  syncGear();
   document.getElementById('i-hp').src = 'art/ui/icon_hp.png';
   document.getElementById('i-food').src = 'art/ui/icon_hunger.png';
   document.getElementById('i-rest').src = 'art/ui/icon_stamina.png';

@@ -253,8 +253,13 @@ const HW = 0.38, HH = 0.46;
 
 // Снаряжение открывается по глубине (ГДД раздел 5)
 const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100;
-const PROP_SPEED = 3, PROP_RAMP = 3, PROP_MAX_RISE = 10, PROP_COOLDOWN = 10;
+const PROP_SPEED = 2, PROP_RAMP = 3;
 const JET_SPEED = 20, JET_RAMP = 5;
+// Пока герой ещё падает, тяга работает тормозом и гасит скорость намного
+// резче, чем потом разгоняет вверх. Без этого подъёмная сила ранца
+// (2/3 ≈ 0.7 кл/с²) не могла перебить тяготение в 16 кл/с²: нажатие вверх
+// в падении выглядело так, будто ранец вообще не включился.
+const THRUST_BRAKE = 26;
 const DRILL_MULT = 0.45;   // ручной бур заметно быстрее кирки
 // Физические углы тайлов слегка «скруглены»: если персонаж цепляется за угол
 // меньше чем на столько, его обводит мимо, а не останавливает. Визуально
@@ -285,7 +290,6 @@ const S = {
   seenFoundation: false,
   gear: { backpack: false, jetpack: false, drill: false },
   thrust: null,
-  flight: { startY: 0, cooldownUntil: 0 },
   fogRelief: new Set(),
   fogRes: new Set(),
   lastCell: '',
@@ -396,9 +400,8 @@ function moveY(dt){
     const jet = S.thrust === 'jet';
     const maxUp = jet ? JET_SPEED : PROP_SPEED;
     const ramp = jet ? JET_RAMP : propRamp();
-    // тяга сперва гасит падение и только потом поднимает — отдельного
-    // «торможения» не нужно, это тот же интеграл
-    S.vy = Math.max(S.vy - (maxUp / ramp) * dt, -maxUp);
+    const accel = S.vy > 0 ? THRUST_BRAKE : maxUp / ramp;
+    S.vy = Math.max(S.vy - accel * dt, -maxUp);
   } else {
     S.vy = Math.min(S.vy + gravityNow() * dt, V_TERM);
   }
@@ -452,21 +455,10 @@ function land(){
   }
 }
 
-function endProp(){
-  if (S.thrust === 'prop') S.flight.cooldownUntil = performance.now() + PROP_COOLDOWN * 1000;
-  S.thrust = null;
-}
-
 function updateFlight(){
-  if (!S.hold.up || S.onGround || S.digging){ endProp(); return; }
+  if (!S.hold.up || S.onGround || S.digging){ S.thrust = null; return; }
   if (S.gear.jetpack){ S.thrust = 'jet'; return; }
-  if (!S.gear.backpack){ S.thrust = null; return; }
-  if (S.thrust !== 'prop'){
-    if (performance.now() < S.flight.cooldownUntil) return;
-    S.thrust = 'prop';
-    S.flight.startY = S.y;
-  }
-  if (S.flight.startY - S.y >= PROP_MAX_RISE) endProp();
+  S.thrust = S.gear.backpack ? 'prop' : null;
 }
 
 function checkUnlocks(){
@@ -474,7 +466,7 @@ function checkUnlocks(){
   if (d >= PROP_DEPTH && !S.gear.backpack){
     S.gear.backpack = true;
     syncGear();
-    toast('Глубина 10. Из подвала пригодился <b>ранец с пропеллерами</b> — держи стик вверх в воздухе, поднимет на 10 клеток, потом перезарядка.', 5200);
+    toast('Глубина 10. Пригодился <b>ранец с пропеллерами</b> — держи стик вверх в воздухе: сначала погасит падение, потом поднимет.', 5200);
   }
   if (d >= JET_DEPTH && !S.gear.jetpack){
     S.gear.jetpack = true;
@@ -855,7 +847,7 @@ document.getElementById('reset').addEventListener('click', () => {
   S.hp = S.food = S.rest = 100;
   S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
   S.gear.backpack = S.gear.jetpack = S.gear.drill = false;
-  S.thrust = null; S.flight.cooldownUntil = 0;
+  S.thrust = null;
   syncGear();
   S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
   S.target = null; S.digging = null;

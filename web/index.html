@@ -242,6 +242,10 @@ const WALK = 4.2;      // клеток/с по земле
 const AIR_CTRL = 0.82; // насколько слушается руля в воздухе
 const V_TERM = 17;     // предел скорости падения
 const HW = 0.38, HH = 0.46;
+// Физические углы тайлов слегка «скруглены»: если персонаж цепляется за угол
+// меньше чем на столько, его обводит мимо, а не останавливает. Визуально
+// тайлы не меняются — это только коллизии.
+const CORNER = 5 / 32;
 
 const MAX_KG = 60;
 const DEMO_SPEED = 4;
@@ -320,15 +324,25 @@ function moveX(dt){
   if (S.vx === 0) return;
   S.x += S.vx * dt;
   const top = S.y - HH + 0.02, bot = S.y + HH - 0.02;
-  if (S.vx > 0){
-    const r = S.x + HW;
-    if (solidPt(r, top) || solidPt(r, bot)){ S.x = Math.floor(r) - HW - 0.001; S.vx = 0; }
-  } else {
-    const l = S.x - HW;
-    if (solidPt(l, top) || solidPt(l, bot)){ S.x = Math.floor(l) + 1 + HW + 0.001; S.vx = 0; }
+  const probe = S.vx > 0 ? S.x + HW : S.x - HW;
+  const hitT = solidPt(probe, top), hitB = solidPt(probe, bot);
+  let slipped = false;
+
+  if (hitT && !hitB){
+    const over = (Math.floor(top) + 1) - top;
+    if (over <= CORNER){ S.y += over + 0.002; slipped = true; }
+  } else if (hitB && !hitT){
+    const over = bot - Math.floor(bot);
+    if (over <= CORNER){ S.y -= over + 0.002; slipped = true; }
+  }
+
+  if (!slipped && (hitT || hitB)){
+    S.x = S.vx > 0 ? Math.floor(probe) - HW - 0.001 : Math.floor(probe) + 1 + HW + 0.001;
+    S.vx = 0;
   }
   S.x = Math.min(Math.max(S.x, HW), W.width - HW);
 }
+
 
 // Возле вершины прыжка и в момент смены знака скорости тяготение
 // ослабляется: скорость набирается и гасится по параболе, и без этой паузы
@@ -343,27 +357,41 @@ function moveY(dt){
   S.y += S.vy * dt;
   const left = S.x - HW + 0.02, right = S.x + HW - 0.02;
   S.onGround = false;
+
   if (S.vy > 0){
     const b = S.y + HH;
-    if (solidPt(left, b) || solidPt(right, b)){
+    const hitL = solidPt(left, b), hitR = solidPt(right, b);
+    if (hitL || hitR){
       S.y = Math.floor(b) - HH - 0.001;
       land();
       S.vy = 0;
       S.onGround = true;
     }
   } else if (S.vy < 0){
-    const t = S.y - HH;
-    if (solidPt(left, t) || solidPt(right, t)){
-      S.y = Math.floor(t) + 1 + HH + 0.001;
+    const tp = S.y - HH;
+    const hitL = solidPt(left, tp), hitR = solidPt(right, tp);
+    let slipped = false;
+    // задет один угол потолка — обводим мимо, если зацеп мелкий
+    if (hitL && !hitR){
+      const over = (Math.floor(left) + 1) - left;
+      if (over <= CORNER){ S.x += over + 0.002; slipped = true; }
+    } else if (hitR && !hitL){
+      const over = right - Math.floor(right);
+      if (over <= CORNER){ S.x -= over + 0.002; slipped = true; }
+    }
+    if (!slipped && (hitL || hitR)){
+      S.y = Math.floor(tp) + 1 + HH + 0.001;
       S.vy = 0;
     }
   }
+
   if (!S.onGround){
     const b = S.y + HH + 0.02;
     S.onGround = S.vy === 0 && (solidPt(left, b) || solidPt(right, b));
   }
   if (S.y < S.apexY) S.apexY = S.y;
 }
+
 
 function land(){
   const h = Math.round(S.y - S.apexY);
@@ -496,7 +524,7 @@ function camera(){
   };
 }
 
-function drawTile(name, sx, sy, resKnown){
+function drawTile(name, sx, sy, resKnown, wx, wy){
   if (!resKnown){
     ctx.fillStyle = solid(name) ? '#2C241B' : '#100D0A';
     ctx.fillRect(sx, sy, TILE, TILE);
@@ -509,7 +537,12 @@ function drawTile(name, sx, sy, resKnown){
     return;
   }
   let file = W.art[name];
-  if (name === 'DIRT') file = 'dirt_' + (1 + ((sx * 7 + sy * 13) >> 5) % 4);
+  if (name === 'DIRT'){
+    // Вариант выбирается по МИРОВЫМ координатам клетки. По экранным он менялся
+    // на каждый пиксель прокрутки, и земля рябила, будто тайлы вращаются.
+    const h = ((wx * 73856093) ^ (wy * 19349663)) >>> 0;
+    file = 'dirt_' + (1 + h % 4);
+  }
   const img = sprites[file];
   if (img && img.complete && img.naturalWidth) ctx.drawImage(img, sx, sy);
   else { ctx.fillStyle = solid(name) ? '#4A3A2A' : '#0F0C09'; ctx.fillRect(sx, sy, TILE, TILE); }
@@ -536,7 +569,7 @@ function draw(){
       }
       const k = key(x, y);
       if (!S.fogRelief.has(k)){ ctx.fillStyle = '#080605'; ctx.fillRect(sx, sy, TILE, TILE); continue; }
-      drawTile(tileAt(x, y), sx, sy, S.fogRes.has(k));
+      drawTile(tileAt(x, y), sx, sy, S.fogRes.has(k), x, y);
     }
   }
 

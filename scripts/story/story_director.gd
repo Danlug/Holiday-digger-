@@ -481,6 +481,8 @@ func _on_dig_refused(reason: String) -> void:
 			hud.toast(StoryText.get_text("quest.gold_first_toast"), 3.0)
 		"gold_needs_pickaxe":
 			hud.toast(StoryText.get_text("quest.gold_needs_pickaxe"), 3.0)
+		"foundation_needs_pickaxe":
+			hud.toast(StoryText.get_text("quest.foundation_needs_pickaxe"), 3.4)
 
 
 func _on_dig_finished(_x: int, _y: int, type: int, _mineral_id: String, _was_loot: bool, _coins: int) -> void:

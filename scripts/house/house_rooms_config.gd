@@ -70,15 +70,35 @@ static func _merge_image_overrides(id: String, base: Dictionary) -> void:
 	var raw := read_json(IMAGE_META_FMT % id)
 	if raw.is_empty():
 		return
-	if raw.has("floor_y"):
-		base["floor_y"] = float(raw["floor_y"])
+	# Импортёр (tools/import_rooms.py) пишет разметку в своём виде: точки
+	# лежат под "anchors", у каждой {x, y, px_x, ...}, а линия пола — это
+	# anchors.floor_y.y. Имена точек у него — как на картинке (door_left,
+	# tools_wall), у дома — по смыслу (door_bedroom, mops_wall). Сводим здесь,
+	# а не переименовываем один из файлов: картинку пересобирают отдельно от
+	# логики, и каждая сторона должна называть вещи своими словами.
+	var anchors: Dictionary = raw.get("anchors", raw)
+	if anchors.has("floor_y"):
+		var fy = anchors["floor_y"]
+		base["floor_y"] = float(fy["y"]) if typeof(fy) == TYPE_DICTIONARY else float(fy)
 	if raw.has("spawn_x"):
 		base["spawn_x"] = float(raw["spawn_x"])
 	var points: Dictionary = base.get("points", {})
 	for key in points.keys():
-		if raw.has(key) and typeof(raw[key]) == TYPE_DICTIONARY and raw[key].has("x"):
-			points[key]["x"] = float(raw[key]["x"])
+		var src_key: String = ART_POINT_NAMES.get(key, key)
+		if anchors.has(src_key) and typeof(anchors[src_key]) == TYPE_DICTIONARY and anchors[src_key].has("x"):
+			points[key]["x"] = float(anchors[src_key]["x"])
 	base["points"] = points
+
+
+## Точка дома → точка на разметке художника. Чего здесь нет — ищется под
+## своим именем.
+const ART_POINT_NAMES := {
+	"door_bedroom": "door_left",
+	"door_workshop": "door_right",
+	"veranda_window": "veranda",
+	"stairs": "stairs_bottom",
+	"mops_wall": "tools_wall",
+}
 
 
 static func bg_path(id: String) -> String:

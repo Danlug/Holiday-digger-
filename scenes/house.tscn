@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scripts/house/house_view.gd" id="1_se78b"]
 [ext_resource type="Texture2D" path="res://art/ui/icon_hp.png" id="2_3bgk5"]
@@ -55,15 +55,15 @@ border_color = Color(0, 0, 0, 0.55)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qcuhb"]
 content_margin_left = 6.0
-content_margin_top = 2.0
+content_margin_top = 4.0
 content_margin_right = 6.0
-content_margin_bottom = 2.0
-bg_color = Color(0.06, 0.05, 0.04, 0.82)
+content_margin_bottom = 4.0
+bg_color = Color(0.07, 0.055, 0.043, 0.92)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7685u"]
 content_margin_left = 6.0
@@ -75,7 +75,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3853c"]
 content_margin_left = 6.0
@@ -87,7 +87,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bhgw4"]
 content_margin_left = 6.0
@@ -135,7 +135,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e5ov4"]
 content_margin_left = 6.0
@@ -147,7 +147,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ep1bp"]
 content_margin_left = 6.0
@@ -175,18 +175,6 @@ border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3kuml"]
 content_margin_left = 6.0
-content_margin_top = 4.0
-content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lamap"]
-content_margin_left = 6.0
 content_margin_top = 2.0
 content_margin_right = 6.0
 content_margin_bottom = 2.0
@@ -196,6 +184,18 @@ border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lamap"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_de74l"]
 content_margin_left = 6.0
@@ -207,7 +207,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qrght"]
 content_margin_left = 6.0
@@ -219,7 +219,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_r8noe"]
 content_margin_left = 6.0
@@ -234,6 +234,18 @@ border_width_bottom = 1
 border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ivbqp"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nrgyv"]
 content_margin_left = 6.0
 content_margin_top = 2.0
 content_margin_right = 6.0
@@ -368,16 +380,22 @@ offset_right = 43.0
 offset_bottom = 5.0
 color = Color(0.431373, 0.576471, 0.658824, 1)
 
-[node name="Notice" type="Label" parent="Root/Header"]
+[node name="Notice" type="Label" parent="Root"]
+visible = false
 layout_mode = 0
+anchor_top = 1.0
 anchor_right = 1.0
-offset_left = 96.0
-offset_top = 4.0
-offset_right = -6.0
-theme_override_font_sizes/font_size = 8
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -92.0
+offset_right = -8.0
+offset_bottom = -48.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qcuhb")
+theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.878431, 0.662745, 0.231373, 1)
-horizontal_alignment = 2
-clip_text = true
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
 
 [node name="Stage" type="Control" parent="Root"]
 clip_contents = true
@@ -418,11 +436,11 @@ offset_left = 6.0
 offset_top = -40.0
 offset_right = 44.0
 offset_bottom = -6.0
-theme_override_styles/normal = SubResource("StyleBoxFlat_qcuhb")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_7685u")
-theme_override_styles/hover = SubResource("StyleBoxFlat_3853c")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_bhgw4")
-theme_override_styles/focus = SubResource("StyleBoxFlat_3ewhn")
+theme_override_styles/normal = SubResource("StyleBoxFlat_7685u")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_3853c")
+theme_override_styles/hover = SubResource("StyleBoxFlat_bhgw4")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_3ewhn")
+theme_override_styles/focus = SubResource("StyleBoxFlat_0fn05")
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
@@ -441,11 +459,11 @@ offset_left = -44.0
 offset_top = -40.0
 offset_right = -6.0
 offset_bottom = -6.0
-theme_override_styles/normal = SubResource("StyleBoxFlat_0fn05")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_82h1m")
-theme_override_styles/hover = SubResource("StyleBoxFlat_e5ov4")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_ep1bp")
-theme_override_styles/focus = SubResource("StyleBoxFlat_57tf3")
+theme_override_styles/normal = SubResource("StyleBoxFlat_82h1m")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_e5ov4")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ep1bp")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_57tf3")
+theme_override_styles/focus = SubResource("StyleBoxFlat_3kuml")
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
@@ -453,33 +471,31 @@ theme_override_colors/font_disabled_color = Color(0.243137, 0.192157, 0.145098, 
 theme_override_font_sizes/font_size = 9
 text = "▶"
 
-[node name="SleepOverlay" type="Control" parent="Root/Stage"]
+[node name="SleepOverlay" type="Control" parent="Root"]
 visible = false
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="Shade" type="ColorRect" parent="Root/Stage/SleepOverlay"]
+[node name="Shade" type="ColorRect" parent="Root/SleepOverlay"]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.03, 0.02, 0.02, 0.82)
 
-[node name="Sprite" type="TextureRect" parent="Root/Stage/SleepOverlay"]
+[node name="Sprite" type="TextureRect" parent="Root/SleepOverlay"]
 layout_mode = 0
-anchor_left = 0.5
 anchor_top = 0.5
-anchor_right = 0.5
+anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -48.0
-offset_top = -70.0
-offset_right = 48.0
-offset_bottom = 26.0
+offset_top = -150.0
+offset_bottom = 110.0
 mouse_filter = 2
-stretch_mode = 3
+expand_mode = 1
+stretch_mode = 5
 
-[node name="Label" type="Label" parent="Root/Stage/SleepOverlay"]
+[node name="Label" type="Label" parent="Root/SleepOverlay"]
 layout_mode = 0
 anchor_top = 1.0
 anchor_right = 1.0
@@ -511,7 +527,7 @@ offset_left = 14.0
 offset_top = -70.0
 offset_right = -14.0
 offset_bottom = 70.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_3kuml")
+theme_override_styles/panel = SubResource("StyleBoxFlat_lamap")
 
 [node name="Box" type="VBoxContainer" parent="Root/Forced/Panel"]
 layout_mode = 2
@@ -526,11 +542,11 @@ autowrap_mode = 2
 [node name="Button" type="Button" parent="Root/Forced/Panel/Box"]
 custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_lamap")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_de74l")
-theme_override_styles/hover = SubResource("StyleBoxFlat_qrght")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_r8noe")
-theme_override_styles/focus = SubResource("StyleBoxFlat_ivbqp")
+theme_override_styles/normal = SubResource("StyleBoxFlat_de74l")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_qrght")
+theme_override_styles/hover = SubResource("StyleBoxFlat_r8noe")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_ivbqp")
+theme_override_styles/focus = SubResource("StyleBoxFlat_nrgyv")
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)

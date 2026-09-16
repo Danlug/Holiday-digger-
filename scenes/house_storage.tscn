@@ -1,30 +1,7 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
-[ext_resource type="Script" path="res://scripts/house/house_storage_view.gd" id="1_5tquv"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jrfy3"]
-content_margin_left = 5.0
-content_margin_top = 2.0
-content_margin_right = 5.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jrtos"]
-content_margin_left = 5.0
-content_margin_top = 2.0
-content_margin_right = 5.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
+[ext_resource type="Script" path="res://scripts/house/house_storage_view.gd" id="1_jrfy3"]
+[ext_resource type="Script" path="res://scripts/ui/drag_scroll.gd" id="2_jrtos"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5x48q"]
 content_margin_left = 5.0
@@ -48,7 +25,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ucwr8"]
 content_margin_left = 5.0
@@ -84,7 +61,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h5r7h"]
 content_margin_left = 5.0
@@ -108,7 +85,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cm4b2"]
 content_margin_left = 5.0
@@ -122,8 +99,32 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_x47sf"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_t2gj7"]
+content_margin_left = 5.0
+content_margin_top = 2.0
+content_margin_right = 5.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
 [node name="HouseStorageView" type="CanvasLayer"]
-script = ExtResource("1_5tquv")
+script = ExtResource("1_jrfy3")
 
 [node name="Root" type="Control" parent="."]
 layout_mode = 3
@@ -156,11 +157,11 @@ text = "СКЛАД"
 [node name="Close" type="Button" parent="Root/Head"]
 custom_minimum_size = Vector2(44, 22)
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_jrfy3")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_jrtos")
-theme_override_styles/hover = SubResource("StyleBoxFlat_5x48q")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_q1t3m")
-theme_override_styles/focus = SubResource("StyleBoxFlat_ucwr8")
+theme_override_styles/normal = SubResource("StyleBoxFlat_5x48q")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_q1t3m")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ucwr8")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_frn3t")
+theme_override_styles/focus = SubResource("StyleBoxFlat_1owpx")
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
@@ -198,6 +199,9 @@ offset_right = -8.0
 offset_bottom = -34.0
 horizontal_scroll_mode = 0
 
+[node name="DragScroll" type="Node" parent="Root/Scroll"]
+script = ExtResource("2_jrtos")
+
 [node name="List" type="VBoxContainer" parent="Root/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -212,11 +216,11 @@ offset_left = 8.0
 offset_top = -30.0
 offset_right = -8.0
 offset_bottom = -6.0
-theme_override_styles/normal = SubResource("StyleBoxFlat_frn3t")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_1owpx")
-theme_override_styles/hover = SubResource("StyleBoxFlat_h5r7h")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_exa31")
-theme_override_styles/focus = SubResource("StyleBoxFlat_cm4b2")
+theme_override_styles/normal = SubResource("StyleBoxFlat_h5r7h")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_exa31")
+theme_override_styles/hover = SubResource("StyleBoxFlat_cm4b2")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_x47sf")
+theme_override_styles/focus = SubResource("StyleBoxFlat_t2gj7")
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)

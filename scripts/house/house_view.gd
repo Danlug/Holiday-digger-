@@ -188,15 +188,27 @@ func _build_header() -> void:
 	_bars["hunger"] = _bar_row(bars, "Hunger", Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
 	_bars["stamina"] = _bar_row(bars, "Stamina", Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
 
-	_notice = _need(header, "Notice", Label) as Label
-	_notice.anchor_right = 1.0
-	_notice.offset_left = 96
-	_notice.offset_right = -6
-	_notice.offset_top = 4
-	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_notice.add_theme_font_size_override("font_size", 8)
+	# Уведомление — пузырь над кнопками ходьбы, на всю ширину и с переносом.
+	# В шапке справа ему доставалось ~120 px с обрезкой, и отказ «Не хочется
+	# спать: бодрость полная…» терял и начало, и конец.
+	_notice = _need(_root, "Notice", Label) as Label
+	_notice.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_notice.offset_left = 8
+	_notice.offset_right = -8
+	_notice.offset_top = -92
+	_notice.offset_bottom = -48
+	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_notice.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_notice.add_theme_font_size_override("font_size", 9)
 	_notice.add_theme_color_override("font_color", ACCENT)
-	_notice.clip_text = true
+	_notice.add_theme_stylebox_override("normal", _box(Color(0.07, 0.055, 0.043, 0.92), ACCENT))
+	_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_notice.visible = false
+	# Пузырь строится вместе с шапкой, раньше комнаты, — а комната (Stage)
+	# занимает весь экран и рисуется поверх всего, что в дереве выше неё.
+	# Без переноса в конец пузырь показывался, но его не было видно.
+	_root.move_child(_notice, _root.get_child_count() - 1)
 
 
 func _bar_row(parent: Control, bar_name: String, color: Color, icon_path: String) -> ColorRect:
@@ -275,8 +287,13 @@ func _build_walk_buttons() -> void:
 
 
 func _build_sleep_overlay() -> void:
-	_sleep_overlay = _need(_stage, "SleepOverlay", Control) as Control
+	# Оверлей живёт в _root, а не в _stage: _stage — это комната, она едет за
+	# камерой по x, и кадр сна, положенный туда, уезжал вместе с ней — у
+	# кровати (треть ширины комнаты) лицо оказывалось наполовину за правым
+	# краем экрана. Экранный слой стоит на месте.
+	_sleep_overlay = _need(_root, "SleepOverlay", Control) as Control
 	_sleep_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.move_child(_sleep_overlay, _root.get_child_count() - 1)
 	_sleep_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_sleep_overlay.visible = false
 
@@ -286,16 +303,20 @@ func _build_sleep_overlay() -> void:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_sleep_sprite = _need(_sleep_overlay, "Sprite", TextureRect) as TextureRect
-	_sleep_sprite.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	# Кадр авторской анимации — 224×258, ровно ширина экрана: коробка под
+	# него на всю ширину, по высоте с запасом; вписываем с сохранением
+	# пропорций, чтобы на другом экране он ужался, а не обрезался.
+	_sleep_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_sleep_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_sleep_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sleep_sprite.anchor_left = 0.5
-	_sleep_sprite.anchor_right = 0.5
+	_sleep_sprite.anchor_left = 0.0
+	_sleep_sprite.anchor_right = 1.0
 	_sleep_sprite.anchor_top = 0.5
 	_sleep_sprite.anchor_bottom = 0.5
-	_sleep_sprite.offset_left = -48
-	_sleep_sprite.offset_right = 48
-	_sleep_sprite.offset_top = -70
-	_sleep_sprite.offset_bottom = 26
+	_sleep_sprite.offset_left = 0
+	_sleep_sprite.offset_right = 0
+	_sleep_sprite.offset_top = -150
+	_sleep_sprite.offset_bottom = 110
 
 	_sleep_label = _need(_sleep_overlay, "Label", Label) as Label
 	_sleep_label.text = "Спит..."
@@ -492,6 +513,7 @@ func _refresh_header() -> void:
 
 	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
 		_notice.text = ""
+		_notice.visible = false
 
 
 func _set_bar(id: String, fraction: float) -> void:
@@ -644,7 +666,15 @@ func _fire(def: Dictionary) -> void:
 	var action := String(def.get("action", ""))
 	var parts := action.split(":", true, 1)
 	if parts.size() == 2 and parts[0] == "goto":
+		# Точка входа — по имени точки в целевой комнате, а не долей: доли
+		# переопределяет разметка арта, и число здесь отстало бы от картинки
+		# при первой же пересборке. Старый ключ enter_x понимаем по-прежнему.
 		var enter_x: float = float(def.get("enter_x", -1.0))
+		var enter_at: String = String(def.get("enter_at", ""))
+		if not enter_at.is_empty():
+			var target_points: Dictionary = HouseRoomsConfig.points(parts[1])
+			if target_points.has(enter_at):
+				enter_x = float(target_points[enter_at].get("x", enter_x))
 		go_to_room(parts[1], enter_x)
 		action_requested.emit("goto", parts[1])
 		return
@@ -757,6 +787,7 @@ func notify(text: String, seconds: float = 3.0) -> void:
 	if _notice == null:
 		return
 	_notice.text = text
+	_notice.visible = not text.is_empty()
 	_notice_until_msec = Time.get_ticks_msec() + seconds * 1000.0
 
 

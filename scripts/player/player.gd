@@ -596,13 +596,13 @@ func _start_dig(tx: int, ty: int) -> void:
 	if GameState.current_tool == "shovel":
 		var shovel_max_depth := Balance.get_tool_max_depth("shovel")
 		if type == TileTypes.Type.FOUNDATION:
-			if not _seen_foundation:
-				_seen_foundation = true
-				# Упрощение квеста "мастерская" (см. итоговый отчёт): полноценной
-				# сцены деда/кирки нет, но игра не оставляет игрока запертым
-				# под фундаментом лопатой — выдаёт ржавую кирку сразу.
-				GameState.set_current_tool("rusty_pickaxe")
-				tool_auto_switched.emit("rusty_pickaxe")
+			# Кирка больше не появляется в руках сама от удара о фундамент:
+			# за ней идут в мастерскую и снимают со стены среди швабр и удочек
+			# (решение владельца; HouseSystem.take_starting_pickaxe). Лопата
+			# о фундамент — только слова, без стана: игрок ещё не знает, что
+			# такое фундамент, и тряска без объяснения ничему не учит.
+			digging = null
+			dig_refused_by_story.emit("foundation_needs_pickaxe")
 			return
 		if shovel_max_depth >= 0 and ty > shovel_max_depth:
 			return

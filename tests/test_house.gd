@@ -395,24 +395,33 @@ func _test_tunnel_transition() -> void:
 # и гаснут по радиусу, несколько точек в радиусе дают несколько кнопок.
 # ---------------------------------------------------------------------------
 
+## Доля x точки — из той же разметки, по которой живёт игра (data/rooms.json,
+## переопределённый art/env/room_<id>.json художника). Цифры в тесте не
+## зашиваем: арт пересобирают отдельно от логики, и тест с числами падал бы
+## на каждой пересборке, ничего не проверяя.
+func _px(room: String, point: String) -> float:
+	return float(HouseRoomsConfig.points(room)[point]["x"])
+
+
 func _test_room_hotspots_appear_and_fade() -> void:
 	if GameState.house_is_indoors:
 		house.exit_to_door()
 	house.enter_house("hall")
 	check("вошёл в салон", house._view.room_id() == "hall")
 
-	# hall.door_workshop: x=0.8, radius=0.08 (data/rooms.json)
-	house._view.set_hero_x_fraction(0.8)
+	house._view.set_hero_x_fraction(_px("hall", "door_workshop"))
 	check("у правой двери — кнопка «Мастерская»", _actions().has("goto:workshop"))
 
-	# hall.front_door: x=0.5, radius=0.08 — не пересекается с door_workshop
-	house._view.set_hero_x_fraction(0.5)
+	# Входная дверь — деревянная у левого края салона, от правой двери далеко.
+	house._view.set_hero_x_fraction(_px("hall", "front_door"))
 	var actions := _actions()
 	check("у входной двери — «Заказать»", actions.has("open_shop"))
 	check("кнопка мастерской вдали погасла", not actions.has("goto:workshop"))
 
-	# Далеко от всех точек — хотспотов нет вовсе.
-	house._view.set_hero_x_fraction(0.0)
+	# Далеко от всех точек — хотспотов нет вовсе. Между входной дверью и
+	# дверями в глубине есть пустая стена: середина этого промежутка.
+	var gap := (_px("hall", "front_door") + _px("hall", "door_bedroom")) / 2.0
+	house._view.set_hero_x_fraction(gap)
 	check("вдали от всех точек хотспотов нет", _actions().is_empty())
 
 
@@ -420,37 +429,39 @@ func _test_room_two_buttons_on_overlap() -> void:
 	if GameState.house_is_indoors:
 		house.exit_to_door()
 	house.enter_house("workshop")
-	# workshop.workbench x=0.45 r=0.1 → [0.35,0.55]; workshop.chest x=0.6
-	# r=0.1 → [0.5,0.7] — общий механизм радиусов пересекает их на [0.5,0.55],
-	# ровно то место, про которое владелец просил две кнопки на выбор.
-	house._view.set_hero_x_fraction(0.52)
+	# Верстак и сундук стоят рядом, радиусы пересекаются — посередине между
+	# ними общий механизм радиусов даёт обе кнопки, ровно то место, про
+	# которое владелец просил две кнопки на выбор.
+	var wb := _px("workshop", "workbench")
+	var ch := _px("workshop", "chest")
+	house._view.set_hero_x_fraction((wb + ch) / 2.0)
 	var actions := _actions()
-	check("на стыке верстака и сундука — «Верстак»", actions.has("open_shop"))
+	check("на стыке верстака и сундука — «Верстак»", actions.has("open_equipment"))
 	check("на стыке верстака и сундука — «Склад»", actions.has("storage"))
 	check("ровно две кнопки, не одна и не три", actions.size() == 2)
 
-	# Чуть в стороне — только одна из двух.
-	house._view.set_hero_x_fraction(0.45)
+	# У самого верстака, с дальней от сундука стороны — только одна из двух.
+	house._view.set_hero_x_fraction(wb + (wb - ch) * 0.6)
 	actions = _actions()
-	check("у самого верстака — только «Верстак»", actions.has("open_shop") and not actions.has("storage"))
+	check("у самого верстака — только «Верстак»", actions.has("open_equipment") and not actions.has("storage"))
 
 
 func _test_room_transitions_use_enter_points() -> void:
 	if GameState.house_is_indoors:
 		house.exit_to_door()
 	house.enter_house("hall")
-	house._view.set_hero_x_fraction(0.8)
+	house._view.set_hero_x_fraction(_px("hall", "door_workshop"))
 	house._view.trigger_point_button("door_workshop")
 	check("нажатие у двери перевело в мастерскую", house._view.room_id() == "workshop")
 	check("GameState.house_room обновился (бухгалтерию ведёт дом)",
 		GameState.house_room == "workshop")
-	check_near("вошёл у лестницы (enter_x из data/rooms.json)",
-		house._view.hero_x_fraction(), 0.12, 0.001)
+	check_near("вошёл у лестницы (enter_at из data/rooms.json)",
+		house._view.hero_x_fraction(), _px("workshop", "stairs"), 0.001)
 
 	house._view.trigger_point_button("stairs", 0)  # index 0 — «Подняться в дом»
 	check("лестница ведёт обратно в салон", house._view.room_id() == "hall")
 	check_near("вошёл у той же двери, из которой уходил",
-		house._view.hero_x_fraction(), 0.8, 0.001)
+		house._view.hero_x_fraction(), _px("hall", "door_workshop"), 0.001)
 
 
 func _test_pickaxe_hotspot() -> void:
@@ -460,7 +471,7 @@ func _test_pickaxe_hotspot() -> void:
 		house.exit_to_door()
 	house.enter_house("workshop")
 
-	house._view.set_hero_x_fraction(0.85)  # workshop.mops_wall
+	house._view.set_hero_x_fraction(_px("workshop", "mops_wall"))
 	check("у стены с удочками — «Взять кирку»", _actions().has("take_pickaxe"))
 
 	house._view.trigger_point_button("mops_wall")
@@ -485,7 +496,7 @@ func _test_front_door_take_delivery_condition() -> void:
 	if GameState.house_is_indoors:
 		house.exit_to_door()
 	house.enter_house("hall")
-	house._view.set_hero_x_fraction(0.5)  # hall.front_door
+	house._view.set_hero_x_fraction(_px("hall", "front_door"))
 	var actions := _actions()
 	check("без доставки — только «Заказать»", actions.has("open_shop"))
 	check("без доставки кнопки «Забрать» нет", not actions.has("take_delivery"))
@@ -507,7 +518,7 @@ func _test_sleep_button_uses_animation_sequence() -> void:
 	GameState.set_stamina(20.0)
 	GameState.set_hunger(100.0)
 	house.enter_house("bedroom")
-	house._view.set_hero_x_fraction(0.42)  # bedroom.bed
+	house._view.set_hero_x_fraction(_px("bedroom", "bed"))
 	check("у кровати — кнопка «Спать»", _actions().has("sleep"))
 
 	house._view.trigger_point_button("bed")

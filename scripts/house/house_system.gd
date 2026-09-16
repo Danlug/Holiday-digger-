@@ -506,7 +506,9 @@ func _on_view_action(action: String, arg: String) -> void:
 			GameState.house_room = HouseStorage.ROOM
 			open_storage()
 		"open_shop":
-			_open_shop()
+			_open_shop("open_shop")
+		"open_equipment":
+			_open_shop("open_workshop")
 		"take_pickaxe":
 			take_starting_pickaxe()
 		"forced_confirm":
@@ -557,11 +559,14 @@ func _finish_sleep_sequence() -> void:
 ## Мастерская (верстак и «Заказать» в салоне открывают одну и ту же витрину —
 ## решение владельца). Сам магазин переписывает другой агент: дому важен
 ## только вызов ShopUI.open_workshop().
-func _open_shop() -> void:
+## Две точки входа в одну шторку: «Заказать» у входной двери — магазин
+## (open_shop), «Верстак» в мастерской — экипировка (open_workshop): что
+## куплено, то и надеть. Раньше оба вели в один экран, и верстак продавал.
+func _open_shop(entry: String = "open_shop") -> void:
 	if not ResourceLoader.exists(SHOP_SCRIPT):
 		_toast("Мастерская пока недоступна.")
 		return
-	load(SHOP_SCRIPT).call("open_workshop")
+	load(SHOP_SCRIPT).call(entry)
 
 
 ## Точка выдачи ржавой кирки (ГДД, решение владельца: «кирку он берёт на

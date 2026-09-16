@@ -1,0 +1,100 @@
+{
+	"_note": "Дом как настоящее пространство (решение владельца, 2026-09-16: 'не меню, а физически зайти'). Три комнаты — hall (салон), bedroom (спальня), workshop (мастерская, бывший подвал). Герой ходит вдоль ОДНОЙ линии пола влево-вправо; поэтому у каждой точки только 'x' — доля 0..1 ПО ШИРИНЕ комнаты. Кнопка хотспота всплывает НАД ГЕРОЕМ (его текущим положением), а не над самой точкой фона, — отдельного 'y' для кнопки не нужно. 'radius' — тоже доля ширины комнаты: если герой встал так, что в радиусе сразу несколько точек, показываются кнопки ВСЕХ их разом (общий механизм, не частный случай сундук/верстак). У кнопки-перехода 'goto:<room>' необязательное 'enter_x' — доля ширины ЦЕЛЕВОЙ комнаты, где герой появится (соседняя дверь с той стороны), иначе берётся 'spawn_x' той комнаты. 'condition' — необязательный ключ, который проверяет house_view.gd (пусто/нет ключа = кнопка всегда доступна, пока герой в радиусе).",
+	"_art": "width/height — те же пропорции, что у art/_source/room_<id>.jpg (эскиза-исходника ещё нет в репозитории на момент правки; доли ниже — прикидка агента дома по заданию владельца и подлежат сверке художником). Когда рядом с готовой картинкой art/env/room_<id>.png появится room_<id>.json с полями floor_y и теми же ключами точек ('x'), он переопределяет доли отсюда — см. HouseRoomsConfig._merge_image_overrides. Пока art/env/room_<id>.png нет, комната рисуется плашкой того же соотношения сторон — хотспоты и переходы работают и без картинки.",
+	"hall": {
+		"width": 800,
+		"height": 448,
+		"floor_y": 0.86,
+		"spawn_x": 0.93,
+		"points": {
+			"door_bedroom": {
+				"x": 0.15,
+				"radius": 0.08,
+				"buttons": [
+					{"label": "Спальня", "action": "goto:bedroom", "enter_x": 0.9}
+				]
+			},
+			"door_workshop": {
+				"x": 0.8,
+				"radius": 0.08,
+				"buttons": [
+					{"label": "Мастерская", "action": "goto:workshop", "enter_x": 0.12}
+				]
+			},
+			"veranda_window": {
+				"x": 0.95,
+				"radius": 0.06,
+				"buttons": [
+					{"label": "Выйти на улицу", "action": "exit_door"}
+				]
+			},
+			"front_door": {
+				"x": 0.5,
+				"radius": 0.08,
+				"buttons": [
+					{"label": "Заказать", "action": "open_shop"},
+					{"label": "Забрать", "action": "take_delivery", "condition": "food_at_door"}
+				]
+			}
+		}
+	},
+	"bedroom": {
+		"width": 800,
+		"height": 448,
+		"floor_y": 0.86,
+		"spawn_x": 0.42,
+		"points": {
+			"bed": {
+				"x": 0.42,
+				"radius": 0.11,
+				"buttons": [
+					{"label": "Спать", "action": "sleep"}
+				]
+			},
+			"door_hall": {
+				"x": 0.9,
+				"radius": 0.08,
+				"buttons": [
+					{"label": "Выйти в салон", "action": "goto:hall", "enter_x": 0.15}
+				]
+			}
+		}
+	},
+	"workshop": {
+		"width": 800,
+		"height": 448,
+		"floor_y": 0.86,
+		"spawn_x": 0.12,
+		"points": {
+			"stairs": {
+				"x": 0.12,
+				"radius": 0.1,
+				"buttons": [
+					{"label": "Подняться в дом", "action": "goto:hall", "enter_x": 0.8},
+					{"label": "В шахту", "action": "exit_tunnel", "condition": "tunnel_built"}
+				]
+			},
+			"workbench": {
+				"x": 0.45,
+				"radius": 0.1,
+				"buttons": [
+					{"label": "Верстак", "action": "open_shop"}
+				]
+			},
+			"chest": {
+				"x": 0.6,
+				"radius": 0.1,
+				"buttons": [
+					{"label": "Склад", "action": "storage"}
+				]
+			},
+			"mops_wall": {
+				"x": 0.85,
+				"radius": 0.09,
+				"buttons": [
+					{"label": "Взять кирку", "action": "take_pickaxe", "condition": "pickaxe_available"}
+				]
+			}
+		}
+	}
+}

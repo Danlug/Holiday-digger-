@@ -1,16 +1,11 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene load_steps=25 format=3]
 
-[ext_resource type="Script" path="res://scripts/house/house_view.gd" id="1_bwc8c"]
-[ext_resource type="Texture2D" path="res://art/ui/icon_hp.png" id="2_mhx8p"]
-[ext_resource type="Texture2D" path="res://art/ui/icon_hunger.png" id="3_65la3"]
-[ext_resource type="Texture2D" path="res://art/ui/icon_stamina.png" id="4_qcuhb"]
-[ext_resource type="Texture2D" path="res://art/env/bed.png" id="5_7685u"]
-[ext_resource type="Texture2D" path="res://art/env/house_exterior.png" id="6_3853c"]
-[ext_resource type="Texture2D" path="res://art/ui/slot_frame.png" id="7_bhgw4"]
-[ext_resource type="Texture2D" path="res://art/env/workbench.png" id="8_3ewhn"]
-[ext_resource type="Texture2D" path="res://art/env/hatch.png" id="9_0fn05"]
+[ext_resource type="Script" path="res://scripts/house/house_view.gd" id="1_se78b"]
+[ext_resource type="Texture2D" path="res://art/ui/icon_hp.png" id="2_3bgk5"]
+[ext_resource type="Texture2D" path="res://art/ui/icon_hunger.png" id="3_f74lx"]
+[ext_resource type="Texture2D" path="res://art/ui/icon_stamina.png" id="4_ptc3g"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_82h1m"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wcu0q"]
 content_margin_left = 6.0
 content_margin_top = 4.0
 content_margin_right = 6.0
@@ -22,7 +17,7 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e5ov4"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bwc8c"]
 content_margin_left = 6.0
 content_margin_top = 4.0
 content_margin_right = 6.0
@@ -33,30 +28,150 @@ border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0, 0, 0, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mhx8p"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.043, 0.035, 0.027, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_65la3"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.043, 0.035, 0.027, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qcuhb"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7685u"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3853c"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bhgw4"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3ewhn"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0fn05"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_82h1m"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e5ov4"]
+content_margin_left = 6.0
+content_margin_top = 2.0
+content_margin_right = 6.0
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ep1bp"]
 content_margin_left = 6.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.043, 0.035, 0.027, 0.85)
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0, 0, 0, 0.55)
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_57tf3"]
 content_margin_left = 6.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.043, 0.035, 0.027, 0.85)
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0, 0, 0, 0.55)
+border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3kuml"]
 content_margin_left = 6.0
@@ -68,14 +183,14 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lamap"]
 content_margin_left = 6.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -84,22 +199,22 @@ border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_de74l"]
 content_margin_left = 6.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
+border_color = Color(0.878431, 0.662745, 0.231373, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qrght"]
 content_margin_left = 6.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -108,10 +223,10 @@ border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_r8noe"]
 content_margin_left = 6.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
+content_margin_bottom = 2.0
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -120,82 +235,10 @@ border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ivbqp"]
 content_margin_left = 6.0
-content_margin_top = 4.0
-content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nrgyv"]
-content_margin_left = 6.0
-content_margin_top = 4.0
-content_margin_right = 6.0
-content_margin_bottom = 4.0
-bg_color = Color(0.117647, 0.0941176, 0.0666667, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_c2gpw"]
-content_margin_left = 6.0
 content_margin_top = 2.0
 content_margin_right = 6.0
 content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4jkga"]
-content_margin_left = 6.0
-content_margin_top = 2.0
-content_margin_right = 6.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878431, 0.662745, 0.231373, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_r2srw"]
-content_margin_left = 6.0
-content_margin_top = 2.0
-content_margin_right = 6.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k27xr"]
-content_margin_left = 6.0
-content_margin_top = 2.0
-content_margin_right = 6.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.243137, 0.192157, 0.145098, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8cron"]
-content_margin_left = 6.0
-content_margin_top = 2.0
-content_margin_right = 6.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 0)
+bg_color = Color(0.06, 0.05, 0.04, 0.82)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -203,7 +246,7 @@ border_width_bottom = 1
 border_color = Color(0.243137, 0.192157, 0.145098, 1)
 
 [node name="House" type="CanvasLayer"]
-script = ExtResource("1_bwc8c")
+script = ExtResource("1_se78b")
 
 [node name="Root" type="Control" parent="."]
 layout_mode = 3
@@ -221,16 +264,16 @@ color = Color(0.0784314, 0.0588235, 0.0431373, 1)
 [node name="Header" type="Panel" parent="Root"]
 layout_mode = 0
 anchor_right = 1.0
-offset_bottom = 52.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_82h1m")
+offset_bottom = 40.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_wcu0q")
 
 [node name="Title" type="Label" parent="Root/Header"]
 layout_mode = 0
 offset_left = 8.0
-offset_top = 3.0
+offset_top = 2.0
 offset_right = 8.0
-offset_bottom = 3.0
-theme_override_font_sizes/font_size = 12
+offset_bottom = 2.0
+theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.878431, 0.662745, 0.231373, 1)
 text = "ДОМ"
 
@@ -239,18 +282,18 @@ layout_mode = 0
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -112.0
-offset_top = 5.0
-offset_right = -8.0
-theme_override_font_sizes/font_size = 9
+offset_top = 3.0
+offset_right = -6.0
+theme_override_font_sizes/font_size = 8
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 horizontal_alignment = 2
 
 [node name="Bars" type="HBoxContainer" parent="Root/Header"]
 layout_mode = 0
 offset_left = 8.0
-offset_top = 24.0
+offset_top = 18.0
 offset_right = 8.0
-offset_bottom = 24.0
+offset_bottom = 18.0
 theme_override_constants/separation = 6
 
 [node name="Hp" type="HBoxContainer" parent="Root/Header/Bars"]
@@ -258,23 +301,23 @@ layout_mode = 2
 theme_override_constants/separation = 3
 
 [node name="Icon" type="TextureRect" parent="Root/Header/Bars/Hp"]
-custom_minimum_size = Vector2(11, 11)
+custom_minimum_size = Vector2(10, 10)
 layout_mode = 2
-texture = ExtResource("2_mhx8p")
+texture = ExtResource("2_3bgk5")
 expand_mode = 1
 stretch_mode = 5
 
 [node name="Track" type="Panel" parent="Root/Header/Bars/Hp"]
-custom_minimum_size = Vector2(48, 7)
+custom_minimum_size = Vector2(44, 6)
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_e5ov4")
+theme_override_styles/panel = SubResource("StyleBoxFlat_bwc8c")
 
 [node name="Fill" type="ColorRect" parent="Root/Header/Bars/Hp/Track"]
 layout_mode = 0
 offset_left = 1.0
 offset_top = 1.0
-offset_right = 47.0
-offset_bottom = 6.0
+offset_right = 43.0
+offset_bottom = 5.0
 color = Color(0.721569, 0.352941, 0.321569, 1)
 
 [node name="Hunger" type="HBoxContainer" parent="Root/Header/Bars"]
@@ -282,23 +325,23 @@ layout_mode = 2
 theme_override_constants/separation = 3
 
 [node name="Icon" type="TextureRect" parent="Root/Header/Bars/Hunger"]
-custom_minimum_size = Vector2(11, 11)
+custom_minimum_size = Vector2(10, 10)
 layout_mode = 2
-texture = ExtResource("3_65la3")
+texture = ExtResource("3_f74lx")
 expand_mode = 1
 stretch_mode = 5
 
 [node name="Track" type="Panel" parent="Root/Header/Bars/Hunger"]
-custom_minimum_size = Vector2(48, 7)
+custom_minimum_size = Vector2(44, 6)
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_ep1bp")
+theme_override_styles/panel = SubResource("StyleBoxFlat_mhx8p")
 
 [node name="Fill" type="ColorRect" parent="Root/Header/Bars/Hunger/Track"]
 layout_mode = 0
 offset_left = 1.0
 offset_top = 1.0
-offset_right = 47.0
-offset_bottom = 6.0
+offset_right = 43.0
+offset_bottom = 5.0
 color = Color(0.768627, 0.439216, 0.415686, 1)
 
 [node name="Stamina" type="HBoxContainer" parent="Root/Header/Bars"]
@@ -306,409 +349,146 @@ layout_mode = 2
 theme_override_constants/separation = 3
 
 [node name="Icon" type="TextureRect" parent="Root/Header/Bars/Stamina"]
-custom_minimum_size = Vector2(11, 11)
+custom_minimum_size = Vector2(10, 10)
 layout_mode = 2
-texture = ExtResource("4_qcuhb")
+texture = ExtResource("4_ptc3g")
 expand_mode = 1
 stretch_mode = 5
 
 [node name="Track" type="Panel" parent="Root/Header/Bars/Stamina"]
-custom_minimum_size = Vector2(48, 7)
+custom_minimum_size = Vector2(44, 6)
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_57tf3")
+theme_override_styles/panel = SubResource("StyleBoxFlat_65la3")
 
 [node name="Fill" type="ColorRect" parent="Root/Header/Bars/Stamina/Track"]
 layout_mode = 0
 offset_left = 1.0
 offset_top = 1.0
-offset_right = 47.0
-offset_bottom = 6.0
+offset_right = 43.0
+offset_bottom = 5.0
 color = Color(0.431373, 0.576471, 0.658824, 1)
 
 [node name="Notice" type="Label" parent="Root/Header"]
 layout_mode = 0
 anchor_right = 1.0
-offset_left = 8.0
-offset_top = 38.0
-offset_right = -8.0
+offset_left = 96.0
+offset_top = 4.0
+offset_right = -6.0
 theme_override_font_sizes/font_size = 8
 theme_override_colors/font_color = Color(0.878431, 0.662745, 0.231373, 1)
+horizontal_alignment = 2
 clip_text = true
 
-[node name="Scroll" type="ScrollContainer" parent="Root"]
+[node name="Stage" type="Control" parent="Root"]
+clip_contents = true
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 40.0
+mouse_filter = 2
+
+[node name="BgFallback" type="ColorRect" parent="Root/Stage"]
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.164706, 0.133333, 0.0941176, 1)
+
+[node name="Bg" type="TextureRect" parent="Root/Stage"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Hero" type="TextureRect" parent="Root/Stage"]
+layout_mode = 0
+offset_right = 48.0
+offset_bottom = 48.0
+mouse_filter = 2
+stretch_mode = 2
+
+[node name="Hotspots" type="Control" parent="Root/Stage"]
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="WalkLeft" type="Button" parent="Root/Stage"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = -40.0
+offset_right = 44.0
+offset_bottom = -6.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qcuhb")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_7685u")
+theme_override_styles/hover = SubResource("StyleBoxFlat_3853c")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_bhgw4")
+theme_override_styles/focus = SubResource("StyleBoxFlat_3ewhn")
+theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
+theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_disabled_color = Color(0.243137, 0.192157, 0.145098, 1)
+theme_override_font_sizes/font_size = 9
+text = "◀"
+
+[node name="WalkRight" type="Button" parent="Root/Stage"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -44.0
+offset_top = -40.0
+offset_right = -6.0
+offset_bottom = -6.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_0fn05")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_82h1m")
+theme_override_styles/hover = SubResource("StyleBoxFlat_e5ov4")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_ep1bp")
+theme_override_styles/focus = SubResource("StyleBoxFlat_57tf3")
+theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
+theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
+theme_override_colors/font_disabled_color = Color(0.243137, 0.192157, 0.145098, 1)
+theme_override_font_sizes/font_size = 9
+text = "▶"
+
+[node name="SleepOverlay" type="Control" parent="Root/Stage"]
+visible = false
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Shade" type="ColorRect" parent="Root/Stage/SleepOverlay"]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 56.0
-offset_right = -6.0
-offset_bottom = -6.0
-horizontal_scroll_mode = 0
-
-[node name="Rooms" type="VBoxContainer" parent="Root/Scroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 5
-
-[node name="Floor_bedroom" type="Label" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-text = "ВТОРОЙ ЭТАЖ"
-
-[node name="Bedroom" type="PanelContainer" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_3kuml")
-
-[node name="Box" type="VBoxContainer" parent="Root/Scroll/Rooms/Bedroom"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="HBoxContainer" parent="Root/Scroll/Rooms/Bedroom/Box"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Icon" type="TextureRect" parent="Root/Scroll/Rooms/Bedroom/Box/Head"]
-custom_minimum_size = Vector2(22, 22)
-layout_mode = 2
-texture = ExtResource("5_7685u")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="Root/Scroll/Rooms/Bedroom/Box/Head"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 11
-text = "Спальня"
-
-[node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/Bedroom/Box/Head"]
-visible = false
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Desc" type="Label" parent="Root/Scroll/Rooms/Bedroom/Box"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Кровать. Сон восстанавливает бодрость — 12.5% за игровой час."
-autowrap_mode = 2
-
-[node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Bedroom/Box"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Actions" type="HFlowContainer" parent="Root/Scroll/Rooms/Bedroom/Box"]
-layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 3
-
-[node name="Note" type="Label" parent="Root/Scroll/Rooms/Bedroom/Box"]
-visible = false
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-autowrap_mode = 2
-
-[node name="Floor_hall" type="Label" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-text = "ПЕРВЫЙ ЭТАЖ"
-
-[node name="Hall" type="PanelContainer" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_lamap")
-
-[node name="Box" type="VBoxContainer" parent="Root/Scroll/Rooms/Hall"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="HBoxContainer" parent="Root/Scroll/Rooms/Hall/Box"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Icon" type="TextureRect" parent="Root/Scroll/Rooms/Hall/Box/Head"]
-custom_minimum_size = Vector2(22, 22)
-layout_mode = 2
-texture = ExtResource("6_3853c")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="Root/Scroll/Rooms/Hall/Box/Head"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 11
-text = "Прихожая"
-
-[node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/Hall/Box/Head"]
-visible = false
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Desc" type="Label" parent="Root/Scroll/Rooms/Hall/Box"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Входная дверь. Сюда привозят заказанную еду."
-autowrap_mode = 2
-
-[node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Hall/Box"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Actions" type="HFlowContainer" parent="Root/Scroll/Rooms/Hall/Box"]
-layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 3
-
-[node name="Note" type="Label" parent="Root/Scroll/Rooms/Hall/Box"]
-visible = false
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-autowrap_mode = 2
-
-[node name="Museum" type="PanelContainer" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_de74l")
-
-[node name="Box" type="VBoxContainer" parent="Root/Scroll/Rooms/Museum"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="HBoxContainer" parent="Root/Scroll/Rooms/Museum/Box"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Icon" type="TextureRect" parent="Root/Scroll/Rooms/Museum/Box/Head"]
-custom_minimum_size = Vector2(22, 22)
-layout_mode = 2
-texture = ExtResource("7_bhgw4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="Root/Scroll/Rooms/Museum/Box/Head"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 11
-text = "Музей"
-
-[node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/Museum/Box/Head"]
-visible = false
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Desc" type="Label" parent="Root/Scroll/Rooms/Museum/Box"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Витрины под коллекцию артефактов (ГДД п.10)."
-autowrap_mode = 2
-
-[node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Museum/Box"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Actions" type="HFlowContainer" parent="Root/Scroll/Rooms/Museum/Box"]
-layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 3
-
-[node name="Note" type="Label" parent="Root/Scroll/Rooms/Museum/Box"]
-visible = false
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-autowrap_mode = 2
-
-[node name="Floor_workshop" type="Label" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-text = "ПОДВАЛ"
-
-[node name="Workshop" type="PanelContainer" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_qrght")
-
-[node name="Box" type="VBoxContainer" parent="Root/Scroll/Rooms/Workshop"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="HBoxContainer" parent="Root/Scroll/Rooms/Workshop/Box"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Icon" type="TextureRect" parent="Root/Scroll/Rooms/Workshop/Box/Head"]
-custom_minimum_size = Vector2(22, 22)
-layout_mode = 2
-texture = ExtResource("8_3ewhn")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="Root/Scroll/Rooms/Workshop/Box/Head"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 11
-text = "Мастерская"
-
-[node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/Workshop/Box/Head"]
-visible = false
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Desc" type="Label" parent="Root/Scroll/Rooms/Workshop/Box"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Верстак деда, лавка и склад: сюда носят материалы на кирку (ГДД п.2, 14, 15)."
-autowrap_mode = 2
-
-[node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Workshop/Box"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Actions" type="HFlowContainer" parent="Root/Scroll/Rooms/Workshop/Box"]
-layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 3
-
-[node name="Note" type="Label" parent="Root/Scroll/Rooms/Workshop/Box"]
-visible = false
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-autowrap_mode = 2
-
-[node name="PeatStill" type="PanelContainer" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_r8noe")
-
-[node name="Box" type="VBoxContainer" parent="Root/Scroll/Rooms/PeatStill"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="HBoxContainer" parent="Root/Scroll/Rooms/PeatStill/Box"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Icon" type="TextureRect" parent="Root/Scroll/Rooms/PeatStill/Box/Head"]
-custom_minimum_size = Vector2(22, 22)
-layout_mode = 2
-texture = ExtResource("7_bhgw4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="Root/Scroll/Rooms/PeatStill/Box/Head"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 11
-text = "Торфоперегонка"
-
-[node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/PeatStill/Box/Head"]
-visible = false
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Desc" type="Label" parent="Root/Scroll/Rooms/PeatStill/Box"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Торф → топливные блоки и удобрение (ГДД п.5)."
-autowrap_mode = 2
-
-[node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/PeatStill/Box"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Actions" type="HFlowContainer" parent="Root/Scroll/Rooms/PeatStill/Box"]
-layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 3
-
-[node name="Note" type="Label" parent="Root/Scroll/Rooms/PeatStill/Box"]
-visible = false
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-autowrap_mode = 2
-
-[node name="Basement" type="PanelContainer" parent="Root/Scroll/Rooms"]
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_ivbqp")
-
-[node name="Box" type="VBoxContainer" parent="Root/Scroll/Rooms/Basement"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="HBoxContainer" parent="Root/Scroll/Rooms/Basement/Box"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="Icon" type="TextureRect" parent="Root/Scroll/Rooms/Basement/Box/Head"]
-custom_minimum_size = Vector2(22, 22)
-layout_mode = 2
-texture = ExtResource("9_0fn05")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="Root/Scroll/Rooms/Basement/Box/Head"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 11
-text = "Ход в шахту"
-
-[node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/Basement/Box/Head"]
-visible = false
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Desc" type="Label" parent="Root/Scroll/Rooms/Basement/Box"]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Ход из подвала к устью тоннеля Роберта — другого входа в копальню нет."
-autowrap_mode = 2
-
-[node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Basement/Box"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Actions" type="HFlowContainer" parent="Root/Scroll/Rooms/Basement/Box"]
-layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 3
-
-[node name="Note" type="Label" parent="Root/Scroll/Rooms/Basement/Box"]
-visible = false
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 8
-theme_override_colors/font_color = Color(0.419608, 0.356863, 0.270588, 1)
-autowrap_mode = 2
+mouse_filter = 2
+color = Color(0.03, 0.02, 0.02, 0.82)
+
+[node name="Sprite" type="TextureRect" parent="Root/Stage/SleepOverlay"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -48.0
+offset_top = -70.0
+offset_right = 48.0
+offset_bottom = 26.0
+mouse_filter = 2
+stretch_mode = 3
+
+[node name="Label" type="Label" parent="Root/Stage/SleepOverlay"]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -40.0
+offset_bottom = -10.0
+theme_override_colors/font_color = Color(0.878431, 0.662745, 0.231373, 1)
+text = "Спит..."
+horizontal_alignment = 1
 
 [node name="Forced" type="Control" parent="Root"]
 visible = false
@@ -731,7 +511,7 @@ offset_left = 14.0
 offset_top = -70.0
 offset_right = -14.0
 offset_bottom = 70.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_nrgyv")
+theme_override_styles/panel = SubResource("StyleBoxFlat_3kuml")
 
 [node name="Box" type="VBoxContainer" parent="Root/Forced/Panel"]
 layout_mode = 2
@@ -746,14 +526,14 @@ autowrap_mode = 2
 [node name="Button" type="Button" parent="Root/Forced/Panel/Box"]
 custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_c2gpw")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_4jkga")
-theme_override_styles/hover = SubResource("StyleBoxFlat_r2srw")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_k27xr")
-theme_override_styles/focus = SubResource("StyleBoxFlat_8cron")
+theme_override_styles/normal = SubResource("StyleBoxFlat_lamap")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_de74l")
+theme_override_styles/hover = SubResource("StyleBoxFlat_qrght")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_r8noe")
+theme_override_styles/focus = SubResource("StyleBoxFlat_ivbqp")
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
 theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
-theme_override_colors/font_disabled_color = Color(0.419608, 0.356863, 0.270588, 1)
+theme_override_colors/font_disabled_color = Color(0.243137, 0.192157, 0.145098, 1)
 theme_override_font_sizes/font_size = 9
 text = "Лечь спать"

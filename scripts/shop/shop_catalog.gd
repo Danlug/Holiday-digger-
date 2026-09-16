@@ -84,6 +84,7 @@ static func recipes() -> Array:
 	var out: Array = []
 	out.append(_recipe_bronze())
 	out.append(_recipe_fuel_block())
+	out.append(_recipe_jetpack())
 	for tool_id in ["iron_pickaxe", "hand_drill", "drill_rig"]:
 		var r := _recipe_tool(tool_id)
 		if not r.is_empty():
@@ -132,6 +133,37 @@ static func _recipe_fuel_block() -> Dictionary:
 
 ## Инструмент: состав и цена берутся из balance.json -> tools.<id>.cost.
 ## Ключ "coins" внутри cost — это монеты, всё остальное — предметы.
+## Джетпак СОБИРАЕТСЯ на верстаке (решение владельца), а не выдаётся сам на
+## глубине 100. Глубина осталась условием появления рецепта: выше игроку
+## нечем платить и некуда лететь. Отдельный вид рецепта («gear»), потому что
+## снаряжение не берут в руки — его носят, и в GameState оно лежит своим
+## списком, а не среди инструментов.
+static func _recipe_jetpack() -> Dictionary:
+	var j: Dictionary = Balance.balance.get("jetpack", {})
+	var cost = Balance.unwrap(j.get("craft_cost", {}))
+	if typeof(cost) != TYPE_DICTIONARY or cost.is_empty():
+		return {}
+	var inputs: Dictionary = {}
+	var coins := 0
+	for key in cost.keys():
+		var amount := int(Balance.unwrap(cost[key]))
+		if key == "coins":
+			coins = amount
+		elif amount > 0:
+			inputs[key] = amount
+	var unlock := int(Balance.unwrap(j.get("unlock", {}).get("depth_min", 100)))
+	return {
+		"id": "jetpack",
+		"name_ru": "Джетпак",
+		"desc_ru": "Полёт вверх на тяге. Разгон 5 секунд, удар головой о потолок на скорости — больно.",
+		"kind": "gear",
+		"output": {"id": "jetpack", "count": 1},
+		"inputs": inputs,
+		"coins": coins,
+		"unlock_depth": unlock,
+	}
+
+
 static func _recipe_tool(tool_id: String) -> Dictionary:
 	var t: Dictionary = Balance.get_tool(tool_id)
 	if t.is_empty():

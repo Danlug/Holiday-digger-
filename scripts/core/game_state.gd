@@ -691,6 +691,12 @@ signal tool_purchase_required(tool_id: String)
 ## остальное — покупка и крафт.
 var owned_tools: Array = ["shovel"]
 
+## Собранное снаряжение (сейчас — джетпак). Отдельно от инструментов: их
+## берут в руки по одному, снаряжение носится постоянно и не выбирается.
+## Хранится, а не вычисляется от глубины: джетпак собирается на верстаке
+## (решение владельца), и глубина про него больше ничего не знает.
+var owned_gear: Array = []
+
 ## Игрок уже спускался в мастерскую. Первый спуск — сюжетная сцена с дедовой
 ## киркой среди швабр и грабель (ГДД п.2), поэтому её нельзя выдать дважды.
 var workshop_visited: bool = false
@@ -734,6 +740,17 @@ func grant_tool(tool_id: String) -> void:
 	owned_tools.append(tool_id)
 
 
+func has_gear(gear_id: String) -> bool:
+	return owned_gear.has(gear_id)
+
+
+## Выдать снаряжение (крафт на верстаке, сюжетная находка).
+func grant_gear(gear_id: String) -> void:
+	if owned_gear.has(gear_id):
+		return
+	owned_gear.append(gear_id)
+
+
 ## Материалы, вложенные в конкретный рецепт верстака:
 ## recipe_id -> {item_id: количество}.
 ##
@@ -769,6 +786,7 @@ func clear_invested(recipe_id: String) -> void:
 ## кнопка "Сброс" не оставляла игроку купленные кирки в новом огороде.
 func reset_economy() -> void:
 	owned_tools = ["shovel"]
+	owned_gear = []
 	workshop_visited = false
 	next_sale_doubled = false
 	lifetime_coins_from_sales = 0

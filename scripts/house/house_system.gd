@@ -249,7 +249,7 @@ func _carve_hatch_cell() -> void:
 	if world.get_tile(hatch.x, hatch.y) != TileTypes.Type.EMPTY:
 		world.dig_cell(hatch.x, hatch.y)
 	if GameState.fog_ref != null:
-		GameState.fog_ref.reveal_around(hatch.x, hatch.y,
+		GameState.fog_ref.reveal_around_cell(hatch.x, hatch.y,
 			GameState.get_vision_terrain_radius(), GameState.get_vision_resource_radius())
 
 

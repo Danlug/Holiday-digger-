@@ -120,7 +120,9 @@ func _restore_top_soil_if_needed() -> void:
 
 
 func _reveal_around_player() -> void:
-	fog.reveal_around(player.cell_x(), player.cell_y(),
+	# Центр — настоящее положение героя, а не номер клетки: аура рисуется
+	# оттуда же, и правило «половина клетки» должно совпадать с картинкой.
+	fog.reveal_around(player.x, player.y,
 		GameState.get_vision_terrain_radius(), GameState.get_vision_resource_radius())
 
 

@@ -180,8 +180,12 @@ func has_backpack() -> bool:
 	return GameState.max_depth_reached >= PROP_DEPTH
 
 
+## Джетпак СОБИРАЕТСЯ на верстаке (решение владельца), а не выдаётся сам на
+## глубине 100. Глубина осталась условием появления рецепта в мастерской, но
+## сам предмет — только через крафт: снаряжение, которое падает в руки за то,
+## что ты просто копал вниз, не ощущается покупкой.
 func has_jetpack() -> bool:
-	return GameState.max_depth_reached >= JET_DEPTH
+	return GameState.has_gear("jetpack")
 
 
 func has_hand_drill() -> bool:
@@ -541,7 +545,8 @@ func _start_dig(tx: int, ty: int) -> void:
 	var base_secs := Balance.get_mineral_drill_seconds(mineral_id) if not mineral_id.is_empty() \
 		else float(Balance.unwrap(Balance.balance.get("digging", {}).get("base_seconds_per_cell", 3.0)))
 	var stage := GameState.get_skill_stage("dig_speed")
-	var total: float = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier()
+	var total: float = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier() \
+		/ Balance.get_global_dig_speed_multiplier()
 	# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
 	total /= GameState.get_speed_multiplier()
 

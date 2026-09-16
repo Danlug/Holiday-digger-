@@ -22,20 +22,51 @@ const DEFAULT_RESOURCE_RADIUS := 1  # ГДД раздел 12: старт рес�
 var _chunks: Dictionary = {}
 
 
+## Доля клетки, которую круг обзора должен накрыть, чтобы клетка открылась
+## (решение владельца). Половина — потому что это единственный порог, который
+## читается на глаз: край ауры прошёл через середину клетки — клетка открылась.
+const COVERAGE_TO_REVEAL := 0.5
+
+## Радиус круга обзора в клетках по ступени прокачки. Полклетки сверху — это
+## та самая аура, которую игрок видит на экране с самого начала: круг всегда
+## рисовался радиусом ступень+0.5.
+##
+## Держать эти полклетки надо здесь, одним числом на всю игру, и вот почему.
+## Правило «открывать при половине клетки» строже прежнего («центр клетки
+## внутри круга») примерно на полклетки. Отними их — и при ступени 1 круг
+## накрывает половину только у своей же клетки: обзор ресурсов схлопывается
+## в одну клетку, и туман перестаёт работать вовсе. Радиусы ступеней в ГДД
+## заданы под ту картинку, что на экране, — её и берём.
+static func vision_radius(stage_radius: int) -> float:
+	return float(stage_radius) + 0.5
+
+
 ## Удобный вызов на каждый шаг героя: раскрывает рельеф большим радиусом,
-## ресурсы — меньшим, за один проход.
-func reveal_around(center_x: int, center_y: int,
+## ресурсы — меньшим, за один проход. Центр — в КЛЕТОЧНЫХ координатах с
+## дробной частью (player.x, player.y), а не в номере клетки: аура рисуется от
+## настоящего положения героя, и если раскрывать от номера клетки, картинка
+## расходится с правилом на полклетки.
+func reveal_around(center_x: float, center_y: float,
 		terrain_radius: int = DEFAULT_TERRAIN_RADIUS,
 		resource_radius: int = DEFAULT_RESOURCE_RADIUS) -> void:
 	reveal_terrain(center_x, center_y, terrain_radius)
 	reveal_resources(center_x, center_y, resource_radius)
 
 
-func reveal_terrain(center_x: int, center_y: int, radius: int) -> void:
+## То же, но от СЕРЕДИНЫ клетки, а не от точки. Отдельным методом, потому что
+## «клетка 15» и точка (15.0) — разные места: точка лежит на её левом краю, и
+## круг, заданный номером клетки, уезжает на полклетки влево-вверх.
+func reveal_around_cell(cell_x: int, cell_y: int,
+		terrain_radius: int = DEFAULT_TERRAIN_RADIUS,
+		resource_radius: int = DEFAULT_RESOURCE_RADIUS) -> void:
+	reveal_around(float(cell_x) + 0.5, float(cell_y) + 0.5, terrain_radius, resource_radius)
+
+
+func reveal_terrain(center_x: float, center_y: float, radius: int) -> void:
 	_reveal_circle(center_x, center_y, radius, true)
 
 
-func reveal_resources(center_x: int, center_y: int, radius: int) -> void:
+func reveal_resources(center_x: float, center_y: float, radius: int) -> void:
 	_reveal_circle(center_x, center_y, radius, false)
 
 
@@ -85,26 +116,76 @@ func load_save_data(data: Dictionary) -> void:
 
 # ============================== ВНУТРЕННЕЕ ==============================
 
-func _reveal_circle(center_x: int, center_y: int, radius: int, is_terrain: bool) -> void:
+## Клетка открывается, когда круг накрывает её не меньше чем на половину
+## площади. Раньше правило было «центр клетки внутри круга» — на глаз это
+## почти то же самое, но круг брался от НОМЕРА клетки и радиусом на полклетки
+## меньше нарисованного, и в игре аура заметно переезжала через клетку раньше,
+## чем та открывалась.
+##
+## Дорогую точную площадь считаем только для кольца на границе: клетка, у
+## которой дальний угол внутри круга, накрыта целиком, а та, у которой ближний
+## угол снаружи, не накрыта вовсе. Таких клеток O(R), а не O(R²).
+func _reveal_circle(center_x: float, center_y: float, radius: int, is_terrain: bool) -> void:
 	if radius <= 0:
 		return
-	var r2 := radius * radius
-	var y_from := maxi(center_y - radius, 1)
-	var y_to := center_y + radius
+	var r := vision_radius(radius)
+	var y_from := maxi(int(floor(center_y - r)), 1)
+	var y_to := int(ceil(center_y + r))
 	for y in range(y_from, y_to + 1):
-		var dy := y - center_y
-		var remaining := r2 - dy * dy
-		if remaining < 0:
-			continue
-		var dx_max := int(floor(sqrt(float(remaining))))
-		var x_from := maxi(center_x - dx_max, 0)
-		var x_to := mini(center_x + dx_max, WIDTH - 1)
+		var x_from := maxi(int(floor(center_x - r)), 0)
+		var x_to := mini(int(ceil(center_x + r)), WIDTH - 1)
 		if x_from > x_to:
 			continue
 		var chunk: Dictionary = _get_chunk(_chunk_index(y), true)
 		var arr: PackedByteArray = chunk.terrain if is_terrain else chunk.resource
 		for x in range(x_from, x_to + 1):
-			_set_bit(arr, _local_index(x, y))
+			if _coverage(center_x, center_y, r, float(x), float(y)) >= COVERAGE_TO_REVEAL:
+				_set_bit(arr, _local_index(x, y))
+
+
+## Какая доля клетки [cx, cx+1] × [cy, cy+1] накрыта кругом (0..1).
+func _coverage(ox: float, oy: float, r: float, cx: float, cy: float) -> float:
+	var x0 := cx - ox
+	var y0 := cy - oy
+	var x1 := x0 + 1.0
+	var y1 := y0 + 1.0
+	# Ближний и дальний углы: две проверки вместо интеграла для 90% клеток.
+	var near_x: float = 0.0 if (x0 <= 0.0 and x1 >= 0.0) else minf(absf(x0), absf(x1))
+	var near_y: float = 0.0 if (y0 <= 0.0 and y1 >= 0.0) else minf(absf(y0), absf(y1))
+	if near_x * near_x + near_y * near_y >= r * r:
+		return 0.0
+	var far_x: float = maxf(absf(x0), absf(x1))
+	var far_y: float = maxf(absf(y0), absf(y1))
+	if far_x * far_x + far_y * far_y <= r * r:
+		return 1.0
+	return _quad(r, x1, y1) - _quad(r, x0, y1) - _quad(r, x1, y0) + _quad(r, x0, y0)
+
+
+## Знаковая площадь пересечения круга (центр в нуле, радиус r) с
+## прямоугольником [0, x] × [0, y]. Круг симметричен по обеим осям, поэтому
+## отрицательные стороны сводятся к положительным со сменой знака.
+func _quad(r: float, x: float, y: float) -> float:
+	var sx: float = signf(x)
+	var sy: float = signf(y)
+	if sx == 0.0 or sy == 0.0:
+		return 0.0
+	var ax: float = minf(absf(x), r)
+	var ay: float = minf(absf(y), r)
+	var area: float
+	if ax * ax + ay * ay <= r * r:
+		area = ax * ay
+	else:
+		# Дуга режет прямоугольник: до a по горизонтали высота полная,
+		# дальше — под дугой (интеграл sqrt(r² - u²)).
+		var a: float = minf(sqrt(maxf(r * r - ay * ay, 0.0)), ax)
+		area = a * ay + (_arc_integral(r, ax) - _arc_integral(r, a))
+	return sx * sy * area
+
+
+## ∫ sqrt(r² − u²) du = ½ (u·sqrt(r² − u²) + r²·asin(u/r))
+func _arc_integral(r: float, u: float) -> float:
+	var t: float = clampf(u / r, -1.0, 1.0)
+	return 0.5 * (u * sqrt(maxf(r * r - u * u, 0.0)) + r * r * asin(t))
 
 
 func _chunk_index(y: int) -> int:

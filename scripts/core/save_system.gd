@@ -104,6 +104,7 @@ static func _serialize() -> Dictionary:
 		# сохраняется — ролик уже просмотрен, и терять его при выходе нечестно.
 		"economy": {
 			"owned_tools": gs.owned_tools,
+			"owned_gear": gs.owned_gear,
 			"workshop_visited": gs.workshop_visited,
 			"next_sale_doubled": gs.next_sale_doubled,
 			"lifetime_coins_from_sales": gs.lifetime_coins_from_sales,
@@ -189,6 +190,11 @@ static func _apply(data: Dictionary) -> void:
 	# там не записаны, и восстановить их можно только по текущему инструменту —
 	# иначе игрок, уже собравший бур, теряет его при первой же загрузке.
 	gs.owned_tools = economy.get("owned_tools", ["shovel", gs.current_tool])
+	# Сейвы до появления верстачного джетпака: снаряжение там считалось от
+	# глубины, поэтому дошедшему до 100 джетпак отдаём — отбирать уже
+	# заработанное при обновлении нельзя.
+	gs.owned_gear = economy.get("owned_gear",
+		["jetpack"] if gs.max_depth_reached >= 100 else [])
 	gs.workshop_visited = bool(economy.get("workshop_visited", gs.workshop_visited))
 	gs.next_sale_doubled = bool(economy.get("next_sale_doubled", false))
 	gs.lifetime_coins_from_sales = int(economy.get("lifetime_coins_from_sales", 0))

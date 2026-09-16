@@ -225,8 +225,13 @@ func _test_gear_unlock_by_depth() -> void:
 	GameState.max_depth_reached = player.PROP_DEPTH
 	check("на глубине 10 открывается ранец с пропеллерами", player.has_backpack())
 	check("джетпака на глубине 10 ещё нет", not player.has_jetpack())
+	# Джетпак глубиной больше НЕ открывается (решение владельца): его
+	# собирают на верстаке. Глубина осталась условием появления рецепта.
 	GameState.max_depth_reached = player.JET_DEPTH
-	check("на глубине 100 открывается джетпак", player.has_jetpack())
+	check("глубина 100 сама джетпак не даёт", not player.has_jetpack())
+	GameState.grant_gear("jetpack")
+	check("собранный на верстаке джетпак работает", player.has_jetpack())
+	GameState.owned_gear.erase("jetpack")
 	check("на глубине 100 открывается ручной бур", player.has_hand_drill())
 	check("буровой машины на глубине 100 ещё нет", not player.has_drill_rig())
 	GameState.max_depth_reached = player.RIG_DEPTH - 1

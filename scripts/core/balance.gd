@@ -247,7 +247,15 @@ func get_upgrade_total_cost(id: String, up_to_stage: int) -> int:
 ## Время копки клетки с учётом ступени "Скорость копки": time = 3.0 * 0.96^stage.
 func get_dig_time_seconds(dig_speed_stage: int) -> float:
 	var base: float = float(_v(balance.get("digging", {}).get("base_seconds_per_cell", 3.0)))
-	return base * pow(0.96, float(dig_speed_stage))
+	return base * pow(0.96, float(dig_speed_stage)) / get_global_dig_speed_multiplier()
+
+
+## Общий множитель темпа копки (решение владельца: со старта в 1.3 раза
+## быстрее). Одним числом на всю игру, а не переписанными секундами у каждого
+## минерала: те заданы по твёрдости и должны читаться как есть.
+func get_global_dig_speed_multiplier() -> float:
+	var m: float = float(_v(balance.get("digging", {}).get("global_speed_multiplier", 1.0)))
+	return m if m > 0.0 else 1.0
 
 
 ## Радиус клеток тумана войны (рельеф/ресурсы) на заданной ступени.

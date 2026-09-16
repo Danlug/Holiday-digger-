@@ -12,6 +12,7 @@ func _init() -> void:
 	print("=== test_world_gen: старт ===")
 	test_determinism()
 	test_layer_percentages_shallow()
+	test_fog_coverage_rule()
 	test_deep_void_and_stone()
 	test_ore_density_corridors()
 	test_gold_and_peat_ramp_grow()
@@ -289,7 +290,7 @@ func test_fog_basic() -> void:
 	var fog := FogOfWar.new()
 	check("клетка не разведана изначально -> BLACK", fog.get_state(15, 100) == FogOfWar.State.BLACK)
 
-	fog.reveal_around(15, 100, 2, 1)
+	fog.reveal_around_cell(15, 100, 2, 1)
 	check("в радиусе ресурсов -> FULL", fog.get_state(15, 100) == FogOfWar.State.FULL)
 	check("в радиусе ресурсов по горизонтали -> FULL", fog.get_state(16, 100) == FogOfWar.State.FULL)
 	check("вне радиуса ресурсов, внутри радиуса рельефа -> GRAY", fog.get_state(17, 100) == FogOfWar.State.GRAY)
@@ -305,7 +306,7 @@ func test_collapse_and_earthquake() -> void:
 	print("-- Обвал чанка и землетрясение --")
 	var w := WorldGen.new(55)
 	var fog := FogOfWar.new()
-	fog.reveal_around(15, 50, 2, 1)
+	fog.reveal_around_cell(15, 50, 2, 1)
 
 	# (25, 2) гарантированно DIRT или STONE при любом seed (мелкий слой,
 	# вне зоны лестницы) — детерминированно копается независимо от seed
@@ -329,7 +330,7 @@ func test_collapse_and_earthquake() -> void:
 
 	var w2 := WorldGen.new(56)
 	var fog2 := FogOfWar.new()
-	fog2.reveal_around(15, 3000, 3, 2)
+	fog2.reveal_around_cell(15, 3000, 3, 2)
 	# (25, 2) и (26, 3) гарантированно диггаемы при любом seed (см. выше)
 	w2.dig_cell(25, 2)
 	w2.dig_cell(26, 3)
@@ -372,6 +373,36 @@ func test_collapse_and_earthquake() -> void:
 	CollapseEvents.trigger_earthquake(w3, FogOfWar.new(), rng3)
 	check("землетрясение не возвращает выкопанное сценарное золото",
 		w3.get_tile(20, 4) == TileTypes.Type.EMPTY)
+
+
+## Туман открывает клетку, когда круг обзора накрыл её не меньше чем на
+## половину площади (решение владельца), и круг этот — ровно тот, что
+## нарисован на экране. Раньше правило было «центр клетки внутри круга», а
+## рисовался круг на полклетки больше: аура переезжала через клетку заметно
+## раньше, чем та открывалась.
+func test_fog_coverage_rule() -> void:
+	print("-- Туман: раскрытие по половине клетки --")
+	var f := FogOfWar.new()
+	f.reveal_around(10.5, 10.5, 1, 0)
+	check("своя клетка открыта", f.get_state(10, 10) != FogOfWar.State.BLACK)
+	check("соседняя по горизонтали открыта", f.get_state(11, 10) != FogOfWar.State.BLACK)
+	check("соседняя по диагонали открыта", f.get_state(11, 11) != FogOfWar.State.BLACK)
+	check("через одну клетку — закрыто", f.get_state(12, 10) == FogOfWar.State.BLACK)
+
+	# Круг симметричен: слева открывается ровно столько же, сколько справа.
+	check("раскрытие симметрично", f.get_state(9, 10) != FogOfWar.State.BLACK
+		and f.get_state(8, 10) == FogOfWar.State.BLACK)
+
+	# Полклетки радиуса — общие у тумана и у отрисовки, чтобы круг был один.
+	check("радиус обзора = ступень + полклетки",
+		is_equal_approx(FogOfWar.vision_radius(2), 2.5))
+
+	# Сдвиг героя на полклетки вправо сдвигает и раскрытие.
+	var f2 := FogOfWar.new()
+	f2.reveal_around(11.5, 10.5, 1, 0)
+	check("раскрытие едет за героем: клетка, закрытая слева, открывается справа",
+		f2.get_state(12, 10) != FogOfWar.State.BLACK
+		and f2.get_state(9, 10) == FogOfWar.State.BLACK)
 
 
 func _scripted_gold_count(w: WorldGen, y: int) -> int:

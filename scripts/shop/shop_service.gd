@@ -266,6 +266,11 @@ static func craft(recipe_id: String) -> Dictionary:
 		GameState.grant_tool(out_id)
 		GameState.set_current_tool(out_id)
 		message = "%s собрана и уже в руках." % String(r["name_ru"])
+	elif String(r["kind"]) == "gear":
+		# Снаряжение не берут в руки — оно просто надето. В инвентарь тоже не
+		# кладётся: вес рюкзака оно не занимает (ГДД п.14).
+		GameState.grant_gear(out_id)
+		message = "%s собран. Теперь ты умеешь летать." % String(r["name_ru"])
 	else:
 		var added := GameState.add_item(out_id, out_count)
 		if added < out_count:

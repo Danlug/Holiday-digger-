@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Дом после смерти деда — из art/_source/house_rich.jpg в art/env/house_rich.png.
+
+Почему отдельный скрипт, а не gen_art: это НЕ плейсхолдер, а присланный
+владельцем рисунок. Нарезка скриптом, чтобы её можно было повторить, когда
+рисунок поправят, — так же, как с персонажами, тайлами и буром.
+
+Что делает:
+  1. срезает небо сверху и пустую мостовую снизу — в игре над домом своё небо,
+     а под ним земля, и чужие полосы этих двух цветов дают шов;
+  2. масштабирует так, чтобы дом встал по клеточной сетке (кратно 32);
+  3. квантует палитру: JPEG размывает пиксель-арт, и без квантования на
+     плоских стенах остаётся грязь из соседних оттенков;
+  4. считает, где у дома вход, и пишет это число рядом — движок ставит
+     спрайт так, чтобы вход пришёлся ровно на клетку двери.
+"""
+from pathlib import Path
+import json
+from PIL import Image
+import numpy as np
+
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "art/_source/house_rich.jpg"
+OUT = ROOT / "art/env/house_rich.png"
+META = ROOT / "art/env/house_rich.json"
+
+TILE = 32
+TARGET_CELLS = 13          # ширина спрайта в клетках (дом занимает клетки 0-14)
+PALETTE_COLORS = 48
+
+
+def sky_mask(a: np.ndarray) -> np.ndarray:
+    """Небо — заметно более синее, чем красное. Порог мягкий: на JPEG градиент
+    неба «плывёт», и жёсткий порог рвёт его на полосы."""
+    return (a[:, :, 2].astype(int) - a[:, :, 0].astype(int)) > 15
+
+
+def main() -> None:
+    im = Image.open(SRC).convert("RGB")
+    a = np.asarray(im)
+    h, w, _ = a.shape
+
+    not_sky = ~sky_mask(a)
+    # Верх: первая строка, где появляется хоть что-то не небо (труба).
+    rows = not_sky.mean(axis=1)
+    top = next(y for y in range(h) if rows[y] > 0.02)
+    # Низ: у картинки внизу широкая полоса мостовой и забор. Забор — часть
+    # участка, он нужен; мостовую ниже забора режем, иначе дом «висит» над
+    # землёй на высоте этой полосы.
+    bottom = h - 1
+    # Бока: оставляем всю ширину — навес с машиной и заборы по краям это
+    # тот самый достаток, который по ГДД бабка тщательно скрывает.
+    left, right = 0, w - 1
+
+    crop = im.crop((left, top, right + 1, bottom + 1))
+
+    out_w = TARGET_CELLS * TILE
+    out_h = max(1, round(crop.height * out_w / crop.width))
+    # Высоту тоже сажаем на сетку: так низ дома ложится ровно на линию земли.
+    out_h = int(round(out_h / TILE)) * TILE
+    small = crop.resize((out_w, out_h), Image.LANCZOS)
+
+    # Квантование: JPEG превращает плоскую стену в облако близких оттенков, и
+    # при увеличении в игре это видно как грязь.
+    small = small.quantize(colors=PALETTE_COLORS, method=Image.MEDIANCUT).convert("RGB")
+
+    # Небо делаем прозрачным — своё небо у игры уже есть.
+    arr = np.asarray(small).copy()
+    alpha = np.where(sky_mask(arr), 0, 255).astype(np.uint8)
+    # Дырки внутри дома (окна цвета неба) закрывать нельзя: заливаем только
+    # прозрачность, связанную с верхней кромкой.
+    alpha = _flood_from_top(alpha)
+    rgba = np.dstack([arr, alpha])
+    Image.fromarray(rgba, "RGBA").save(OUT)
+
+    entrance_x = _entrance_x(arr, alpha)
+    META.write_text(json.dumps({
+        "entrance_x": entrance_x,
+        "width": out_w,
+        "height": out_h,
+        "_note": "entrance_x — точка спрайта, которая должна прийтись на клетку двери",
+    }, ensure_ascii=False, indent="\t") + "\n", encoding="utf-8")
+    print(f"{OUT.name}: {out_w}×{out_h}, вход на x={entrance_x}")
+
+
+def _flood_from_top(alpha: np.ndarray) -> np.ndarray:
+    """Прозрачным делаем только небо, связанное с краями кадра. Окна того же
+    цвета внутри дома обязаны остаться непрозрачными, иначе сквозь дом видно
+    землю."""
+    h, w = alpha.shape
+    seen = np.zeros_like(alpha, dtype=bool)
+    stack = [(0, x) for x in range(w) if alpha[0, x] == 0]
+    stack += [(y, 0) for y in range(h) if alpha[y, 0] == 0]
+    stack += [(y, w - 1) for y in range(h) if alpha[y, w - 1] == 0]
+    while stack:
+        y, x = stack.pop()
+        if y < 0 or y >= h or x < 0 or x >= w or seen[y, x] or alpha[y, x] != 0:
+            continue
+        seen[y, x] = True
+        stack += [(y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)]
+    out = np.full_like(alpha, 255)
+    out[seen] = 0
+    return out
+
+
+# Вход — раздвижные стёкла первого этажа, доля от ширины кадра.
+#
+# Число проставлено руками, а не найдено автоматически, и вот почему: поиск
+# «самого тёмного места фасада» уверенно показывал на навес с машиной — там
+# тень глубже, чем в остеклении. Для одной картинки, присланной владельцем,
+# честнее одно число с объяснением, чем эвристика, которая ошибается и молчит
+# об этом. Доля, а не пиксели: рисунок перережут — число переживёт.
+ENTRANCE_FRACTION = 0.715
+
+
+def _entrance_x(arr: np.ndarray, alpha: np.ndarray) -> int:
+    return int(round(alpha.shape[1] * ENTRANCE_FRACTION))
+
+
+if __name__ == "__main__":
+    main()

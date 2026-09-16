@@ -16,7 +16,12 @@ extends Node2D
 ## покажет люк в мире, откроет спуск из подвала и закроет огород.
 
 const TILE := 32
-const HOUSE_SPRITE := "res://art/env/house_exterior.png"
+## Дом бабки после смерти деда (решение владельца, картинка от него же):
+## двухэтажный, с навесом, машиной и забором — тот самый достаток, который
+## она тщательно скрывает (ГДД п.2). Старый house_exterior.png остаётся для
+## катсцен, где показывают время деда.
+const HOUSE_SPRITE := "res://art/env/house_rich.png"
+const HOUSE_META := "res://art/env/house_rich.json"
 const HATCH_SPRITE := "res://art/env/hatch.png"
 const VIEW_SCENE := "res://scenes/house.tscn"
 const PROMPT_SCENE := "res://scenes/house_prompt.tscn"
@@ -108,11 +113,16 @@ func _build_world_props() -> void:
 		_exterior.centered = false
 		_exterior.texture = load(HOUSE_SPRITE)
 		var size := _exterior.texture.get_size()
-		# Дверь на рисунке в середине фасада, поэтому фасад центрируется по
-		# клетке двери. Низ ставится на ВЕРХ первой земляной клетки (y = 1), а
-		# не на y = 0: земля начинается с первого слоя, и герой стоит ступнями
-		# именно там — по y = 0 дом висел бы на клетку выше уровня земли.
-		_exterior.position = Vector2((door.x + 0.5) * TILE - size.x * 0.5, TILE - size.y)
+		# Дом прижимается ПРАВЫМ краем к границе огорода, а не центрируется по
+		# двери: он шире своей половины карты не бывает, но и залезать на
+		# грядки не должен — там копают. Дверь на рисунке одна и не в центре
+		# (левее — навес с машиной), поэтому клетка двери в balance.json
+		# подобрана под рисунок, а не наоборот.
+		#
+		# Низ ставится на ВЕРХ первой земляной клетки (y = 1), а не на y = 0:
+		# земля начинается с первого слоя, и герой стоит ступнями именно там —
+		# по y = 0 дом висел бы на клетку выше уровня земли.
+		_exterior.position = Vector2(WorldGen.GARDEN_X_MIN * TILE - size.x, TILE - size.y)
 		add_child(_exterior)
 
 	if ResourceLoader.exists(HATCH_SPRITE):

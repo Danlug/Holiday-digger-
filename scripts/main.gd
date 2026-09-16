@@ -149,11 +149,20 @@ func _process(delta: float) -> void:
 		_handle_death()
 
 
+## Высоту неба держит рендер мира — берём число оттуда, а не заводим второе:
+## камера обязана останавливаться ровно на той строке, выше которой небо уже
+## не нарисовано (см. world_view.gd:SKY_HEIGHT).
+const SKY_HEIGHT: int = preload("res://scripts/world/world_view.gd").SKY_HEIGHT
+
+
 func _camera() -> Vector2:
 	var vw := float(_view_w())
 	var vh := float(_view_h())
 	var cam_x: float = clampf(player.x - vw / 2.0, 0.0, maxf(0.0, float(WorldGen.WIDTH) - vw))
-	var cam_y: float = maxf(player.y - vh / 2.0, -2.0)
+	# Верх неба — жёсткий предел: выше кромки смотреть не на что. Раньше здесь
+	# стояло -2, и небо над огородом было толщиной в две клетки — подниматься
+	# на ранце было некуда, экран упирался в землю.
+	var cam_y: float = maxf(player.y - vh / 2.0, -float(SKY_HEIGHT))
 	return Vector2(cam_x, cam_y)
 
 

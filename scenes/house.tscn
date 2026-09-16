@@ -676,7 +676,7 @@ stretch_mode = 5
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 11
-text = "Люк в шахту"
+text = "Ход в шахту"
 
 [node name="Hero" type="TextureRect" parent="Root/Scroll/Rooms/Basement/Box/Head"]
 visible = false
@@ -690,7 +690,7 @@ custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 8
 theme_override_colors/font_color = Color(0.615686, 0.545098, 0.45098, 1)
-text = "Ход из подвала под фундамент, на глубину 6."
+text = "Ход из подвала к устью тоннеля Роберта — другого входа в копальню нет."
 autowrap_mode = 2
 
 [node name="Slot" type="VBoxContainer" parent="Root/Scroll/Rooms/Basement/Box"]

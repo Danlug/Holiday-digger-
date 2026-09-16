@@ -42,7 +42,7 @@ func _ready() -> void:
 	_test_paid_order_needs_coins()
 	_test_energy_bar_effect()
 	_test_enter_and_exit_keeps_state()
-	_test_hatch_transition()
+	_test_tunnel_transition()
 	_test_storage_access_rules()
 	_test_storage_survives_death_and_save()
 	_test_no_food_button()
@@ -320,62 +320,77 @@ func _test_no_food_button() -> void:
 	house._button = null
 
 
-func _test_hatch_transition() -> void:
-	var hatch := HouseConfig.hatch_cell()
+func _test_tunnel_transition() -> void:
+	# Люк отменён владельцем: после огорода Роберт пробивает вниз бетонный
+	# тоннель — колодец по клетке WorldGen.TUNNEL_X глубиной TUNNEL_DEPTH,
+	# стенки TUNNEL_WALL_LEFT и TUNNEL_WALL_RIGHT железобетонные, остальной
+	# огород засыпан и больше не копается. Геометрию держит мир, дом только
+	# зовёт его и ставит героя в устье.
 	GameState.house_hatch_built = false
+	GameState.house_garden_closed = false
 	house.enter_house("basement")
-	check("без люка спуститься нельзя", not house.exit_through_hatch())
+	check("без тоннеля спуститься нельзя", not house.exit_through_tunnel())
 	check("герой остался в доме", GameState.house_is_indoors)
+	check("до Роберта устье тоннеля не пробито",
+		world.get_tile(WorldGen.TUNNEL_X, 1) != TileTypes.Type.EMPTY)
+	check("до Роберта огород ещё копается", not world.is_garden_locked())
 
-	# Роберт закончил работу: люк построен, огород закрыт (ГДД п.9).
-	# Вызываем ровно тем именем, которым дом зовёт сюжетная сцена Роберта
-	# (data/story.json: {"do":"hook","target":"house","method":"build_hatch"}).
-	# Копаем клетку огорода, чтобы было что засыпать.
+	# Роберт закончил работу (ГДД п.9). Вызываем ровно тем именем, которым дом
+	# зовёт сюжетная сцена Роберта (data/story.json: {"do":"hook",
+	# "target":"house","method":"build_tunnel"}). Копаем клетку огорода,
+	# чтобы было что засыпать.
 	world.dig_cell(25, 2)
 	check("клетка огорода выкопана до прихода Роберта", world.is_dug(25, 2))
-	check("хук сюжета build_hatch на месте", house.has_method("build_hatch"))
-	house.build_hatch()
-	check("после Роберта люк построен", GameState.house_hatch_built)
+	check("хук сюжета build_tunnel на месте", house.has_method("build_tunnel"))
+	# Старое имя хука обязано остаться: в сейве может лежать очередь сцен,
+	# записанная до отмены люка.
+	check("старый хук build_hatch остался обёрткой", house.has_method("build_hatch"))
+	house.build_tunnel()
+	check("после Роберта тоннель построен", GameState.house_hatch_built)
 	check("после Роберта огород закрыт", GameState.house_garden_closed)
 	check("после Роберта огород засыпан землёй", not world.is_dug(25, 2))
+	check("после Роберта огород больше не вскопать", world.is_garden_locked())
 
-	check("спуск через люк сработал", house.exit_through_hatch())
+	var mouth := world.tunnel_mouth()
+	check("устье тоннеля — верхняя клетка колодца",
+		mouth == Vector2i(WorldGen.TUNNEL_X, 1))
+	check("дом спрашивает устье у мира", house.tunnel_mouth() == mouth)
+	# Старое имя клетки люка отдаёт то же устье: люка больше нет, а вернуть
+	# несуществующую клетку — значит замуровать спускающегося.
+	check("HouseConfig.hatch_cell() отдаёт устье тоннеля",
+		HouseConfig.tunnel_mouth_cell() == HouseConfig.hatch_cell())
+
+	var shaft_empty := true
+	for y in range(1, WorldGen.TUNNEL_DEPTH + 1):
+		if world.get_tile(WorldGen.TUNNEL_X, y) != TileTypes.Type.EMPTY:
+			shaft_empty = false
+	check("колодец пробит на всю глубину", shaft_empty)
+
+	check("спуск по тоннелю сработал", house.exit_through_tunnel())
 	check("герой снаружи", not GameState.house_is_indoors)
-	check_near("герой стоит под люком по x", player.x, hatch.x + 0.5, 0.001)
-	# Ставим на клетку НИЖЕ люка: люк втягивает при касании, и приземляться
-	# прямо в него нельзя — спуск и подъём зациклились бы.
-	check_near("герой стоит на клетку ниже люка", player.y, hatch.y + 1.5, 0.001)
-	check("клетка люка пробита", world.get_tile(hatch.x, hatch.y) == TileTypes.Type.EMPTY)
-	check("люк лежит прямо под фундаментом", hatch.y == 6)
+	# Из дома герой попадает РОВНО в устье (решение владельца): вниз ведёт
+	# только колодец, шага в сторону из него нет.
+	check_near("герой стоит в устье по x", player.x, mouth.x + 0.5, 0.001)
+	check_near("герой стоит в устье по y", player.y, mouth.y + 0.5, 0.001)
 
-	# Под люком расчищена площадка 3×3 (решение владельца): иначе спустившийся
-	# герой упирается плечами в породу, и шага в сторону у него нет.
-	var clear := true
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
-			if hatch.y + dy < 1:
-				continue
-			if world.get_tile(hatch.x + dx, hatch.y + dy) != TileTypes.Type.EMPTY:
-				clear = false
-	check("под люком расчищено 3×3", clear)
-
-	# Люк втягивает в дом сам, но только после того, как от него отошли:
-	# иначе выход через люк — петля.
-	house._auto_enter_hatch_if_touched()
-	check("сразу после спуска люк обратно не затягивает", not GameState.house_is_indoors)
-	var away_x: float = player.x
-	player.x = hatch.x + 6.5
-	house._auto_enter_hatch_if_touched()      # отошёл — люк взводится
-	player.x = away_x
-	player.y = hatch.y + 0.5
-	house._auto_enter_hatch_if_touched()
-	check("вернулся на люк — втянуло в дом без кнопки", GameState.house_is_indoors)
+	# Устье втягивает в дом само, но только после того, как от него отошли:
+	# иначе спуск — петля «вышел и тут же затянуло обратно».
+	house._auto_enter_tunnel_if_touched()
+	check("сразу после спуска устье обратно не затягивает", not GameState.house_is_indoors)
+	player.x = mouth.x + 0.5
+	player.y = mouth.y + WorldGen.TUNNEL_DEPTH - 0.5
+	house._auto_enter_tunnel_if_touched()      # ушёл вглубь — устье взводится
+	check("в глубине колодца в дом не затягивает", not GameState.house_is_indoors)
+	# Поднялся снизу и налетел на устье — возврат домой без кнопки.
+	player.y = mouth.y + 0.5
+	house._auto_enter_tunnel_if_touched()
+	check("налетел на устье снизу — вернуло в дом без кнопки", GameState.house_is_indoors)
 	check("попал именно в подвал", GameState.house_room == "basement")
-	house.exit_through_hatch()
 
-	# Землетрясение стирает диффы: клетка люка обязана пробиваться заново,
-	# иначе спуск замуровывает героя в породе.
+	# Землетрясение стирает диффы: колодец обязан пробиваться заново, иначе
+	# спуск замуровывает героя в породе.
 	world.apply_global_event(12345)
-	house.enter_house("basement")
-	check("спуск после землетрясения сработал", house.exit_through_hatch())
-	check("клетка люка снова пуста", world.get_tile(hatch.x, hatch.y) == TileTypes.Type.EMPTY)
+	check("спуск после землетрясения сработал", house.exit_through_tunnel())
+	check("устье снова пусто",
+		world.get_tile(mouth.x, mouth.y) == TileTypes.Type.EMPTY)
+	check("огород после землетрясения всё так же закрыт", world.is_garden_locked())

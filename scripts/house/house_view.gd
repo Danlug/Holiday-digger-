@@ -27,7 +27,8 @@ const DIM := Color8(0x9D, 0x8B, 0x73)
 const FLOOR_LABEL := Color8(0x6B, 0x5B, 0x45)
 
 ## Комнаты дома (ГДД п.2, 9, 10): спальня наверху, прихожая с входной дверью
-## и музей на первом этаже, мастерская, торфоперегонка и люк — в подвале.
+## и музей на первом этаже, мастерская, торфоперегонка и ход к тоннелю
+## Роберта — в подвале.
 ## Мастерская и музей заведены пустыми: их наполняют другие системы, дому
 ## достаточно, чтобы туда можно было войти.
 const ROOMS := [
@@ -46,9 +47,9 @@ const ROOMS := [
 	{"id": "peat_still", "floor": "Подвал", "title": "Торфоперегонка",
 		"icon": "res://art/ui/slot_frame.png",
 		"desc": "Торф → топливные блоки и удобрение (ГДД п.5)."},
-	{"id": "basement", "floor": "Подвал", "title": "Люк в шахту",
+	{"id": "basement", "floor": "Подвал", "title": "Ход в шахту",
 		"icon": "res://art/env/hatch.png",
-		"desc": "Ход из подвала под фундамент, на глубину 6."},
+		"desc": "Ход из подвала к устью тоннеля Роберта — другого входа в копальню нет."},
 ]
 
 # Комнаты, которые наполняют другие системы. Ключ — id комнаты, значение —
@@ -329,7 +330,7 @@ func _wire_actions() -> void:
 	_add_button("hall", "Заказать", "toggle_menu")
 	_add_button("hall", "Забрать", "take_delivery")
 	_add_button("hall", "На улицу", "exit_door")
-	_add_button("basement", "В шахту", "exit_hatch")
+	_add_button("basement", "В шахту", "exit_tunnel")
 	_add_button("workshop", "Склад", "storage")
 	for room_id in EXTERNAL_PANELS.keys():
 		_add_button(String(room_id), "Открыть", "open_panel:" + String(room_id))
@@ -544,15 +545,17 @@ func _slot_label(slot: VBoxContainer, text: String) -> Label:
 
 
 func _refresh_basement() -> void:
-	var button := _button("basement", "exit_hatch")
+	var button := _button("basement", "exit_tunnel")
+	# Флаг остался с прежним именем (house_hatch_built), но значит он теперь
+	# одно: Роберт пробил тоннель. Переименование поля — за scripts/core.
 	button.disabled = not GameState.house_hatch_built
 	var note := _note("basement")
 	note.visible = true
 	if GameState.house_hatch_built:
-		var hatch := HouseConfig.hatch_cell()
-		note.text = "Люк выводит на клетку (%d, %d) — сразу под фундаментом." % [hatch.x, hatch.y]
+		var mouth := HouseConfig.tunnel_mouth_cell()
+		note.text = "Ход выводит в устье тоннеля — клетка (%d, %d). Вниз только по колодцу: стенки бетонные." % [mouth.x, mouth.y]
 	else:
-		note.text = "Люк ещё не построен: его строит Роберт, которого пришлёт бабка (ГДД п.9)."
+		note.text = "Тоннеля ещё нет: его пробьёт Роберт, которого пришлёт бабка (ГДД п.9)."
 
 
 ## Строка склада в мастерской: сколько там лежит и сколько это весит. Вес

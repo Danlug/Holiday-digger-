@@ -98,6 +98,8 @@ func _ready() -> void:
 	else:
 		hud.toast("Бабка улетела в Таиланд. Огород твой — копай.", 3.6)
 
+	_apply_saved_earthquake_on_start()
+
 
 func _view_w() -> int:
 	return hud.get_view_cells().x
@@ -147,6 +149,9 @@ func _process(delta: float) -> void:
 
 	if not GameState.is_alive:
 		_handle_death()
+	# Отложенное землетрясение ждёт не следующего тика таймера обвалов, а
+	# самого героя: "как только вылез" — это про его шаг, а не про минуту.
+	_apply_pending_earthquake_if_safe()
 
 
 func _camera() -> Vector2:
@@ -170,7 +175,11 @@ func _handle_death() -> void:
 		for y in range(y0, y1):
 			if world.is_dug(x, y):
 				world.diffs.erase(y * WorldGen.WIDTH + x)
-	fog.reset_all()
+	# Гасим туман только над заросшим слоем, а не весь мир: изменился ровно
+	# он. Разведанная глубина — часы работы игрока, и смерть по ГДД отбирает
+	# инвентарь, а не карту (то же правило, что у обвала: закрываем туманом
+	# только то, что переписали).
+	fog.reset_rect(x0, y0, x1 - x0, y1 - y0)
 	player.teleport_home()
 	GameState.respawn()
 	hud.toast("Ты погиб. Минералы потеряны. В игре уцелел бы только чёрный ящик.", 4.2)
@@ -182,8 +191,50 @@ func _on_collapse_tick() -> void:
 	# на порядок реже. Реальный игрок не должен стоять и смотреть, как мир
 	# рушится каждую минуту — обвалы должны быть редким сюрпризом.
 	if randf() < 0.35:
-		CollapseEvents.trigger_chunk_collapse(world, fog)
-		hud.toast("Где-то в шахте прогремел обвал.", 3.0)
+		# Обвал случается только НИЖЕ героя (решение владельца), поэтому тик
+		# отдаёт его клетку. Если под ним места не нашлось, обвала не было —
+		# и тоста тоже: пугать сообщением о том, чего не произошло, нечестно.
+		var rect := CollapseEvents.trigger_chunk_collapse(world, fog, null, player.cell_y())
+		if not rect.is_empty():
+			hud.toast("Где-то в шахте прогремел обвал.", 3.0)
 	elif randf() < 0.03:
-		CollapseEvents.trigger_earthquake(world, fog)
-		hud.toast("Земля вздрогнула — копальню тряхнуло целиком.", 3.6)
+		# Полный ресет не может застать героя в земле (решение владельца):
+		# запоминаем событие и применяем, когда он выберется. Тост — в момент
+		# РЕАЛЬНОГО применения, иначе игрок услышит грохот, которого не было.
+		GameState.pending_earthquake = true
+		_apply_pending_earthquake_if_safe()
+
+
+## Отложенное землетрясение: полный ресет копальни не может случиться, пока
+## герой в земле, — порода сомкнулась бы прямо на нём. Ждём, пока он не
+## окажется дома или наверху у входа в шахту, и только тогда трясём.
+func _apply_pending_earthquake_if_safe() -> bool:
+	if not GameState.pending_earthquake:
+		return false
+	if not CollapseEvents.try_trigger_earthquake(world, fog,
+			player.cell_y(), GameState.house_is_indoors):
+		return false
+	GameState.pending_earthquake = false
+	hud.toast("Земля вздрогнула — копальню тряхнуло целиком.", 3.6)
+	return true
+
+
+## Землетрясение, дождавшееся своего часа в сейве. Герой закрыл игру под
+## землёй — "вылезти наверх" ему уже негде, поэтому трясём копальню сейчас и
+## будим его дома, а не в перетряхнутой породе (решение владельца).
+func _apply_saved_earthquake_on_start() -> void:
+	if not GameState.pending_earthquake:
+		return
+	GameState.pending_earthquake = false
+	CollapseEvents.trigger_earthquake(world, fog)
+	var house := HouseSystem.instance
+	if house != null:
+		# Дом разбирает ссылки на героя и HUD только в своём _process, а
+		# спрятать HUD и заморозить героя надо уже сейчас — представляем их
+		# сами, как это делает house_system._resolve_refs.
+		if house.player == null:
+			house.player = player
+		if house.hud == null:
+			house.hud = hud
+		house.enter_house("bedroom")
+	hud.toast("Пока тебя не было, копальню тряхнуло целиком. Ты отсиделся дома.", 4.4)

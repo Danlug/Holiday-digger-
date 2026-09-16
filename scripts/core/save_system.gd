@@ -77,6 +77,13 @@ static func _serialize() -> Dictionary:
 		"world_seed": gs.world_seed,
 		"world": _serialize_world(gs),
 
+		# Отложенное землетрясение обязано пережить выход из игры: без записи
+		# в сейв игроку достаточно свернуть игру под землёй, чтобы полный
+		# ресет не случился никогда (см. game_state.pending_earthquake).
+		"events": {
+			"pending_earthquake": gs.pending_earthquake,
+		},
+
 		# --- дом и выживание (scripts/house/) ---
 		# Сохраняется всё, что игрок уже "потратил" или получил: построенный
 		# Робертом люк, стадия обучения, оплаченная и ещё не забранная
@@ -174,6 +181,11 @@ static func _apply(data: Dictionary) -> void:
 	gs.last_reset_utc_date = String(ads_data.get("last_reset_utc_date", gs.last_reset_utc_date))
 
 	gs.world_seed = int(data.get("world_seed", gs.world_seed))
+
+	# Сейвы до правила об отложенном ресете блока "events" не содержат —
+	# для них отложенного землетрясения просто нет.
+	var events_data: Dictionary = data.get("events", {})
+	gs.pending_earthquake = bool(events_data.get("pending_earthquake", false))
 
 	# --- дом и выживание (scripts/house/) ---
 	var house_data: Dictionary = data.get("house", {})

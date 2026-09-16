@@ -54,6 +54,14 @@ CHARACTERS = {
     "grandma_rich":   (526, 19, 639, 327),     # бабка после смерти деда
 }
 
+# Кирки с ЭТОГО листа больше не сохраняются: весь ряд из шести приходит с
+# отдельного авторского листа через tools/import_pickaxes.py, одним масштабом
+# и в одной ориентации (см. его шапку). Вырезать их отсюда всё равно надо —
+# ржавая кирка идёт реквизитом в процедурную сборку копки (anim_dig), — а вот
+# записывать поверх нельзя: запуск import_art.py затёр бы ряд и сломал
+# «чем дороже, тем крупнее».
+SUPERSEDED_ITEMS = {"items/pickaxe_rusty", "items/pickaxe_iron"}
+
 ITEMS = {
     # имя файла: (бокс на листе, размер результата)
     "items/pickaxe_rusty":      ((58, 376, 132, 450), (32, 32)),
@@ -752,28 +760,17 @@ def main(sheet_path):
     for name, (box, size) in ITEMS.items():
         raw = cut(sheet, mask, box)
         raws[name.split("/")[1]] = raw
+        if name in SUPERSEDED_ITEMS:
+            continue
         img = fit(raw, size)
         out = Image.new("RGBA", size, (0, 0, 0, 0))
         out.alpha_composite(img, ((size[0] - img.size[0]) // 2,
                                   (size[1] - img.size[1]) // 2))
         written.append(save(out, name))
 
-    # Треснувшая кирка: отдельного рисунка на листе нет, делаем из ржавой —
-    # выкусываем щербину на бойке и глушим цвет.
-    rusty = Image.open(os.path.join(ROOT, "art", "items", "pickaxe_rusty.png"))
-    cracked = rusty.copy()
-    cp = cracked.load()
-    w, h = cracked.size
-    for y in range(h // 4, h // 2):
-        for x in range(w // 2, w):
-            if cp[x, y][3] and (x + y) % 7 == 0:
-                cp[x, y] = (0, 0, 0, 0)
-    for y in range(h):
-        for x in range(w):
-            r, g, b, al = cp[x, y]
-            if al:
-                cp[x, y] = (int(r * 0.82), int(g * 0.78), int(b * 0.74), al)
-    written.append(save(cracked, "items/pickaxe_rusty_cracked"))
+    # Колотая кирка переехала в tools/import_pickaxes.py — туда же, где
+    # делается целая ржавая, и по тем же координатам её бойка. Здесь она
+    # собиралась из ДИАГОНАЛЬНОЙ ржавой, которой больше нет.
 
     # полная поза деда с компасом — под катсцену, там он стоит, а не ходит
     written.append(save(fit(cut(sheet, mask, (1005, 19, 1170, 327)),

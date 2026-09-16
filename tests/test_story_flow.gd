@@ -236,6 +236,34 @@ func _test_death_trigger_and_bars() -> void:
 	director._apply_no_fatigue_period()
 	check("после смерти усталость снова тратится", is_equal_approx(GameState.stamina, 50.0))
 
+	_test_bars_for_old_saves()
+
+
+## Сохранения, снятые до появления флага bars_introduced, о нём не знают: у
+## игрока обучение давно позади, а после обновления полоски просто исчезли бы
+## посреди игры. Признак «обучение пройдено» — пробитый фундамент или глубина
+## ниже его уровня.
+func _test_bars_for_old_saves() -> void:
+	var saved_depth := GameState.max_depth_reached
+	GameState.story_flags.erase("bars_introduced")
+	GameState.story_flags.erase("death_seen")
+	GameState.story_flags.erase("foundation_broken")
+	GameState.story_seen.erase("death")
+	GameState.max_depth_reached = 0
+	check("на самом обучении полосок всё ещё нет", not director._bars_introduced())
+
+	GameState.max_depth_reached = 40
+	check("старый сейв с глубиной 40 полоски возвращает", director._bars_introduced())
+	check("найденное «уже пройдено» записано флагом", StoryState.has_flag("bars_introduced"))
+
+	GameState.story_flags.erase("bars_introduced")
+	GameState.max_depth_reached = 0
+	StoryState.set_flag("foundation_broken")
+	check("пробитый фундамент полоски возвращает", director._bars_introduced())
+
+	GameState.max_depth_reached = saved_depth
+	StoryState.set_flag("bars_introduced")
+
 
 ## Обучающие задания (ГДД п.9, порядок владельца): золото — фундамент —
 ## продать — заказать еду. Проверяем состояние, а не события: игрок может

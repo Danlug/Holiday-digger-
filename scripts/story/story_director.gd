@@ -17,6 +17,9 @@ extends Node
 
 const SLEEP_LESSON_STAMINA := 8.0   # порог "первого истощения" в процентах
 const MANUAL_DIGS_BEFORE_AUTODIG := 3
+## Глубина фундамента (world_layers.json -> foundation_y). Всё, что выше, —
+## огород и обучение; всё, что ниже, — уже игра.
+const FOUNDATION_DEPTH := 5
 
 ## Чужие системы. Подключаются одной строкой из main.gd, когда появятся:
 ##   $StoryDirector.house = $House
@@ -163,7 +166,7 @@ func _process(_dt: float) -> void:
 ## всего это сделать здесь: GameState тикает расход всегда, а править чужой
 ## файл ради обучающего периода нельзя.
 func _apply_no_fatigue_period() -> void:
-	var introduced := StoryState.has_flag("bars_introduced")
+	var introduced := _bars_introduced()
 	if _gauges != null and _gauges.are_gauges_visible() != introduced:
 		_gauges.set_gauges_visible(introduced)
 	if introduced:
@@ -172,6 +175,22 @@ func _apply_no_fatigue_period() -> void:
 		GameState.set_stamina(100.0)
 	if GameState.hunger < 100.0:
 		GameState.set_hunger(100.0)
+
+
+## Полоски показаны? Обычный ответ — флаг сцены смерти. Но сохранения, снятые
+## до появления флага, о нём не знают: у игрока давно пройдено обучение, а
+## после обновления полоски просто исчезли бы посреди игры. Поэтому обучающим
+## периодом считается только то, что обучением и является, — до пробитого
+## фундамента и выше его уровня. Найденное так «уже пройдено» записываем
+## флагом, чтобы больше не выводить его каждый кадр.
+func _bars_introduced() -> bool:
+	if StoryState.has_flag("bars_introduced"):
+		return true
+	if StoryState.has_flag("death_seen") or StoryState.has_flag("foundation_broken") \
+			or StoryState.is_seen("death") or GameState.max_depth_reached > FOUNDATION_DEPTH:
+		StoryState.set_flag("bars_introduced")
+		return true
+	return false
 
 
 ## Обучающие задания. Порядок сверху вниз совпадает с порядком онбординга:

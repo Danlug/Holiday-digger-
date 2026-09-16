@@ -53,6 +53,10 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
+var _xp_fill: ColorRect
+var _level_label: Label
+var _hero_button: Button
+var _hero_plus: Label
 var _hp_fill: ColorRect
 var _hunger_fill: ColorRect
 var _stamina_fill: ColorRect
@@ -136,6 +140,7 @@ func _ready() -> void:
 func set_gauges_visible(v: bool) -> void:
 	if _gauges_box != null:
 		_gauges_box.visible = v
+	_place_objective()
 
 
 func are_gauges_visible() -> bool:
@@ -175,18 +180,85 @@ func _build_ui() -> void:
 	_build_strip()
 
 
+## Левый верхний угол сверху вниз: уровень и опыт, три полоски выживания,
+## кнопка «Герой». Один столбец — потому что всё это про самого героя, и
+## глазу не приходится собирать его состояние по разным углам экрана.
 func _build_gauges(parent: Control) -> void:
 	var box := VBoxContainer.new()
 	box.name = "Gauges"
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Герой» внутри
 	box.position = Vector2(8, 8)
 	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
 	_gauges_box = box
 
+	_build_xp_row(box)
 	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
 	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
 	_stamina_fill = _make_gauge_row(box, Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
+	_build_hero_button(box)
+
+
+## Уровень и опыт — над полосками выживания. Полоска опыта тоньше остальных:
+## она про долгую перспективу, а те три — про «доживу ли до поверхности», и
+## путать их по важности нельзя.
+func _build_xp_row(parent: Control) -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 5)
+	parent.add_child(row)
+
+	_level_label = Label.new()
+	_level_label.add_theme_font_size_override("font_size", 10)
+	_level_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	_level_label.custom_minimum_size = Vector2(13, 0)
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(_level_label)
+
+	var track := Panel.new()
+	track.custom_minimum_size = Vector2(72, 5)
+	# Без этого HBoxContainer растягивает подложку на всю высоту ряда (её
+	# задаёт иконка слева), и под заливкой висит чёрный хвост.
+	track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.043, 0.035, 0.027, 0.75)
+	sb.border_color = Color(0, 0, 0, 0.55)
+	sb.set_border_width_all(1)
+	track.add_theme_stylebox_override("panel", sb)
+	row.add_child(track)
+
+	_xp_fill = ColorRect.new()
+	_xp_fill.color = Color8(0xE0, 0xA9, 0x3B)
+	_xp_fill.position = Vector2.ZERO
+	_xp_fill.size = Vector2(72, 5)
+	track.add_child(_xp_fill)
+
+
+## Кнопка «Герой» переехала из меню «•••» под полоски (решение владельца): она
+## про то же, про что и они, и открывать её оттуда, где показано состояние
+## героя, естественнее, чем из общего ящика.
+##
+## Когда есть непотраченные очки — подпись золотом и зелёный плюс: иначе
+## игрок копит очки и не знает об этом.
+func _build_hero_button(parent: Control) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 3)
+	parent.add_child(row)
+
+	_hero_button = Button.new()
+	_hero_button.text = "Герой"
+	_hero_button.add_theme_font_size_override("font_size", 9)
+	_hero_button.focus_mode = Control.FOCUS_NONE
+	_hero_button.custom_minimum_size = Vector2(44, 16)
+	_hero_button.pressed.connect(func(): ProgressScreen.open("progress"))
+	row.add_child(_hero_button)
+
+	_hero_plus = Label.new()
+	_hero_plus.text = "+"
+	_hero_plus.add_theme_font_size_override("font_size", 13)
+	_hero_plus.add_theme_color_override("font_color", Color8(0x6E, 0xC6, 0x4B))
+	_hero_plus.visible = false
+	row.add_child(_hero_plus)
 
 
 func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> ColorRect:
@@ -205,6 +277,7 @@ func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> C
 
 	var track := Panel.new()
 	track.custom_minimum_size = Vector2(72, 8)
+	track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.043, 0.035, 0.027, 0.75)
 	sb.border_color = Color(0, 0, 0, 0.55)
@@ -323,7 +396,7 @@ func _build_stick(parent: Control) -> void:
 	parent.add_child(_stick)
 
 	var hint := Label.new()
-	hint.text = "ВВЕРХ — ПРЫЖОК"
+	hint.text = ""
 	# Кегль под уменьшившийся стик: при 8 подпись вылезала за круг.
 	hint.add_theme_font_size_override("font_size", 6)
 	hint.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
@@ -722,8 +795,8 @@ func _build_strip() -> void:
 	# Иконкой, а не словом: ряд шириной 224 не вмещает подпись «Инвентарь»
 	# вместе с названием инструмента, снаряжением, режимом и сбросом.
 	_inv_button = _make_chip("")
-	if ResourceLoader.exists("res://art/ui/icon_inventory.png"):
-		_inv_button.icon = load("res://art/ui/icon_inventory.png")
+	if ResourceLoader.exists("res://art/ui/icon_backpack.png"):
+		_inv_button.icon = load("res://art/ui/icon_backpack.png")
 		_inv_button.expand_icon = true
 		_inv_button.custom_minimum_size = Vector2(26, STRIP_H)
 	else:
@@ -737,7 +810,7 @@ func _build_strip() -> void:
 	# нажатию (и подсказкой при наведении на компьютере): слово «Лопата»
 	# держало в ряду шириной 224 почти сорок точек, а нужно оно раз в час —
 	# когда игрок сам не помнит, чем копает.
-	_tool_button = _make_chip("")
+	_tool_button = _make_flat(_make_chip(""))
 	_tool_button.custom_minimum_size = Vector2(26, STRIP_H)
 	_tool_button.expand_icon = true
 	_tool_button.pressed.connect(_show_tool_name)
@@ -773,13 +846,10 @@ func _build_strip() -> void:
 	more_menu.add_child(shop_btn)
 	# --- конец блока экономики ---
 
-	# --- прокачка и музей: кнопка экрана героя (scripts/progress/) ---
-	# Одна кнопка на три вкладки: прокачка, музей, рекорды. Витрина музея
-	# открывается и отдельно — ProgressScreen.open("museum").
-	var hero_btn := ProgressScreen.make_hud_button(_make_chip(""))
-	if hero_btn.text.is_empty():
-		hero_btn.text = "Герой"
-	more_menu.add_child(hero_btn)
+	# --- прокачка и музей (scripts/progress/) ---
+	# Кнопки «Герой» в «⋯» больше нет: экран героя открывается кнопкой под
+	# полосками жизни (_build_hero_button), где её видно, не раскрывая меню,
+	# и где она золотится, когда есть что прокачать.
 	# --- конец блока прокачки ---
 
 	# --- дом: контекстная кнопка (scripts/house/) ---
@@ -798,10 +868,10 @@ func _build_strip() -> void:
 	# кирки. Поэтому кнопка постоянная, а не контекстная. Иконкой и без
 	# подписи: в ряду шириной 224 на восемь кнопок каждое слово на счету.
 	var storage_btn := _make_chip("")
-	if ResourceLoader.exists("res://art/ui/icon_blackbox.png"):
-		storage_btn.icon = load("res://art/ui/icon_blackbox.png")
+	if ResourceLoader.exists("res://art/ui/icon_inventory.png"):
+		storage_btn.icon = load("res://art/ui/icon_inventory.png")
 		storage_btn.expand_icon = true
-		storage_btn.custom_minimum_size = Vector2(20, STRIP_H)
+		storage_btn.custom_minimum_size = Vector2(22, STRIP_H)
 	else:
 		storage_btn.text = "Скл"
 	storage_btn.tooltip_text = "Склад в мастерской"
@@ -999,8 +1069,8 @@ func _build_objective_line() -> void:
 	_objective_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_objective_panel.offset_left = 8
 	_objective_panel.offset_right = -8
-	_objective_panel.offset_top = 58
 	add_child(_objective_panel)
+	_place_objective()
 
 	_objective_label = Label.new()
 	_objective_label.add_theme_font_size_override("font_size", 10)
@@ -1010,12 +1080,26 @@ func _build_objective_line() -> void:
 	_objective_panel.add_child(_objective_label)
 
 
+## Строка задания встаёт ПОД левым столбиком (опыт, полоски, «Герой»), а не
+## на фиксированной высоте: столбик то появляется целиком, то исчезает на
+## время обучения, и жёсткая координата либо накрывала полоски, либо висела
+## в пустоте. Высоту берём минимальную — она известна до раскладки.
+func _place_objective() -> void:
+	if _objective_panel == null:
+		return
+	var top := 12.0
+	if _gauges_box != null and _gauges_box.visible:
+		top = _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0
+	_objective_panel.offset_top = top
+
+
 ## Ставит текст задания; пустая строка убирает строку с экрана.
 func set_objective(text: String) -> void:
 	if _objective_panel == null:
 		return
 	_objective_label.text = text
 	_objective_panel.visible = not text.is_empty()
+	_place_objective()
 
 
 ## Всплывающая подпись инструмента: панелька над полосой, по центру, гаснет
@@ -1106,6 +1190,20 @@ func _make_chip(text: String) -> Button:
 	return b
 
 
+# Кнопка-иконка без рамки: рамка обещает нажатие, которое что-то переключит,
+# а инструмент по нажатию всего лишь называет себя. Отступы оставляем от
+# _make_chip — иначе иконка липнет к соседям.
+func _make_flat(b: Button) -> Button:
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb := StyleBoxEmpty.new()
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		sb.content_margin_left = 4
+		sb.content_margin_right = 4
+		b.add_theme_stylebox_override(state, sb)
+	return b
+
+
 func _make_gear_icon(parent: Control, path: String) -> TextureRect:
 	var t := TextureRect.new()
 	t.custom_minimum_size = Vector2(17, 17)
@@ -1113,7 +1211,7 @@ func _make_gear_icon(parent: Control, path: String) -> TextureRect:
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if ResourceLoader.exists(path):
 		t.texture = load(path)
-	t.modulate = Color(1, 1, 1, 0.22)
+	t.visible = false
 	parent.add_child(t)
 	return t
 
@@ -1145,6 +1243,7 @@ func _update_layout() -> void:
 	_stick.queue_redraw()
 	_knob.queue_redraw()
 	_layout_arrows()
+	_place_objective()
 
 
 func get_view_cells() -> Vector2i:
@@ -1177,14 +1276,40 @@ func _connect_game_state() -> void:
 			_render_inventory()
 	)
 	GameState.tool_changed.connect(func(_t): _sync_tool())
+	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
+	GameState.leveled_up.connect(func(_lvl, _pts): _sync_xp())
+	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
 
 
 func _sync_all() -> void:
 	_hp_fill.size.x = 72.0
 	_hunger_fill.size.x = 72.0
 	_stamina_fill.size.x = 72.0
+	_sync_xp()
+	_sync_hero_button()
 	_sync_purse()
 	_sync_tool()
+
+
+func _sync_xp() -> void:
+	if _xp_fill == null:
+		return
+	_level_label.text = str(GameState.level)
+	var need: float = float(Balance.xp_required_for_level(GameState.level))
+	var frac: float = clampf(float(GameState.xp) / maxf(need, 1.0), 0.0, 1.0)
+	_xp_fill.size.x = 72.0 * frac
+	_sync_hero_button()
+
+
+## Есть непотраченные очки — подпись золотом и зелёный плюс. Без этого игрок
+## копит очки и не знает об этом: экран героя сам о себе не напоминает.
+func _sync_hero_button() -> void:
+	if _hero_button == null:
+		return
+	var has_points := GameState.skill_points_available > 0
+	_hero_plus.visible = has_points
+	_hero_button.add_theme_color_override("font_color",
+		Color8(0xE0, 0xA9, 0x3B) if has_points else Color8(0x9D, 0x8B, 0x73))
 
 
 func _sync_purse() -> void:
@@ -1213,8 +1338,10 @@ func _sync_tool() -> void:
 	if _tool_name_panel != null and _tool_name_panel.visible:
 		_tool_name_label.text = tool_name
 	if player != null:
-		_gear_pack.modulate = Color(1, 1, 1, 1.0 if player.has_backpack() else 0.22)
-		_gear_jet.modulate = Color(1, 1, 1, 1.0 if player.has_jetpack() else 0.22)
+		# Тёмная иконка недоступного снаряжения читалась как сломанная кнопка,
+		# а не как «ещё не куплено». Чего нет — того и на полосе нет.
+		_gear_pack.visible = player.has_backpack()
+		_gear_jet.visible = player.has_jetpack()
 
 
 func _tool_icon_file(tool_id: String) -> String:
@@ -1376,6 +1503,16 @@ func _render_inventory() -> void:
 			sum_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			sum_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
 			line.add_child(sum_label)
+			# Съесть прямо из рюкзака: кнопку «Еда» с нижней полосы убрали, и
+			# голод в шахте закрывается там, где еда лежит.
+			if HouseConfig.is_food(row.id):
+				var eat_btn := Button.new()
+				eat_btn.text = "Съесть"
+				eat_btn.add_theme_font_size_override("font_size", 9)
+				eat_btn.custom_minimum_size = Vector2(38, 20)
+				var fid: String = row.id
+				eat_btn.pressed.connect(func(): _eat_from_inventory(fid))
+				line.add_child(eat_btn)
 			# Выбросить: рюкзак заполняется задолго до подъёма, и без этого
 			# единственный способ освободить место под алмаз — идти домой.
 			var drop_btn := Button.new()
@@ -1395,6 +1532,17 @@ func _render_inventory() -> void:
 	_inv_load_label.text = "%.1f / %.0f кг" % [load_kg, max_kg]
 
 
+func _eat_from_inventory(id: String) -> void:
+	var res := HouseFood.eat(id)
+	if not bool(res.get("ok", false)):
+		toast(String(res.get("reason", "")))
+		return
+	toast("%s: голод +%d%%, бодрость +%d%%" % [
+		HouseConfig.food_name(id), int(res.get("hunger", 0.0)), int(res.get("stamina", 0.0))])
+	_render_inventory()
+	_sync_all()
+
+
 ## Три режима по кругу: джойстик → палец → стрелки (решение владельца).
 const MODES: Array[String] = ["stick", "hold", "arrows"]
 
@@ -1411,12 +1559,10 @@ func _set_mode(m: String) -> void:
 	_arrows_held.clear()
 	if player != null:
 		player.release_control()
-	# Коротко: полная подпись («Джойстик»/«Удержание») не помещается в ряд
-	# шириной 224 вместе с инвентарём, инструментом и снаряжением.
-	match mode:
-		"stick": _mode_button.text = "Стик"
-		"hold": _mode_button.text = "Палец"
-		_: _mode_button.text = "Стрелки"
+	# Одна подпись на все три режима: название текущего («Стик»/«Палец»/
+	# «Стрелки») игроку ничего не говорило — кнопка читалась как состояние, а
+	# не как переключатель. Что именно включено, видно на экране.
+	_mode_button.text = "Управление"
 	_stick.visible = mode == "stick"
 	_hold_hint.visible = mode == "hold"
 	if _arrows_panel != null:

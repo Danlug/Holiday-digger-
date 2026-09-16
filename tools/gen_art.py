@@ -1195,6 +1195,46 @@ def draw_icon_inventory():
     save(img, "ui/icon_inventory.png")
 
 
+def draw_icon_backpack():
+    """Рюкзак для кнопки инвентаря.
+
+    Сундук, который нарисовал художник, лежит под именем ui/icon_inventory.png
+    и ушёл на кнопку СКЛАДА: склад — это сундук, а рюкзак — то, что на себе.
+    Раньше одна иконка стояла на обеих кнопках, и они не различались.
+
+    Рисуется под размер кнопки нижней полосы — около двадцати точек по
+    высоте. На таком кегле читается только силуэт, поэтому лямки выходят за
+    корпус по бокам, сверху торчит ручка, а клапан отделён тёмной линией:
+    без них пиксельный прямоугольник читался как ящик, а не как рюкзак.
+    """
+    img = item_canvas()
+    body = C("rust_tool")
+    dark = shade(body, 0.62)
+    # ручка сверху — по ней рюкзак узнаётся раньше, чем по лямкам
+    rect(img, 14, 5, 18, 8, dark)
+    rect(img, 15, 6, 17, 8, (0, 0, 0, 0))
+    # лямки: шире корпуса, поэтому видны по бокам даже в 20 точек. Цвет —
+    # светлее корпуса, иначе на почти чёрной полосе они сливаются с фоном.
+    strap = shade(C("wood_dark"), 1.5)
+    rect(img, 5, 10, 9, 27, strap)
+    rect(img, 23, 10, 27, 27, strap)
+    rect(img, 5, 24, 9, 26, shade(C("iron_tool"), 0.8))
+    rect(img, 23, 24, 27, 26, shade(C("iron_tool"), 0.8))
+    # корпус
+    rect(img, 8, 8, 24, 27, body)
+    rect(img, 8, 8, 24, 10, shade(body, 1.3))
+    # клапан с тёмной кромкой и светлой застёжкой
+    rect(img, 8, 8, 24, 17, shade(body, 1.12))
+    rect(img, 8, 17, 24, 18, dark)
+    rect(img, 14, 14, 18, 19, C("iron_tool"))
+    rect(img, 15, 16, 17, 18, shade(C("iron_tool"), 0.6))
+    # карман
+    rect(img, 11, 20, 21, 26, shade(body, 0.86))
+    rect(img, 11, 20, 21, 21, dark)
+    blend_px(img, 9, 10, (255, 255, 255, 70))
+    save(img, "ui/icon_backpack.png")
+
+
 def draw_icon_blackbox():
     img = item_canvas()
     rect(img, 6, 10, 26, 24, C("blackbox_body"))
@@ -1248,6 +1288,7 @@ def gen_ui():
     draw_icon_coin()
     draw_icon_dollar()
     draw_icon_inventory()
+    draw_icon_backpack()
     draw_icon_blackbox()
     draw_icon_depth()
     draw_panel_9slice()

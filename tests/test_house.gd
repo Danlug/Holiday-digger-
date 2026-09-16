@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_hatch_transition()
 	_test_storage_access_rules()
 	_test_storage_survives_death_and_save()
+	_test_no_food_button()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -289,6 +290,34 @@ func _test_enter_and_exit_keeps_state() -> void:
 	check("бодрость не изменилась", is_equal_approx(GameState.stamina, stamina_before))
 	check("сытость не изменилась", is_equal_approx(GameState.hunger, hunger_before))
 	check("инвентарь цел", GameState.get_item_count("iron_ore") == iron_before)
+
+
+## Кнопки «Еда» на нижней полосе больше нет (решение владельца): она висела
+## там всю вылазку и путалась с инструментом. Едят из рюкзака — кнопкой в
+## строке предмета (scripts/ui/hud.gd), а контекстная кнопка дома остаётся
+## только под дверь.
+func _test_no_food_button() -> void:
+	var btn := Button.new()
+	btn.add_to_group("house_button")
+	add_child(btn)
+	house._button = btn
+	house._button_action = ""
+
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	GameState.inventory.clear()
+	GameState.add_item("food_soup", 1)
+	GameState.set_hunger(10.0)
+	var door := HouseConfig.door_cell()
+	player.x = float(door.x) + 20.0
+	player.y = 40.5
+	house._update_hud_button()
+	check("вдали от двери с едой в рюкзаке кнопки нет", not btn.visible)
+	check("действие «съесть» у кнопки не назначено", not house._button_action.begins_with("eat"))
+	check("есть из рюкзака по-прежнему можно", bool(HouseFood.eat("food_soup")["ok"]))
+
+	btn.queue_free()
+	house._button = null
 
 
 func _test_hatch_transition() -> void:

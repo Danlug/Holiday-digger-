@@ -535,6 +535,11 @@ func _make_craft_row(r: Dictionary) -> Control:
 	title.text = String(r["name_ru"])
 	title.add_theme_font_size_override("font_size", 10)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Без обрезки Label требует себе всю ширину текста, и длинное название
+	# («Ранец с пропеллерами») распирает ряд шире экрана — вместе с ним за
+	# правый край уезжают кнопки «На склад» и «Собрать».
+	title.clip_text = true
+	title.custom_minimum_size = Vector2(40, 0)
 	head.add_child(title)
 
 	# «На склад» — та же кнопка, что раньше была «Вложить», но теперь это
@@ -556,6 +561,8 @@ func _make_craft_row(r: Dictionary) -> Control:
 	desc.text = String(r["desc_ru"])
 	desc.add_theme_font_size_override("font_size", 8)
 	desc.add_theme_color_override("font_color", DIM)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(desc)
 
 	var parts: Array = []
@@ -573,6 +580,8 @@ func _make_craft_row(r: Dictionary) -> Control:
 		reason.text = String(check["reason"])
 		reason.add_theme_font_size_override("font_size", 8)
 		reason.add_theme_color_override("font_color", GREEN if String(check["reason"]) == "Уже собрано" else DIM)
+		reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		reason.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_child(reason)
 
 	box.add_child(HSeparator.new())

@@ -363,15 +363,12 @@ func _update_hud_button() -> void:
 		_button.visible = false
 		return
 	else:
-		var food := HouseFood.best_food_for_now()
-		if food.is_empty():
-			_button_action = ""
-			_button.visible = false
-			return
-		_button_action = "eat:" + food
-		# Коротко: в ряду нижней полосы каждая буква — место, которого там
-		# уже не хватает (см. комментарий к кнопке в hud.gd).
-		_button.text = "Еда"
+		# Кнопки «Еда» на полосе больше нет (решение владельца): она висела
+		# внизу всю вылазку и путалась с инструментом. Едят теперь из рюкзака
+		# — там, где еда и лежит (кнопка «Съесть» в строке, см. hud.gd).
+		_button_action = ""
+		_button.visible = false
+		return
 	_button.visible = true
 
 

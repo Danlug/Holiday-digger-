@@ -52,6 +52,8 @@ var _stick: Control
 var _knob: Control
 var _hold_hint: Label
 var _tool_button: Button
+var _objective_panel: PanelContainer
+var _objective_label: Label
 var _tool_name_panel: PanelContainer
 var _tool_name_label: Label
 var _tool_name_timer: Timer
@@ -563,6 +565,7 @@ func _build_strip() -> void:
 	# по важности, а не по алфавиту: игрок сидит в шахте, а не в меню.
 	var more_menu := _build_more_menu()
 	_build_tool_name_popup()
+	_build_objective_line()
 
 	# Иконкой, а не словом: ряд шириной 224 не вмещает подпись «Инвентарь»
 	# вместе с названием инструмента, снаряжением, режимом и сбросом.
@@ -708,6 +711,43 @@ func _build_more_menu() -> VBoxContainer:
 	box.add_theme_constant_override("separation", 3)
 	_more_panel.add_child(box)
 	return box
+
+
+## Строка текущего обучающего задания — над полосой, поверх экрана. Держится,
+## пока задание не выполнено: это не подсказка, а условие, без которого игра
+## дальше не пускает (ГДД п.9). Тостом её сделать нельзя — тост гаснет, а
+## задание надо видеть всё время, пока копаешь.
+func _build_objective_line() -> void:
+	_objective_panel = PanelContainer.new()
+	_objective_panel.name = "Objective"
+	_objective_panel.visible = false
+	_objective_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.071, 0.055, 0.043, 0.92)
+	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(5)
+	_objective_panel.add_theme_stylebox_override("panel", sb)
+	_objective_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_objective_panel.offset_left = 8
+	_objective_panel.offset_right = -8
+	_objective_panel.offset_top = 58
+	add_child(_objective_panel)
+
+	_objective_label = Label.new()
+	_objective_label.add_theme_font_size_override("font_size", 10)
+	_objective_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_objective_panel.add_child(_objective_label)
+
+
+## Ставит текст задания; пустая строка убирает строку с экрана.
+func set_objective(text: String) -> void:
+	if _objective_panel == null:
+		return
+	_objective_label.text = text
+	_objective_panel.visible = not text.is_empty()
 
 
 ## Всплывающая подпись инструмента: панелька над полосой, по центру, гаснет

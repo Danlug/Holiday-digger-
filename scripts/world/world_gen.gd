@@ -175,6 +175,22 @@ func dig_cell(x: int, y: int) -> bool:
 	return true
 
 
+## Сценарные клетки огорода (сейчас — пять самородков золота на 4 уровне).
+## Нужны сюжету: он подсвечивает их и не пускает игрока к фундаменту, пока
+## они не выбраны. Порядок списка — из data/world_layers.json.
+func scripted_loot_cells() -> Array:
+	var out: Array = []
+	for cell in layers.get("scripted_loot", {}).get("cells", []):
+		out.append(Vector2i(int(cell.get("x", -1)), int(cell.get("y", -1))))
+	return out
+
+
+## Глубина фундамента. Сюжету она нужна, чтобы отличить «пробил фундамент» от
+## любой другой копки, а миру — чтобы не спрашивать число дважды.
+func foundation_y() -> int:
+	return _foundation_y
+
+
 func is_dug(x: int, y: int) -> bool:
 	return diffs.has(_key(x, y))
 

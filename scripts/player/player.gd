@@ -14,6 +14,9 @@ signal dig_started(x: int, y: int, tile_type: int)
 signal dig_cancelled
 signal dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_loot: bool, coins: int)
 signal dig_blocked(tile_type: int)  # инструмент не берёт эту породу — стан
+## Копать нельзя не из-за инструмента, а потому что так решил сюжет
+## (обучение: сперва золото, потом фундамент). Текст даёт сюжет, не игрок.
+signal dig_refused_by_story(reason: String)
 signal tool_auto_switched(tool_id: String)
 signal gear_unlocked(gear_id: String)
 signal jumped
@@ -475,6 +478,16 @@ func _start_dig(tx: int, ty: int) -> void:
 	if type == TileTypes.Type.STAIRCASE:
 		return
 
+	# Обучение не пускает к фундаменту, пока не выбраны пять самородков
+	# золота на четвёртом уровне (ГДД п.9, порядок владельца: сперва золото
+	# киркой, потом фундамент). Проверка здесь, а не в сюжете: остановить
+	# удар можно только там, где он начинается.
+	if type == TileTypes.Type.FOUNDATION \
+			and StoryState.is_seen("workshop") and not StoryState.has_flag("gold_taken"):
+		digging = null
+		dig_refused_by_story.emit("gold_first")
+		return
+
 	if GameState.current_tool == "shovel":
 		var shovel_max_depth := Balance.get_tool_max_depth("shovel")
 		if type == TileTypes.Type.FOUNDATION:
@@ -490,6 +503,16 @@ func _start_dig(tx: int, ty: int) -> void:
 			return
 
 	if not _can_dig(type):
+		# Обучающее золото — исключение из стана. Автокопка оставляет пять
+		# самородков на четвёртом уровне торчать посреди расчищенной земли, и
+		# первое, что делает игрок, — бьёт по ним лопатой. Минута стана за
+		# это приходит РАНЬШЕ, чем игра успела сказать, что такое золото и
+		# зачем нужна кирка: наказание за незнание, которое сама же и
+		# устроила. Пока сцена мастерской не сыграла, вместо стана объясняем.
+		if type == TileTypes.Type.GOLD_ORE and not StoryState.is_seen("workshop"):
+			digging = null
+			dig_refused_by_story.emit("gold_needs_pickaxe")
+			return
 		stun_until_msec = Time.get_ticks_msec() + float(Balance.unwrap(
 			Balance.balance.get("digging", {}).get("shovel_stun_on_stone_or_gold_seconds", 60))) * 1000.0
 		digging = null

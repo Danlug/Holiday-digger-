@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_resolve_dir_zones()
 	_test_dig_earth_gives_xp_not_coins()
 	_test_shovel_cannot_dig_stone()
+	_test_tutorial_gold_does_not_stun()
 	_test_gear_unlock_by_depth()
 	_test_exhaustion_penalty()
 
@@ -146,6 +147,48 @@ func _test_shovel_cannot_dig_stone() -> void:
 	_tick(3)
 	check("лопата не берёт камень — копка не началась", player.digging == null)
 	check("лопата о камень — герой оглушён (стан)", player.stun_until_msec > Time.get_ticks_msec())
+
+
+## Обучающее золото не оглушает. Автокопка оставляет пять самородков торчать
+## посреди расчищенной земли, и первое, что делает игрок, — бьёт по ним
+## лопатой. Минута стана за это приходит раньше, чем игра объяснила, что такое
+## золото и зачем кирка. После сцены мастерской стан возвращается: там игрок
+## уже знает, чем копают золото, и бьёт лопатой по своей воле.
+func _test_tutorial_gold_does_not_stun() -> void:
+	var cells: Array = world.scripted_loot_cells()
+	check("сценарное золото для теста нашлось", not cells.is_empty())
+	if cells.is_empty():
+		return
+	var cell: Vector2i = cells[0]
+	GameState.current_tool = "shovel"
+	GameState.story_seen.erase("workshop")
+	# Автокопка к этому моменту расчистила колонку над самородком — без этого
+	# герою просто негде стоять, и коллизия выталкивает его наверх.
+	for y in range(1, cell.y):
+		world.dig_cell(cell.x, y)
+	# Ровно та поза, в которой игрок оказывается после автокопки: стоит НА
+	# самородке и жмёт «вниз».
+	player.x = float(cell.x) + 0.5
+	player.y = float(cell.y) - 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+	player.stun_until_msec = 0.0
+
+	_tick(3)
+	check("лопата не берёт сценарное золото", player.digging == null)
+	check("до мастерской золото не оглушает", player.stun_until_msec <= Time.get_ticks_msec())
+
+	# После мастерской правило общее: лопата о золото — стан.
+	GameState.story_seen.append("workshop")
+	player.stun_until_msec = 0.0
+	player.digging = null
+	_tick(3)
+	check("после мастерской лопата о золото оглушает", player.stun_until_msec > Time.get_ticks_msec())
+	GameState.story_seen.erase("workshop")
+	player.hold_down = false
+	player.stun_until_msec = 0.0
 
 
 func _test_gear_unlock_by_depth() -> void:

@@ -59,7 +59,12 @@ func _run() -> void:
 	await _test_autodig_terminates()
 	await _test_tutorial_does_not_loop()
 	await _test_death_trigger_and_bars()
+	_test_tutorial_quests()
 
+	_print_total()
+
+
+func _print_total() -> void:
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -200,11 +205,23 @@ func _test_death_trigger_and_bars() -> void:
 	director._apply_no_fatigue_period()
 	check("до сцены смерти усталость не тратится", is_equal_approx(GameState.stamina, 100.0))
 
+	# Сцену смерти зовёт ПРОБИТИЕ ФУНДАМЕНТА (решение владельца), а не копка
+	# под собой: фундамент пробивают ровно один раз и только киркой, а мимо
+	# копки под собой игрок мог пройти боком и не увидеть сцену вовсе.
 	GameState.story_queue.clear()
-	director._on_dig_started(player.cell_x(), player.cell_y() + 1, TileTypes.Type.DIRT)
-	check("копка под собой после мастерской зовёт сцену смерти", GameState.story_queue.has("death"))
-	director._on_dig_started(player.cell_x(), player.cell_y() + 1, TileTypes.Type.DIRT)
+	StoryState.set_flag("gold_taken")
+	director._on_dig_finished(20, 5, TileTypes.Type.FOUNDATION, "", false, 0)
+	check("пробитие фундамента зовёт сцену смерти", GameState.story_queue.has("death"))
+	check("флаг пробитого фундамента выставлен", StoryState.has_flag("foundation_broken"))
+	director._on_dig_finished(21, 5, TileTypes.Type.FOUNDATION, "", false, 0)
 	check("второй раз та же сцена в очередь не встаёт", GameState.story_queue.count("death") == 1)
+	# Обычная копка сцену смерти не зовёт — иначе она играла бы на первой земле.
+	GameState.story_queue.clear()
+	StoryState.mark_seen("death")
+	director._on_dig_finished(22, 6, TileTypes.Type.DIRT, "", false, 0)
+	check("обычная клетка сцену смерти не зовёт", not GameState.story_queue.has("death"))
+	GameState.story_seen.erase("death")
+	GameState.story_queue.append("death")
 
 	var rounds := await _drain(director)
 	check("очередь после смерти доигралась до конца", rounds < 40, "кругов: %d" % rounds)
@@ -218,3 +235,58 @@ func _test_death_trigger_and_bars() -> void:
 	GameState.set_stamina(50.0)
 	director._apply_no_fatigue_period()
 	check("после смерти усталость снова тратится", is_equal_approx(GameState.stamina, 50.0))
+
+
+## Обучающие задания (ГДД п.9, порядок владельца): золото — фундамент —
+## продать — заказать еду. Проверяем состояние, а не события: игрок может
+## выйти посреди задания, и после загрузки оно обязано найтись само.
+func _test_tutorial_quests() -> void:
+	StoryState.clear_all()
+	GameState.inventory.clear()
+	GameState.coins = 0
+	GameState.house_food_at_door.clear()
+
+	director._update_quests()
+	check("до мастерской заданий нет", director._objective.is_empty())
+
+	StoryState.mark_seen("workshop")
+	director._update_quests()
+	var gold_cells: Array = world.scripted_loot_cells()
+	check("сценарного золота ровно пять", gold_cells.size() == 5)
+	check("после мастерской задание — золото", director._objective.contains("золото"))
+	check("подсвечены все пять клеток", director._quest_cells.size() == 5)
+	check("задание считает оставшиеся самородки", director._objective.contains("5"))
+
+	world.dig_cell(gold_cells[0].x, gold_cells[0].y)
+	director._update_quests()
+	check("выкопанный самородок из подсветки уходит", director._quest_cells.size() == 4)
+	check("задание не закрыто, пока золото не выбрано", not StoryState.has_flag("gold_taken"))
+
+	for i in range(1, gold_cells.size()):
+		world.dig_cell(gold_cells[i].x, gold_cells[i].y)
+	director._update_quests()
+	check("всё золото выбрано — задание закрыто", StoryState.has_flag("gold_taken"))
+	check("подсветка снята", director._quest_cells.is_empty())
+	check("следующее задание — фундамент", director._objective.contains("фундамент"))
+
+	StoryState.set_flag("foundation_broken")
+	StoryState.mark_seen("death")
+	GameState.add_item("gold", 5)
+	director._update_quests()
+	check("после смерти задание — продать золото", director._objective.contains("продай"))
+	check("с золотом в рюкзаке продажа не засчитана", not StoryState.has_flag("gold_sold"))
+
+	# Выбросить — не значит продать: пустой рюкзак без денег задание не закрывает.
+	GameState.inventory.clear()
+	director._update_quests()
+	check("выброшенное золото за продажу не считается", not StoryState.has_flag("gold_sold"))
+
+	GameState.coins = 250
+	director._update_quests()
+	check("проданное золото закрывает задание", StoryState.has_flag("gold_sold"))
+	check("следующее задание — еда", director._objective.contains("еду"))
+
+	GameState.house_food_at_door["food_soup"] = 1
+	director._update_quests()
+	check("заказанная еда закрывает обучение", StoryState.has_flag("food_ordered"))
+	check("заданий больше нет", director._objective.is_empty())

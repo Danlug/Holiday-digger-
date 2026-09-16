@@ -126,6 +126,17 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 		_set_color(s, COLOR_FALLBACK_SOLID if solid2 else COLOR_FALLBACK_EMPTY)
 
 
+## Клетки, подсвеченные обучающим заданием. Ставит сюжет (story_director),
+## мир только рисует: какие клетки важны — знание сюжета, а не карты.
+var _quest_cells: Array = []
+
+
+func set_quest_cells(cells: Array) -> void:
+	_quest_cells = cells
+	if _overlay != null:
+		_overlay.queue_redraw()
+
+
 func _on_overlay_draw() -> void:
 	if player == null:
 		return
@@ -137,6 +148,17 @@ func _on_overlay_draw() -> void:
 	var res_r: float = (GameState.get_vision_resource_radius() + 0.5) * TILE
 	_overlay.draw_arc(Vector2(pcx, pcy), relief_r, 0, TAU, 48, Color(0.918, 0.867, 0.776, 0.16), 1.0)
 	_overlay.draw_arc(Vector2(pcx, pcy), res_r, 0, TAU, 48, Color(0.878, 0.663, 0.231, 0.3), 1.0)
+
+	# Клетки обучающего задания (пять самородков золота): пульсирующая рамка,
+	# чтобы их было видно среди породы. Задание висит строкой в интерфейсе, но
+	# «на четвёртом уровне» — не адрес: без рамки игрок ходит и ищет.
+	if not _quest_cells.is_empty():
+		var pulse: float = 0.55 + 0.45 * sin(float(Time.get_ticks_msec()) / 260.0)
+		for c: Vector2i in _quest_cells:
+			var qx: float = c.x * TILE
+			var qy: float = c.y * TILE
+			_overlay.draw_rect(Rect2(qx + 1, qy + 1, TILE - 2, TILE - 2),
+				Color(0.878, 0.663, 0.231, pulse), false, 2.0)
 
 	# Подсветка копаемой клетки.
 	if player.digging != null:

@@ -1,408 +1,1453 @@
 {
-  "version": 1,
-  "_note": "Структура катсцен. Текстов здесь НЕТ — только ключи в data/story_<локаль>.json, чтобы переписывание реплик и перевод не задевали режиссуру, а режиссура не ломала перевод.",
-  "_beats": {
-    "card": "полноэкранная карточка-титр; sec — через сколько сама уйдёт (тап ускоряет)",
-    "narr": "закадровый текст, ждёт тапа",
-    "say": "реплика; who — id актёра (подпись берётся из speaker.<who>)",
-    "show": "поставить актёра: at=left|center|right, pose=имя листа в art/character/<actor>/, flip, scale",
-    "hide": "убрать актёра",
-    "prop": "поставить реквизит из таблицы props",
-    "clear": "убрать со сцены всё",
-    "mood": "сменить свет/фон сцены (таблица moods)",
-    "wait": "пауза sec секунд",
-    "fade": "dir=out затемнение, dir=in проявление",
-    "item": "карточка найденного предмета (icon, name, text)",
-    "tap": "обязательный тап по подсвеченной цели — обучение действием, а не текстом",
-    "move": "сдвинуть актёра на dy пикселей за sec (герой проваливается в яму)",
-    "shake": "тряска сцены",
-    "daynight": "ускоренная смена суток: cycles раз по sec секунд"
-  },
-  "_effects": {
-    "flag": "поставить сюжетный флаг id",
-    "tool": "выдать инструмент id",
-    "coins": "начислить n монет",
-    "dollars": "начислить n премиум-валюты",
-    "artifact": "положить артефакт id в коллекцию",
-    "xp": "начислить n опыта",
-    "sleep": "уснуть на hours игровых часов",
-    "stamina": "выставить бодрость в n процентов",
-    "hunger": "добавить n процентов сытости",
-    "toast": "показать подсказку HUD (ключ текста)",
-    "teleport_home": "вернуть героя на поверхность к дому",
-    "hook": "вызвать метод чужой системы, если она уже подключена (house/shop)"
-  },
-
-  "moods": {
-    "day":         {"sky": "#7d93a6", "ground": "#6b5a3e"},
-    "dusk":        {"sky": "#4a3f52", "ground": "#493b29"},
-    "night":       {"sky": "#141a2b", "ground": "#2a2218"},
-    "cellar":      {"sky": "#1c1712", "ground": "#241c14"},
-    "underground": {"sky": "#241a12", "ground": "#382a1c"},
-    "dark":        {"sky": "#0b0806", "ground": "#0b0806"},
-    "room":        {"sky": "#2e2519", "ground": "#3a2d1e"}
-  },
-
-  "props": {
-    "house":     {"tex": "res://art/env/house_exterior.png", "scale": 0.95, "y": 0.0},
-    "fence":     {"tex": "res://art/env/fence.png",          "scale": 1.6, "y": 0.0},
-    "grave":     {"tex": "res://art/env/grave.png",          "scale": 2.0, "y": 0.0},
-    "workbench": {"tex": "res://art/env/workbench.png",      "scale": 2.4, "y": 0.0},
-    "bed":       {"tex": "res://art/env/bed.png",            "scale": 2.4, "y": 0.0},
-    "hatch":     {"tex": "res://art/env/hatch.png",          "scale": 2.4, "y": 0.0},
-    "shovel":    {"tex": "res://art/items/shovel.png",       "scale": 1.8, "y": 0.0},
-    "pickaxe":   {"tex": "res://art/items/pickaxe_rusty.png","scale": 1.8, "y": 0.0},
-    "backpack":  {"tex": "res://art/items/backpack_propeller.png", "scale": 1.8, "y": 0.0}
-  },
-
-  "actors": {
-    "grandpa":      {"dir": "grandpa",      "speaker": "speaker.grandpa"},
-    "grandpa_gear": {"dir": "grandpa_gear", "speaker": "speaker.grandpa"},
-    "grandma_poor": {"dir": "grandma_poor", "speaker": "speaker.grandma"},
-    "grandma_rich": {"dir": "grandma_rich", "speaker": "speaker.grandma"},
-    "boy":          {"dir": "boy",          "speaker": "speaker.boy"},
-    "boy_gear":     {"dir": "boy_gear",     "speaker": "speaker.boy"},
-    "robert":       {"dir": "",             "speaker": "speaker.robert"},
-    "parents":      {"dir": "",             "speaker": "speaker.parents"}
-  },
-
-  "scenes": [
-    {
-      "id": "intro_grandpa",
-      "title": "intro_grandpa.title",
-      "beats": [
-        {"t": "mood", "id": "dark"},
-        {"t": "card", "text": "intro_grandpa.card_when", "sec": 3.2},
-        {"t": "mood", "id": "day"},
-        {"t": "prop", "id": "house", "at": "right"},
-        {"t": "prop", "id": "fence", "at": "far_right"},
-        {"t": "show", "actor": "grandpa", "at": "left", "pose": "dig_shovel"},
-        {"t": "narr", "text": "intro_grandpa.n1"},
-        {"t": "show", "actor": "grandpa", "at": "left", "pose": "idle"},
-        {"t": "say", "who": "grandpa", "text": "intro_grandpa.s1"},
-        {"t": "narr", "text": "intro_grandpa.n2"},
-        {"t": "shake", "sec": 0.35},
-        {"t": "say", "who": "grandpa", "text": "intro_grandpa.s2"},
-        {"t": "show", "actor": "grandpa", "at": "left", "pose": "dig_shovel"},
-        {"t": "narr", "text": "intro_grandpa.n3"},
-        {"t": "hide", "actor": "grandpa"},
-        {"t": "show", "actor": "grandpa_gear", "at": "left", "pose": "pose_compass", "scale": 2.0},
-        {"t": "narr", "text": "intro_grandpa.n3b"},
-        {"t": "hide", "actor": "grandpa_gear"},
-        {"t": "show", "actor": "grandpa", "at": "left", "pose": "dig_shovel"},
-        {"t": "show", "actor": "grandma_poor", "at": "right", "pose": "idle", "flip": true},
-        {"t": "say", "who": "grandma_poor", "text": "intro_grandpa.g1"},
-        {"t": "narr", "text": "intro_grandpa.n4"},
-        {"t": "say", "who": "grandpa", "text": "intro_grandpa.s3"},
-        {"t": "mood", "id": "dusk"},
-        {"t": "narr", "text": "intro_grandpa.n5"},
-        {"t": "mood", "id": "night"},
-        {"t": "move", "actor": "grandpa", "dy": 26, "sec": 1.0},
-        {"t": "say", "who": "grandma_poor", "text": "intro_grandpa.g2"},
-        {"t": "say", "who": "grandpa", "text": "intro_grandpa.s4"},
-        {"t": "hide", "actor": "grandma_poor"},
-        {"t": "move", "actor": "grandpa", "dy": 20, "sec": 1.2},
-        {"t": "narr", "text": "intro_grandpa.n6"},
-        {"t": "daynight", "cycles": 3, "sec": 0.7},
-        {"t": "fade", "dir": "out", "sec": 1.2},
-        {"t": "clear"},
-        {"t": "mood", "id": "dark"},
-        {"t": "card", "text": "intro_grandpa.card_death", "sec": 4.0},
-        {"t": "mood", "id": "dusk"},
-        {"t": "fade", "dir": "in", "sec": 0.8},
-        {"t": "prop", "id": "grave", "at": "center"},
-        {"t": "show", "actor": "grandma_poor", "at": "left", "pose": "idle"},
-        {"t": "say", "who": "grandma_poor", "text": "intro_grandpa.g3"},
-        {"t": "narr", "text": "intro_grandpa.n7"},
-        {"t": "fade", "dir": "out", "sec": 0.9}
-      ],
-      "effects": [
-        {"do": "flag", "id": "intro_grandpa_seen"}
-      ]
-    },
-
-    {
-      "id": "intro_boy",
-      "title": "intro_boy.title",
-      "beats": [
-        {"t": "mood", "id": "dark"},
-        {"t": "card", "text": "intro_boy.card_when", "sec": 2.6},
-        {"t": "mood", "id": "room"},
-        {"t": "fade", "dir": "in", "sec": 0.7},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "narr", "text": "intro_boy.n1"},
-        {"t": "say", "who": "boy", "text": "intro_boy.s1"},
-        {"t": "narr", "text": "intro_boy.n2"},
-        {"t": "say", "who": "parents", "text": "intro_boy.p1"},
-        {"t": "say", "who": "boy", "text": "intro_boy.s2"},
-        {"t": "fade", "dir": "out", "sec": 0.7},
-        {"t": "clear"},
-        {"t": "mood", "id": "dark"},
-        {"t": "card", "text": "intro_boy.card_there", "sec": 2.2},
-        {"t": "mood", "id": "day"},
-        {"t": "prop", "id": "house", "at": "center"},
-        {"t": "prop", "id": "fence", "at": "far_left"},
-        {"t": "fade", "dir": "in", "sec": 0.8},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "idle"},
-        {"t": "narr", "text": "intro_boy.n3"},
-        {"t": "say", "who": "boy", "text": "intro_boy.s3"},
-        {"t": "show", "actor": "grandma_rich", "at": "right", "pose": "idle", "flip": true},
-        {"t": "say", "who": "grandma_rich", "text": "intro_boy.g1"},
-        {"t": "say", "who": "boy", "text": "intro_boy.s4"},
-        {"t": "say", "who": "grandma_rich", "text": "intro_boy.g2"},
-        {"t": "say", "who": "boy", "text": "intro_boy.s5"},
-        {"t": "say", "who": "grandma_rich", "text": "intro_boy.g3"},
-        {"t": "mood", "id": "night"},
-        {"t": "hide", "actor": "grandma_rich"},
-        {"t": "narr", "text": "intro_boy.n4"},
-        {"t": "mood", "id": "day"},
-        {"t": "card", "text": "intro_boy.card_morning", "sec": 2.6},
-        {"t": "show", "actor": "grandma_rich", "at": "right", "pose": "walk", "flip": true},
-        {"t": "say", "who": "grandma_rich", "text": "intro_boy.g4"},
-        {"t": "hide", "actor": "grandma_rich"},
-        {"t": "narr", "text": "intro_boy.n5"},
-        {"t": "clear"},
-        {"t": "mood", "id": "dark"},
-        {"t": "prop", "id": "shovel", "at": "center"},
-        {"t": "card", "text": "intro_boy.card_shovel", "sec": 2.8},
-        {"t": "fade", "dir": "out", "sec": 0.6}
-      ],
-      "effects": [
-        {"do": "flag", "id": "intro_seen"},
-        {"do": "toast", "text": "tutorial_dig.hint", "sec": 6.0}
-      ]
-    },
-
-    {
-      "id": "autodig_start",
-      "title": "autodig.title",
-      "beats": [
-        {"t": "mood", "id": "dusk"},
-        {"t": "card", "text": "autodig.card_start", "sec": 2.4}
-      ],
-      "effects": []
-    },
-
-    {
-      "id": "autodig_done",
-      "title": "autodig.title",
-      "beats": [
-        {"t": "mood", "id": "night"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "narr", "text": "autodig.n_done"}
-      ],
-      "effects": [
-        {"do": "flag", "id": "autodig_done"},
-        {"do": "toast", "text": "autodig.toast_done", "sec": 5.0}
-      ]
-    },
-
-    {
-      "id": "dud_treasure",
-      "title": "dud_treasure.title",
-      "beats": [
-        {"t": "mood", "id": "underground"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "dig_shovel"},
-        {"t": "narr", "text": "dud_treasure.n1"},
-        {"t": "hide", "actor": "boy"},
-        {"t": "item", "icon": "res://art/ui/icon_blackbox.png", "name": "item.dud_treasure", "text": "dud_treasure.item_text"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "dud_treasure.s1"},
-        {"t": "narr", "text": "dud_treasure.n2"},
-        {"t": "card", "text": "dud_treasure.card_collection", "sec": 3.0}
-      ],
-      "effects": [
-        {"do": "flag", "id": "dud_treasure_found"},
-        {"do": "artifact", "id": "antiquity_1"},
-        {"do": "coins", "n": 50},
-        {"do": "dollars", "n": 5}
-      ]
-    },
-
-    {
-      "id": "workshop",
-      "title": "workshop.title",
-      "beats": [
-        {"t": "mood", "id": "underground"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "dig_shovel"},
-        {"t": "narr", "text": "workshop.n1"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "workshop.s1"},
-        {"t": "narr", "text": "workshop.n2"},
-        {"t": "fade", "dir": "out", "sec": 0.6},
-        {"t": "clear"},
-        {"t": "mood", "id": "cellar"},
-        {"t": "prop", "id": "workbench", "at": "right"},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "idle"},
-        {"t": "fade", "dir": "in", "sec": 0.9},
-        {"t": "narr", "text": "workshop.n3"},
-        {"t": "narr", "text": "workshop.n4"},
-        {"t": "say", "who": "boy", "text": "workshop.s2"},
-        {"t": "narr", "text": "workshop.n5"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle", "scale": 4.0},
-        {"t": "narr", "text": "workshop.n6"},
-        {"t": "hide", "actor": "boy"},
-        {"t": "item", "icon": "res://art/items/pickaxe_rusty.png", "name": "item.rusty_pickaxe", "text": "workshop.item_text"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "dig_pick_rusty"},
-        {"t": "say", "who": "boy", "text": "workshop.s3"}
-      ],
-      "effects": [
-        {"do": "flag", "id": "workshop_seen"},
-        {"do": "tool", "id": "rusty_pickaxe"}
-      ]
-    },
-
-    {
-      "id": "death",
-      "title": "death.title",
-      "beats": [
-        {"t": "mood", "id": "day"},
-        {"t": "card", "text": "death.card_down", "sec": 2.0},
-        {"t": "mood", "id": "underground"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "dig_pick_rusty"},
-        {"t": "narr", "text": "death.n1"},
-        {"t": "move", "actor": "boy", "dy": 18, "sec": 0.8},
-        {"t": "move", "actor": "boy", "dy": 18, "sec": 0.8},
-        {"t": "move", "actor": "boy", "dy": 18, "sec": 0.8},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "death.s1"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "fall"},
-        {"t": "narr", "text": "death.n2"},
-        {"t": "shake", "sec": 0.4},
-        {"t": "narr", "text": "death.n3"},
-        {"t": "daynight", "cycles": 3, "sec": 0.65},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "sleep"},
-        {"t": "say", "who": "boy", "text": "death.s2"},
-        {"t": "narr", "text": "death.n4"},
-        {"t": "fade", "dir": "out", "sec": 1.4},
-        {"t": "clear"},
-        {"t": "mood", "id": "dark"},
-        {"t": "card", "text": "death.card_same", "sec": 3.0},
-        {"t": "mood", "id": "room"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "sleep"},
-        {"t": "fade", "dir": "in", "sec": 1.0},
-        {"t": "narr", "text": "death.n5"},
-        {"t": "narr", "text": "death.n6"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "death.s3"},
-        {"t": "card", "text": "death.card_bars", "sec": 4.0}
-      ],
-      "effects": [
-        {"do": "flag", "id": "death_seen"},
-        {"do": "flag", "id": "bars_introduced"},
-        {"do": "teleport_home"},
-        {"do": "stamina", "n": 100},
-        {"do": "hunger", "n": 100},
-        {"do": "toast", "text": "death.toast_bars", "sec": 6.0}
-      ]
-    },
-
-    {
-      "id": "backpack",
-      "title": "backpack.title",
-      "beats": [
-        {"t": "mood", "id": "cellar"},
-        {"t": "prop", "id": "workbench", "at": "right"},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "idle"},
-        {"t": "narr", "text": "backpack.n1"},
-        {"t": "narr", "text": "backpack.n2"},
-        {"t": "say", "who": "boy", "text": "backpack.s1"},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "dig_pick_rusty"},
-        {"t": "shake", "sec": 0.3},
-        {"t": "wait", "sec": 0.4},
-        {"t": "shake", "sec": 0.3},
-        {"t": "narr", "text": "backpack.n3"},
-        {"t": "hide", "actor": "boy"},
-        {"t": "item", "icon": "res://art/items/backpack_propeller.png", "name": "item.backpack", "text": "backpack.item_text"},
-        {"t": "show", "actor": "boy_gear", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "backpack.s2"}
-      ],
-      "effects": [
-        {"do": "flag", "id": "backpack_owned"}
-      ]
-    },
-
-    {
-      "id": "robert",
-      "title": "robert.title",
-      "beats": [
-        {"t": "mood", "id": "room"},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "robert.s1"},
-        {"t": "show", "actor": "grandma_rich", "at": "right", "pose": "idle", "flip": true},
-        {"t": "shake", "sec": 0.5},
-        {"t": "say", "who": "grandma_rich", "text": "robert.g1"},
-        {"t": "narr", "text": "robert.n1"},
-        {"t": "say", "who": "grandma_rich", "text": "robert.g2"},
-        {"t": "clear"},
-        {"t": "mood", "id": "day"},
-        {"t": "prop", "id": "house", "at": "right"},
-        {"t": "narr", "text": "robert.n2"},
-        {"t": "mood", "id": "dusk"},
-        {"t": "narr", "text": "robert.n3"},
-        {"t": "clear"},
-        {"t": "mood", "id": "cellar"},
-        {"t": "prop", "id": "hatch", "at": "center"},
-        {"t": "say", "who": "robert", "text": "robert.r1"},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "robert.s2"},
-        {"t": "say", "who": "robert", "text": "robert.r2"}
-      ],
-      "effects": [
-        {"do": "flag", "id": "robert_seen"},
-        {"do": "flag", "id": "hatch_built"},
-        {"do": "hook", "target": "house", "method": "build_hatch"},
-        {"do": "toast", "text": "robert.toast_hatch", "sec": 5.0}
-      ]
-    },
-
-    {
-      "id": "sleep_lesson_1",
-      "title": "sleep1.title",
-      "beats": [
-        {"t": "mood", "id": "dusk"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "fall"},
-        {"t": "narr", "text": "sleep1.n1"},
-        {"t": "mood", "id": "room"},
-        {"t": "prop", "id": "bed", "at": "right"},
-        {"t": "show", "actor": "boy", "at": "left", "pose": "idle"},
-        {"t": "narr", "text": "sleep1.n2"},
-        {"t": "tap", "prop": "bed", "text": "sleep1.tap_bed"},
-        {"t": "hide", "actor": "boy"},
-        {"t": "show", "actor": "boy", "at": "right", "pose": "sleep"},
-        {"t": "card", "text": "sleep1.card_rules", "sec": 4.5},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "sleep1.s1"}
-      ],
-      "effects": [
-        {"do": "flag", "id": "sleep_lesson_1_seen"},
-        {"do": "teleport_home"},
-        {"do": "sleep", "hours": 8},
-        {"do": "stamina", "n": 100}
-      ]
-    },
-
-    {
-      "id": "sleep_lesson_2",
-      "title": "sleep2.title",
-      "beats": [
-        {"t": "mood", "id": "underground"},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "fall"},
-        {"t": "narr", "text": "sleep2.n1"},
-        {"t": "narr", "text": "sleep2.n2"},
-        {"t": "hide", "actor": "boy"},
-        {"t": "item", "icon": "res://art/ui/icon_stamina.png", "name": "item.energy_bar", "text": "sleep2.item_text"},
-        {"t": "tap", "prop": "", "text": "sleep2.tap_bar"},
-        {"t": "card", "text": "sleep2.card_rules", "sec": 4.5},
-        {"t": "show", "actor": "boy", "at": "center", "pose": "idle"},
-        {"t": "say", "who": "boy", "text": "sleep2.s1"}
-      ],
-      "effects": [
-        {"do": "flag", "id": "sleep_lesson_2_seen"},
-        {"do": "stamina", "n": 100},
-        {"do": "hunger", "n": 50},
-        {"do": "hook", "target": "shop", "method": "unlock_doping_section"}
-      ]
-    }
-  ]
+	"version": 1,
+	"_note": "Структура катсцен. Текстов здесь НЕТ — только ключи в data/story_<локаль>.json, чтобы переписывание реплик и перевод не задевали режиссуру, а режиссура не ломала перевод.",
+	"_beats": {
+		"card": "полноэкранная карточка-титр; sec — через сколько сама уйдёт (тап ускоряет)",
+		"narr": "закадровый текст, ждёт тапа",
+		"say": "реплика; who — id актёра (подпись берётся из speaker.<who>)",
+		"show": "поставить актёра: at=left|center|right, pose=имя листа в art/character/<actor>/, flip, scale",
+		"hide": "убрать актёра",
+		"prop": "поставить реквизит из таблицы props",
+		"clear": "убрать со сцены всё",
+		"mood": "сменить свет/фон сцены (таблица moods)",
+		"wait": "пауза sec секунд",
+		"fade": "dir=out затемнение, dir=in проявление",
+		"item": "карточка найденного предмета (icon, name, text)",
+		"tap": "обязательный тап по подсвеченной цели — обучение действием, а не текстом",
+		"move": "сдвинуть актёра на dy пикселей за sec (герой проваливается в яму)",
+		"shake": "тряска сцены",
+		"daynight": "ускоренная смена суток: cycles раз по sec секунд"
+	},
+	"_effects": {
+		"flag": "поставить сюжетный флаг id",
+		"tool": "выдать инструмент id",
+		"coins": "начислить n монет",
+		"dollars": "начислить n премиум-валюты",
+		"artifact": "положить артефакт id в коллекцию",
+		"xp": "начислить n опыта",
+		"sleep": "уснуть на hours игровых часов",
+		"stamina": "выставить бодрость в n процентов",
+		"hunger": "добавить n процентов сытости",
+		"toast": "показать подсказку HUD (ключ текста)",
+		"teleport_home": "вернуть героя на поверхность к дому",
+		"hook": "вызвать метод чужой системы, если она уже подключена (house/shop)"
+	},
+	"moods": {
+		"day": {
+			"sky": "#7d93a6",
+			"ground": "#6b5a3e"
+		},
+		"dusk": {
+			"sky": "#4a3f52",
+			"ground": "#493b29"
+		},
+		"night": {
+			"sky": "#141a2b",
+			"ground": "#2a2218"
+		},
+		"cellar": {
+			"sky": "#1c1712",
+			"ground": "#241c14"
+		},
+		"underground": {
+			"sky": "#241a12",
+			"ground": "#382a1c"
+		},
+		"dark": {
+			"sky": "#0b0806",
+			"ground": "#0b0806"
+		},
+		"room": {
+			"sky": "#2e2519",
+			"ground": "#3a2d1e"
+		}
+	},
+	"props": {
+		"house": {
+			"tex": "res://art/env/house_exterior.png",
+			"scale": 0.95,
+			"y": 0.0
+		},
+		"fence": {
+			"tex": "res://art/env/fence.png",
+			"scale": 1.6,
+			"y": 0.0
+		},
+		"grave": {
+			"tex": "res://art/env/grave.png",
+			"scale": 2.0,
+			"y": 0.0
+		},
+		"workbench": {
+			"tex": "res://art/env/workbench.png",
+			"scale": 2.4,
+			"y": 0.0
+		},
+		"bed": {
+			"tex": "res://art/env/bed.png",
+			"scale": 2.4,
+			"y": 0.0
+		},
+		"hatch": {
+			"tex": "res://art/env/hatch.png",
+			"scale": 2.4,
+			"y": 0.0
+		},
+		"shovel": {
+			"tex": "res://art/items/shovel.png",
+			"scale": 1.8,
+			"y": 0.0
+		},
+		"pickaxe": {
+			"tex": "res://art/items/pickaxe_rusty.png",
+			"scale": 1.8,
+			"y": 0.0
+		},
+		"backpack": {
+			"tex": "res://art/items/backpack_propeller.png",
+			"scale": 1.8,
+			"y": 0.0
+		}
+	},
+	"actors": {
+		"grandpa": {
+			"dir": "grandpa",
+			"speaker": "speaker.grandpa"
+		},
+		"grandpa_gear": {
+			"dir": "grandpa_gear",
+			"speaker": "speaker.grandpa"
+		},
+		"grandma_poor": {
+			"dir": "grandma_poor",
+			"speaker": "speaker.grandma"
+		},
+		"grandma_rich": {
+			"dir": "grandma_rich",
+			"speaker": "speaker.grandma"
+		},
+		"boy": {
+			"dir": "boy",
+			"speaker": "speaker.boy"
+		},
+		"boy_gear": {
+			"dir": "boy_gear",
+			"speaker": "speaker.boy"
+		},
+		"robert": {
+			"dir": "",
+			"speaker": "speaker.robert"
+		},
+		"parents": {
+			"dir": "",
+			"speaker": "speaker.parents"
+		}
+	},
+	"scenes": [
+		{
+			"id": "intro_grandpa",
+			"title": "intro_grandpa.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "intro_grandpa.card_when",
+					"sec": 3.2
+				},
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "prop",
+					"id": "house",
+					"at": "right"
+				},
+				{
+					"t": "prop",
+					"id": "fence",
+					"at": "far_right"
+				},
+				{
+					"t": "show",
+					"actor": "grandpa",
+					"at": "left",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n1"
+				},
+				{
+					"t": "show",
+					"actor": "grandpa",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s1"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n2"
+				},
+				{
+					"t": "shake",
+					"sec": 0.35
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s2"
+				},
+				{
+					"t": "show",
+					"actor": "grandpa",
+					"at": "left",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n3"
+				},
+				{
+					"t": "hide",
+					"actor": "grandpa"
+				},
+				{
+					"t": "show",
+					"actor": "grandpa_gear",
+					"at": "left",
+					"pose": "pose_compass",
+					"scale": 2.0
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n3b"
+				},
+				{
+					"t": "hide",
+					"actor": "grandpa_gear"
+				},
+				{
+					"t": "show",
+					"actor": "grandpa",
+					"at": "left",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_poor",
+					"at": "right",
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g1"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n4"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s3"
+				},
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n5"
+				},
+				{
+					"t": "mood",
+					"id": "night"
+				},
+				{
+					"t": "move",
+					"actor": "grandpa",
+					"dy": 26,
+					"sec": 1.0
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g2"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s4"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_poor"
+				},
+				{
+					"t": "move",
+					"actor": "grandpa",
+					"dy": 20,
+					"sec": 1.2
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n6"
+				},
+				{
+					"t": "daynight",
+					"cycles": 3,
+					"sec": 0.7
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 1.2
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "intro_grandpa.card_death",
+					"sec": 4.0
+				},
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.8
+				},
+				{
+					"t": "prop",
+					"id": "grave",
+					"at": "center"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_poor",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g3"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n7"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.9
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "intro_grandpa_seen"
+				}
+			]
+		},
+		{
+			"id": "intro_boy",
+			"title": "intro_boy.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_when",
+					"sec": 2.6
+				},
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.7
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s1"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n2"
+				},
+				{
+					"t": "say",
+					"who": "parents",
+					"text": "intro_boy.p1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s2"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.7
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_there",
+					"sec": 2.2
+				},
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "prop",
+					"id": "house",
+					"at": "center"
+				},
+				{
+					"t": "prop",
+					"id": "fence",
+					"at": "far_left"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.8
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n3"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s3"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_rich",
+					"at": "right",
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s4"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g2"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s5"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g3"
+				},
+				{
+					"t": "mood",
+					"id": "night"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_rich"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n4"
+				},
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_morning",
+					"sec": 2.6
+				},
+				{
+					"t": "show",
+					"actor": "grandma_rich",
+					"at": "right",
+					"pose": "walk",
+					"flip": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g4"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_rich"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n5"
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "prop",
+					"id": "shovel",
+					"at": "center"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_shovel",
+					"sec": 2.8
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.6
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "intro_seen"
+				},
+				{
+					"do": "toast",
+					"text": "tutorial_dig.hint",
+					"sec": 6.0
+				}
+			]
+		},
+		{
+			"id": "autodig_start",
+			"title": "autodig.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "card",
+					"text": "autodig.card_start",
+					"sec": 2.4
+				}
+			],
+			"effects": []
+		},
+		{
+			"id": "autodig_done",
+			"title": "autodig.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "night"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "autodig.n_done"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "autodig_done"
+				},
+				{
+					"do": "toast",
+					"text": "autodig.toast_done",
+					"sec": 5.0
+				}
+			]
+		},
+		{
+			"id": "dud_treasure",
+			"title": "dud_treasure.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "narr",
+					"text": "dud_treasure.n1"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/ui/icon_blackbox.png",
+					"name": "item.dud_treasure",
+					"text": "dud_treasure.item_text"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "dud_treasure.s1"
+				},
+				{
+					"t": "narr",
+					"text": "dud_treasure.n2"
+				},
+				{
+					"t": "card",
+					"text": "dud_treasure.card_collection",
+					"sec": 3.0
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "dud_treasure_found"
+				},
+				{
+					"do": "artifact",
+					"id": "antiquity_1"
+				},
+				{
+					"do": "coins",
+					"n": 50
+				},
+				{
+					"do": "dollars",
+					"n": 5
+				}
+			]
+		},
+		{
+			"id": "workshop",
+			"title": "workshop.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n1"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "workshop.s1"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n2"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.6
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "cellar"
+				},
+				{
+					"t": "prop",
+					"id": "workbench",
+					"at": "right"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.9
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n3"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n4"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "workshop.s2"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n5"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle",
+					"scale": 4.0
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n6"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/items/pickaxe_rusty.png",
+					"name": "item.rusty_pickaxe",
+					"text": "workshop.item_text"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "workshop.s3"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "workshop_seen"
+				},
+				{
+					"do": "tool",
+					"id": "rusty_pickaxe"
+				}
+			]
+		},
+		{
+			"id": "death",
+			"title": "death.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "card",
+					"text": "death.card_down",
+					"sec": 2.0
+				},
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "narr",
+					"text": "death.n1"
+				},
+				{
+					"t": "move",
+					"actor": "boy",
+					"dy": 18,
+					"sec": 0.8
+				},
+				{
+					"t": "move",
+					"actor": "boy",
+					"dy": 18,
+					"sec": 0.8
+				},
+				{
+					"t": "move",
+					"actor": "boy",
+					"dy": 18,
+					"sec": 0.8
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "death.s1"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "death.n2"
+				},
+				{
+					"t": "shake",
+					"sec": 0.4
+				},
+				{
+					"t": "narr",
+					"text": "death.n3"
+				},
+				{
+					"t": "daynight",
+					"cycles": 3,
+					"sec": 0.65
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "sleep"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "death.s2"
+				},
+				{
+					"t": "narr",
+					"text": "death.n4"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 1.4
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "death.card_same",
+					"sec": 3.0
+				},
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "sleep"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 1.0
+				},
+				{
+					"t": "narr",
+					"text": "death.n5"
+				},
+				{
+					"t": "narr",
+					"text": "death.n6"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "death.s3"
+				},
+				{
+					"t": "card",
+					"text": "death.card_bars",
+					"sec": 4.0
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "death_seen"
+				},
+				{
+					"do": "flag",
+					"id": "bars_introduced"
+				},
+				{
+					"do": "teleport_home"
+				},
+				{
+					"do": "enter_house",
+					"room": "workshop"
+				},
+				{
+					"do": "stamina",
+					"n": 100
+				},
+				{
+					"do": "hunger",
+					"n": 100
+				},
+				{
+					"do": "toast",
+					"text": "death.toast_bars",
+					"sec": 6.0
+				}
+			]
+		},
+		{
+			"id": "backpack",
+			"title": "backpack.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "cellar"
+				},
+				{
+					"t": "prop",
+					"id": "workbench",
+					"at": "right"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n1"
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n2"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "backpack.s1"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "shake",
+					"sec": 0.3
+				},
+				{
+					"t": "wait",
+					"sec": 0.4
+				},
+				{
+					"t": "shake",
+					"sec": 0.3
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n3"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/items/backpack_propeller.png",
+					"name": "item.backpack",
+					"text": "backpack.item_text"
+				},
+				{
+					"t": "show",
+					"actor": "boy_gear",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "backpack.s2"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "backpack_owned"
+				}
+			]
+		},
+		{
+			"id": "robert",
+			"title": "robert.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "robert.s1"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_rich",
+					"at": "right",
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "shake",
+					"sec": 0.5
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "robert.g1"
+				},
+				{
+					"t": "narr",
+					"text": "robert.n1"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "robert.g2"
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "prop",
+					"id": "house",
+					"at": "right"
+				},
+				{
+					"t": "narr",
+					"text": "robert.n2"
+				},
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "narr",
+					"text": "robert.n3"
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "cellar"
+				},
+				{
+					"t": "prop",
+					"id": "hatch",
+					"at": "center"
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "robert.r1"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "robert.s2"
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "robert.r2"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "robert_seen"
+				},
+				{
+					"do": "flag",
+					"id": "hatch_built"
+				},
+				{
+					"do": "hook",
+					"target": "house",
+					"method": "build_hatch"
+				},
+				{
+					"do": "toast",
+					"text": "robert.toast_hatch",
+					"sec": 5.0
+				}
+			]
+		},
+		{
+			"id": "fuel_station",
+			"title": "fuel.title",
+			"_comment": "Решение владельца: заправка появляется ПОСЛЕ разговора с бабкой и после того, как у героя завёлся ручной бур. Заказывает её бабка, ставится она в огороде, а сделка простая: ей удобрение с торфоперегонки, ему топливные блоки.",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "show",
+					"actor": "boy_gear",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "fuel.s1"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_rich",
+					"at": "right",
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "fuel.g1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "fuel.s2"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "fuel.g2"
+				},
+				{
+					"t": "narr",
+					"text": "fuel.n1"
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "prop",
+					"id": "fence",
+					"at": "right"
+				},
+				{
+					"t": "narr",
+					"text": "fuel.n2"
+				},
+				{
+					"t": "show",
+					"actor": "boy_gear",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "fuel.s3"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "fuel_station_built"
+				},
+				{
+					"do": "toast",
+					"text": "fuel.toast",
+					"sec": 5.0
+				}
+			]
+		},
+		{
+			"id": "sleep_lesson_1",
+			"title": "sleep1.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "sleep1.n1"
+				},
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "prop",
+					"id": "bed",
+					"at": "right"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "sleep1.n2"
+				},
+				{
+					"t": "tap",
+					"prop": "bed",
+					"text": "sleep1.tap_bed"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "right",
+					"pose": "sleep"
+				},
+				{
+					"t": "card",
+					"text": "sleep1.card_rules",
+					"sec": 4.5
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "sleep1.s1"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "sleep_lesson_1_seen"
+				},
+				{
+					"do": "teleport_home"
+				},
+				{
+					"do": "sleep",
+					"hours": 8
+				},
+				{
+					"do": "stamina",
+					"n": 100
+				}
+			]
+		},
+		{
+			"id": "sleep_lesson_2",
+			"title": "sleep2.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "sleep2.n1"
+				},
+				{
+					"t": "narr",
+					"text": "sleep2.n2"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/ui/icon_stamina.png",
+					"name": "item.energy_bar",
+					"text": "sleep2.item_text"
+				},
+				{
+					"t": "tap",
+					"prop": "",
+					"text": "sleep2.tap_bar"
+				},
+				{
+					"t": "card",
+					"text": "sleep2.card_rules",
+					"sec": 4.5
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "sleep2.s1"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "sleep_lesson_2_seen"
+				},
+				{
+					"do": "stamina",
+					"n": 100
+				},
+				{
+					"do": "hunger",
+					"n": 50
+				},
+				{
+					"do": "hook",
+					"target": "shop",
+					"method": "unlock_doping_section"
+				}
+			]
+		}
+	]
 }

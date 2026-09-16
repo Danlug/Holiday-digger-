@@ -11,7 +11,7 @@ extends SceneTree
 const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	"mood", "wait", "fade", "item", "tap", "move", "shake", "daynight"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
-	"sleep", "stamina", "hunger", "teleport_home", "toast", "hook"]
+	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
 const REQUIRED_SCENES := ["intro_grandpa", "intro_boy", "autodig_start",
 	"autodig_done", "dud_treasure", "workshop", "death", "backpack", "robert",

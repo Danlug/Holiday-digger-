@@ -33,6 +33,14 @@ var auto_dig: AutoDigTutorial
 
 var _playing: bool = false
 var _manual_digs: int = 0
+
+# --- обучающие задания (ГДД п.9) ---
+## Обучение не рассказывает круг, а ПРОВОДИТ по нему: пока задание не
+## выполнено, игра не пускает дальше. Текущее задание висит строкой над
+## нижней полосой, а клетки, которые надо выкопать, подсвечены в мире.
+## Пустая строка — заданий сейчас нет.
+var _objective: String = ""
+var _quest_cells: Array = []
 var _gauges: Control = null
 var _booted: bool = false
 var _resetting: bool = false
@@ -100,6 +108,8 @@ func setup(p_player: Node, p_world: WorldGen, p_hud: Control) -> void:
 
 func _connect_signals() -> void:
 	if player != null:
+		if player.has_signal("dig_refused_by_story"):
+			player.dig_refused_by_story.connect(_on_dig_refused)
 		if player.has_signal("dig_finished"):
 			player.dig_finished.connect(_on_dig_finished)
 		if player.has_signal("dig_started"):
@@ -137,6 +147,7 @@ func _process(_dt: float) -> void:
 	if not _booted:
 		return
 	_apply_no_fatigue_period()
+	_update_quests()
 	if _playing:
 		return
 	# Пока крутится автокопка, новые триггеры не собираем: ролик и так держит
@@ -163,6 +174,75 @@ func _apply_no_fatigue_period() -> void:
 		GameState.set_hunger(100.0)
 
 
+## Обучающие задания. Порядок сверху вниз совпадает с порядком онбординга:
+## золото на 4 уровне — фундамент — (сцена смерти) — продать — заказать еду.
+## Проверяется каждый кадр по состоянию мира, а не по событиям: игрок может
+## выйти из игры посреди задания, и после загрузки оно должно найтись само.
+func _update_quests() -> void:
+	var text := ""
+	var cells: Array = []
+	# Выполнение задания открывает следующее в тот же кадр, поэтому шаг
+	# повторяется, пока состояние не устоится. Без этого между «золото
+	# собрано» и «пробей фундамент» экран на кадр остаётся пустым, а в тестах
+	# — до следующего вызова.
+	for _pass in range(4):
+		text = ""
+		cells = []
+
+		if StoryState.is_seen("workshop") and not StoryState.has_flag("gold_taken"):
+			cells = _remaining_gold()
+			if cells.is_empty():
+				StoryState.set_flag("gold_taken")
+				if hud != null:
+					hud.toast(StoryText.get_text("quest.gold_done"), 3.4)
+				continue
+			text = StoryText.get_text("quest.gold") % cells.size()
+		elif StoryState.has_flag("gold_taken") and not StoryState.has_flag("foundation_broken"):
+			text = StoryText.get_text("quest.foundation")
+		elif StoryState.is_seen("death") and not StoryState.has_flag("gold_sold"):
+			if _gold_sold():
+				StoryState.set_flag("gold_sold")
+				continue
+			text = StoryText.get_text("quest.sell")
+		elif StoryState.has_flag("gold_sold") and not StoryState.has_flag("food_ordered"):
+			if not GameState.house_food_at_door.is_empty():
+				StoryState.set_flag("food_ordered")
+				continue
+			text = StoryText.get_text("quest.food")
+		break  # ни одно задание не закрылось на этом проходе — состояние устоялось
+
+	if text != _objective:
+		_objective = text
+		if hud != null and hud.has_method("set_objective"):
+			hud.set_objective(text)
+	if cells != _quest_cells:
+		_quest_cells = cells
+		_publish_quest_cells()
+
+
+## Клетки сценарного золота, которые ещё не выкопаны.
+func _remaining_gold() -> Array:
+	if world == null:
+		return []
+	var out: Array = []
+	for c: Vector2i in world.scripted_loot_cells():
+		if world.get_tile(c.x, c.y) == TileTypes.Type.GOLD_ORE:
+			out.append(c)
+	return out
+
+
+## «Продал золото» — именно продал, а не выбросил: в рюкзаке его нет И за него
+## что-то дали. Без второй половины задание закрывалось бы кнопкой «выбросить».
+func _gold_sold() -> bool:
+	return int(GameState.inventory.get("gold", 0)) <= 0 and GameState.coins > 0
+
+
+func _publish_quest_cells() -> void:
+	var view := get_tree().root.find_child("WorldView", true, false)
+	if view != null and view.has_method("set_quest_cells"):
+		view.set_quest_cells(_quest_cells)
+
+
 func _check_triggers() -> void:
 	# Порядок важен: сверху вниз он совпадает с порядком онбординга из ГДД.
 	if not StoryState.has_flag("intro_seen"):
@@ -179,6 +259,14 @@ func _check_triggers() -> void:
 		if not StoryState.is_seen("robert"):
 			StoryState.enqueue("robert")
 			return
+
+	# Заправка (решение владельца): после разговора с бабкой (сцена Роберта —
+	# первый её звонок) и после того, как завёлся ручной бур. Раньше ставить
+	# нечего: без бура топливо некуда лить.
+	if StoryState.is_seen("robert") and not StoryState.is_seen("fuel_station") \
+			and player != null and player.has_hand_drill():
+		StoryState.enqueue("fuel_station")
+		return
 
 	if StoryState.has_flag("bars_introduced"):
 		if not StoryState.is_seen("sleep_lesson_1") and GameState.stamina <= SLEEP_LESSON_STAMINA:
@@ -328,6 +416,12 @@ func _apply_effects(effects: Array) -> void:
 			"teleport_home":
 				if player != null:
 					player.teleport_home()
+			"enter_house":
+				# Дом сам представился режиссёру (см. house_system._resolve_refs),
+				# поэтому зовём его напрямую, а не ищем по дереву.
+				var room := String(e.get("room", "hall"))
+				if house != null and house.has_method("enter_house"):
+					house.enter_house(room)
 			"toast":
 				if hud != null:
 					hud.toast(StoryText.get_text(String(e.get("text", ""))), float(e.get("sec", 3.0)))
@@ -358,20 +452,35 @@ func _call_hook(target: String, method: String) -> void:
 # Сигналы игрока
 # ---------------------------------------------------------------------------
 
-func _on_dig_finished(_x: int, _y: int, _type: int, _mineral_id: String, _was_loot: bool, _coins: int) -> void:
+## Игрок стучится в фундамент раньше времени. Текст — здесь, а не у игрока:
+## причина сюжетная, и знать про неё должен сюжет.
+func _on_dig_refused(reason: String) -> void:
+	if hud == null:
+		return
+	match reason:
+		"gold_first":
+			hud.toast(StoryText.get_text("quest.gold_first_toast"), 3.0)
+		"gold_needs_pickaxe":
+			hud.toast(StoryText.get_text("quest.gold_needs_pickaxe"), 3.0)
+
+
+func _on_dig_finished(_x: int, _y: int, type: int, _mineral_id: String, _was_loot: bool, _coins: int) -> void:
 	_manual_digs += 1
-
-
-## Сцена смерти (ГДД раздел 9, пункт 7): "копнуть один раз под себя". Ловим
-## именно копку строго под ногами и только после мастерской — до кирки герою
-## ещё нечем повторить путь деда.
-func _on_dig_started(x: int, y: int, _type: int) -> void:
-	if not StoryState.is_seen("workshop") or StoryState.is_seen("death"):
+	if type != TileTypes.Type.FOUNDATION or StoryState.has_flag("foundation_broken"):
 		return
-	if player == null:
-		return
-	if x == player.cell_x() and y == player.cell_y() + 1:
+	StoryState.set_flag("foundation_broken")
+	if not StoryState.is_seen("death"):
 		StoryState.enqueue("death")
+
+
+## Сцена смерти (ГДД п.9, решение владельца): играет СРАЗУ после пробития
+## фундамента. Раньше ловили «копнул один раз под себя» — но это не гарантия:
+## игрок мог ходить по четвёртому уровню сколько угодно и уйти в шахту боком,
+## так и не увидев сцену, на которой держится вся вторая половина обучения
+## (полоски, продажа, еда). Фундамент же пробивают ровно один раз и только
+## киркой, так что момент точный.
+func _on_dig_started(_x: int, _y: int, _type: int) -> void:
+	pass
 
 
 ## Кирка сейчас выдаётся игроком автоматически при первом ударе лопатой о
@@ -401,6 +510,11 @@ func _on_max_depth_changed(depth: int) -> void:
 		auto_dig.abort()
 	StoryState.clear_all()
 	_manual_digs = 0
+	_objective = ""
+	_quest_cells = []
+	if hud != null and hud.has_method("set_objective"):
+		hud.set_objective("")
+	_publish_quest_cells()
 	_playing = false
 	_release_control()
 	_resetting = false

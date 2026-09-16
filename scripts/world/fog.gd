@@ -86,11 +86,42 @@ func get_state(x: int, y: int) -> int:
 	return State.BLACK
 
 
-## Полный сброс тумана (после обвала/землетрясения, раздел 8 ГДД: "После
-## любого сброса весь рельеф снова закрывается туманом войны"). Отчистка
-## словаря чанков — O(число разведанных чанков), не O(глубина × ширина).
+## Полный сброс тумана. Остался за землетрясением (раздел 8 ГДД: "После
+## любого сброса весь рельеф снова закрывается туманом войны") — оно и есть
+## "перетряхнуло копальню целиком". Обвал чанка гасит только свою зону, см.
+## reset_rect. Отчистка словаря чанков — O(число разведанных чанков), не
+## O(глубина × ширина).
 func reset_all() -> void:
 	_chunks.clear()
+
+
+## Сброс тумана по прямоугольнику клеток — ровно зона обвала и ничего больше
+## (решение владельца: "не надо закрывать всю карту, только там где случился
+## обвал"). Разведанная глубина стоит игроку часов, и гасить её целиком из-за
+## обвала в пять клеток на другом конце шахты — обман.
+##
+## Чистим побитово именно клетки прямоугольника, а не выбрасываем затронутые
+## чанки: чанк — это 32 строки на всю ширину, и обвал 5×5 стёр бы вместе с
+## собой полосу в 1024 клетки вокруг.
+func reset_rect(x0: int, y0: int, w: int, h: int) -> void:
+	var x_from := maxi(x0, 0)
+	var x_to := mini(x0 + w - 1, WIDTH - 1)
+	# Выше первой земляной клетки тумана нет вовсе (см. get_state), поэтому
+	# и гасить там нечего.
+	var y_from := maxi(y0, 1)
+	var y_to := y0 + h - 1
+	if x_from > x_to or y_from > y_to:
+		return
+	for y in range(y_from, y_to + 1):
+		var chunk: Dictionary = _get_chunk(_chunk_index(y), false)
+		# Неразведанный чанк не аллоцирован — он и так весь чёрный, а создать
+		# его ради сброса значило бы плодить пустые маски на всю глубину.
+		if chunk.is_empty():
+			continue
+		for x in range(x_from, x_to + 1):
+			var idx := _local_index(x, y)
+			_clear_bit(chunk.terrain, idx)
+			_clear_bit(chunk.resource, idx)
 
 
 func to_save_data() -> Dictionary:
@@ -223,3 +254,10 @@ static func _set_bit(arr: PackedByteArray, idx: int) -> void:
 	if byte_i >= arr.size():
 		return
 	arr[byte_i] = arr[byte_i] | (1 << (idx % 8))
+
+
+static func _clear_bit(arr: PackedByteArray, idx: int) -> void:
+	var byte_i := idx / 8
+	if byte_i >= arr.size():
+		return
+	arr[byte_i] = arr[byte_i] & ~(1 << (idx % 8))

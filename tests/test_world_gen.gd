@@ -23,6 +23,9 @@ func _init() -> void:
 	test_all_solid_tiles_are_pickaxe_diggable()
 	test_fog_basic()
 	test_collapse_and_earthquake()
+	test_collapse_fog_only_in_zone()
+	test_collapse_below_player_only()
+	test_full_reset_waits_for_player()
 	print("=== Итог: %d проверок, %d провалов ===" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -319,7 +322,14 @@ func test_collapse_and_earthquake() -> void:
 	rng.seed = 42
 	var rect := CollapseEvents.trigger_chunk_collapse(w, fog, rng)
 	check("обвал вернул непустой прямоугольник", rect.w > 0 and rect.h > 0)
-	check("после обвала туман полностью сброшен", fog.get_state(15, 50) == FogOfWar.State.BLACK)
+	# Весь туман обвал больше не гасит (решение владельца) — только свою зону.
+	# Подробно это проверяет test_collapse_fog_only_in_zone, здесь достаточно
+	# совпадения: разведанная клетка чернеет тогда и только тогда, когда она
+	# попала в прямоугольник обвала.
+	var probe_in_rect: bool = 50 >= int(rect.y0) and 50 < int(rect.y0) + int(rect.h) \
+		and 15 >= int(rect.x0) and 15 < int(rect.x0) + int(rect.w)
+	check("после обвала туман погашен ровно в его зоне",
+		(fog.get_state(15, 50) == FogOfWar.State.BLACK) == probe_in_rect)
 
 	# зафиксированные клетки (фундамент/лестница/торф/алмаз) полностью
 	# исключены из событий сброса (см. world_gen._clear_diffs_in_rect):
@@ -373,6 +383,144 @@ func test_collapse_and_earthquake() -> void:
 	CollapseEvents.trigger_earthquake(w3, FogOfWar.new(), rng3)
 	check("землетрясение не возвращает выкопанное сценарное золото",
 		w3.get_tile(20, 4) == TileTypes.Type.EMPTY)
+
+
+## Правило владельца: "когда случается обвал, ты вообще гасишь мне весь экран,
+## не надо закрывать всю карту, только там где случился обвал". Разведанная
+## глубина стоит игроку часов — обвал в пяти клетках не имеет права её стирать.
+func test_collapse_fog_only_in_zone() -> void:
+	print("-- Обвал: туман гаснет только в своей зоне --")
+	var f := FogOfWar.new()
+	f.reveal_around_cell(10, 100, 3, 2)
+	f.reveal_around_cell(10, 200, 3, 2)
+	f.reset_rect(9, 99, 3, 3)
+	check("клетка внутри прямоугольника погашена", f.get_state(10, 100) == FogOfWar.State.BLACK)
+	check("угол прямоугольника погашен", f.get_state(9, 99) == FogOfWar.State.BLACK)
+	check("клетка сразу за правым краем уцелела", f.get_state(12, 100) != FogOfWar.State.BLACK)
+	check("клетка сразу под нижним краем уцелела", f.get_state(10, 102) != FogOfWar.State.BLACK)
+	check("разведка на другой глубине не тронута", f.get_state(10, 200) != FogOfWar.State.BLACK)
+
+	# Прямоугольник обвала не обязан лежать внутри одного чанка тумана
+	# (32 строки): граница проходит по y = 33, и гасить надо по обе стороны.
+	var f2 := FogOfWar.new()
+	for y in range(28, 40):
+		f2.reveal_around_cell(5, y, 1, 0)
+	f2.reset_rect(4, 30, 3, 8)
+	check("гашение переходит границу чанка (выше)", f2.get_state(5, 32) == FogOfWar.State.BLACK)
+	check("гашение переходит границу чанка (ниже)", f2.get_state(5, 34) == FogOfWar.State.BLACK)
+	check("за пределами прямоугольника чанк не выброшен целиком",
+		f2.get_state(5, 29) != FogOfWar.State.BLACK and f2.get_state(5, 38) != FogOfWar.State.BLACK)
+
+	# Тот же закон через сам обвал: всё, что он погасил, лежит в его
+	# прямоугольнике, а разведка вдалеке остаётся на месте.
+	var w := WorldGen.new(4242)
+	var f3 := FogOfWar.new()
+	var probes: Array = []
+	for i in range(40):
+		var y := 50 + i * 111
+		probes.append(y)
+		f3.reveal_around_cell(15, y, 2, 1)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2024
+	var rect := CollapseEvents.trigger_chunk_collapse(w, f3, rng)
+	var outside_alive := 0
+	var inside_dark := true
+	for y in probes:
+		var in_rect: bool = y >= int(rect.y0) and y < int(rect.y0) + int(rect.h) \
+			and 15 >= int(rect.x0) and 15 < int(rect.x0) + int(rect.w)
+		if in_rect:
+			if f3.get_state(15, y) != FogOfWar.State.BLACK:
+				inside_dark = false
+		elif f3.get_state(15, y) != FogOfWar.State.BLACK:
+			outside_alive += 1
+	check("обвал погасил клетки своей зоны", inside_dark)
+	check("обвал не тронул разведку вне своей зоны (уцелело %d проб)" % outside_alive,
+		outside_alive > 0)
+
+	# Землетрясение — это "перетряхнуло копальню целиком", и вот оно гасит всё.
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 3
+	CollapseEvents.trigger_earthquake(w, f3, rng2)
+	var any_left := false
+	for y in probes:
+		if f3.get_state(15, y) != FogOfWar.State.BLACK:
+			any_left = true
+	check("землетрясение по-прежнему гасит весь туман", not any_left)
+
+
+## Правило владельца: "обвал не может произойти выше или прямо на уровне
+## героя". Порода, сомкнувшаяся на самом герое, отнимает ход не по его вине.
+func test_collapse_below_player_only() -> void:
+	print("-- Обвал только ниже героя --")
+	var w := WorldGen.new(777)
+	var fog := FogOfWar.new()
+	var player_y := 500
+	# Самый верхний край, который выдал обвал за все прогоны. Стартует НИЖЕ
+	# дна, иначе минимум никогда не поднимется до реальных значений и
+	# проверка пройдёт впустую.
+	var worst := w.max_depth + 1
+	var empties := 0
+	for i in range(200):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = i
+		var rect := CollapseEvents.trigger_chunk_collapse(w, fog, rng, player_y)
+		if rect.is_empty():
+			empties += 1
+			continue
+		worst = mini(worst, int(rect.y0))
+	check("обвал всегда случается (место под героем есть)", empties == 0)
+	check("верхний край обвала строго ниже клетки героя (самый верхний — %d при герое на %d)"
+		% [worst, player_y], worst > player_y)
+
+	# Герой у самого дна: класть обвал некуда — события просто нет, и тост
+	# показывать не о чем (main.gd проверяет пустой словарь).
+	var rng_deep := RandomNumberGenerator.new()
+	rng_deep.seed = 5
+	var deep := CollapseEvents.trigger_chunk_collapse(w, fog, rng_deep, w.max_depth - 1)
+	check("у самого дна обвала не происходит (пустой словарь)", deep.is_empty())
+
+	# Без героя (-1) ограничения нет — так обвал зовут тесты и код без сцены.
+	var rng_free := RandomNumberGenerator.new()
+	rng_free.seed = 9
+	var free_rect := CollapseEvents.trigger_chunk_collapse(w, fog, rng_free, -1)
+	check("без героя обвал по-прежнему возможен на любой глубине",
+		not free_rect.is_empty() and int(free_rect.y0) >= 1)
+
+
+## Правило владельца: "не может произойти полный ресет пока он в земле, даже
+## если тригернулось событие... пока он не вылезет наверх или в 3 на 3 клетки".
+func test_full_reset_waits_for_player() -> void:
+	print("-- Полный ресет ждёт, пока герой не выберется --")
+	check("на поверхности трясти можно", CollapseEvents.is_safe_for_full_reset(0, false))
+	check("на входе в шахту трясти можно", CollapseEvents.is_safe_for_full_reset(1, false))
+	check("на клетку ниже входа — уже нельзя", not CollapseEvents.is_safe_for_full_reset(2, false))
+	check("в доме трясти можно с любой глубины", CollapseEvents.is_safe_for_full_reset(300, true))
+
+	var w := WorldGen.new(31337)
+	var fog := FogOfWar.new()
+	fog.reveal_around_cell(15, 300, 2, 1)
+	w.dig_cell(25, 2)
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 17
+	var shook: bool = CollapseEvents.try_trigger_earthquake(w, fog, 300, false, rng)
+	check("под землёй землетрясение не применяется", not shook)
+	check("мир под землёй остался как был", w.is_dug(25, 2))
+	check("туман под землёй остался разведанным", fog.get_state(15, 300) != FogOfWar.State.BLACK)
+
+	# Герой вылез — отложенное событие применяется тем же вызовом.
+	var shook_up: bool = CollapseEvents.try_trigger_earthquake(w, fog, 1, false, rng)
+	check("наверху отложенное землетрясение применяется", shook_up)
+	check("мир перетряхнуло", not w.is_dug(25, 2))
+	check("туман сброшен целиком", fog.get_state(15, 300) == FogOfWar.State.BLACK)
+
+	# Дом — вторая безопасная точка: ресет догоняет героя и там.
+	var w2 := WorldGen.new(31338)
+	var fog2 := FogOfWar.new()
+	w2.dig_cell(25, 2)
+	check("в доме отложенное землетрясение применяется",
+		CollapseEvents.try_trigger_earthquake(w2, fog2, 900, true, rng))
+	check("мир перетряхнуло и из дома", not w2.is_dug(25, 2))
 
 
 ## Туман открывает клетку, когда круг обзора накрыл её не меньше чем на

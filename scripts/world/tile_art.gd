@@ -12,6 +12,10 @@ static var _tile_to_file: Dictionary = {
 	TileTypes.Type.EMPTY: "empty",
 	TileTypes.Type.STONE: "stone",
 	TileTypes.Type.FOUNDATION: "foundation",
+	# Стены тоннеля Роберта — тот же железобетон, что и фундамент, и рисуются
+	# тем же тайлом: отдельная графика не нужна, а общий вид как раз читается
+	# правильно — «продолжение фундамента вверх».
+	TileTypes.Type.REINFORCED: "foundation",
 	TileTypes.Type.SCRAP_METAL: "ore_scrap",
 	TileTypes.Type.IRON_ORE: "ore_iron",
 	TileTypes.Type.LEAD_ORE: "ore_lead",

@@ -486,6 +486,125 @@ func get_tool_name_ru(id: String) -> String:
 	return String(get_tool(id).get("name_ru", id))
 
 
+## Цена инструмента в монетах. Кирки стоят ТОЛЬКО монеты (решение владельца:
+## "остальные 5 покупаются в магазине"), поэтому у них это вся цена целиком.
+func get_tool_cost_coins(id: String) -> int:
+	return int(_v(get_tool_cost(id).get("coins", 0)))
+
+
+## Полная статья цены инструмента: {coins: int, <item_id>: int}. Пустой
+## словарь — инструмент бесплатный (лопата, ржавая кирка).
+func get_tool_cost(id: String) -> Dictionary:
+	var cost = _v(get_tool(id).get("cost", {}))
+	return cost if typeof(cost) == TYPE_DICTIONARY else {}
+
+
+## Нужны ли инструменту материалы помимо монет. Разделительная черта нового
+## прогресса: у кирок — нет (только монеты), у техники — да (рецепт остаётся).
+func tool_needs_materials(id: String) -> bool:
+	for key in get_tool_cost(id).keys():
+		if String(key) != "coins" and int(_v(get_tool_cost(id)[key])) > 0:
+			return true
+	return false
+
+
+## Путь к иконке инструмента; пустая строка — картинки ещё нет и рисовать
+## нечего (владелец присылает арт отдельно).
+func get_tool_icon(id: String) -> String:
+	return String(get_tool(id).get("icon", ""))
+
+
+## Идентификаторы одной линейки инструментов ("pickaxe" — шесть кирок,
+## "tech" — бур и буровая машина), отсортированные по ступени.
+## Порядок берётся из поля tier, а не из порядка ключей в JSON: линейку будут
+## дополнять, и вставленная в середину ступень не должна менять смысл файла.
+func get_tools_in_line(line: String) -> Array:
+	var rows: Array = []
+	for id in balance.get("tools", {}).keys():
+		var t = balance["tools"][id]
+		if typeof(t) != TYPE_DICTIONARY:
+			continue
+		if String(t.get("line", "")) != line:
+			continue
+		rows.append({"id": String(id), "tier": int(_v(t.get("tier", 0)))})
+	rows.sort_custom(func(a, b): return int(a["tier"]) < int(b["tier"]))
+	var out: Array = []
+	for r in rows:
+		out.append(String(r["id"]))
+	return out
+
+
+# ---------------------------------------------------------------------------
+# Снаряжение: линейка ранцев (balance.json -> gear)
+#
+# Четыре ступени, одна надета. Множитель ступени умножает ПОТОЛОК скорости
+# подъёма базового ранца — см. gear._note в data/balance.json и _move_y в
+# scripts/player/player.gd, где он применяется.
+# ---------------------------------------------------------------------------
+
+func get_gear(id: String) -> Dictionary:
+	var g = balance.get("gear", {}).get(id, {})
+	return g if typeof(g) == TYPE_DICTIONARY else {}
+
+
+## Все ступени линейки по возрастанию tier.
+func get_gear_ids() -> Array:
+	var rows: Array = []
+	for id in balance.get("gear", {}).keys():
+		var g = balance["gear"][id]
+		if typeof(g) != TYPE_DICTIONARY or not g.has("tier"):
+			continue
+		rows.append({"id": String(id), "tier": int(_v(g["tier"]))})
+	rows.sort_custom(func(a, b): return int(a["tier"]) < int(b["tier"]))
+	var out: Array = []
+	for r in rows:
+		out.append(String(r["id"]))
+	return out
+
+
+## Множитель скорости полёта ступени. 0.0 у пустого id — это не "летать со
+## скоростью ноль", а "ранца нет вовсе": так grant_gear() может сравнивать
+## новую ступень с надетой одним числом, не проверяя отдельно пустой случай.
+func get_gear_fly_multiplier(id: String) -> float:
+	if id.is_empty():
+		return 0.0
+	return float(_v(get_gear(id).get("fly_speed_multiplier", 0.0)))
+
+
+## Потолок скорости подъёма БАЗОВОГО ранца, клеток/с. Его умножает вся линейка.
+func get_gear_base_speed() -> float:
+	return float(_v(balance.get("gear", {}).get("base_max_speed_cells_per_sec", 2.5)))
+
+
+## Фактический потолок скорости подъёма ступени, клеток/с.
+func get_gear_max_speed(id: String) -> float:
+	return get_gear_base_speed() * get_gear_fly_multiplier(id)
+
+
+## "prop" — пропеллеры (разгон зависит от груза), "jet" — реактивная тяга
+## (свой разгон и своя анимация полёта). Вид, а не отдельная ветка линейки:
+## ступени идут подряд, просто верхние две — реактивные.
+func get_gear_kind(id: String) -> String:
+	return String(get_gear(id).get("kind", "prop"))
+
+
+func get_gear_cost_coins(id: String) -> int:
+	var cost = _v(get_gear(id).get("cost", {}))
+	if typeof(cost) != TYPE_DICTIONARY:
+		return 0
+	return int(_v(cost.get("coins", 0)))
+
+
+func get_gear_name_ru(id: String) -> String:
+	return String(get_gear(id).get("name_ru", id))
+
+
+## Путь к иконке ступени; пустая строка — арта ещё нет (владелец присылает
+## анимации ранцев позже), и UI просто не рисует картинку.
+func get_gear_icon(id: String) -> String:
+	return String(get_gear(id).get("icon", ""))
+
+
 ## Время бурения клетки минерала id базовым инструментом (drill_seconds из
 ## minerals.json), с запасным значением, если минерал не описан явно.
 func get_mineral_drill_seconds(id: String) -> float:

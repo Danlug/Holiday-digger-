@@ -14,7 +14,7 @@ extends RefCounted
 ## будущем — прибавить SCHEMA_VERSION и дописать шаг в _migrate().
 
 const SAVE_PATH := "user://save.json"
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
 
 
 static func has_save() -> bool:
@@ -112,6 +112,7 @@ static func _serialize() -> Dictionary:
 		"economy": {
 			"owned_tools": gs.owned_tools,
 			"owned_gear": gs.owned_gear,
+			"current_gear": gs.current_gear,
 			"rare_find_toasts_shown": gs.rare_find_toasts_shown,
 			"well_level": gs.well_level,
 			"well_last_collect_unix": gs.well_last_collect_unix,
@@ -205,14 +206,19 @@ static func _apply(data: Dictionary) -> void:
 	# там не записаны, и восстановить их можно только по текущему инструменту —
 	# иначе игрок, уже собравший бур, теряет его при первой же загрузке.
 	gs.owned_tools = economy.get("owned_tools", ["shovel", gs.current_tool])
-	# Сейвы до появления верстачного джетпака: снаряжение там считалось от
-	# глубины, поэтому дошедшему до 100 джетпак отдаём — отбирать уже
-	# заработанное при обновлении нельзя.
 	gs.rare_find_toasts_shown = int(economy.get("rare_find_toasts_shown", 0))
 	gs.well_level = int(economy.get("well_level", 0))
 	gs.well_last_collect_unix = int(economy.get("well_last_collect_unix", 0))
-	gs.owned_gear = economy.get("owned_gear",
-		["jetpack"] if gs.max_depth_reached >= 100 else [])
+	# Старые правила («ранец с глубины 10, джетпак с глубины 100») разбирает
+	# миграция v1 -> v2: к этому месту ключ уже есть даже у сейва, где его не
+	# было вовсе. Здесь остаётся простое чтение.
+	gs.owned_gear = economy.get("owned_gear", [])
+	# Надетая ступень ранца. Сейвы до линейки ранцев её не знают — миграция
+	# v1 -> v2 дописывает её сама (см. _migrate_v1_to_v2), здесь остаётся
+	# только страховка: надетым не может быть то, чего нет в собственности.
+	gs.current_gear = String(economy.get("current_gear", ""))
+	if not gs.current_gear.is_empty() and not gs.owned_gear.has(gs.current_gear):
+		gs.current_gear = ""
 	gs.workshop_visited = bool(economy.get("workshop_visited", gs.workshop_visited))
 	gs.next_sale_doubled = bool(economy.get("next_sale_doubled", false))
 	gs.lifetime_coins_from_sales = int(economy.get("lifetime_coins_from_sales", 0))
@@ -241,18 +247,60 @@ static func _as_int_counts(raw) -> Dictionary:
 
 
 ## Приводит сохранение произвольной старой версии к текущей SCHEMA_VERSION.
-## Сейчас существует только версия 1, поэтому шагов миграции нет — но
-## структура заложена, чтобы будущие апдейты могли писать сюда шаги вида
-## "if from_version == 1: ...".
+## Шаги идут ступенями: каждая функция поднимает сейв ровно на одну версию.
 static func _migrate(data: Dictionary) -> Dictionary:
 	var from_version := int(data.get("version", 1))
 	if from_version > SCHEMA_VERSION:
 		push_warning("SaveSystem: сейв версии %d новее текущей схемы %d — грузим как есть" % [from_version, SCHEMA_VERSION])
 		return data
-	# Будущие миграции добавлять здесь ступенями, например:
-	# if from_version == 1:
-	#     data = _migrate_v1_to_v2(data)
-	#     from_version = 2
+	if from_version <= 1:
+		data = _migrate_v1_to_v2(data)
+		from_version = 2
+	data["version"] = from_version
+	return data
+
+
+## v1 -> v2: владелец переписал прогресс — кирки и ранцы стали линейками за
+## монеты, а рецепты остались только у техники.
+##
+## Ничего не отбираем. По старым правилам у игрока могли быть:
+##   * железная кирка — собиралась из 25 железа, 10 бронзы, 30 свинца и 200
+##     монет. Теперь она стоит 500 монет, но заслужена она уже была: id не
+##     менялся, поэтому она просто остаётся в owned_tools как есть, и
+##     трогать её здесь не нужно;
+##   * джетпак — собирался на верстаке и лежал в owned_gear отдельной строкой,
+##     без понятия «надет». Теперь это третья ступень линейки: собственность
+##     сохраняется, и он становится надетым;
+##   * ранец с пропеллерами — его в сейве НЕ БЫЛО вовсе: старый код выдавал
+##     его по флагу сюжета backpack_owned или по достигнутой глубине 10.
+##     После обновления ранец стоит 100 монет, и игрок, пролетавший на нём
+##     полигры, обнаружил бы, что летать больше нечем. Поэтому глубина 10 в
+##     старом сейве читается как «ранец был» и записывается в собственность.
+##     Это одноразовое чтение старого признака, а не новое правило: начиная с
+##     v2 глубина ранцев не выдаёт.
+static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
+	var economy: Dictionary = data.get("economy", {})
+	var depth := int(Dictionary(data.get("depth", {})).get("max_depth_reached", 0))
+
+	var gear: Array = economy.get("owned_gear", [])
+	# Сейв мог вообще не иметь блока economy (до магазина): тогда джетпак у
+	# игрока был, если он дошёл до глубины 100 — снаряжение считалось от неё.
+	if not economy.has("owned_gear") and depth >= 100:
+		gear = ["jetpack"]
+	if depth >= 10 and not gear.has("backpack"):
+		gear.append("backpack")
+
+	# Надевается лучшая из имеющихся ступеней: предлагать игроку выбор между
+	# джетпаком и ранцем на экране, которого он ещё не видел, — значит
+	# посадить его после обновления на пропеллеры.
+	var best := ""
+	for id in gear:
+		if Balance.get_gear_fly_multiplier(String(id)) > Balance.get_gear_fly_multiplier(best):
+			best = String(id)
+
+	economy["owned_gear"] = gear
+	economy["current_gear"] = best
+	data["economy"] = economy
 	return data
 
 

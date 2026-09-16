@@ -26,6 +26,7 @@ signal black_box_changed
 signal artifact_collected(artifact_id: String)
 signal branch_completed(branch_num: int)
 signal tool_changed(tool_id: String)
+signal gear_changed(gear_id: String)
 signal max_depth_changed(depth: int)
 signal daily_reset
 
@@ -55,6 +56,11 @@ var black_box: Dictionary = {}  # mineral_id:String -> count:int
 
 # --- Инструмент и прогресс ---
 var current_tool: String = "shovel"
+## Надетая ступень ранца ("" — летать нечем). Ровно одна активная: владелец
+## переписал ранцы в линейку из четырёх ступеней, где надетую выбирают на
+## верстаке. Хранится рядом с current_tool, потому что это ровно такой же
+## выбор — только не для рук, а для спины.
+var current_gear: String = ""
 var max_depth_reached: int = 0
 var collected_artifacts: Array = []  # артефакт id
 var completed_branches: Array = []   # номера веток
@@ -232,6 +238,7 @@ func reset_progress() -> void:
 	inventory.clear()
 	black_box.clear()
 	current_tool = "shovel"
+	current_gear = ""
 	max_depth_reached = 0
 	collected_artifacts.clear()
 	completed_branches.clear()
@@ -250,6 +257,7 @@ func reset_progress() -> void:
 	inventory_changed.emit()
 	black_box_changed.emit()
 	tool_changed.emit(current_tool)
+	gear_changed.emit(current_gear)
 	max_depth_changed.emit(max_depth_reached)
 
 
@@ -703,10 +711,12 @@ signal tool_purchase_required(tool_id: String)
 ## остальное — покупка и крафт.
 var owned_tools: Array = ["shovel"]
 
-## Собранное снаряжение (сейчас — джетпак). Отдельно от инструментов: их
-## берут в руки по одному, снаряжение носится постоянно и не выбирается.
-## Хранится, а не вычисляется от глубины: джетпак собирается на верстаке
-## (решение владельца), и глубина про него больше ничего не знает.
+## Купленные ступени ранца. Отдельно от инструментов: инструмент берут в руки,
+## ранец надевают на спину, и одно другому не мешает — герой копает алмазной
+## киркой с джетпаком за плечами.
+##
+## Хранится, а не вычисляется от глубины: вся линейка покупается за монеты
+## (решение владельца), и глубина про неё больше ничего не знает.
 var owned_gear: Array = []
 
 ## Сколько раз уже показывали тост о редкой находке. Решение владельца: такое
@@ -767,11 +777,36 @@ func has_gear(gear_id: String) -> bool:
 	return owned_gear.has(gear_id)
 
 
-## Выдать снаряжение (крафт на верстаке, сюжетная находка).
+## Выдать ступень ранца (покупка в магазине, сюжетная находка).
+##
+## Свежая ступень сразу надевается, если она быстрее надетой: покупать ранец
+## и отдельно идти его надевать — лишний шаг ради ничего. Выбор вручную
+## никуда не девается, он живёт на верстаке (верстак = экипировка).
 func grant_gear(gear_id: String) -> void:
-	if owned_gear.has(gear_id):
-		return
-	owned_gear.append(gear_id)
+	if not owned_gear.has(gear_id):
+		owned_gear.append(gear_id)
+	if Balance.get_gear_fly_multiplier(gear_id) > Balance.get_gear_fly_multiplier(current_gear):
+		set_current_gear(gear_id)
+
+
+## Надеть ступень ранца. "" — снять всё. Возвращает false, если такой ступени
+## у игрока нет: владение проверяется здесь, в единственной точке смены, —
+## так же, как у инструментов в set_current_tool.
+func set_current_gear(gear_id: String) -> bool:
+	if not gear_id.is_empty() and not has_gear(gear_id):
+		return false
+	if current_gear == gear_id:
+		return true
+	current_gear = gear_id
+	gear_changed.emit(gear_id)
+	return true
+
+
+## Множитель скорости полёта надетой ступени. 0.0 — ранца нет вовсе; физика
+## полёта до этого места не доходит, потому что тяга включается только когда
+## ранец надет (см. player.gd:_update_flight).
+func get_gear_fly_multiplier() -> float:
+	return Balance.get_gear_fly_multiplier(current_gear)
 
 
 ## Материалы, вложенные в конкретный рецепт верстака:
@@ -810,6 +845,7 @@ func clear_invested(recipe_id: String) -> void:
 func reset_economy() -> void:
 	owned_tools = ["shovel"]
 	owned_gear = []
+	current_gear = ""
 	rare_find_toasts_shown = 0
 	well_level = 0
 	well_last_collect_unix = 0

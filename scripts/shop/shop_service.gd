@@ -156,13 +156,13 @@ static func is_recipe_unlocked(recipe_id: String) -> bool:
 	return GameState.max_depth_reached >= ShopCatalog.unlock_depth(recipe_id)
 
 
-## Инструменты собираются ИЗ СКЛАДА: железная кирка стоит 160 кг материалов
-## при рюкзаке в 60, и за одну ходку их не принести. Склад стоит в мастерской
-## рядом с верстаком (ГДД п.14), поэтому материал копится там, а не в
-## «проекте»: вложения обратно не доставались, а со склада взять можно.
+## Техника собирается ИЗ СКЛАДА: ручной бур стоит 500 железа при рюкзаке в 60,
+## и за одну ходку их не принести. Склад стоит в мастерской рядом с верстаком
+## (ГДД п.14), поэтому материал копится там, а не в «проекте»: вложения
+## обратно не доставались, а со склада взять можно.
 static func is_project(recipe_id: String) -> bool:
 	var r := ShopCatalog.recipe(recipe_id)
-	return not r.is_empty() and String(r["kind"]) == "tool"
+	return not r.is_empty() and ["tool", "machine"].has(String(r["kind"]))
 
 
 ## Сколько материала id доступно верстаку: склад ПЛЮС рюкзак. Считать только
@@ -216,6 +216,8 @@ static func check_craft(recipe_id: String) -> Dictionary:
 			"reason": "Откроется на глубине %d" % ShopCatalog.unlock_depth(recipe_id)}
 	if String(r["kind"]) == "tool" and GameState.owns_tool(String(r["output"]["id"])):
 		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false, "reason": "Уже собрано"}
+	if String(r["kind"]) == "machine" and _machine_built(String(r["output"]["id"])):
+		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false, "reason": "Уже собрано"}
 
 	var missing: Dictionary = {}
 	for id in r["inputs"].keys():
@@ -266,11 +268,13 @@ static func craft(recipe_id: String) -> Dictionary:
 		GameState.grant_tool(out_id)
 		GameState.set_current_tool(out_id)
 		message = "%s собрана и уже в руках." % String(r["name_ru"])
-	elif String(r["kind"]) == "gear":
-		# Снаряжение не берут в руки — оно просто надето. В инвентарь тоже не
-		# кладётся: вес рюкзака оно не занимает (ГДД п.14).
-		GameState.grant_gear(out_id)
-		message = "%s собран. Теперь ты умеешь летать." % String(r["name_ru"])
+	elif String(r["kind"]) == "machine":
+		# Машина не берётся в руки и не кладётся в рюкзак: она стоит у дома.
+		# Собранная скважина сразу начинает отсчёт — иначе первый же забор
+		# выдал бы доход за всё время, что игрок прожил до неё.
+		GameState.well_level = 1
+		GameState.well_last_collect_unix = int(Time.get_unix_time_from_system())
+		message = "%s собрана. Теперь она копает сама." % String(r["name_ru"])
 	else:
 		var added := GameState.add_item(out_id, out_count)
 		if added < out_count:
@@ -279,6 +283,64 @@ static func craft(recipe_id: String) -> Dictionary:
 		message = "+%d %s" % [out_count, ShopCatalog.item_name(out_id)]
 	SaveSystem.save_game()
 	return {"ok": true, "message": message}
+
+
+## Построена ли машина. Скважина — единственная на сегодня, и её состояние
+## живёт в GameState.well_level, а не в списке предметов.
+static func _machine_built(machine_id: String) -> bool:
+	return machine_id == "well" and GameState.well_level > 0
+
+
+# ---------------------------------------------------------------------------
+# Покупка ступеней: кирки и ранцы (решение владельца)
+#
+# «Больше не нужно ресурсы собирать для крафта» — шесть кирок и четыре ранца
+# берутся за монеты в магазине у входной двери. Рецептов у них нет вовсе, и
+# ворот по глубине тоже: воротами прогресса стал ценник.
+# ---------------------------------------------------------------------------
+
+## Покупка ступени инструмента за монеты. Отказывает всему, у чего в цене
+## есть материалы: такое собирается на верстаке, а не покупается, и продать
+## его за одни монеты означало бы дыру в обе стороны.
+static func buy_tool(tool_id: String) -> Dictionary:
+	if Balance.get_tool(tool_id).is_empty():
+		return {"ok": false, "message": "Такого инструмента нет"}
+	if not can_shop_here():
+		return {"ok": false, "message": "Магазин у входной двери"}
+	if GameState.owns_tool(tool_id):
+		return {"ok": false, "message": "Уже есть"}
+	if Balance.tool_needs_materials(tool_id):
+		return {"ok": false, "message": "Это собирается на верстаке, а не покупается"}
+	var price := Balance.get_tool_cost_coins(tool_id)
+	if price <= 0:
+		return {"ok": false, "message": "Это не продаётся"}
+	if not GameState.spend_coins(price):
+		return {"ok": false, "message": "Не хватает монет"}
+	GameState.grant_tool(tool_id)
+	# Купленная кирка сразу в руках: покупать её и отдельно идти надевать —
+	# лишний шаг. Выбор вручную остаётся на верстаке (верстак = экипировка).
+	GameState.set_current_tool(tool_id)
+	SaveSystem.save_game()
+	return {"ok": true, "message": "%s куплена — уже в руках." % Balance.get_tool_name_ru(tool_id)}
+
+
+## Покупка ступени ранца за монеты. Надевается сразу, если быстрее надетой
+## (этим занимается GameState.grant_gear).
+static func buy_gear(gear_id: String) -> Dictionary:
+	if Balance.get_gear(gear_id).is_empty():
+		return {"ok": false, "message": "Такого ранца нет"}
+	if not can_shop_here():
+		return {"ok": false, "message": "Магазин у входной двери"}
+	if GameState.has_gear(gear_id):
+		return {"ok": false, "message": "Уже есть"}
+	var price := Balance.get_gear_cost_coins(gear_id)
+	if price <= 0:
+		return {"ok": false, "message": "Это не продаётся"}
+	if not GameState.spend_coins(price):
+		return {"ok": false, "message": "Не хватает монет"}
+	GameState.grant_gear(gear_id)
+	SaveSystem.save_game()
+	return {"ok": true, "message": "%s куплен." % Balance.get_gear_name_ru(gear_id)}
 
 
 ## Списать материал на крафт: сначала со склада, потом из рюкзака. Порядок

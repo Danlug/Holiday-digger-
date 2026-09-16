@@ -21,16 +21,26 @@ func _ready() -> void:
 	_test_not_bought()
 	_test_craft_bronze()
 	_test_craft_fuel_block()
-	_test_craft_jetpack()
 	_test_idle_well_payout()
 	_test_craft_without_materials()
-	_test_iron_pickaxe_from_storage()
+	_test_hand_drill_from_storage()
 	_test_tool_requires_ownership()
 	_test_buy_spends_coins()
 	_test_exchange_dollars()
 	_test_ad_double_sale()
 	_test_workshop_gives_rusty_pickaxe()
 	_test_cannot_sell_from_mine()
+
+	# --- прогресс за деньги (переписан владельцем) ---
+	_test_pickaxe_prices_and_multipliers()
+	_test_gear_prices_and_multipliers()
+	_test_buy_pickaxe_spends_exact_coins()
+	_test_buy_gear_spends_exact_coins()
+	_test_pickaxes_and_gear_are_not_crafted()
+	_test_tech_is_still_crafted()
+	_test_equipment_switches_dig_and_fly()
+	_test_shop_ui_builds_every_screen()
+	_test_save_migration_v1()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -54,6 +64,8 @@ func _fresh() -> void:
 	GameState.house_storage.clear()
 	GameState.owned_tools = ["shovel"]
 	GameState.current_tool = "shovel"
+	GameState.owned_gear = []
+	GameState.current_gear = ""
 	GameState.max_depth_reached = 0
 	# Скупка и верстак работают только дома (ГДД раздел 5: мастерская в
 	# подвале). Большинство проверок — про саму арифметику, поэтому ставим
@@ -143,29 +155,6 @@ func _test_craft_fuel_block() -> void:
 	check("блок лежит в рюкзаке", GameState.get_item_count("fuel_block") == 1)
 
 
-## Джетпак собирается на верстаке (решение владельца), а не выдаётся по
-## глубине. Снаряжение не берут в руки и оно не занимает вес.
-func _test_craft_jetpack() -> void:
-	var r := ShopCatalog.recipe("jetpack")
-	check("рецепт джетпака есть на верстаке", not r.is_empty())
-	if r.is_empty():
-		return
-	check("джетпак — снаряжение, а не инструмент", String(r["kind"]) == "gear")
-	check("рецепт открывается с глубины", int(r["unlock_depth"]) > 0)
-
-	GameState.owned_gear.clear()
-	GameState.coins = 999999
-	for id in r["inputs"].keys():
-		GameState.house_storage[String(id)] = int(r["inputs"][id]) * 2
-	var res := ShopService.craft("jetpack")
-	check("джетпак собрался: " + String(res.get("message", "")), bool(res["ok"]))
-	check("джетпак теперь есть", GameState.has_gear("jetpack"))
-	check("в руках остался прежний инструмент, джетпак в руки не берут",
-		GameState.current_tool != "jetpack")
-	check("джетпак не лёг в рюкзак и не занял вес",
-		GameState.get_item_count("jetpack") == 0)
-
-
 ## Скважина платит рудой и золотом и никогда — донатной валютой
 ## (решение владельца).
 func _test_idle_well_payout() -> void:
@@ -207,58 +196,60 @@ func _test_idle_well_payout() -> void:
 
 func _test_craft_without_materials() -> void:
 	_fresh()
+	GameState.max_depth_reached = 100
 	GameState.coins = 10000
-	var result := ShopService.craft("iron_pickaxe")
-	check("без материалов кирка не крафтится", not bool(result["ok"]))
+	var result := ShopService.craft("hand_drill")
+	check("без материалов техника не крафтится", not bool(result["ok"]))
 	check("неудачный крафт не тронул монеты", GameState.coins == 10000)
-	check("инструмент не появился", not GameState.owned_tools.has("iron_pickaxe"))
+	check("инструмент не появился", not GameState.owned_tools.has("hand_drill"))
 
 
-## Железная кирка: 25 железа + 10 бронзы + 30 свинца + 200 монет (ГДД раздел 5).
-## 160 кг материалов при рюкзаке 60 кг — копятся на складе за несколько ходок
-## (ГДД раздел 14, «Склад в мастерской»).
-func _test_iron_pickaxe_from_storage() -> void:
+## Ручной бур: 500 железа + 100 бронзы + 50 серебра + 2000 монет. Материалы
+## копятся на складе в мастерской за несколько ходок (ГДД п.14, «Склад»):
+## одним рюкзаком в 60 кг их не принести. Это осталось единственной ветвью,
+## где крафт из материалов вообще есть, — техника.
+func _test_hand_drill_from_storage() -> void:
 	_fresh()
-	var recipe := ShopCatalog.recipe("iron_pickaxe")
-	check("рецепт железной кирки из ГДД: 25 железа",  int(recipe["inputs"]["iron_ore"]) == 25)
-	check("рецепт железной кирки из ГДД: 10 бронзы",  int(recipe["inputs"]["bronze"]) == 10)
-	check("рецепт железной кирки из ГДД: 30 свинца",  int(recipe["inputs"]["lead"]) == 30)
-	check("рецепт железной кирки из ГДД: 200 монет",  int(recipe["coins"]) == 200)
+	GameState.max_depth_reached = 100
+	var recipe := ShopCatalog.recipe("hand_drill")
+	check("рецепт ручного бура существует", not recipe.is_empty())
+	if recipe.is_empty():
+		return
+	check("рецепт бура: 500 железа", int(recipe["inputs"]["iron_ore"]) == 500)
+	check("рецепт бура: 2000 монет", int(recipe["coins"]) == 2000)
 
 	var total_kg := 0.0
 	for id in recipe["inputs"].keys():
 		total_kg += Balance.get_mineral_weight(String(id)) * int(recipe["inputs"][id])
-	check("материалы кирки тяжелее одного рюкзака — склад нужен по делу",
+	check("материалы бура тяжелее одного рюкзака — склад нужен по делу",
 		total_kg > GameState.get_max_carry_kg())
 
 	# Первая ходка: принесли часть железа и сложили на склад.
-	GameState.inventory["iron_ore"] = 20
-	ShopService.invest("iron_pickaxe")
+	GameState.inventory["iron_ore"] = 400
+	ShopService.invest("hand_drill")
 	check("сложенное ушло из рюкзака", GameState.get_item_count("iron_ore") == 0)
-	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == 20)
-	check("неполного рецепта не хватает на крафт", not ShopService.can_craft("iron_pickaxe"))
+	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == 400)
+	check("неполного рецепта не хватает на крафт", not ShopService.can_craft("hand_drill"))
 
-	# Вторая ходка: остальное железо и свинец. Лишнее железо сверх рецепта
-	# остаётся в рюкзаке — на склад уходит ровно столько, сколько нужно.
-	GameState.inventory["iron_ore"] = 10
-	GameState.inventory["lead"] = 30
-	ShopService.invest("iron_pickaxe")
-	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == 25)
-	check("излишек остался у игрока", GameState.get_item_count("iron_ore") == 5)
+	# Вторая ходка: остальное. Лишнее железо сверх рецепта остаётся в рюкзаке —
+	# на склад уходит ровно столько, сколько нужно.
+	GameState.inventory["iron_ore"] = 150
+	GameState.inventory["bronze"] = 100
+	GameState.inventory["silver"] = 50
+	ShopService.invest("hand_drill")
+	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == 500)
+	check("излишек остался у игрока", GameState.get_item_count("iron_ore") == 50)
 
-	# Третья ходка: бронза и монеты.
-	GameState.inventory["bronze"] = 10
-	ShopService.invest("iron_pickaxe")
-	GameState.coins = 199
-	check("без монет кирка не собирается", not ShopService.can_craft("iron_pickaxe"))
-	GameState.coins = 250
-	check("набранного склада хватает на крафт", bool(ShopService.craft("iron_pickaxe")["ok"]))
+	GameState.coins = 1999
+	check("без монет бур не собирается", not ShopService.can_craft("hand_drill"))
+	GameState.coins = 2050
+	check("набранного склада хватает на крафт", bool(ShopService.craft("hand_drill")["ok"]))
 	check("монеты списаны ровно по рецепту", GameState.coins == 50)
-	check("кирка в собственности", GameState.owned_tools.has("iron_pickaxe"))
-	check("кирка взята в руки", GameState.current_tool == "iron_pickaxe")
+	check("бур в собственности", GameState.owned_tools.has("hand_drill"))
+	check("бур взят в руки", GameState.current_tool == "hand_drill")
 	check("склад опустел ровно на рецепт", HouseStorage.count("iron_ore") == 0
-		and HouseStorage.count("lead") == 0 and HouseStorage.count("bronze") == 0)
-	check("излишек из рюкзака крафт не тронул", GameState.get_item_count("iron_ore") == 5)
+		and HouseStorage.count("silver") == 0 and HouseStorage.count("bronze") == 0)
+	check("излишек из рюкзака крафт не тронул", GameState.get_item_count("iron_ore") == 50)
 
 
 # ---------------------------------------------------------------------------
@@ -390,3 +381,283 @@ func _test_cannot_sell_from_mine() -> void:
 			used += 1
 	check("лимит дистанционных сдач на день соблюдён (%d)" % limit, used == limit)
 	GameState.house_is_indoors = true
+
+
+# ---------------------------------------------------------------------------
+# Прогресс за деньги (владелец переписал развитие игры)
+#
+# «Больше не нужно ресурсы собирать для крафта, есть 6 видов кирок, они стоят
+# разных денег»: цены и множители заданы словами владельца и проверяются
+# здесь ровно теми числами, которые он назвал. Разойдутся данные со словами —
+# падать должно тут, а не в игре.
+# ---------------------------------------------------------------------------
+
+## Ржавая ×1.0 (находится в мастерской), железная 500/×1.3, титановая
+## 1500/×1.6, платиновая 10000/×2.5, алмазная 20000/×3.5, обсидиановая
+## 50000/×5.
+func _test_pickaxe_prices_and_multipliers() -> void:
+	var want := [
+		["rusty_pickaxe", 0, 1.0],
+		["iron_pickaxe", 500, 1.3],
+		["titanium_pickaxe", 1500, 1.6],
+		["platinum_pickaxe", 10000, 2.5],
+		["diamond_pickaxe", 20000, 3.5],
+		["obsidian_pickaxe", 50000, 5.0],
+	]
+	var line := Balance.get_tools_in_line("pickaxe")
+	check("кирок ровно шесть (владелец: «есть 6 видов кирок»)", line.size() == 6)
+	for i in range(want.size()):
+		var id := String(want[i][0])
+		var price := int(want[i][1])
+		var mult := float(want[i][2])
+		check("кирка %s стоит на своей ступени (%d-я)" % [id, i], i < line.size() and line[i] == id)
+		check("%s: цена %d монет" % [id, price], Balance.get_tool_cost_coins(id) == price)
+		check("%s: копка ×%s" % [id, mult],
+			is_equal_approx(Balance.get_tool_speed_multiplier(id), mult))
+		# Деньги — единственные ворота прогресса (решение агента, см. отчёт):
+		# по глубине кирки не ограничены вовсе.
+		check("%s: по глубине не ограничена" % id, Balance.get_tool_max_depth(id) < 0)
+	# У лопаты ограничение осталось: она про землю, а не про породу.
+	check("у лопаты ограничение по глубине осталось", Balance.get_tool_max_depth("shovel") == 4)
+
+
+## Ранец 100, улучшенный 1000/×2, джетпак 5000/×3, топовый 20000/×10.
+## Множитель — на скорость полёта, то есть на потолок подъёма в клетках/сек.
+func _test_gear_prices_and_multipliers() -> void:
+	var base := Balance.get_gear_base_speed()
+	var want := [
+		["backpack", 100, 1.0],
+		["backpack_plus", 1000, 2.0],
+		["jetpack", 5000, 3.0],
+		["jetpack_top", 20000, 10.0],
+	]
+	var line := Balance.get_gear_ids()
+	check("ранцев ровно четыре", line.size() == 4)
+	for i in range(want.size()):
+		var id := String(want[i][0])
+		var price := int(want[i][1])
+		var mult := float(want[i][2])
+		check("ранец %s стоит на своей ступени (%d-я)" % [id, i], i < line.size() and line[i] == id)
+		check("%s: цена %d монет" % [id, price], Balance.get_gear_cost_coins(id) == price)
+		check("%s: полёт ×%s" % [id, mult],
+			is_equal_approx(Balance.get_gear_fly_multiplier(id), mult))
+		check("%s: потолок подъёма %.1f кл/с" % [id, base * mult],
+			is_equal_approx(Balance.get_gear_max_speed(id), base * mult))
+	check("верхние две ступени — реактивные", Balance.get_gear_kind("jetpack") == "jet"
+		and Balance.get_gear_kind("jetpack_top") == "jet")
+	check("нижние две — пропеллеры", Balance.get_gear_kind("backpack") == "prop"
+		and Balance.get_gear_kind("backpack_plus") == "prop")
+
+
+## Покупка снимает РОВНО цену — ни монетой больше.
+func _test_buy_pickaxe_spends_exact_coins() -> void:
+	_fresh()
+	var price := Balance.get_tool_cost_coins("titanium_pickaxe")
+	GameState.coins = price - 1
+	check("без монет титановая кирка не покупается",
+		not bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+	check("неудачная покупка монет не тронула", GameState.coins == price - 1)
+	check("кирка не появилась", not GameState.owned_tools.has("titanium_pickaxe"))
+
+	GameState.coins = price + 77
+	check("покупка прошла", bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+	check("списано ровно %d монет" % price, GameState.coins == 77)
+	check("кирка в собственности", GameState.owned_tools.has("titanium_pickaxe"))
+	check("купленная кирка сразу в руках", GameState.current_tool == "titanium_pickaxe")
+
+	check("дважды одну кирку не продают",
+		not bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+	check("повторная покупка монет не тронула", GameState.coins == 77)
+
+	# Ржавая кирка не продаётся вовсе: она находится в мастерской.
+	_fresh()
+	GameState.coins = 10000
+	check("ржавая кирка в магазине не продаётся",
+		not bool(ShopService.buy_tool("rusty_pickaxe")["ok"]))
+
+
+func _test_buy_gear_spends_exact_coins() -> void:
+	_fresh()
+	var price := Balance.get_gear_cost_coins("backpack")
+	GameState.coins = price - 1
+	check("без монет ранец не покупается", not bool(ShopService.buy_gear("backpack")["ok"]))
+	check("неудачная покупка монет не тронула", GameState.coins == price - 1)
+
+	GameState.coins = price + 5
+	check("ранец куплен", bool(ShopService.buy_gear("backpack")["ok"]))
+	check("списано ровно %d монет" % price, GameState.coins == 5)
+	check("ранец в собственности", GameState.has_gear("backpack"))
+	check("купленный ранец сразу надет", GameState.current_gear == "backpack")
+
+	# Ступень получше надевается сама; ступень похуже — нет, иначе покупка
+	# запасного ранца пересаживала бы игрока с джетпака на пропеллеры.
+	GameState.coins = Balance.get_gear_cost_coins("jetpack")
+	check("джетпак куплен", bool(ShopService.buy_gear("jetpack")["ok"]))
+	check("джетпак надет сам — он быстрее", GameState.current_gear == "jetpack")
+	GameState.coins = Balance.get_gear_cost_coins("backpack_plus")
+	check("улучшенный ранец куплен", bool(ShopService.buy_gear("backpack_plus")["ok"]))
+	check("медленная ступень сама не надевается", GameState.current_gear == "jetpack")
+
+
+## Ни одной кирки и ни одного ранца в рецептах быть не должно.
+func _test_pickaxes_and_gear_are_not_crafted() -> void:
+	var craftable: Array = []
+	for r in ShopCatalog.recipes():
+		craftable.append(String(r["id"]))
+	for id in Balance.get_tools_in_line("pickaxe"):
+		check("кирка %s не крафтится" % id, not craftable.has(id))
+	for id in Balance.get_gear_ids():
+		check("ранец %s не крафтится" % id, not craftable.has(id))
+	check("рецепта джетпака больше нет", ShopCatalog.recipe("jetpack").is_empty())
+
+	# И наоборот: технику за одни монеты не купить.
+	_fresh()
+	GameState.coins = 999999
+	check("ручной бур за монеты не продаётся — он собирается",
+		not bool(ShopService.buy_tool("hand_drill")["ok"]))
+	check("монеты не тронуты", GameState.coins == 999999)
+
+
+## Техника по-прежнему собирается из материалов (решение владельца).
+func _test_tech_is_still_crafted() -> void:
+	var craftable: Array = []
+	for r in ShopCatalog.recipes():
+		craftable.append(String(r["id"]))
+	for id in ["hand_drill", "drill_rig", "well"]:
+		check("техника %s осталась в рецептах" % id, craftable.has(id))
+
+	# Скважина ставится уровнем, а не кладётся в рюкзак.
+	_fresh()
+	GameState.well_level = 0
+	GameState.max_depth_reached = 200
+	var r := ShopCatalog.recipe("well")
+	check("рецепт скважины есть", not r.is_empty())
+	if r.is_empty():
+		return
+	GameState.coins = int(r["coins"])
+	for id in r["inputs"].keys():
+		GameState.house_storage[String(id)] = int(r["inputs"][id])
+	var res := ShopService.craft("well")
+	check("скважина собралась: " + String(res.get("message", "")), bool(res["ok"]))
+	check("скважина построена уровнем 1", GameState.well_level == 1)
+	check("монеты за скважину списаны", GameState.coins == 0)
+	check("второй раз скважину не собрать", not ShopService.can_craft("well"))
+	GameState.well_level = 0
+
+
+## Экипировка меняет то, ради чего она и заведена: скорость копки и полёта.
+func _test_equipment_switches_dig_and_fly() -> void:
+	_fresh()
+	GameState.grant_tool("iron_pickaxe")
+	GameState.grant_tool("obsidian_pickaxe")
+	GameState.set_current_tool("iron_pickaxe")
+	check("на железной кирке копка ×1.3",
+		is_equal_approx(Equipment.current_dig_multiplier(), 1.3))
+	check("смена кирки на верстаке прошла", bool(Equipment.equip_tool("obsidian_pickaxe")["ok"]))
+	check("на обсидиановой копка ×5", is_equal_approx(Equipment.current_dig_multiplier(), 5.0))
+	check("в руках именно она", GameState.current_tool == "obsidian_pickaxe")
+
+	# Того, чего нет, не надеть.
+	check("некупленную кирку надеть нельзя",
+		not bool(Equipment.equip_tool("diamond_pickaxe")["ok"]))
+	check("в руках осталась прежняя", GameState.current_tool == "obsidian_pickaxe")
+
+	var base := Balance.get_gear_base_speed()
+	GameState.grant_gear("backpack")
+	GameState.grant_gear("jetpack_top")
+	check("после покупки надет топовый джетпак", GameState.current_gear == "jetpack_top")
+	check("потолок полёта = база ×10",
+		is_equal_approx(Equipment.current_fly_speed(), base * 10.0))
+	check("смена ранца на верстаке прошла", bool(Equipment.equip_gear("backpack")["ok"]))
+	check("на базовом ранце потолок = база",
+		is_equal_approx(Equipment.current_fly_speed(), base))
+	check("некупленный ранец надеть нельзя",
+		not bool(Equipment.equip_gear("backpack_plus")["ok"]))
+
+	# Переодеваться можно только у верстака, в мастерской.
+	GameState.house_is_indoors = false
+	check("из шахты кирку не сменить", not bool(Equipment.equip_tool("iron_pickaxe")["ok"]))
+	check("из шахты ранец не сменить", not bool(Equipment.equip_gear("jetpack_top")["ok"]))
+	GameState.house_is_indoors = true
+
+
+# ---------------------------------------------------------------------------
+# Совместимость сейвов
+#
+# После обновления у игрока не должно пропасть НИЧЕГО из того, что он уже
+# заработал по старым правилам.
+# ---------------------------------------------------------------------------
+
+func _test_save_migration_v1() -> void:
+	_fresh()
+
+	# Старый сейв: собранная железная кирка и джетпак с верстака, глубина 300.
+	# Ранца в сейве нет вовсе — старый код выдавал его по глубине 10.
+	var old_save := {
+		"version": 1,
+		"depth": {"max_depth_reached": 300},
+		"tool": {"current_tool": "iron_pickaxe"},
+		"economy": {
+			"owned_tools": ["shovel", "rusty_pickaxe", "iron_pickaxe"],
+			"owned_gear": ["jetpack"],
+		},
+	}
+	var migrated := SaveSystem._migrate(old_save.duplicate(true))
+	check("миграция подняла версию сейва до 2", int(migrated["version"]) == 2)
+	var eco: Dictionary = migrated["economy"]
+	check("железная кирка не пропала", Array(eco["owned_tools"]).has("iron_pickaxe"))
+	check("джетпак не пропал", Array(eco["owned_gear"]).has("jetpack"))
+	check("ранец, летавший по глубине, записан в собственность",
+		Array(eco["owned_gear"]).has("backpack"))
+	check("надет лучший из имеющихся — джетпак", String(eco["current_gear"]) == "jetpack")
+
+	# Совсем старый сейв: блока economy нет вовсе, только глубина 150.
+	# По прежним правилам джетпак давался с глубины 100, ранец — с 10.
+	var ancient := {"version": 1, "depth": {"max_depth_reached": 150}}
+	var eco2: Dictionary = SaveSystem._migrate(ancient)["economy"]
+	check("древний сейв: джетпак с глубины 100 сохранён",
+		Array(eco2["owned_gear"]).has("jetpack"))
+	check("древний сейв: ранец с глубины 10 сохранён",
+		Array(eco2["owned_gear"]).has("backpack"))
+	check("древний сейв: надет джетпак", String(eco2["current_gear"]) == "jetpack")
+
+	# Мелкая глубина — ни ранца, ни джетпака: отдавать то, чего не было, тоже
+	# нельзя, иначе обновление раздаёт снаряжение бесплатно.
+	var shallow := {"version": 1, "depth": {"max_depth_reached": 3}}
+	var eco3: Dictionary = SaveSystem._migrate(shallow)["economy"]
+	check("на глубине 3 ранца не было и не появилось",
+		Array(eco3["owned_gear"]).is_empty() and String(eco3["current_gear"]).is_empty())
+
+	# Сейв текущей версии миграция не переписывает.
+	var fresh_save := {
+		"version": 2,
+		"depth": {"max_depth_reached": 500},
+		"economy": {"owned_gear": ["backpack"], "current_gear": "backpack"},
+	}
+	var eco4: Dictionary = SaveSystem._migrate(fresh_save)["economy"]
+	check("сейв версии 2 миграция не переписывает",
+		Array(eco4["owned_gear"]).size() == 1 and String(eco4["current_gear"]) == "backpack")
+
+
+## Дымовая проверка шторки: каждый из четырёх разделов магазина и экран
+## экипировки должны СТРОИТЬСЯ. Кнопки здесь не нажимаются — вся арифметика
+## проверена выше, — но список строится кодом, и опечатка в имени поля роняет
+## не тест, а игрока, открывшего магазин.
+func _test_shop_ui_builds_every_screen() -> void:
+	_fresh()
+	GameState.coins = 100000
+	GameState.grant_tool("iron_pickaxe")
+	GameState.grant_gear("backpack")
+	GameState.inventory["gold"] = 3
+
+	var ui = load("res://scenes/shop.tscn").instantiate()
+	add_child(ui)
+	for screen in [ShopUI.TAB_PICKS, ShopUI.TAB_TECH, ShopUI.TAB_FOOD,
+			ShopUI.TAB_SELL, ShopUI.SCREEN_EQUIP]:
+		ui.open(screen)
+		check("раздел «%s» открылся и построил список" % screen,
+			ui.is_open() and ui._list.get_child_count() > 0)
+	ui.close()
+	check("шторка закрывается", not ui.is_open())
+	ui.queue_free()
+	_fresh()

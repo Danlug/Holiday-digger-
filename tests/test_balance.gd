@@ -27,6 +27,8 @@ func _init() -> void:
 	_test_mineral_data(bal)
 	_test_dig_speed(bal)
 	_test_luck(bal)
+	_test_tool_line(bal)
+	_test_gear_line(bal)
 
 	_print_summary()
 	quit(0 if failures == 0 else 1)
@@ -183,6 +185,75 @@ func _test_luck(bal) -> void:
 	var chance5: Dictionary = bal.get_luck_chance_percent(5)
 	_check("шанс земли ступень 5 = 10%", chance5["earth"], 10.0, 0.001)
 	_check("шанс ресурса ступень 5 = 5%", chance5["resource"], 5.0, 0.001)
+
+
+# ---------------------------------------------------------------------------
+# Линейка кирок и линейка ранцев (владелец переписал развитие игры)
+#
+# Проверка на уровне ДАННЫХ, без автолоадов и без магазина: цены и множители
+# названы владельцем словами, и если balance.json разойдётся с этими словами,
+# упасть должно здесь — раньше, чем игрок увидит не ту цену на кнопке.
+# ---------------------------------------------------------------------------
+
+func _test_tool_line(bal) -> void:
+	print("--- Кирки ---")
+	var want := [
+		["rusty_pickaxe", 0, 1.0],
+		["iron_pickaxe", 500, 1.3],
+		["titanium_pickaxe", 1500, 1.6],
+		["platinum_pickaxe", 10000, 2.5],
+		["diamond_pickaxe", 20000, 3.5],
+		["obsidian_pickaxe", 50000, 5.0],
+	]
+	var line: Array = bal.get_tools_in_line("pickaxe")
+	_check_int("кирок ровно шесть", line.size(), 6)
+	for i in range(want.size()):
+		var id := String(want[i][0])
+		_check_true("ступень %d — %s" % [i, id], i < line.size() and String(line[i]) == id)
+		_check_int("%s: цена" % id, bal.get_tool_cost_coins(id), int(want[i][1]))
+		_check("%s: копка" % id, bal.get_tool_speed_multiplier(id), float(want[i][2]), 0.0001)
+		# Ворота прогресса — деньги, а не глубина (решение агента, см. отчёт).
+		_check_true("%s: по глубине не ограничена" % id, bal.get_tool_max_depth(id) < 0)
+	_check_int("у лопаты ограничение по глубине осталось", bal.get_tool_max_depth("shovel"), 4)
+	# Кирки — только за монеты, материалов в цене нет ни у одной.
+	for id in line:
+		_check_true("%s покупается за одни монеты" % id, not bal.tool_needs_materials(String(id)))
+	# Техника — наоборот: без материалов не собирается.
+	for id in ["hand_drill", "drill_rig"]:
+		_check_true("технику %s одними монетами не взять" % id, bal.tool_needs_materials(id))
+
+
+func _test_gear_line(bal) -> void:
+	print("--- Ранцы ---")
+	var base: float = bal.get_gear_base_speed()
+	_check("база линейки = прежняя PROP_SPEED (2.5 кл/с)", base, 2.5, 0.0001)
+	var want := [
+		["backpack", 100, 1.0],
+		["backpack_plus", 1000, 2.0],
+		["jetpack", 5000, 3.0],
+		["jetpack_top", 20000, 10.0],
+	]
+	var line: Array = bal.get_gear_ids()
+	_check_int("ранцев ровно четыре", line.size(), 4)
+	for i in range(want.size()):
+		var id := String(want[i][0])
+		var mult := float(want[i][2])
+		_check_true("ступень %d — %s" % [i, id], i < line.size() and String(line[i]) == id)
+		_check_int("%s: цена" % id, bal.get_gear_cost_coins(id), int(want[i][1]))
+		_check("%s: полёт" % id, bal.get_gear_fly_multiplier(id), mult, 0.0001)
+		# Множитель — на СКОРОСТЬ полёта: потолок подъёма в клетках/сек.
+		_check("%s: потолок подъёма" % id, bal.get_gear_max_speed(id), base * mult, 0.0001)
+	_check_true("верхние две ступени реактивные",
+		bal.get_gear_kind("jetpack") == "jet" and bal.get_gear_kind("jetpack_top") == "jet")
+	_check_true("нижние две — пропеллеры",
+		bal.get_gear_kind("backpack") == "prop" and bal.get_gear_kind("backpack_plus") == "prop")
+	# Пустой id — не «летать со скоростью ноль», а «ранца нет»: на этом
+	# держится сравнение ступеней в GameState.grant_gear.
+	_check("без ранца множителя нет", bal.get_gear_fly_multiplier(""), 0.0, 0.0001)
+	# Топовый джетпак быстрее всех, но всё ещё медленнее свободного падения
+	# (player.gd:V_TERM = 32): падать по-прежнему опаснее, чем лететь.
+	_check_true("потолок топового джетпака ниже предела падения",
+		bal.get_gear_max_speed("jetpack_top") < 32.0)
 
 
 func _print_summary() -> void:

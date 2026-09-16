@@ -340,19 +340,27 @@ func _test_tutorial_gold_does_not_stun() -> void:
 	player.stun_until_msec = 0.0
 
 
+## Ранцы по глубине больше НЕ открываются: владелец переписал их в линейку из
+## четырёх ступеней за монеты, и летает герой тем, что надето.
 func _test_gear_unlock_by_depth() -> void:
+	GameState.owned_gear.clear()
+	GameState.current_gear = ""
 	GameState.max_depth_reached = 0
-	check("на глубине 0 ранца ещё нет", not player.has_backpack())
+	check("на глубине 0 летать нечем", not player.has_backpack())
 	GameState.max_depth_reached = player.PROP_DEPTH
-	check("на глубине 10 открывается ранец с пропеллерами", player.has_backpack())
-	check("джетпака на глубине 10 ещё нет", not player.has_jetpack())
-	# Джетпак глубиной больше НЕ открывается (решение владельца): его
-	# собирают на верстаке. Глубина осталась условием появления рецепта.
+	check("глубина 10 ранца больше не выдаёт", not player.has_backpack())
 	GameState.max_depth_reached = player.JET_DEPTH
-	check("глубина 100 сама джетпак не даёт", not player.has_jetpack())
+	check("глубина 100 джетпака больше не выдаёт", not player.has_jetpack())
+
+	GameState.grant_gear("backpack")
+	check("купленный ранец даёт полёт", player.has_backpack())
+	check("ранец — пропеллеры, а не реактивная тяга", not player.has_jetpack())
 	GameState.grant_gear("jetpack")
-	check("собранный на верстаке джетпак работает", player.has_jetpack())
-	GameState.owned_gear.erase("jetpack")
+	check("купленный джетпак надет и считается реактивным", player.has_jetpack())
+	GameState.set_current_gear("backpack")
+	check("надет ранец — тяга снова пропеллерная", not player.has_jetpack())
+	GameState.owned_gear.clear()
+	GameState.current_gear = ""
 	check("на глубине 100 открывается ручной бур", player.has_hand_drill())
 	check("буровой машины на глубине 100 ещё нет", not player.has_drill_rig())
 	GameState.max_depth_reached = player.RIG_DEPTH - 1
@@ -426,7 +434,11 @@ func _test_exhaustion_penalty() -> void:
 ## не уходит за него ни на клетку и упирается мягко — без рывка о стену.
 func _test_sky_ceiling() -> void:
 	GameState.reset_progress()
-	GameState.grant_gear("jetpack")
+	# Верхняя ступень линейки: самый быстрый полёт в игре (×10 к базовому
+	# ранцу). Потолок неба проверяется именно ею — на медленной ступени герой
+	# просто не успевает долететь за отведённые 20 секунд, и проверка
+	# говорила бы не о потолке, а о скорости ранца.
+	GameState.grant_gear("jetpack_top")
 	GameState.max_depth_reached = player.JET_DEPTH
 	check("небо высотой 20–30 клеток (просьба владельца)",
 		player.SKY_HEIGHT >= 20 and player.SKY_HEIGHT <= 30)

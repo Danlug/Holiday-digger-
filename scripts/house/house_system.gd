@@ -8,12 +8,13 @@ extends Node2D
 ## переходы «огород ↔ дом ↔ шахта».
 ##
 ## Подключается одной строкой из scripts/main.gd. Узел кладётся в ViewRoot,
-## потому что экстерьер дома и люк — часть мира и обязаны ездить вместе с
-## камерой; интерьер и модалка живут на своих CanvasLayer и от камеры не
-## зависят.
+## потому что экстерьер дома — часть мира и обязан ездить вместе с камерой;
+## интерьер и модалка живут на своих CanvasLayer и от камеры не зависят.
 ##
 ## Роберту (ГДД п.9) достаточно вызвать robert_finished_garden(): дом сам
-## покажет люк в мире, откроет спуск из подвала и закроет огород.
+## попросит мир пробить тоннель, откроет спуск из подвала и закроет огород.
+## Люка (старое решение) больше нет — владелец его отменил: единственный
+## вход в копальню теперь бетонный тоннель Роберта в клетке WorldGen.TUNNEL_X.
 
 const TILE := 32
 ## Дом бабки после смерти деда (решение владельца, картинка от него же):
@@ -22,7 +23,6 @@ const TILE := 32
 ## катсцен, где показывают время деда.
 const HOUSE_SPRITE := "res://art/env/house_rich.png"
 const HOUSE_META := "res://art/env/house_rich.json"
-const HATCH_SPRITE := "res://art/env/hatch.png"
 const VIEW_SCENE := "res://scenes/house.tscn"
 const PROMPT_SCENE := "res://scenes/house_prompt.tscn"
 const STORAGE_SCENE := "res://scenes/house_storage.tscn"
@@ -40,16 +40,16 @@ var _view: CanvasLayer = null
 var _prompt: CanvasLayer = null
 var _storage_view: CanvasLayer = null
 var _exterior: Sprite2D = null
-var _hatch: Sprite2D = null
 var _button: Button = null
 var _button_action: String = ""
 var _storage_button: Button = null
 var _prompt_action: String = ""
 
-## Люк втягивает в дом при касании (решение владельца), но только после того,
-## как от него отошли. Без этой защёлки выход через люк превращается в петлю:
-## герой выходит, стоит на люке, люк тут же забирает его обратно.
-var _hatch_armed: bool = false
+## Устье тоннеля втягивает в дом при касании (решение владельца), но только
+## после того, как от него отошли. Без этой защёлки спуск превращается в
+## петлю: герой выходит в устье, стоит в нём, и устье тут же забирает его
+## обратно. Раньше тем же латчем был защищён люк.
+var _tunnel_armed: bool = false
 var _story: Node = null
 
 
@@ -70,7 +70,6 @@ func _ready() -> void:
 	GameState.daily_reset.connect(_on_daily_reset)
 
 	_resolve_refs()
-	_sync_world_props()
 
 
 func _resolve_refs() -> void:
@@ -84,7 +83,7 @@ func _resolve_refs() -> void:
 		hud = get_tree().root.find_child("HUD", true, false)
 	if _story == null:
 		_story = get_tree().root.find_child("StoryDirector", true, false)
-		# Сюжетная система зовёт дом через свои хуки (build_hatch у Роберта,
+		# Сюжетная система зовёт дом через свои хуки (build_tunnel у Роберта,
 		# ГДД п.9), но сама искать его не умеет — представляемся сами: дом
 		# знает про сюжет, сюжету про дом знать не обязательно.
 		if _story != null and _story.get("house") == null:
@@ -102,7 +101,8 @@ func _resolve_refs() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Мир: дом на поверхности и люк под фундаментом
+# Мир: дом на поверхности. Тоннель Роберта дом не рисует — это тайлы, а их
+# геометрию держит scripts/world/world_gen.gd (build_robert_tunnel).
 # ---------------------------------------------------------------------------
 
 func _build_world_props() -> void:
@@ -124,21 +124,6 @@ func _build_world_props() -> void:
 		# по y = 0 дом висел бы на клетку выше уровня земли.
 		_exterior.position = Vector2(WorldGen.GARDEN_X_MIN * TILE - size.x, TILE - size.y)
 		add_child(_exterior)
-
-	if ResourceLoader.exists(HATCH_SPRITE):
-		_hatch = Sprite2D.new()
-		_hatch.name = "Hatch"
-		_hatch.centered = false
-		_hatch.texture = load(HATCH_SPRITE)
-		var hatch_cell := HouseConfig.hatch_cell()
-		_hatch.position = Vector2(hatch_cell.x * TILE, hatch_cell.y * TILE)
-		_hatch.visible = false
-		add_child(_hatch)
-
-
-func _sync_world_props() -> void:
-	if _hatch != null:
-		_hatch.visible = GameState.house_hatch_built
 
 
 func _build_scenes() -> void:
@@ -172,9 +157,8 @@ func _build_scenes() -> void:
 
 func _process(_dt: float) -> void:
 	_resolve_refs()
-	_sync_world_props()
 	_tick_tutorial()
-	_auto_enter_hatch_if_touched()
+	_auto_enter_tunnel_if_touched()
 	_update_hud_button()
 	if _view != null and _view.visible:
 		_view.refresh()
@@ -198,12 +182,31 @@ func near_door() -> bool:
 	return player.y < 1.5 and absf(player.x - (door.x + 0.5)) <= HouseConfig.interact_radius()
 
 
-func near_hatch() -> bool:
+## Устье тоннеля Роберта — верхняя клетка бетонного колодца (ГДД п.9,
+## решение владельца: единственный вход в копальню). Геометрию держит мир,
+## дом только спрашивает; HouseConfig отвечает запасным значением, пока мира
+## ещё нет (загрузка сейва до генерации, тесты дома в одиночку).
+func tunnel_mouth() -> Vector2i:
+	if world == null:
+		world = GameState.world_ref
+	if world != null:
+		return world.tunnel_mouth()
+	return HouseConfig.tunnel_mouth_cell()
+
+
+## Стоит ли герой в устье тоннеля (в радиусе взаимодействия).
+func near_tunnel_mouth() -> bool:
 	if player == null or not GameState.house_hatch_built:
 		return false
-	var hatch := HouseConfig.hatch_cell()
-	return absf(player.x - (hatch.x + 0.5)) <= HouseConfig.interact_radius() \
-		and absf(player.y - (hatch.y + 0.5)) <= HouseConfig.interact_radius()
+	var mouth := tunnel_mouth()
+	return absf(player.x - (mouth.x + 0.5)) <= HouseConfig.interact_radius() \
+		and absf(player.y - (mouth.y + 0.5)) <= HouseConfig.interact_radius()
+
+
+## Старое имя времён люка. Оставлено обёрткой: на него мог ссылаться чужой
+## код, написанный до отмены люка.
+func near_hatch() -> bool:
+	return near_tunnel_mouth()
 
 
 func enter_house(room: String = "hall") -> void:
@@ -226,17 +229,34 @@ func exit_to_door() -> void:
 	_leave_house(Vector2(door.x + 0.5, 0.5))
 
 
-## Выход через люк в шахту (ГДД п.9). Возвращает false, если люка ещё нет.
-func exit_through_hatch() -> bool:
+## Спуск из подвала в шахту (ГДД п.9). Возвращает false, пока Роберт не
+## пробил тоннель.
+func exit_through_tunnel() -> bool:
 	if not GameState.house_hatch_built:
 		return false
-	var hatch := HouseConfig.hatch_cell()
-	_carve_hatch_cell()
-	# Ставим не В люк, а на клетку НИЖЕ — внутрь расчищенной площадки: это и
-	# читается как «спустился», и не оставляет героя стоять в самой дыре.
-	_hatch_armed = false
-	_leave_house(Vector2(hatch.x + 0.5, hatch.y + 1.5))
+	if world == null:
+		world = GameState.world_ref
+	if world == null:
+		return false
+	# Тоннель пробивается заново на каждом спуске: землетрясение (ГДД п.8)
+	# стирает диффы, и колодец зарастает обратно. Вызов идемпотентный —
+	# мир сам разбирается, что уже пробито.
+	world.build_robert_tunnel()
+	var mouth := world.tunnel_mouth()
+	# Герой встаёт РОВНО в устье (решение владельца): вниз ведёт только
+	# колодец, шага в сторону из него нет — стенки 16 и 18 железобетонные.
+	# Латч гасится ДО выхода, иначе устье тут же утащит героя обратно в дом
+	# (см. _auto_enter_tunnel_if_touched).
+	_tunnel_armed = false
+	_reveal_around(mouth)
+	_leave_house(Vector2(mouth.x + 0.5, mouth.y + 0.5))
 	return true
+
+
+## Старое имя спуска (люк). Оставлено обёрткой ради старых сейвов и старых
+## записей очереди сюжета: люка больше нет, но падать на них нельзя.
+func exit_through_hatch() -> bool:
+	return exit_through_tunnel()
 
 
 func _leave_house(world_pos: Vector2) -> void:
@@ -256,36 +276,13 @@ func _leave_house(world_pos: Vector2) -> void:
 	_freeze_player(false)
 
 
-## Площадка под люком: 3×3 пустых клетки вокруг него (решение владельца).
-##
-## Одной пустой клетки мало по двум причинам сразу. Первая: спускаясь, герой
-## выпадает ровно в неё и тут же упирается плечами в породу — шага в сторону
-## нет, и единственное, что можно сделать, это копать. Вторая: люк втягивает
-## обратно при касании, а значит приземляться прямо в него нельзя — нужно
-## место, куда отойти, иначе спуск и подъём зациклятся.
-##
-## Перекапывается каждый раз, когда через люк выходят: землетрясение (ГДД п.8)
-## стирает диффы и зарастает площадку обратно.
-const HATCH_CLEARING := 1   # радиус в клетках: 1 -> 3×3
-
-
-func _carve_hatch_cell() -> void:
-	if world == null:
-		world = GameState.world_ref
-	if world == null:
+## Туман вокруг клетки, куда герой только что попал не своим ходом: без
+## этого он вываливается в устье тоннеля посреди чёрного экрана.
+func _reveal_around(cell: Vector2i) -> void:
+	if GameState.fog_ref == null:
 		return
-	var hatch := HouseConfig.hatch_cell()
-	for dy in range(-HATCH_CLEARING, HATCH_CLEARING + 1):
-		for dx in range(-HATCH_CLEARING, HATCH_CLEARING + 1):
-			var cx := hatch.x + dx
-			var cy := hatch.y + dy
-			if cy < 1:
-				continue   # выше поверхности копать нечего
-			if world.get_tile(cx, cy) != TileTypes.Type.EMPTY:
-				world.dig_cell(cx, cy)
-	if GameState.fog_ref != null:
-		GameState.fog_ref.reveal_around_cell(hatch.x, hatch.y,
-			GameState.get_vision_terrain_radius(), GameState.get_vision_resource_radius())
+	GameState.fog_ref.reveal_around_cell(cell.x, cell.y,
+		GameState.get_vision_terrain_radius(), GameState.get_vision_resource_radius())
 
 
 func _freeze_player(value: bool) -> void:
@@ -300,49 +297,61 @@ func _freeze_player(value: bool) -> void:
 
 
 ## Хук сюжетной сцены Роберта (data/story.json: {"do":"hook","target":"house",
-## "method":"build_hatch"}). Имя менять нельзя — на него ссылается сценарий.
-func build_hatch() -> void:
+## "method":"build_tunnel"}). Имя менять нельзя — на него ссылается сценарий.
+func build_tunnel() -> void:
 	robert_finished_garden()
 
 
-## Роберт закончил работу (ГДД п.9): огород приведён в порядок и закрыт,
-## из подвала построен люк. Одна точка входа для сюжетной системы.
+## Старое имя того же хука (люк отменён владельцем). Тонкая обёртка, а не
+## удалённый метод: в сейве лежит очередь сюжетных сцен, и у игрока со старым
+## сохранением в ней может остаться method="build_hatch" — без обёртки сцена
+## Роберта молча не построила бы ничего, и игрок остался бы без входа в шахту.
+func build_hatch() -> void:
+	build_tunnel()
+
+
+## Роберт закончил работу (ГДД п.9, решение владельца): огород засыпан и
+## закрыт навсегда, вместо лестницы вниз уходит бетонный тоннель. Одна точка
+## входа для сюжетной системы.
 func robert_finished_garden() -> void:
+	# Поле в GameState осталось со времён люка (house_hatch_built), смысл у
+	# него теперь один: Роберт построил тоннель. Переименование поля — за
+	# scripts/core, дому важно только значение.
 	GameState.house_hatch_built = true
 	GameState.house_garden_closed = true
-	# Огород выравнивается и засыпается землёй (решение владельца): Роберт
-	# приводит его в порядок, и оставлять после него поле воронок нельзя.
-	# Выкопанное сценарное золото не отрастает — оно зафиксировано и уже
-	# унесено игроком.
 	if world == null:
 		world = GameState.world_ref
 	if world != null:
-		world.restore_garden()
-	_sync_world_props()
-	_toast("Роберт закончил: огород выровнял и засыпал, из подвала есть люк в шахту.", 4.0)
+		# Вся геометрия — знание мира: он пробивает колодец в клетке
+		# WorldGen.TUNNEL_X, ставит железобетонные стенки 16 и 18, засыпает
+		# остальной огород (копать там больше нельзя) и расчищает площадку
+		# под фундаментом. Выкопанное сценарное золото не отрастает — оно
+		# зафиксировано и уже унесено игроком.
+		world.build_robert_tunnel()
+	_toast("Роберт закончил: огород засыпан и закрыт, вниз ведёт бетонный тоннель.", 4.0)
 
 
 # ---------------------------------------------------------------------------
 # Контекстная кнопка HUD
 # ---------------------------------------------------------------------------
 
-## Люк втягивает героя в дом сам, как только он на него налетел (решение
-## владельца): подтверждение у дырки в полу, через которую только что вылез,
-## — лишний тап на каждом подъёме.
+## Устье тоннеля втягивает героя в дом само, как только он в него налетел
+## (решение владельца, раньше так же работал люк): подтверждение у дыры, из
+## которой только что поднялся, — лишний тап на каждом возвращении.
 ##
 ## Дверь так НЕ работает намеренно: мимо неё ходят по огороду постоянно, и
 ## дом хватал бы игрока при каждом проходе.
-func _auto_enter_hatch_if_touched() -> void:
+func _auto_enter_tunnel_if_touched() -> void:
 	if GameState.house_is_indoors or not GameState.is_alive:
 		return
 	if not GameState.house_hatch_built or player == null or player.frozen:
 		return
-	if not near_hatch():
-		_hatch_armed = true
+	if not near_tunnel_mouth():
+		_tunnel_armed = true
 		return
-	if not _hatch_armed:
+	if not _tunnel_armed:
 		return
-	_hatch_armed = false
+	_tunnel_armed = false
 	enter_house("basement")
 
 
@@ -356,8 +365,8 @@ func _update_hud_button() -> void:
 	if near_door():
 		_button_action = "enter_door"
 		_button.text = "Дом"
-	elif near_hatch():
-		# Кнопки у люка больше нет: в него просто влетаешь (решение
+	elif near_tunnel_mouth():
+		# Кнопки у тоннеля нет: в его устье просто влетаешь (решение
 		# владельца). Строку оставляем пустой, чтобы она не мигала у ног.
 		_button_action = ""
 		_button.visible = false
@@ -402,9 +411,11 @@ func _on_view_action(action: String, arg: String) -> void:
 			_eat(arg)
 		"exit_door":
 			exit_to_door()
-		"exit_hatch":
-			if not exit_through_hatch():
-				_toast("Люка ещё нет — его построит Роберт.")
+		# exit_hatch — то же действие под старым именем: интерьер мог быть
+		# собран из сохранённой сцены, снятой до отмены люка.
+		"exit_tunnel", "exit_hatch":
+			if not exit_through_tunnel():
+				_toast("Тоннеля ещё нет — его пробьёт Роберт.")
 		"storage":
 			# Тап пришёл из карточки мастерской, то есть герой уже подошёл к
 			# складу: фиксируем комнату, иначе панель откроется в режиме
@@ -482,7 +493,7 @@ func _eat(food_id: String) -> void:
 ## система, обучение ведёт она — у неё те же две стадии сняты катсценами
 ## (sleep_lesson_1 и sleep_lesson_2 в data/story.json), и два учителя разом
 ## показали бы игроку два экрана про одно и то же. Дом в этом случае держит
-## наготове сами действия: open_bedroom(), give_energy_bar(), build_hatch().
+## наготове сами действия: open_bedroom(), give_energy_bar(), build_tunnel().
 func _tick_tutorial() -> void:
 	if not GameState.is_alive or player == null or _story != null:
 		return

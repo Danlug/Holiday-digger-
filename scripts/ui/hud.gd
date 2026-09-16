@@ -817,8 +817,8 @@ func _build_strip() -> void:
 	strip.add_child(_tool_button)
 
 	var gear_box := HBoxContainer.new()
-	_gear_pack = _make_gear_icon(gear_box, "res://art/items/backpack_propeller.png")
-	_gear_jet = _make_gear_icon(gear_box, "res://art/items/jetpack.png")
+	_gear_pack = _make_gear_icon(gear_box, "")
+	_gear_jet = null
 	strip.add_child(gear_box)
 
 	# Пустая распорка: слева — то, чем копают, справа — куда ходят. Раньше
@@ -831,7 +831,9 @@ func _build_strip() -> void:
 	# --- экономика: кнопка мастерской (scripts/shop/) ---
 	# Одна кнопка на всю экономику: шторка внутри сама делится на продажу,
 	# верстак и лавку. Из комнаты мастерской она же открывается вызовом
-	# ShopUI.open_workshop() — кнопка нужна, пока дома как сцены нет.
+	# ShopUI.open_shop() — верстак в мастерской теперь экипировка, а магазин
+	# живёт у входной двери; эта кнопка — запасной вход, пока дом как сцена
+	# не доделан.
 	var shop_btn := _make_chip("")
 	if ResourceLoader.exists("res://art/ui/icon_coin.png"):
 		shop_btn.icon = load("res://art/ui/icon_coin.png")
@@ -840,7 +842,7 @@ func _build_strip() -> void:
 	else:
 		shop_btn.text = "Лавка"
 	shop_btn.tooltip_text = "Мастерская: продажа, верстак, лавка"
-	shop_btn.pressed.connect(func(): ShopUI.open_workshop())
+	shop_btn.pressed.connect(func(): ShopUI.open_shop())
 	shop_btn.text = "Мастерская"
 	shop_btn.custom_minimum_size = Vector2(0, STRIP_H)
 	more_menu.add_child(shop_btn)
@@ -1270,6 +1272,7 @@ func _connect_game_state() -> void:
 	GameState.stamina_changed.connect(func(s): _stamina_fill.size.x = 72.0 * clampf(s / 100.0, 0.0, 1.0))
 	GameState.coins_changed.connect(func(_c): _sync_purse())
 	GameState.dollars_changed.connect(func(_d): _sync_purse())
+	GameState.gear_changed.connect(func(_g): _sync_gear_icon())
 	GameState.inventory_changed.connect(func():
 		_sync_purse()
 		if _inv_sheet.visible:
@@ -1326,8 +1329,8 @@ func _sync_tool() -> void:
 	var tool_id := GameState.current_tool
 	var tool_name := Balance.get_tool_name_ru(tool_id)
 	_tool_button.tooltip_text = tool_name
-	var icon_path := "res://art/items/" + _tool_icon_file(tool_id) + ".png"
-	if ResourceLoader.exists(icon_path):
+	var icon_path := _tool_icon_path(tool_id)
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
 		_tool_button.icon = load(icon_path)
 	else:
 		# Без картинки кнопка была бы пустым прямоугольником — тогда пусть
@@ -1337,23 +1340,42 @@ func _sync_tool() -> void:
 	# показываем название, не дожидаясь, пока игрок ткнёт в иконку.
 	if _tool_name_panel != null and _tool_name_panel.visible:
 		_tool_name_label.text = tool_name
-	if player != null:
-		# Тёмная иконка недоступного снаряжения читалась как сломанная кнопка,
-		# а не как «ещё не куплено». Чего нет — того и на полосе нет.
-		_gear_pack.visible = player.has_backpack()
-		_gear_jet.visible = player.has_jetpack()
+	_sync_gear_icon()
 
 
-func _tool_icon_file(tool_id: String) -> String:
-	match tool_id:
-		"shovel": return "shovel"
-		"rusty_pickaxe": return "pickaxe_rusty_cracked" if (player != null and player.rusty_pickaxe_cracked) else "pickaxe_rusty"
-		"iron_pickaxe": return "pickaxe_iron"
-		"hand_drill": return "hand_drill"
+## На полосе — один значок: то, что надето. Тёмная иконка недоступного
+## снаряжения читалась как сломанная кнопка, а не как «ещё не куплено», а с
+## четырьмя ступенями и две фиксированные картинки отстали бы от линейки.
+func _sync_gear_icon() -> void:
+	if _gear_pack == null:
+		return
+	var gear_id := GameState.current_gear
+	var path := Balance.get_gear_icon(gear_id) if not gear_id.is_empty() else ""
+	if not path.is_empty() and not path.begins_with("res://"):
+		path = "res://" + path
+	if path.is_empty() or not ResourceLoader.exists(path):
+		_gear_pack.visible = false
+		return
+	_gear_pack.texture = load(path)
+	_gear_pack.tooltip_text = Balance.get_gear_name_ru(gear_id)
+	_gear_pack.visible = true
+
+
+## Путь к иконке инструмента — из данных (balance.json -> tools.icon), а не
+## из перечисления здесь: с шестью кирками перечисление отставало бы от
+## линейки при каждом добавлении. Исключение одно — трещина на дедовой кирке,
+## это состояние героя, а не инструмента.
+func _tool_icon_path(tool_id: String) -> String:
+	if tool_id == "rusty_pickaxe" and player != null and player.rusty_pickaxe_cracked:
+		return "res://art/items/pickaxe_rusty_cracked.png"
+	var path := Balance.get_tool_icon(tool_id)
+	if path.is_empty():
 		# Своей иконки у буровой машины нет — на полосе остаётся бур: машина
 		# и есть бур, только с кабиной и гусеницами.
-		"drill_rig": return "hand_drill"
-		_: return "shovel"
+		if tool_id == "drill_rig":
+			return "res://art/items/hand_drill.png"
+		return ""
+	return path if path.begins_with("res://") else "res://" + path
 
 
 func _update_depth() -> void:
@@ -1410,11 +1432,9 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 
 func _on_gear_unlocked(gear_id: String) -> void:
 	_sync_tool()
-	if gear_id == "backpack":
-		toast("Глубина 10. Пригодился ранец с пропеллерами — держи стик вверх в воздухе.", 5.0)
-	elif gear_id == "jetpack":
-		toast("Глубина 100. Собраны джетпак и ручной бур.", 5.0)
-	elif gear_id == "drill_rig":
+	# Ранцы и джетпаки больше не выдаются глубиной — их покупают, и о покупке
+	# говорит магазин. Здесь остались только вещи, которые открывает глубина.
+	if gear_id == "drill_rig":
 		toast("Глубина 1000. Собрана буровая машина — копает втрое быстрее бура.", 5.0)
 
 

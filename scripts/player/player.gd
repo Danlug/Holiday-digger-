@@ -223,6 +223,15 @@ func has_jetpack() -> bool:
 	return Balance.get_gear_kind(GameState.current_gear) == "jet" and has_backpack()
 
 
+## Ступень надетого снаряжения (0 — ничего, 1..4 — ранец… топовый джетпак).
+## По ней CharacterView выбирает ленту полёта fly_1..fly_4 — своя у каждой
+## ступени, потому что нарисованы они вместе с героем, а не накладкой.
+func flight_tier() -> int:
+	if GameState.current_gear.is_empty():
+		return 0
+	return int(Balance.unwrap(Balance.get_gear(GameState.current_gear).get("tier", 0)))
+
+
 func has_hand_drill() -> bool:
 	return GameState.max_depth_reached >= JET_DEPTH
 

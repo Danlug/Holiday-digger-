@@ -24,14 +24,31 @@ const GROUND_Y := 46
 ## кабине, и он становится мельче героя пешком. Лишняя высота кадра уходит
 ## ВНИЗ, под линию земли, — бур, копающий вниз, входит в клетку под машиной,
 ## и отвал породы должен лечь именно туда.
+##
+## Ленты полёта fly_1..fly_4 — та же история, только лишнее место уходит
+## ВВЕРХ, под винты, и немного вниз, под выхлоп. Тело героя в них того же
+## размера, что в idle.png: масштаб на весь лист один, и посчитан он по росту
+## героя (см. tools/import_packs.py). Влезть в 48×48 винты не могут — у
+## большого винта один диск 66 px в поперечнике, у топового джетпака пламя
+## уносит на 43 px назад, — а ужимать под них героя нельзя: он станет мельче
+## себя же пешком. Числа берутся из печати импортёра, менять их руками не надо.
 const SHEET_FRAME := {
 	"dig_rig_down": [80, 56, 50],
 	"dig_rig_side": [80, 56, 50],
+	"fly_1": [54, 56, 53],
+	"fly_2": [70, 57, 55],
+	"fly_3": [52, 49, 45],
+	"fly_4": [90, 47, 42],
 }
+
+## Лента полёта по уровню снаряжения: 1 — ранец, 2 — улучшенный ранец,
+## 3 — джетпак, 4 — топовый джетпак. 0 — снаряжения нет.
+const FLY_SHEETS := ["fly_1", "fly_2", "fly_3", "fly_4"]
 
 ## Листы копки, нарисованные отдельно для копки вниз и для копки вбок.
 ## Ключ — общее имя набора, к нему приписывается "_down" или "_side".
 const DIG_SHEETS := ["idle", "walk", "fall", "fly", "fly_jet",
+		"fly_1", "fly_2", "fly_3", "fly_4",
 		"dig_shovel", "dig_pick", "dig_pick_rusty",
 		"dig_drill_down", "dig_drill_side", "dig_rig_down", "dig_rig_side"]
 
@@ -44,6 +61,10 @@ const SHAKE_HZ := 14.0
 var _sprite: Sprite2D
 var _stun_flash: ColorRect
 var _sheets: Dictionary = {}
+
+## Уровень снаряжения, выставленный снаружи. -1 значит «не выставляли» — тогда
+## уровень спрашивается у самого героя, см. _flight_tier().
+var _tier_override: int = -1
 
 
 func _ready() -> void:
@@ -72,6 +93,50 @@ func _dig_sheet_name() -> String:
 	return base + dir if _sheets.has(base + dir) else base
 
 
+## Задать уровень летающего снаряжения извне: 0 — снаряжения нет, 1..4 —
+## уровни из магазина. Нужно и для теста, и для витрины: там герой показан в
+## полёте на снаряжении, которого у него ещё нет.
+func set_flight_tier(tier: int) -> void:
+	_tier_override = clampi(tier, 0, FLY_SHEETS.size())
+
+
+## Уровень снаряжения героя.
+##
+## Снаряжение переписывается в линейку из четырёх уровней, и новый метод
+## flight_tier() у героя может появиться уже после этого файла. Пока его нет,
+## уровень собирается из старых has_jetpack()/has_backpack(): джетпак это
+## третий уровень линейки, ранец — первый. Ни того, ни другого — ноль.
+func _flight_tier() -> int:
+	if _tier_override >= 0:
+		return _tier_override
+	if player == null:
+		return 0
+	if player.has_method("flight_tier"):
+		return clampi(int(player.flight_tier()), 0, FLY_SHEETS.size())
+	if player.has_method("has_jetpack") and player.has_jetpack():
+		return 3
+	if player.has_method("has_backpack") and player.has_backpack():
+		return 1
+	return 0
+
+
+## Имя ленты полёта. Новые ленты по уровням, а если их в сборке нет — старые
+## fly/fly_jet, а если и тех нет — падение: герой всё равно в воздухе. Кадр из
+## листа, которого нет, рисовать нечем, и лучше показать не тот полёт, чем
+## уронить отрисовку.
+func _fly_sheet_name() -> String:
+	var tier: int = _flight_tier()
+	var names: Array = []
+	if tier > 0:
+		names.append(FLY_SHEETS[tier - 1])
+	names.append("fly_jet" if tier >= 3 else "fly")
+	names.append("fall")
+	for name: String in names:
+		if _sheets.has(name):
+			return name
+	return String(names[0])
+
+
 func _process(_dt: float) -> void:
 	if player == null:
 		return
@@ -83,12 +148,11 @@ func _process(_dt: float) -> void:
 		# бурмобиля — ещё и своя на каждое направление копки.
 		sheet_name = _dig_sheet_name()
 	elif not player.on_ground:
-		# Ранец и джетпак выглядят по-разному, и по кадру должно быть видно,
-		# на чём герой висит.
-		if player.thrust == "jet":
-			sheet_name = "fly_jet"
-		elif player.thrust != "":
-			sheet_name = "fly"
+		# Все четыре уровня снаряжения выглядят по-разному, и по кадру должно
+		# быть видно, на чём герой висит: пропеллер, большой винт, джетпак с
+		# выхлопом или две ракеты. Тяга при этом своя — она из player.thrust.
+		if player.thrust != "":
+			sheet_name = _fly_sheet_name()
 		else:
 			sheet_name = "fall"
 	else:

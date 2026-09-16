@@ -101,12 +101,19 @@ func _stone_fraction(w: WorldGen, y_min: int, y_max: int, seeds: int) -> float:
 	return float(hit) / float(total)
 
 
+## Первые четыре уровня огорода — обучающая песочница БЕЗ КАМНЯ. Лопата о
+## камень даёт минуту стана (ГДД п.5), а кирки на этих уровнях ещё нет и
+## взяться ей неоткуда: наказание за незнание на первой минуте игры, которое
+## ничему не учит. Плюс автокопка камень не берёт и оставляла бы его торчать
+## посреди расчищенной земли — ровно на пути к фундаменту. Камень начинается
+## ниже фундамента.
 func test_layer_percentages_shallow() -> void:
-	print("-- Плотность камня, слои 1-4 --")
+	print("-- Первые четыре уровня: камня нет --")
 	var w := WorldGen.new(1)
-	check_range("камень на глубине 1 (ожидание 3%)", _stone_fraction(w, 1, 1, 400), 0.01, 0.06)
-	check_range("камень на глубине 2 (ожидание 7%)", _stone_fraction(w, 2, 2, 400), 0.04, 0.11)
-	check_range("камень на глубине 3-4 (ожидание 10%)", _stone_fraction(w, 3, 4, 250), 0.06, 0.15)
+	check("на глубине 1 камня нет", is_zero_approx(_stone_fraction(w, 1, 1, 400)))
+	check("на глубине 2 камня нет", is_zero_approx(_stone_fraction(w, 2, 2, 400)))
+	check("на глубинах 3-4 камня нет", is_zero_approx(_stone_fraction(w, 3, 4, 250)))
+	check("ниже фундамента камень есть", _stone_fraction(w, 6, 12, 200) > 0.01)
 
 
 func test_deep_void_and_stone() -> void:

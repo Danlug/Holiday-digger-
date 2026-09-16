@@ -19,6 +19,9 @@ func _init() -> void:
 	test_foundation_solid()
 	test_scripted_diamond()
 	test_staircase()
+	test_robert_tunnel()
+	test_garden_sealed_after_robert()
+	test_tunnel_survives_collapse()
 	test_peat_seam_solid()
 	test_all_solid_tiles_are_pickaxe_diggable()
 	test_fog_basic()
@@ -249,6 +252,204 @@ func test_staircase() -> void:
 			ok = false
 			print("     уровень %d: найдено %d клеток лестницы, ожидалось %d" % [y, count, expected_counts[y]])
 	check("количество клеток лестницы по уровням 1/2/3/4", ok)
+
+
+## Тоннель Роберта: единственный вход в копальню после того, как он закончил
+## огород (решение владельца — люк и лестница отменены).
+func test_robert_tunnel() -> void:
+	print("-- Тоннель Роберта вместо лестницы --")
+	var w := WorldGen.new(4242)
+
+	# --- до Роберта мир прежний: лестница есть, железобетона нет, копается ---
+	check("до Роберта огород не заперт", not w.is_garden_locked())
+	var reinforced_before := 0
+	var staircase_before := 0
+	for y in range(1, 5):
+		for x in range(WorldGen.WIDTH):
+			var t := w.get_tile(x, y)
+			if t == TileTypes.Type.REINFORCED:
+				reinforced_before += 1
+			elif t == TileTypes.Type.STAIRCASE:
+				staircase_before += 1
+	check("до Роберта железобетона в мире нет", reinforced_before == 0)
+	check("до Роберта лестница на месте (1+2+3+4 клетки)", staircase_before == 10)
+	# обучение копает первые четыре уровня — берём клетку заведомо вне
+	# лестницы и вне сценарного золота
+	check("до Роберта огород копается", w.dig_cell(22, 2))
+	check("выкопанная до Роберта клетка — дыра", w.get_tile(22, 2) == TileTypes.Type.EMPTY)
+
+	# --- Роберт закончил ---
+	w.build_robert_tunnel()
+	check("после Роберта огород заперт", w.is_garden_locked())
+	check("устье тоннеля — (17, 1)", w.tunnel_mouth() == Vector2i(WorldGen.TUNNEL_X, 1))
+
+	var ok_shaft := true
+	var ok_walls := true
+	for y in range(1, WorldGen.TUNNEL_DEPTH + 1):
+		if w.get_tile(WorldGen.TUNNEL_X, y) != TileTypes.Type.EMPTY:
+			ok_shaft = false
+		if w.get_tile(WorldGen.TUNNEL_WALL_LEFT, y) != TileTypes.Type.REINFORCED:
+			ok_walls = false
+		if w.get_tile(WorldGen.TUNNEL_WALL_RIGHT, y) != TileTypes.Type.REINFORCED:
+			ok_walls = false
+	check("колонка x=17 пуста на уровнях 1..4", ok_shaft)
+	check("колонки x=16 и x=18 — железобетон на уровнях 1..4", ok_walls)
+	check("глубина тоннеля ровно 4", WorldGen.TUNNEL_DEPTH == 4)
+	check("тоннель не уходит на пятый уровень (там фундамент)",
+		w.get_tile(WorldGen.TUNNEL_WALL_LEFT, 5) == TileTypes.Type.FOUNDATION)
+
+	# --- железобетон не копается НИКАКИМ инструментом ---
+	check("железобетон не берётся лопатой",
+		not TileTypes.can_dig_with_shovel(TileTypes.Type.REINFORCED))
+	check("железобетон не берётся киркой",
+		not TileTypes.can_dig_with_pickaxe(TileTypes.Type.REINFORCED))
+	check("железобетон вообще не копается", not TileTypes.is_diggable(TileTypes.Type.REINFORCED))
+	var ok_walls_hold := true
+	for y in range(1, WorldGen.TUNNEL_DEPTH + 1):
+		if w.dig_cell(WorldGen.TUNNEL_WALL_LEFT, y) or w.dig_cell(WorldGen.TUNNEL_WALL_RIGHT, y):
+			ok_walls_hold = false
+		if w.get_tile(WorldGen.TUNNEL_WALL_LEFT, y) != TileTypes.Type.REINFORCED:
+			ok_walls_hold = false
+	check("стены тоннеля не прокопать (dig_cell отказывает и стена цела)", ok_walls_hold)
+
+	# --- лестницы больше нет ---
+	var staircase_after := 0
+	for y in range(1, 6):
+		for x in range(WorldGen.WIDTH):
+			if w.get_tile(x, y) == TileTypes.Type.STAIRCASE:
+				staircase_after += 1
+	check("после Роберта лестницы в мире нет", staircase_after == 0)
+
+	# --- мягкая блокировка: колодец не тупик ---
+	check("фундамент под устьем пробит", w.get_tile(WorldGen.TUNNEL_X, 5) == TileTypes.Type.EMPTY)
+	check("фундамент рядом с устьем цел (пробита ровно одна клетка)",
+		w.get_tile(WorldGen.TUNNEL_X + 1, 5) == TileTypes.Type.FOUNDATION)
+	var ok_landing := true
+	for y in range(6, 8):
+		for x in range(WorldGen.TUNNEL_WALL_LEFT, WorldGen.TUNNEL_WALL_RIGHT + 1):
+			if w.get_tile(x, y) != TileTypes.Type.EMPTY:
+				ok_landing = false
+	check("под фундаментом расчищена площадка 3 клетки в ширину на 2 вниз", ok_landing)
+
+	# --- идемпотентность ---
+	var before := w.get_save_data()
+	w.build_robert_tunnel()
+	w.build_robert_tunnel()
+	var after := w.get_save_data()
+	check("повторная постройка тоннеля ничего не меняет",
+		before["dug"].size() == after["dug"].size() and w.is_garden_locked())
+
+	# --- замок переживает сохранение/загрузку ---
+	var reloaded := WorldGen.new(4242)
+	reloaded.load_save_data(after)
+	check("замок огорода сохраняется и загружается", reloaded.is_garden_locked())
+	check("после загрузки тоннель на месте",
+		reloaded.get_tile(WorldGen.TUNNEL_X, 3) == TileTypes.Type.EMPTY
+		and reloaded.get_tile(WorldGen.TUNNEL_WALL_LEFT, 3) == TileTypes.Type.REINFORCED)
+
+
+## После Роберта копать в огороде нельзя вообще, а верхний грунт неприкасаем
+## всегда — и до него, и после.
+func test_garden_sealed_after_robert() -> void:
+	print("-- Запечатанный огород --")
+	var w := WorldGen.new(7)
+
+	# поверхность неприкасаема ещё до Роберта
+	var ok_surface := true
+	for x in range(WorldGen.WIDTH):
+		if w.dig_cell(x, 0) or w.get_tile(x, 0) != TileTypes.Type.EMPTY:
+			ok_surface = false
+	check("верхний грунт (y=0) не копается и до Роберта", ok_surface)
+
+	# наковыряли воронок по всему огороду, как обучение
+	var dug_before := 0
+	for y in range(1, 5):
+		for x in range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH):
+			if w.dig_cell(x, y):
+				dug_before += 1
+	check("до Роберта огород копался (воронок наковыряли)", dug_before > 0)
+
+	w.build_robert_tunnel()
+
+	# воронки засыпаны: дыр в огороде не осталось нигде, кроме тоннеля
+	var holes := 0
+	for y in range(1, 5):
+		for x in range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH):
+			if x == WorldGen.TUNNEL_X:
+				continue
+			if w.get_tile(x, y) == TileTypes.Type.EMPTY:
+				holes += 1
+	check("Роберт засыпал все воронки огорода (дыр нет)", holes == 0)
+
+	# и больше ничего не выкопать
+	var ok_sealed := true
+	for y in range(1, 5):
+		for x in range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH):
+			if x == WorldGen.TUNNEL_X:
+				continue
+			if w.dig_cell(x, y):
+				ok_sealed = false
+			if w.get_tile(x, y) == TileTypes.Type.EMPTY:
+				ok_sealed = false
+	check("после Роберта огород на уровнях 1..4 не копается ни в одной клетке", ok_sealed)
+	check("верхний грунт не копается и после Роберта", not w.dig_cell(20, 0))
+
+	# ниже фундамента мир по-прежнему копается: запечатан только огород
+	check("под фундаментом копать по-прежнему можно", w.dig_cell(25, 20))
+
+	# Хук для дома и игрока: по нему они отказывают в ударе ДО начала копки,
+	# не дожидаясь, пока dig_cell вернёт false в конце анимации.
+	check("is_garden_sealed_cell: грядка заперта", w.is_garden_sealed_cell(25, 3))
+	check("is_garden_sealed_cell: ствол тоннеля не заперт",
+		not w.is_garden_sealed_cell(WorldGen.TUNNEL_X, 3))
+	check("is_garden_sealed_cell: ниже фундамента не заперто",
+		not w.is_garden_sealed_cell(25, 20))
+	var fresh := WorldGen.new(7)
+	check("is_garden_sealed_cell: до Роберта ничего не заперто",
+		not fresh.is_garden_sealed_cell(25, 3))
+
+
+## Обвал и землетрясение тоннель не разрушают: он зафиксирован так же, как
+## фундамент и лестница.
+func test_tunnel_survives_collapse() -> void:
+	print("-- События сброса не трогают тоннель --")
+	var w := WorldGen.new(31337)
+	var fog := FogOfWar.new()
+	w.build_robert_tunnel()
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	for i in range(5):
+		CollapseEvents.trigger_chunk_collapse(w, fog, rng)
+	var ok_after_chunks := _tunnel_intact(w)
+	check("обвалы чанков тоннель не разрушают", ok_after_chunks)
+
+	CollapseEvents.trigger_earthquake(w, fog, rng)
+	check("землетрясение тоннель не разрушает", _tunnel_intact(w))
+	check("землетрясение не возвращает фундамент под устьем",
+		w.get_tile(WorldGen.TUNNEL_X, 5) == TileTypes.Type.EMPTY)
+	check("землетрясение не отпирает огород", w.is_garden_locked())
+
+	# и запечатанный огород после встряски всё так же не копается и без дыр
+	var ok_sealed := true
+	for y in range(1, 5):
+		for x in range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH):
+			if x == WorldGen.TUNNEL_X:
+				continue
+			if w.dig_cell(x, y) or w.get_tile(x, y) == TileTypes.Type.EMPTY:
+				ok_sealed = false
+	check("после землетрясения огород всё так же запечатан и цел", ok_sealed)
+
+
+func _tunnel_intact(w: WorldGen) -> bool:
+	for y in range(1, WorldGen.TUNNEL_DEPTH + 1):
+		if w.get_tile(WorldGen.TUNNEL_X, y) != TileTypes.Type.EMPTY:
+			return false
+		if w.get_tile(WorldGen.TUNNEL_WALL_LEFT, y) != TileTypes.Type.REINFORCED:
+			return false
+		if w.get_tile(WorldGen.TUNNEL_WALL_RIGHT, y) != TileTypes.Type.REINFORCED:
+			return false
+	return true
 
 
 func test_peat_seam_solid() -> void:

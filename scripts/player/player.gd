@@ -36,6 +36,20 @@ const HW := 0.38
 const HH := 0.46
 const CORNER := 5.0 / 32.0     # скругление углов коллизии
 
+# --- потолок неба ---
+# Высоту неба знает рендер мира (world_view.gd:SKY_HEIGHT) — второго числа
+# здесь не заводим: физика и картинка обязаны кончаться в одной клетке,
+# иначе герой либо упирается в пустое место, либо улетает за нарисованную
+# кромку в ничто.
+const SKY_HEIGHT: int = preload("res://scripts/world/world_view.gd").SKY_HEIGHT
+# Герой встаёт на клетку НИЖЕ самой кромки: камера выше -SKY_HEIGHT не идёт,
+# а кадр героя выше его ног на полторы клетки — без этого запаса верхний край
+# экрана срезал бы ранец с головой.
+const SKY_MARGIN := 1.0
+# Последние клетки подъёма тяга гаснет пропорционально остатку: потолок должен
+# ощущаться упором, в который герой всплывает, а не невидимой стеной с рывком.
+const SKY_BRAKE := 3.0
+
 # --- снаряжение открывается по глубине (ГДД раздел 5/6) ---
 const PROP_DEPTH := 10
 const JET_DEPTH := 100
@@ -333,6 +347,11 @@ func _gravity_now() -> float:
 	return G * APEX_G if absf(vy) < APEX_V else G
 
 
+## Самое верхнее положение центра героя: верх неба плюс запас под кадр.
+func _sky_ceiling() -> float:
+	return -float(SKY_HEIGHT) + SKY_MARGIN
+
+
 func _prop_ramp() -> float:
 	return PROP_RAMP / pow(0.85, GameState.get_total_weight() / 20.0)
 
@@ -348,7 +367,18 @@ func _move_y(dt: float) -> void:
 		var g: float = COAST_DECEL if (coasting and vy < 0.0) else _gravity_now()
 		vy = minf(vy + g * dt, V_TERM)
 
+	# Небо не бесконечное: на подлёте к его верху гасим подъём пропорционально
+	# остатку высоты. Падение это не трогает (только vy < 0), так что урон от
+	# падения считается по прежним правилам.
+	var ceiling: float = _sky_ceiling()
+	if vy < 0.0 and y - ceiling < SKY_BRAKE:
+		vy *= clampf((y - ceiling) / SKY_BRAKE, 0.0, 1.0)
+
 	y += vy * dt
+	# Страховка на случай большого dt: за нарисованную кромку не выпускаем.
+	if y < ceiling:
+		y = ceiling
+		vy = maxf(vy, 0.0)
 	var left := x - HW + 0.02
 	var right := x + HW - 0.02
 	on_ground = false

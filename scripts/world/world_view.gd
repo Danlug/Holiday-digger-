@@ -18,8 +18,23 @@ var _pool_cols: int = 0
 var _pool_rows: int = 0
 var _white_tex: ImageTexture
 
+## Высота неба: сколько клеток воздуха лежит над поверхностью (строки
+## y = -1 .. -SKY_HEIGHT; y = 0 — сама кромка земли). 24 клетки — середина
+## заказанного владельцем диапазона 20–30 и почти два экрана по высоте
+## (экран ~14 клеток): подъём на ранце успевает почувствоваться полётом, но
+## верх неба видно уже с земли, и небо не превращается в пустую шахту вверх.
+##
+## Число живёт здесь, потому что небо — это картинка, и рисует её этот файл.
+## Из него же его берут камера (scripts/main.gd:_camera) и потолок полёта
+## (scripts/player/player.gd): небо обязано кончаться в одной и той же
+## клетке и на экране, и в физике, иначе герой упирается в пустоту или
+## улетает за нарисованную кромку.
+const SKY_HEIGHT := 24
+
 # Цвета вне палитры тайлов (небо, земля-поверхность, неразведанное, ГДД п.12)
-const COLOR_SKY := Color8(0x1D, 0x2A, 0x33)
+const COLOR_SKY := Color8(0x1D, 0x2A, 0x33)          # у самой земли
+const COLOR_SKY_TOP := Color8(0x0A, 0x0C, 0x12)      # void_far — верхняя кромка
+const COLOR_HORIZON := Color8(0x2E, 0x35, 0x48)      # void_rim — полоса горизонта
 const COLOR_GROUND := Color8(0x3E, 0x5A, 0x2E)
 const COLOR_FOG_BLACK := Color8(0x08, 0x06, 0x05)
 const COLOR_GRAY_SOLID := Color8(0x2C, 0x24, 0x1B)
@@ -35,6 +50,8 @@ func _ready() -> void:
 	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
 	img.fill(Color.WHITE)
 	_white_tex = ImageTexture.create_from_image(img)
+
+	_build_sky_colors()
 
 	_overlay = Node2D.new()
 	_overlay.name = "Overlay"
@@ -95,9 +112,34 @@ func render(cam: Vector2) -> void:
 	_overlay.queue_redraw()
 
 
+## Цвета неба по строкам считаются один раз: render() зовут каждый кадр на
+## каждую клетку экрана, и lerp на клетку там был бы арифметикой на пустом
+## месте. Индекс 0 — строка y = -1 (у самой земли).
+var _sky_colors: PackedColorArray = PackedColorArray()
+
+
+func _build_sky_colors() -> void:
+	_sky_colors.resize(SKY_HEIGHT)
+	for i in range(SKY_HEIGHT):
+		var t: float = float(i) / float(maxi(SKY_HEIGHT - 1, 1))
+		_sky_colors[i] = COLOR_SKY.lerp(COLOR_SKY_TOP, t)
+	# Горизонт: строка воздуха над самой землёй чуть светлее неба. Без неё
+	# кромка земли на тёмном фоне читается не как горизонт, а как обрыв.
+	_sky_colors[0] = COLOR_HORIZON
+
+
+## Цвет строки неба. Выше верхней кромки тоже спрашивают: render() рисует на
+## клетку шире экрана, а камера стоит ровно на -SKY_HEIGHT — берём верхний
+## цвет, чтобы на кромке не зияла дыра из неинициализированного спрайта.
+func _sky_color(wy: int) -> Color:
+	if _sky_colors.is_empty():
+		return COLOR_SKY
+	return _sky_colors[clampi(-wy - 1, 0, _sky_colors.size() - 1)]
+
+
 func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 	if wy < 0:
-		_set_color(s, COLOR_SKY)
+		_set_color(s, _sky_color(wy))
 		return
 	if wy == 0:
 		_set_color(s, COLOR_GROUND)

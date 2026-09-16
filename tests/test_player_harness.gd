@@ -35,6 +35,8 @@ func _ready() -> void:
 	_test_tutorial_gold_does_not_stun()
 	_test_gear_unlock_by_depth()
 	_test_exhaustion_penalty()
+	_test_sky_ceiling()
+	_test_sky_colors()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -377,3 +379,59 @@ func _test_exhaustion_penalty() -> void:
 	check("на 10% голода приходит серьёзное предупреждение", seen.any(func(e): return e[0] == "hunger" and e[1]))
 	GameState.survival_warning.disconnect(cb)
 	GameState.reset_progress()
+
+
+# ---------------------------------------------------------------------------
+# Небо над поверхностью: высота, потолок полёта и цвет кромки
+# ---------------------------------------------------------------------------
+
+## Воздух над землёй конечен (world_view.gd:SKY_HEIGHT). Проверяем ровно то,
+## ради чего потолок и заводился: герой на джетпаке долетает почти до верха,
+## не уходит за него ни на клетку и упирается мягко — без рывка о стену.
+func _test_sky_ceiling() -> void:
+	GameState.reset_progress()
+	GameState.grant_gear("jetpack")
+	GameState.max_depth_reached = player.JET_DEPTH
+	check("небо высотой 20–30 клеток (просьба владельца)",
+		player.SKY_HEIGHT >= 20 and player.SKY_HEIGHT <= 30)
+
+	player.release_control()
+	player.x = 20.5
+	player.y = 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.digging = null
+	player.on_ground = true
+
+	var ceiling: float = player._sky_ceiling()
+	var top: float = player.y      # самая высокая достигнутая точка
+	var v_at_top: float = 0.0
+	for i in range(600):           # 20 игровых секунд непрерывного подъёма
+		player.set_intent(0, true, false)
+		# Пауза между толчком прыжка и включением тяги отмеряется НАСТОЯЩИМИ
+		# миллисекундами (JUMP_TO_FLY_MS), а 600 кадров симуляции пролетают
+		# быстрее неё — снимаем задержку руками, иначе тяга не включится
+		# никогда и проверять будет нечего.
+		player._fly_arm_at_msec = 0.0
+		player.physics_tick(1.0 / 30.0)
+		if player.y < top:
+			top = player.y
+			v_at_top = player.vy
+	player.release_control()
+
+	check("герой не улетает выше верха неба", top >= ceiling - 0.001)
+	check("на джетпаке герой добирается до верха неба", top <= ceiling + 1.0)
+	check("в потолок герой всплывает, а не влетает рывком", absf(v_at_top) < 1.0)
+	GameState.reset_progress()
+
+
+## Кромка неба не должна зиять дырой: render() красит на клетку выше камеры,
+## а камера стоит ровно на -SKY_HEIGHT.
+func _test_sky_colors() -> void:
+	var view = load("res://scripts/world/world_view.gd").new()
+	add_child(view)  # _ready собирает таблицу цветов
+	var near_ground: Color = view._sky_color(-1)
+	var at_top: Color = view._sky_color(-view.SKY_HEIGHT)
+	check("небо у земли и у верхней кромки — разные тона", near_ground != at_top)
+	check("строка выше верха неба тоже покрашена",
+		view._sky_color(-view.SKY_HEIGHT - 1) == at_top)
+	view.queue_free()

@@ -145,7 +145,7 @@ body{
    так экрану достаётся вся высота, а большой палец остаётся там же, где
    держит телефон. */
 #stick{
-  position:absolute;left:12px;bottom:12px;
+  position:absolute;right:12px;bottom:12px;   /* справа: под большой палец правой руки */
   width:118px;height:118px;
   border-radius:50%;
   background:radial-gradient(circle at 50% 50%, #241C15C0 0%, #1A140FA8 70%, transparent 71%);
@@ -749,7 +749,10 @@ function givePickaxe(){
    Пороги разные на вход и на выход (45° / 33°), чтобы на самой границе
    режим не мигал. */
 const ANG_ON = 45, ANG_OFF = 33;   // градусы от горизонтали
-const ANG_PURE = 72;               // круче — чистая вертикаль, без шага вбок
+/* 67.5° — середина между идеальной диагональю (45°) и вертикалью (90°):
+   вектор достаётся тому из шести направлений, к которому он ближе. */
+const ANG_PURE = 67.5;
+const DIAG = 0.70710678;           // ручка на диагонали стоит ровно на 45°
 
 // Возвращает нормированный вектор «залипания» для отрисовки ручки стика.
 function resolveDir(vx, vy, dead){
@@ -762,9 +765,11 @@ function resolveDir(vx, vy, dead){
   const ang = Math.atan2(-vy, Math.abs(vx)) * 180 / Math.PI;   // -90..90
   const z = S.dirZone;
   let zone;
-  if (z === 'up') zone = ang > ANG_OFF ? 'up' : (ang < -ANG_ON ? 'down' : 'side');
-  else if (z === 'down') zone = ang < -ANG_OFF ? 'down' : (ang > ANG_ON ? 'up' : 'side');
-  else zone = ang > ANG_ON ? 'up' : (ang < -ANG_ON ? 'down' : 'side');
+  /* Границы включающие: ровно 45° — это идеальная диагональ ↗, и отдавать
+     её шагу вбок нельзя. «До 45° — шаг, от 45° — вверх». */
+  if (z === 'up') zone = ang >= ANG_OFF ? 'up' : (ang <= -ANG_ON ? 'down' : 'side');
+  else if (z === 'down') zone = ang <= -ANG_OFF ? 'down' : (ang >= ANG_ON ? 'up' : 'side');
+  else zone = ang >= ANG_ON ? 'up' : (ang <= -ANG_ON ? 'down' : 'side');
   S.dirZone = zone;
 
   const side = vx === 0 ? 0 : Math.sign(vx);
@@ -773,10 +778,11 @@ function resolveDir(vx, vy, dead){
     return { x: side, y: 0 };
   }
   if (zone === 'up'){
-    // до 72° можно бежать и прыгать одновременно, круче — чистый взлёт
+    // ↗ и ↖ — бежать и прыгать одновременно; круче 67.5° — чистое ↑
     S.hold.dx = ang < ANG_PURE ? side : 0;
     S.hold.up = true; S.hold.down = false;
-    return { x: S.hold.dx * 0.55, y: -1 };
+    return S.hold.dx === 0 ? { x: 0, y: -1 }
+                           : { x: S.hold.dx * DIAG, y: -DIAG };
   }
   // вниз копаем строго под собой: это всегда осознанное действие
   S.hold.dx = 0; S.hold.up = false; S.hold.down = true;

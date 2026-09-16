@@ -550,6 +550,15 @@ func _start_dig(tx: int, ty: int) -> void:
 	if type == TileTypes.Type.STAIRCASE:
 		return
 
+	# Запечатанный Робертом огород (уровни 1..4 вне ствола тоннеля) не
+	# копается вообще. Отказывать надо ДО удара, а не после: world.dig_cell()
+	# своё держит и клетку не отдаёт, но удар уже прошёл бы — а опыт в
+	# _finish_dig начисляется за сам удар. Получалась бесконечная ферма опыта
+	# на грядке.
+	if world.has_method("is_garden_sealed_cell") and world.is_garden_sealed_cell(tx, ty):
+		digging = null
+		return
+
 	# Обучение не пускает к фундаменту, пока не выбраны пять самородков
 	# золота на четвёртом уровне (ГДД п.9, порядок владельца: сперва золото
 	# киркой, потом фундамент). Проверка здесь, а не в сюжете: остановить
@@ -609,7 +618,11 @@ func _finish_dig() -> void:
 	digging = null
 	if world == null:
 		return
-	world.dig_cell(d.x, d.y)
+	# Мир — последнее слово: если клетку он не отдал (зафиксированная порода,
+	# запечатанный огород), то и награды за удар нет. Раньше результат
+	# игнорировался, и опыт капал за удары по несокрушимому.
+	if not world.dig_cell(d.x, d.y):
+		return
 
 	var mineral_id := MineralMap.mineral_id_for(d.type)
 	var price := Balance.get_mineral_price(mineral_id) if not mineral_id.is_empty() else 0

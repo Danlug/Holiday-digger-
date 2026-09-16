@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_exhaustion_penalty()
 	_test_sky_ceiling()
 	_test_sky_colors()
+	_test_sealed_garden_gives_no_xp()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -241,6 +242,41 @@ func _test_dig_earth_gives_xp_not_coins() -> void:
 	check("опыт за землю начислен", GameState.xp > xp_before)
 	check("монеты за копку НЕ начислены", GameState.coins == coins_before)
 	check("земля НЕ попала в инвентарь (см. ГДД раздел 4)", not GameState.inventory.has("earth"))
+
+
+## Запечатанный Робертом огород не должен кормить опытом. Мир клетку не
+## отдаёт, но раньше результат dig_cell игнорировался, и опыт капал за сам
+## удар — на грядке получалась бесконечная ферма.
+func _test_sealed_garden_gives_no_xp() -> void:
+	var sealed := WorldGen.new(4242)
+	sealed.build_robert_tunnel()
+	var prev_world = player.world
+	player.world = sealed
+	GameState.world_ref = sealed
+
+	# Клетка земли в огороде вне ствола тоннеля: x=25 заведомо не 16..18.
+	var cx := 25
+	var cy := 2
+	check("огород после Роберта запечатан", sealed.is_garden_sealed_cell(cx, cy))
+	check("в запечатанном огороде клетка не пустая", sealed.get_tile(cx, cy) != TileTypes.Type.EMPTY)
+
+	GameState.current_tool = "shovel"
+	var xp_before := GameState.xp
+	player.x = float(cx) - 1.0 + player.HW + 0.5
+	player.y = float(cy) + 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 1; player.hold_up = false; player.hold_down = false
+	player.digging = null
+	for i in range(600):
+		player.physics_tick(1.0 / 30.0)
+	check("запечатанная клетка не выкопана", sealed.get_tile(cx, cy) != TileTypes.Type.EMPTY)
+	check("опыт за удары по запечатанному огороду не начислен", GameState.xp == xp_before)
+	check("удар по запечатанному даже не начинается", player.digging == null)
+
+	player.hold_dx = 0
+	player.world = prev_world
+	GameState.world_ref = prev_world
 
 
 func _test_shovel_cannot_dig_stone() -> void:

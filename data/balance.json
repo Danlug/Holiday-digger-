@@ -47,7 +47,8 @@
 		"base_seconds_per_cell": 3.0,
 		"can_dig_upward": false,
 		"tap_same_direction_cancels": true,
-		"shovel_stun_on_stone_or_gold_seconds": 60
+		"shovel_stun_on_stone_or_gold_seconds": 1.0,
+		"_shovel_stun_note": "решение владельца: стан символический — секунда и быстрая тряска героя на 3 пикселя вправо-влево (её рисует character_view). Минута, стоявшая здесь раньше, означала, что одно неверное касание камня вынимает игрока из игры дольше, чем длится сама вылазка, и лечится это только тем, что игрок откладывает телефон. Число — скаляр, а не {value, proposed}: так в этом файле записаны все решения владельца."
 	},
 	"carry_capacity": {
 		"base_kg": 60,

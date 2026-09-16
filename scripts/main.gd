@@ -127,7 +127,7 @@ func _reveal_around_player() -> void:
 func _process(delta: float) -> void:
 	var dt: float = minf(delta, 0.033)
 
-	hud.update_hold_intent()
+	hud.update_input_intent()
 	player.physics_tick(dt)
 	_reveal_around_player()
 

@@ -52,8 +52,14 @@ func _load_json(path: String) -> Dictionary:
 ## Достаёт числовое/любое значение из "сырого" JSON-узла, независимо от того,
 ## обычное это значение или обёртка {"value":X,"proposed":true,"note":"..."}.
 ## Публичная точка входа для других скриптов — используй Balance.unwrap(x).
+## Разворачивает {"value": X, "proposed": true, "note": "..."} в X.
+##
+## Ключа "proposed" НЕ требуем: раньше требовали, и словарь без него молча
+## проезжал сквозь unwrap целиком — дальше его брали во float(), получали
+## ноль вместо числа, и ни одна сторона не ругалась. Достаточно самого
+## "value": в этом файле так записаны только обёрнутые значения.
 static func unwrap(node):
-	if typeof(node) == TYPE_DICTIONARY and node.has("value") and node.has("proposed"):
+	if typeof(node) == TYPE_DICTIONARY and node.has("value"):
 		return node["value"]
 	return node
 

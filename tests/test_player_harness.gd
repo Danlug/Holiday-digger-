@@ -27,6 +27,7 @@ func _ready() -> void:
 
 	_test_gravity_and_landing()
 	_test_resolve_dir_zones()
+	_test_keyboard_intent()
 	_test_dig_earth_gives_xp_not_coins()
 	_test_shovel_cannot_dig_stone()
 	_test_tutorial_gold_does_not_stun()
@@ -98,6 +99,33 @@ func _test_resolve_dir_zones() -> void:
 	player.resolve_dir(0.0, 0.0, 0.26)
 	var snap_up = player.resolve_dir(0.1, -1.0, 0.26)
 	check("вектор почти строго вверх (>72° от горизонтали) -> чистый взлёт без шага", player.hold_up and player.hold_dx == 0)
+
+
+## Клавиатура (WASD и стрелки): набор намерения без углового магнетизма.
+## Магнетизм придуман против неточного пальца на стекле, клавиша дискретна —
+## и правила у неё те же, что палец получает ПОСЛЕ магнетизма: вниз строго под
+## собой без шага, вверх можно вместе с шагом.
+func _test_keyboard_intent() -> void:
+	player.set_intent(1, false, false)
+	check("клавиша вправо — шаг вправо, без верха и низа",
+		player.hold_dx == 1 and not player.hold_up and not player.hold_down)
+
+	player.set_intent(-1, true, false)
+	check("влево+вверх — бежит и прыгает одновременно",
+		player.hold_dx == -1 and player.hold_up and not player.hold_down)
+
+	player.set_intent(0, false, true)
+	check("вниз — строго под собой, без шага",
+		player.hold_dx == 0 and not player.hold_up and player.hold_down)
+
+	# Зона направления сбрасывается вместе с намерением: иначе следующий кадр
+	# с джойстика унаследует гистерезис от клавиатуры и «залипнет» в копке.
+	player.set_intent(0, false, false)
+	check("отпущенные клавиши снимают намерение",
+		player.hold_dx == 0 and not player.hold_up and not player.hold_down)
+	var snap = player.resolve_dir(1.0, 0.0, 0.26)
+	check("после клавиатуры джойстик читается заново", snap != null and snap.x == 1)
+	player.release_control()
 
 
 func _test_dig_earth_gives_xp_not_coins() -> void:

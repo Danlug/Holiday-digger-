@@ -37,6 +37,10 @@ const DIG_SHEETS := ["idle", "walk", "fall", "fly", "fly_jet",
 
 var player: Node = null
 
+# Тряска стана: 3 пикселя вправо-влево (решение владельца) на 14 Гц.
+const SHAKE_PIXELS := 3.0
+const SHAKE_HZ := 14.0
+
 var _sprite: Sprite2D
 var _stun_flash: ColorRect
 var _sheets: Dictionary = {}
@@ -102,5 +106,18 @@ func _process(_dt: float) -> void:
 	_sprite.flip_h = player.facing < 0
 	# Линия земли листа должна лечь туда же, куда ложится подошва у кадра
 	# 48×48, иначе высокий кадр повиснет над землёй.
-	_sprite.position = Vector2(-fw / 2.0,
+	_sprite.position = Vector2(-fw / 2.0 + _stun_shake(),
 			-HH * TILE - 16.0 + float(GROUND_Y - int(geom[2])))
+
+
+## Стан показывается тряской, а не простоем: секунда без движения выглядит как
+## зависшая игра, и игрок начинает давить на экран. Три пикселя вправо-влево
+## на 14 Гц читаются как «отдало в руки», занимают ровно столько, сколько
+## длится стан, и не двигают саму клетку — только рисунок героя.
+func _stun_shake() -> float:
+	if player.stun_until_msec <= 0.0:
+		return 0.0
+	var left: float = player.stun_until_msec - float(Time.get_ticks_msec())
+	if left <= 0.0:
+		return 0.0
+	return signf(sin(left / 1000.0 * TAU * SHAKE_HZ)) * SHAKE_PIXELS

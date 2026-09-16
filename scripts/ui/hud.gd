@@ -32,6 +32,16 @@ var _touch_pointer: int = -100
 var _touch_pos: Vector2 = Vector2.ZERO
 var _has_touch: bool = false
 
+# --- клавиатура ---
+## WASD и стрелки работают в обоих режимах управления и имеют приоритет над
+## пальцем: кто держит клавишу, тот и ведёт героя. Нужны и для игры на
+## компьютере, и для отладки — мышью не покажешь «влево и вверх одновременно».
+const KEYS_LEFT: Array[Key] = [KEY_A, KEY_LEFT]
+const KEYS_RIGHT: Array[Key] = [KEY_D, KEY_RIGHT]
+const KEYS_UP: Array[Key] = [KEY_W, KEY_UP]
+const KEYS_DOWN: Array[Key] = [KEY_S, KEY_DOWN]
+var _keyboard_active: bool = false
+
 var stage_rect: Rect2 = Rect2()
 var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd каждый кадр (см. camera() в web-демо)
 
@@ -687,7 +697,7 @@ func _build_strip() -> void:
 ## Меню «⋯»: то, что нужно на поверхности, а не в шахте.
 ##
 ## Всплывает НАД полосой и прижато к правому краю, к своей кнопке. Пока оно
-## открыто, ввод в мир глушится (см. _input и update_hold_intent) — иначе
+## открыто, ввод в мир глушится (см. _input и update_input_intent) — иначе
 ## палец, метящий в пункт меню, попадает в джойстик под ним и герой копает
 ## под открытым меню.
 func _build_more_menu() -> VBoxContainer:
@@ -1254,10 +1264,16 @@ func _handle_hold_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 
-## Пересчитывает намерение удержания каждый физический кадр (см.
-## readHoldIntent в web-демо) — вызывается из main.gd перед player.physics_tick.
-func update_hold_intent() -> void:
-	if mode != "hold" or player == null or ProgressScreen.is_open() or is_more_menu_open():
+## Пересчитывает намерение игрока каждый физический кадр (см. readHoldIntent
+## в web-демо) — вызывается из main.gd перед player.physics_tick. Сначала
+## клавиатура, потом палец: клавиша главнее, иначе лежащий на стекле палец
+## перебивал бы её каждый кадр.
+func update_input_intent() -> void:
+	if player == null or ProgressScreen.is_open() or is_more_menu_open():
+		return
+	if _apply_keyboard():
+		return
+	if mode != "hold":
 		return
 	if not _has_touch:
 		player.resolve_dir(0.0, 0.0, 1.0)
@@ -1266,6 +1282,51 @@ func update_hold_intent() -> void:
 	var wy: float = current_cam.y + _touch_pos.y / TILE
 	player.resolve_dir(wx - player.x, wy - player.y, 0.45)
 	player.cancel_wrong_dig()
+
+
+## Клавиатура: WASD и стрелки. Возвращает true, если клавиша держится и
+## намерение уже выставлено ею.
+##
+## Углового магнетизма здесь нет намеренно. Он придуман против неточного
+## пальца на стекле — «чуть-чуть вниз» вместо «влево», — а клавиша дискретна:
+## нажал S, значит копать под собой. Поэтому правила простые и те же, что
+## читает палец после магнетизма: вниз — строго под собой, без шага; вверх —
+## можно бежать и прыгать одновременно.
+func _apply_keyboard() -> bool:
+	var dx := 0
+	if _any_key(KEYS_LEFT):
+		dx -= 1
+	if _any_key(KEYS_RIGHT):
+		dx += 1
+	var up := _any_key(KEYS_UP)
+	var down := _any_key(KEYS_DOWN)
+
+	if dx == 0 and not up and not down:
+		if _keyboard_active:
+			_keyboard_active = false
+			player.release_control()
+			_position_knob(null)
+		return false
+
+	_keyboard_active = true
+	if down:
+		player.set_intent(0, false, true)
+		_position_knob(Vector2(0, 1))
+	elif up:
+		player.set_intent(dx, true, false)
+		_position_knob(Vector2(dx * 0.55, -1))
+	else:
+		player.set_intent(dx, false, false)
+		_position_knob(Vector2(dx, 0))
+	player.cancel_wrong_dig()
+	return true
+
+
+static func _any_key(keys: Array[Key]) -> bool:
+	for k: Key in keys:
+		if Input.is_key_pressed(k):
+			return true
+	return false
 
 
 func set_camera(cam: Vector2) -> void:

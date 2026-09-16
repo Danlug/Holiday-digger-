@@ -398,7 +398,7 @@ const CORNER = 5 / 32;
 
 const MAX_KG = 60;
 const DEMO_SPEED = 4;
-const STUN_MS = 3000;
+const STUN_MS = 1000;   // символический стан: секунда и тряска, см. ГДД п.5
 
 const S = {
   x: 20.5, y: 0.5,
@@ -923,7 +923,13 @@ function draw(){
   // Линия земли листа обязана лечь туда же, куда ложится подошва у кадра
   // 48×48, иначе высокий кадр повиснет над землёй.
   const [FW, FH, FG] = SHEET_FRAME[sheet] || [CHAR_W, CHAR_H, GROUND_Y];
-  const dx0 = Math.round(pcx - FW / 2);
+  // Стан показывается тряской, а не простоем: секунда без движения выглядит
+  // как зависшая игра, и игрок начинает давить на экран. Три пикселя
+  // вправо-влево на 14 Гц читаются как «отдало в руки» и не двигают клетку —
+  // только рисунок героя (то же делает character_view.gd в движке).
+  const stunLeft = S.stunUntil - performance.now();
+  const shake = stunLeft > 0 ? Math.sign(Math.sin(stunLeft / 1000 * Math.PI * 2 * 14)) * 3 : 0;
+  const dx0 = Math.round(pcx - FW / 2) + shake;
   const dy0 = Math.round(pcy - HH * TILE - 16 + (GROUND_Y - FG));
   if (img && img.complete && img.naturalWidth){
     const frames = Math.max(1, Math.round(img.naturalWidth / FW));
@@ -937,12 +943,6 @@ function draw(){
     ctx.fillStyle = '#C9553F'; ctx.fillRect(dx0 + 8, dy0 + 18, 16, 26);
   }
 
-  if (performance.now() < S.stunUntil){
-    ctx.fillStyle = '#E0A93B';
-    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 60);
-    ctx.fillRect(Math.round(pcx - CHAR_W / 2) + 6, dy0 - 6, 20, 3);
-    ctx.globalAlpha = 1;
-  }
 
   placeDepth(cam);
 }

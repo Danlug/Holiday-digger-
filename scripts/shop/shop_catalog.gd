@@ -1,15 +1,20 @@
 class_name ShopCatalog
 extends RefCounted
-## ShopCatalog — что мастерская умеет: рецепты верстака, товары лавки,
-## рекламные награды и правила скупки.
+## ShopCatalog — что продаётся и что собирается: линейка кирок, линейка
+## ранцев, рецепты техники, товары лавки, рекламные награды и правила скупки.
 ##
-## Числа НЕ дублируются: рецепты собираются из data/balance.json (железная
-## кирка и бронза 1:1 заданы ГДД разделом 5 напрямую, топливный блок 4:1 —
-## тем же разделом, цены бура и машины лежат там же с пометкой proposed), а
-## цены руды — из data/minerals.json через автолоад Balance. Свой файл
-## data/shop.json держит только то, чего в них нет: ассортимент лавки,
-## величину рекламных наград и список того, что мастерская обратно не
-## скупает.
+## Владелец переписал прогресс: КИРКИ И РАНЦЫ БОЛЬШЕ НЕ КРАФТЯТСЯ — шесть
+## кирок и четыре ранца покупаются за монеты. Рецепты из материалов остались
+## только у ТЕХНИКИ: ручной бур, буровая машина, буровая скважина (плюс
+## плавка бронзы и топливный блок, без которых техника не собирается).
+##
+## Числа НЕ дублируются: линейки и рецепты собираются из data/balance.json
+## (цены и множители кирок и ранцев заданы владельцем напрямую, бронза 1:1 и
+## топливный блок 4:1 — ГДД разделом 5, цены бура и машины лежат там же с
+## пометкой proposed), а цены руды — из data/minerals.json через автолоад
+## Balance. Свой файл data/shop.json держит только то, чего в них нет:
+## ассортимент лавки, величину рекламных наград, глубины открытия рецептов и
+## список того, что мастерская обратно не скупает.
 ##
 ## Загружается лениво и кэшируется в статике: каталог читается на каждом
 ## открытии магазина, а парсить JSON ради каждого клика незачем.
@@ -77,18 +82,24 @@ static func ad_double_sale_id() -> String:
 # Верстак
 # ---------------------------------------------------------------------------
 
-## Все рецепты верстака в порядке показа. Каждый:
-##   {id, name_ru, kind: "item"|"tool", output: {id, count},
+## Все рецепты раздела «Техника» в порядке показа. Каждый:
+##   {id, name_ru, kind: "item"|"tool"|"machine", output: {id, count},
 ##    inputs: {mineral_id: count}, coins: int, unlock_depth: int, desc_ru}
+##
+## Кирок, ранцев и джетпаков здесь НЕТ и быть не должно: их покупают за
+## монеты (см. pickaxes() и gear_line()). Рецепт остался тем, чем он и был по
+## задумке владельца, — способом превратить накопанное в машину.
 static func recipes() -> Array:
 	var out: Array = []
 	out.append(_recipe_bronze())
 	out.append(_recipe_fuel_block())
-	out.append(_recipe_jetpack())
-	for tool_id in ["iron_pickaxe", "hand_drill", "drill_rig"]:
+	for tool_id in ["hand_drill", "drill_rig"]:
 		var r := _recipe_tool(tool_id)
 		if not r.is_empty():
 			out.append(r)
+	var well := _recipe_well()
+	if not well.is_empty():
+		out.append(well)
 	return out
 
 
@@ -131,16 +142,13 @@ static func _recipe_fuel_block() -> Dictionary:
 	}
 
 
-## Инструмент: состав и цена берутся из balance.json -> tools.<id>.cost.
-## Ключ "coins" внутри cost — это монеты, всё остальное — предметы.
-## Джетпак СОБИРАЕТСЯ на верстаке (решение владельца), а не выдаётся сам на
-## глубине 100. Глубина осталась условием появления рецепта: выше игроку
-## нечем платить и некуда лететь. Отдельный вид рецепта («gear»), потому что
-## снаряжение не берут в руки — его носят, и в GameState оно лежит своим
-## списком, а не среди инструментов.
-static func _recipe_jetpack() -> Dictionary:
-	var j: Dictionary = Balance.balance.get("jetpack", {})
-	var cost = Balance.unwrap(j.get("craft_cost", {}))
+## Буровая скважина (ГДД п.1) — единственная idle-механика и единственная
+## машина, которая копает без игрока. Состав лежит в balance.json ->
+## idle_well.build_cost; собранная скважина ставится уровнем 1, а не кладётся
+## в инвентарь: она стоит у дома, а не носится в рюкзаке.
+static func _recipe_well() -> Dictionary:
+	var w: Dictionary = Balance.balance.get("idle_well", {})
+	var cost = Balance.unwrap(w.get("build_cost", {}))
 	if typeof(cost) != TYPE_DICTIONARY or cost.is_empty():
 		return {}
 	var inputs: Dictionary = {}
@@ -151,16 +159,15 @@ static func _recipe_jetpack() -> Dictionary:
 			coins = amount
 		elif amount > 0:
 			inputs[key] = amount
-	var unlock := int(Balance.unwrap(j.get("unlock", {}).get("depth_min", 100)))
 	return {
-		"id": "jetpack",
-		"name_ru": "Джетпак",
-		"desc_ru": "Полёт вверх на тяге. Разгон 5 секунд, удар головой о потолок на скорости — больно.",
-		"kind": "gear",
-		"output": {"id": "jetpack", "count": 1},
+		"id": "well",
+		"name_ru": String(w.get("name_ru", "Буровая скважина")),
+		"desc_ru": "Копает сама, пока тебя нет. Добыча ложится на склад в мастерской.",
+		"kind": "machine",
+		"output": {"id": "well", "count": 1},
 		"inputs": inputs,
 		"coins": coins,
-		"unlock_depth": unlock,
+		"unlock_depth": unlock_depth("well"),
 	}
 
 
@@ -211,6 +218,62 @@ static func _tool_desc(tool_id: String) -> String:
 static func unlock_depth(recipe_id: String) -> int:
 	var table: Dictionary = data().get("craft", {}).get("unlock_depth", {})
 	return int(Balance.unwrap(table.get(recipe_id, 0)))
+
+
+# ---------------------------------------------------------------------------
+# Линейка кирок и линейка ранцев — только за монеты (решение владельца)
+#
+# Обе линейки лежат в data/balance.json (tools с line="pickaxe" и gear) и
+# читаются отсюда одинаково: ступень, название, цена в монетах, множитель,
+# иконка. Никаких рецептов и никаких ворот по глубине — единственные ворота
+# теперь деньги.
+# ---------------------------------------------------------------------------
+
+## Шесть кирок по ступеням: ржавая (найдена в мастерской, цена 0) и пять
+## покупных. Строка: {id, name_ru, price_coins, speed_multiplier, icon,
+## desc_ru, free}.
+static func pickaxes() -> Array:
+	var out: Array = []
+	for id in Balance.get_tools_in_line("pickaxe"):
+		var price := Balance.get_tool_cost_coins(id)
+		out.append({
+			"id": id,
+			"name_ru": Balance.get_tool_name_ru(id),
+			"price_coins": price,
+			"speed_multiplier": Balance.get_tool_speed_multiplier(id),
+			"icon": Balance.get_tool_icon(id),
+			"desc_ru": "копка ×%s" % mult_text(Balance.get_tool_speed_multiplier(id)),
+			"free": price <= 0,
+		})
+	return out
+
+
+## Четыре ранца по ступеням. Строка: {id, name_ru, price_coins,
+## fly_multiplier, max_speed, kind, icon, desc_ru}.
+static func gear_line() -> Array:
+	var out: Array = []
+	for id in Balance.get_gear_ids():
+		out.append({
+			"id": id,
+			"name_ru": Balance.get_gear_name_ru(id),
+			"price_coins": Balance.get_gear_cost_coins(id),
+			"fly_multiplier": Balance.get_gear_fly_multiplier(id),
+			"max_speed": Balance.get_gear_max_speed(id),
+			"kind": Balance.get_gear_kind(id),
+			"icon": Balance.get_gear_icon(id),
+			"desc_ru": "полёт ×%s — %s кл/с" % [
+				mult_text(Balance.get_gear_fly_multiplier(id)),
+				mult_text(Balance.get_gear_max_speed(id))],
+		})
+	return out
+
+
+## Множитель строкой без хвоста из нулей: ×5, а не ×5.0, но ×1.3 — как есть.
+## На экране в 224 точки лишний знак стоит дороже, чем кажется.
+static func mult_text(value: float) -> String:
+	if is_equal_approx(value, roundf(value)):
+		return str(int(roundf(value)))
+	return "%.1f" % value
 
 
 # ---------------------------------------------------------------------------
@@ -321,4 +384,7 @@ static func item_name(id: String) -> String:
 	var t: Dictionary = Balance.get_tool(id)
 	if not t.is_empty():
 		return Balance.get_tool_name_ru(id)
+	var g: Dictionary = Balance.get_gear(id)
+	if not g.is_empty():
+		return Balance.get_gear_name_ru(id)
 	return id

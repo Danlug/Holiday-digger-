@@ -1,24 +1,51 @@
 class_name ShopUI
 extends CanvasLayer
-## ShopUI — шторка мастерской: продажа сырья, верстак, лавка и магазин
-## долларов (ГДД разделы 5, 7, 15).
+## ShopUI — две шторки в одном слое: МАГАЗИН у входной двери и ЭКИПИРОВКА
+## (верстак) в мастерской. Владелец развёл их по смыслу:
+##   магазин — только продаёт и покупает, четыре раздела: Кирки, Техника,
+##     Еда, Продать;
+##   верстак — выбираешь, какой киркой копать и какой ранец надеть из уже
+##     купленных; туда же со временем уйдут улучшения и починка.
+##
+## Классов всё-таки один, а не два: шторка целиком состоит из общей обвязки —
+## заморозка героя, выключение ввода HUD, кошелёк в шапке, всплывающее
+## сообщение, скролл на 224 точки ширины. Разводить это по двум CanvasLayer
+## значило бы продублировать полторы сотни строк ради двух разных списков, а
+## новый узел в сцену магазина (scenes/shop.tscn) отсюда всё равно не
+## добавить. Разведено то, что действительно разное: логика экипировки живёт
+## своим файлом scripts/shop/equipment.gd, логика торговли — в ShopService.
 ##
 ## Лежит поверх игрового экрана отдельным слоем, как и весь остальной
 ## интерфейс (ГДД раздел 16): отдельных панелей вокруг экрана нет, на
 ## телефоне каждая такая панель съедает высоту, которой и так мало.
 ##
-## Вся арифметика — в ShopService: здесь только показ и нажатия. Открыть
-## магазин можно двумя способами, и оба нужны:
-##   ShopUI.open_workshop()  — из комнаты мастерской (scripts/house/), одна строка;
-##   кнопка в нижней полосе HUD — пока дома как сцены нет.
+## Точки входа:
+##   ShopUI.open_shop()      — от входной двери (её подсказку «заказать»
+##                             рисует scripts/house/);
+##   ShopUI.open_workshop()  — верстак из комнаты мастерской (scripts/house/),
+##                             открывает ЭКИПИРОВКУ, а не магазин;
+##   ShopUI.open_premium()   — доллары; ведёт в раздел «Еда», см. ниже.
 ##
 ## Пока шторка открыта, герой заморожен, а ввод HUD выключен: джойстик лежит
 ## под шторкой на всю ширину экрана и иначе перехватывал бы нажатия у кнопок.
 
+const TAB_PICKS := "picks"
+const TAB_TECH := "tech"
+const TAB_FOOD := "food"
 const TAB_SELL := "sell"
-const TAB_CRAFT := "craft"
-const TAB_SHOP := "shop"
-const TAB_PREMIUM := "premium"
+## Экипировка — не пятая вкладка магазина, а отдельный экран: у верстака своя
+## дверь (кнопка в мастерской) и вкладок над ним нет.
+const SCREEN_EQUIP := "equip"
+
+## Доллары (премиум-валюта) остались на месте, но БЕЗ своей вкладки: на экране
+## в 224 точки четыре вкладки уже по 52 точки каждая, пятая начала бы резать
+## слова. Разложены по смыслу:
+##   товары за доллары (батончик, энергетик, таблетка, часы-телепорт) — в
+##     «Еде», рядом с обычными допингами: это всё расходники, и делить их по
+##     валюте значит заставлять игрока помнить, в каком кармане что лежит;
+##   обмен долларов на монеты и ролик «чуть-чуть долларов» — внизу «Продать»:
+##     эта вкладка и так про то, как в кошельке появляются монеты.
+## Сам кошелёк с обеими валютами виден в шапке на любой вкладке.
 
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
 const GREEN := Color8(0x7F, 0xB8, 0x6B)
@@ -29,7 +56,7 @@ const BAD := Color8(0xB8, 0x5A, 0x52)
 ## строкой, не протаскивая ссылку через полдерева сцен.
 static var instance: ShopUI = null
 
-var _tab: String = TAB_SELL
+var _tab: String = TAB_PICKS
 ## "sell" — обычная скупка дома, "remote" — дистанционная сдача за ролик.
 var _footer_mode: String = "sell"
 var _selected: Dictionary = {}   # mineral_id -> true, что отмечено к продаже
@@ -38,6 +65,9 @@ var _root: Control
 var _title: Label
 var _purse: Label
 var _tab_buttons: Dictionary = {}
+## Ряд вкладок целиком — на экране экипировки он прячется: там выбирать
+## нечего, а пустая полоса кнопок читалась бы как «магазин сломался».
+var _tabs_row: Control
 var _list: VBoxContainer
 var _footer: HBoxContainer
 var _footer_total: Label
@@ -59,20 +89,31 @@ var _hud_input_was_on: bool = true
 # Точки входа
 # ---------------------------------------------------------------------------
 
-## Из комнаты мастерской (scripts/house/) — ровно одна строка на их стороне.
+## Верстак из комнаты мастерской (scripts/house/) — ровно одна строка на их
+## стороне. Открывает ЭКИПИРОВКУ: магазин переехал к входной двери, и верстак
+## теперь ничего не продаёт.
 static func open_workshop() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
 		return
-	instance.open(TAB_SELL)
+	instance.open(SCREEN_EQUIP)
 
 
-## Магазин долларов доступен всегда и везде (ГДД раздел 15).
+## Магазин у входной двери (подсказку «заказать» рисует scripts/house/).
+static func open_shop() -> void:
+	if instance == null:
+		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
+		return
+	instance.open(TAB_PICKS)
+
+
+## Доллары доступны всегда и везде (ГДД раздел 15). Своей вкладки у них нет —
+## ведём в «Еду», где лежат товары за доллары.
 static func open_premium() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
 		return
-	instance.open(TAB_PREMIUM)
+	instance.open(TAB_FOOD)
 
 
 func _ready() -> void:
@@ -94,7 +135,7 @@ func is_open() -> bool:
 	return _root != null and _root.visible
 
 
-func open(tab: String = TAB_SELL) -> void:
+func open(tab: String = TAB_PICKS) -> void:
 	_resolve_refs()
 	_freeze_world(true)
 	_selected.clear()
@@ -103,11 +144,12 @@ func open(tab: String = TAB_SELL) -> void:
 	for row in ShopService.sellable_stacks():
 		_selected[row["id"]] = true
 	_root.visible = true
-	if tab != TAB_PREMIUM:
-		# Первый спуск в мастерскую — та самая сцена с дедовой киркой среди
-		# швабр и грабель (ГДД раздел 2).
+	if tab == SCREEN_EQUIP:
+		# Ржавая кирка находится в мастерской среди удочек, лопат и палок
+		# (слова владельца) — то есть ровно здесь, у верстака, а не в
+		# магазине: магазин её и не продаёт.
 		if ShopService.visit_workshop():
-			notice("Среди швабр и грабель нашлась дедова кирка.", 4.0)
+			notice("Среди удочек, лопат и палок нашлась ржавая кирка.", 4.0)
 	_set_tab(tab)
 
 
@@ -200,10 +242,11 @@ func _build() -> void:
 	tabs.offset_top = 28; tabs.offset_bottom = 46
 	tabs.add_theme_constant_override("separation", 3)
 	_root.add_child(tabs)
+	_tabs_row = tabs
+	_tab_buttons[TAB_PICKS] = _make_tab(tabs, TAB_PICKS, "Кирки")
+	_tab_buttons[TAB_TECH] = _make_tab(tabs, TAB_TECH, "Техника")
+	_tab_buttons[TAB_FOOD] = _make_tab(tabs, TAB_FOOD, "Еда")
 	_tab_buttons[TAB_SELL] = _make_tab(tabs, TAB_SELL, "Продать")
-	_tab_buttons[TAB_CRAFT] = _make_tab(tabs, TAB_CRAFT, "Верстак")
-	_tab_buttons[TAB_SHOP] = _make_tab(tabs, TAB_SHOP, "Лавка")
-	_tab_buttons[TAB_PREMIUM] = _make_tab(tabs, TAB_PREMIUM, "$")
 
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -320,11 +363,14 @@ func _set_tab(tab: String) -> void:
 	_tab = tab
 	for id in _tab_buttons.keys():
 		_tab_buttons[id].button_pressed = (id == tab)
+	if _tabs_row != null:
+		_tabs_row.visible = tab != SCREEN_EQUIP
 	match tab:
+		TAB_PICKS: _title.text = "Кирки и ранцы"
+		TAB_TECH: _title.text = "Техника"
+		TAB_FOOD: _title.text = "Еда"
 		TAB_SELL: _title.text = "Скупка сырья"
-		TAB_CRAFT: _title.text = "Верстак"
-		TAB_SHOP: _title.text = "Лавка"
-		TAB_PREMIUM: _title.text = "Доллары"
+		SCREEN_EQUIP: _title.text = "Экипировка"
 	_render()
 
 
@@ -333,10 +379,11 @@ func _render() -> void:
 	for c in _list.get_children():
 		c.queue_free()
 	match _tab:
+		TAB_PICKS: _render_picks()
+		TAB_TECH: _render_tech()
+		TAB_FOOD: _render_food()
 		TAB_SELL: _render_sell()
-		TAB_CRAFT: _render_craft()
-		TAB_SHOP: _render_shop()
-		TAB_PREMIUM: _render_premium()
+		SCREEN_EQUIP: _render_equip()
 
 
 func _add_hint(text: String, color: Color = DIM) -> void:
@@ -347,6 +394,148 @@ func _add_hint(text: String, color: Color = DIM) -> void:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_child(l)
+
+
+# --- Кирки и ранцы: покупка за монеты ----------------------------------------
+
+## Раздел «Кирки». Ранцы лежат здесь же, вторым блоком, а не пятой вкладкой:
+## владелец просил четыре раздела, а кирка и ранец — это одно и то же по
+## смыслу покупки (личное снаряжение героя за монеты, без единого материала).
+## В «Технике» им не место: там всё собирается из руды.
+func _render_picks() -> void:
+	_footer.visible = false
+	_add_hint("Ступени покупаются за монеты, материалы не нужны. Выбрать, чем копать и что надеть, можно на верстаке в мастерской.")
+
+	_add_section("Кирки")
+	for row in ShopCatalog.pickaxes():
+		_list.add_child(_make_buy_row(row, "tool"))
+
+	_add_section("Ранцы")
+	for row in ShopCatalog.gear_line():
+		_list.add_child(_make_buy_row(row, "gear"))
+
+
+## Заголовок блока внутри вкладки.
+func _add_section(text: String) -> void:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 10)
+	l.add_theme_color_override("font_color", GOLD)
+	_list.add_child(l)
+
+
+## Строка покупки ступени: иконка (если арт уже есть), название с эффектом и
+## кнопка с ценой. kind: "tool" — кирка, "gear" — ранец.
+func _make_buy_row(row: Dictionary, kind: String) -> Control:
+	var id := String(row["id"])
+	var price := int(row["price_coins"])
+	var owned: bool = GameState.owns_tool(id) if kind == "tool" else GameState.has_gear(id)
+	var box := HBoxContainer.new()
+
+	# Иконки может ещё не быть: арт ранцев владелец пришлёт позже, новые кирки
+	# рисует другой агент. Чего нет — того и не показываем, подставлять чужую
+	# картинку нельзя: игрок запомнит её как «ту самую кирку».
+	var icon_path := String(row.get("icon", ""))
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(16, 16)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = load(icon_path)
+		box.add_child(icon)
+
+	var text := Label.new()
+	text.text = "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
+	text.add_theme_font_size_override("font_size", 9)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	box.add_child(text)
+
+	var btn := _make_button("")
+	btn.custom_minimum_size = Vector2(52, 18)
+	if owned:
+		btn.text = "Есть"
+		btn.disabled = true
+	elif price <= 0:
+		# Ржавая кирка не продаётся: она находится в мастерской среди удочек,
+		# лопат и палок (слова владельца).
+		btn.text = "В мастерской"
+		btn.disabled = true
+	else:
+		btn.text = str(price)
+		btn.disabled = GameState.coins < price
+		btn.pressed.connect(func(): _do_buy_tier(id, kind))
+	box.add_child(btn)
+	return box
+
+
+func _do_buy_tier(id: String, kind: String) -> void:
+	var result := ShopService.buy_tool(id) if kind == "tool" else ShopService.buy_gear(id)
+	notice(String(result["message"]), 3.0)
+	_render()
+
+
+# --- Экипировка (верстак в мастерской) ---------------------------------------
+
+## Отдельный экран, а не вкладка магазина: у верстака своя дверь. Здесь ничего
+## не покупается — только выбирается, чем копать и что надеть из уже купленного.
+func _render_equip() -> void:
+	_footer.visible = false
+	if not Equipment.is_at_workbench():
+		_add_hint("Верстак стоит в подвале дома. Отсюда видно, что есть, но переодеться нельзя.", GOLD)
+	_add_hint("Кирка × скорость копки: %s. Ранец: %s." % [
+		ShopCatalog.mult_text(Equipment.current_dig_multiplier()),
+		("%s кл/с" % ShopCatalog.mult_text(Equipment.current_fly_speed()))
+			if Equipment.current_fly_speed() > 0.0 else "нет"])
+
+	_add_section("Чем копать")
+	var any_tool := false
+	for row in Equipment.pickaxe_rows():
+		if not bool(row["owned"]):
+			continue
+		any_tool = true
+		_list.add_child(_make_equip_row(row, "tool"))
+	if not any_tool:
+		_add_hint("Кирок пока нет — ржавая лежит где-то здесь же, в мастерской.")
+
+	_add_section("Что надеть")
+	var any_gear := false
+	for row in Equipment.gear_rows():
+		if not bool(row["owned"]):
+			continue
+		any_gear = true
+		_list.add_child(_make_equip_row(row, "gear"))
+	if not any_gear:
+		_add_hint("Ранцев пока нет. Первый стоит %d монет в магазине у входной двери."
+			% Balance.get_gear_cost_coins("backpack"))
+
+
+func _make_equip_row(row: Dictionary, kind: String) -> Control:
+	var id := String(row["id"])
+	var active := bool(row["active"])
+	var box := HBoxContainer.new()
+
+	var text := Label.new()
+	text.text = "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
+	text.add_theme_font_size_override("font_size", 9)
+	text.add_theme_color_override("font_color", GREEN if active else Color(1, 1, 1))
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	box.add_child(text)
+
+	var btn := _make_button("Надето" if active else ("Взять" if kind == "tool" else "Надеть"))
+	btn.custom_minimum_size = Vector2(48, 18)
+	btn.disabled = active or not Equipment.is_at_workbench()
+	if not btn.disabled:
+		btn.pressed.connect(func(): _do_equip(id, kind))
+	box.add_child(btn)
+	return box
+
+
+func _do_equip(id: String, kind: String) -> void:
+	var result := Equipment.equip_tool(id) if kind == "tool" else Equipment.equip_gear(id)
+	notice(String(result["message"]), 2.6)
+	_render()
 
 
 # --- Продажа -----------------------------------------------------------------
@@ -367,6 +556,7 @@ func _render_sell() -> void:
 		_footer_button.text = "Продать"
 		_footer_button.disabled = true
 		_show_unsellable_hint()
+		_add_dollars_block()
 		return
 
 	for row in rows:
@@ -380,6 +570,7 @@ func _render_sell() -> void:
 			r.button_pressed = false
 		_list.add_child(r)
 	_show_unsellable_hint()
+	_add_dollars_block()
 	_update_sell_footer()
 
 
@@ -510,13 +701,16 @@ func _do_sell() -> void:
 	_render()
 
 
-# --- Верстак -----------------------------------------------------------------
+# --- Техника -----------------------------------------------------------------
 
-func _render_craft() -> void:
+## Единственный раздел, где ещё нужны материалы: скважина, буровая машина,
+## ручной бур (и плавка с перегонкой, без которых их не собрать). Кирки и
+## ранцы отсюда ушли — они покупаются за монеты.
+func _render_tech() -> void:
 	_footer.visible = false
 	if not ShopService.is_at_workshop():
-		_add_hint("Верстак стоит в подвале дома (ГДД раздел 5) — складывать и собирать можно только там. Отсюда видно только, чего ещё не хватает.", GOLD)
-	_add_hint("Материалы копятся на складе в мастерской: железная кирка весит 160 кг при рюкзаке в 60, за одну ходку её не принести. Верстак берёт со склада и из рюкзака.")
+		_add_hint("Техника собирается на верстаке в подвале дома — складывать и собирать можно только там. Отсюда видно только, чего ещё не хватает.", GOLD)
+	_add_hint("Техника — единственное, что ещё собирается из материалов. Они копятся на складе в мастерской: ручной бур стоит 500 железа при рюкзаке в 60, за одну ходку столько не принести. Верстак берёт со склада и из рюкзака.")
 	for r in ShopCatalog.recipes():
 		_list.add_child(_make_craft_row(r))
 
@@ -621,30 +815,39 @@ func _do_craft(recipe_id: String) -> void:
 	_render()
 
 
-# --- Лавка и доллары ---------------------------------------------------------
+# --- Еда: расходники за обе валюты -------------------------------------------
 
-func _render_shop() -> void:
+## Раздел «Еда». Товары за доллары лежат здесь же, а не отдельной вкладкой:
+## это ровно такие же расходники (батончик, энергетик, таблетка, часы), и
+## разложить их по валютам значит заставить игрока помнить, в каком кармане
+## что лежит. Цена на кнопке всегда со своим знаком — монеты или $.
+func _render_food() -> void:
 	_footer.visible = false
 	var goods := ShopCatalog.goods_coins()
 	if goods.is_empty():
-		_add_hint("Лавка пока пуста.")
+		_add_hint("За монеты пока ничего нет.")
 	for g in goods:
 		_list.add_child(_make_good_row(g, "coins"))
+
+	var premium := ShopCatalog.goods_dollars()
+	if not premium.is_empty():
+		_add_section("За доллары")
+		_add_hint("Доллары в игре нельзя купить: платежей в этой сборке нет. Их дают ролики, клады и закрытые ветки коллекции.", DIM)
+		for g in premium:
+			_list.add_child(_make_good_row(g, "dollars"))
 
 	_add_hint("Ролики (лимит на сегодня, ГДД раздел 15):")
 	for a in ShopCatalog.ad_rewards():
 		if String(a.get("id", "")) == "small_premium_currency":
-			continue  # доллары — во вкладке долларов, чтобы не дублировать кнопку
+			continue  # ролик за доллары — внизу «Продать», рядом с обменом
 		_list.add_child(_make_ad_row(a))
 
 
-func _render_premium() -> void:
-	_footer.visible = false
-	_add_hint("Доллары в игре нельзя купить: платежей в этой сборке нет. Их дают ролики, клады и закрытые ветки коллекции.", DIM)
-	for g in ShopCatalog.goods_dollars():
-		_list.add_child(_make_good_row(g, "dollars"))
-
-	_add_hint("Обмен (курс из data/balance.json, помечен как предложенный):")
+## Доллары внизу вкладки «Продать»: обмен на монеты и ролик за доллары. Обе
+## строки про одно — как в кошельке появляются деньги, а именно этим вкладка
+## и занимается. Пятой вкладки ради двух строк на экране в 224 точки не будет.
+func _add_dollars_block() -> void:
+	_add_section("Доллары")
 	var ex := HBoxContainer.new()
 	var ex_label := Label.new()
 	ex_label.text = "1 $ = %d монет" % ShopCatalog.coins_per_dollar()
@@ -736,9 +939,13 @@ func _on_footer_pressed() -> void:
 		_do_sell()
 
 
-## Игра попыталась надеть инструмент, которого у игрока нет (например, бур на
-## глубине 100). Объясняем, где он теперь берётся, — иначе игрок видит, что
-## "ничего не произошло".
+## Игра попыталась надеть инструмент, которого у игрока нет. Объясняем, где он
+## берётся, — иначе игрок видит, что "ничего не произошло". Ответ теперь
+## зависит от того, что это: кирку покупают, технику собирают.
 func _on_tool_purchase_required(tool_id: String) -> void:
-	notice("%s не выдаётся по глубине — его собирают на верстаке в мастерской." %
-		Balance.get_tool_name_ru(tool_id), 4.5)
+	var name_ru := Balance.get_tool_name_ru(tool_id)
+	if Balance.tool_needs_materials(tool_id):
+		notice("%s собирается на верстаке в мастерской, из материалов." % name_ru, 4.5)
+	else:
+		notice("%s продаётся в магазине у входной двери — %d монет." % [
+			name_ru, Balance.get_tool_cost_coins(tool_id)], 4.5)

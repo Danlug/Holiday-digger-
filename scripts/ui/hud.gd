@@ -72,21 +72,27 @@ var _hold_hint: Label
 ## Шесть кнопок ровно по шести направлениям магнетизма: ↖ ↑ ↗ / ← → / ↓.
 ## Вниз по диагонали нет — копка всегда строго под собой, и кнопки под неё
 ## быть не должно, иначе игрок ищет её и не находит.
-## Стрелки РИСУЮТСЯ треугольниками, а не пишутся символами: ↑ ↖ ↗ ← → ↓
-## (U+2190…U+2197) в шрифте темы по умолчанию отсутствуют и выходят пустыми
+## Четыре стрелки крестом (решение владельца), диагональных кнопок нет.
+## Диагонали при этом никуда не делись: ↑ вместе с ← или → дают ↖ и ↗, как на
+## любой крестовине. Без этого в режиме стрелок нельзя прыгнуть вперёд — а в
+## двух других режимах можно, и одно и то же движение требовало бы разных
+## навыков в зависимости от режима.
+##
+## Стрелки РИСУЮТСЯ треугольниками, а не пишутся символами: ↑ ← → ↓
+## (U+2190…U+2193) в шрифте темы по умолчанию отсутствуют и выходят пустыми
 ## квадратами с шестнадцатеричным кодом внутри — та же ловушка, что с ✕ и ↺.
 ## Вектор здесь — направление острия.
 const ARROW_CELLS: Array = [
-	{"dir": "upleft", "col": 0, "row": 0, "v": Vector2(-0.7071, -0.7071)},
 	{"dir": "up", "col": 1, "row": 0, "v": Vector2(0, -1)},
-	{"dir": "upright", "col": 2, "row": 0, "v": Vector2(0.7071, -0.7071)},
 	{"dir": "left", "col": 0, "row": 1, "v": Vector2(-1, 0)},
 	{"dir": "right", "col": 2, "row": 1, "v": Vector2(1, 0)},
 	{"dir": "down", "col": 1, "row": 2, "v": Vector2(0, 1)},
 ]
 var _arrows_panel: Control
 var _arrow_buttons: Dictionary = {}   # dir -> Button
-var _arrow_held: String = ""
+## Какие стрелки зажаты прямо сейчас. Именно НАБОР, а не одна: две кнопки
+## под двумя пальцами — это диагональ.
+var _arrows_held: Dictionary = {}
 var _tool_button: Button
 var _well_panel: Control
 var _objective_panel: PanelContainer
@@ -427,31 +433,39 @@ func _layout_arrows() -> void:
 
 
 func _on_arrow_down(dir: String) -> void:
-	_arrow_held = dir
-	_apply_arrow(dir)
+	_arrows_held[dir] = true
+	_apply_arrows()
 
 
 func _on_arrow_up(dir: String) -> void:
-	if _arrow_held != dir:
-		return
-	_arrow_held = ""
-	if player != null:
+	_arrows_held.erase(dir)
+	if _arrows_held.is_empty() and player != null:
 		player.release_control()
 		player.digging = null
-
-
-## Стрелка — это уже выбранное направление, магнетизм ей не нужен: он против
-## неточного пальца, а кнопка неточной не бывает.
-func _apply_arrow(dir: String) -> void:
-	if player == null:
 		return
-	match dir:
-		"left": player.set_intent(-1, false, false)
-		"right": player.set_intent(1, false, false)
-		"up": player.set_intent(0, true, false)
-		"upleft": player.set_intent(-1, true, false)
-		"upright": player.set_intent(1, true, false)
-		"down": player.set_intent(0, false, true)
+	_apply_arrows()
+
+
+## Стрелки — это уже выбранные направления, магнетизм им не нужен: он против
+## неточного пальца, а кнопка неточной не бывает.
+##
+## Правила те же, что у джойстика после магнетизма: вниз всегда строго под
+## собой (↓ перебивает всё остальное — копка это осознанное действие), вверх
+## можно вместе с шагом.
+func _apply_arrows() -> void:
+	if player == null or _arrows_held.is_empty():
+		return
+	var dx := 0
+	if _arrows_held.has("left"):
+		dx -= 1
+	if _arrows_held.has("right"):
+		dx += 1
+	if _arrows_held.has("down"):
+		player.set_intent(0, false, true)
+	elif _arrows_held.has("up"):
+		player.set_intent(dx, true, false)
+	else:
+		player.set_intent(dx, false, false)
 	player.cancel_wrong_dig()
 
 
@@ -1394,7 +1408,7 @@ func _set_mode(m: String) -> void:
 	mode = m
 	_release_stick()
 	_has_touch = false
-	_arrow_held = ""
+	_arrows_held.clear()
 	if player != null:
 		player.release_control()
 	# Коротко: полная подпись («Джойстик»/«Удержание») не помещается в ряд
@@ -1595,8 +1609,7 @@ func update_input_intent() -> void:
 	if _apply_keyboard():
 		return
 	if mode == "arrows":
-		if not _arrow_held.is_empty():
-			_apply_arrow(_arrow_held)
+		_apply_arrows()
 		return
 	if mode != "hold":
 		return

@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_gravity_and_landing()
 	_test_resolve_dir_zones()
 	_test_six_direction_snap()
+	_test_arrow_pad_combinations()
 	_test_keyboard_intent()
 	_test_dig_earth_gives_xp_not_coins()
 	_test_shovel_cannot_dig_stone()
@@ -139,6 +140,51 @@ func _test_six_direction_snap() -> void:
 	check("вниз по диагонали не существует — это ↓ строго под собой",
 		s5 != null and player.hold_dx == 0 and player.hold_down
 		and is_zero_approx(s5.x) and is_equal_approx(s5.y, 1.0))
+	player.release_control()
+
+
+## Экранные стрелки: четыре кнопки, диагонали — двумя пальцами (↑ вместе с
+## ← или →). Логика набора намерения та же, что у клавиатуры и джойстика
+## после магнетизма: ↓ перебивает всё, ↑ можно вместе с шагом.
+func _test_arrow_pad_combinations() -> void:
+	var hud = preload("res://scripts/ui/hud.gd").new()
+	hud.player = player
+
+	check("кнопок на крестовине ровно четыре", hud.ARROW_CELLS.size() == 4)
+	var dirs: Array = []
+	for cell in hud.ARROW_CELLS:
+		dirs.append(String(cell["dir"]))
+	check("диагональных кнопок нет",
+		not dirs.has("upleft") and not dirs.has("upright"))
+	check("есть все четыре стороны",
+		dirs.has("up") and dirs.has("down") and dirs.has("left") and dirs.has("right"))
+
+	hud._arrows_held = {"right": true}
+	hud._apply_arrows()
+	check("→ — шаг вправо", player.hold_dx == 1 and not player.hold_up and not player.hold_down)
+
+	hud._arrows_held = {"up": true, "right": true}
+	hud._apply_arrows()
+	check("↑ и → вместе — диагональ: бежит и прыгает",
+		player.hold_dx == 1 and player.hold_up and not player.hold_down)
+
+	hud._arrows_held = {"up": true, "left": true}
+	hud._apply_arrows()
+	check("↑ и ← вместе — зеркальная диагональ",
+		player.hold_dx == -1 and player.hold_up)
+
+	# ↓ перебивает всё: копка — осознанное действие, и «вниз-вбок» не бывает.
+	hud._arrows_held = {"down": true, "right": true}
+	hud._apply_arrows()
+	check("↓ вместе с → — всё равно строго под собой",
+		player.hold_dx == 0 and player.hold_down and not player.hold_up)
+
+	# Обе горизонтальные разом гасят друг друга, а не дёргают героя.
+	hud._arrows_held = {"left": true, "right": true}
+	hud._apply_arrows()
+	check("← и → вместе гасят друг друга", player.hold_dx == 0)
+
+	hud.free()
 	player.release_control()
 
 

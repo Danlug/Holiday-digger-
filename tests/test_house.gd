@@ -1,12 +1,14 @@
 extends Node
-## test_house — проверка системы дома (scripts/house/): сон, еда, переходы.
+## test_house — проверка системы дома (scripts/house/): сон, еда, переходы,
+## и — с редизайна владельца от 2026-09-16 — дом как пространство: герой
+## ходит по комнате, кнопки-хотспоты всплывают над ним в радиусе точки (и
+## гаснут вне его), несколько точек в радиусе дают несколько кнопок разом,
+## переходы между комнатами ставят героя у нужной двери, а «Спать» у кровати
+## идёт через короткую анимацию, а не мгновенно.
 ##
 ## Запускается СЦЕНОЙ, а не через --script: дом обращается к автозагрузкам
 ## GameState/Balance, а в режиме --script их нет (см. docs/BUILD.md):
 ##   godot --headless --path . res://tests/test_house.tscn
-##
-## Проверяется ровно то, ради чего система написана: бодрость и голод должны
-## восстанавливаться, а вход в дом и обратно — не терять состояние игрока.
 
 var failures := 0
 var total := 0
@@ -45,7 +47,15 @@ func _ready() -> void:
 	_test_tunnel_transition()
 	_test_storage_access_rules()
 	_test_storage_survives_death_and_save()
-	_test_no_food_button()
+
+	_test_room_hotspots_appear_and_fade()
+	_test_room_two_buttons_on_overlap()
+	_test_room_transitions_use_enter_points()
+	_test_pickaxe_hotspot()
+	_test_front_door_take_delivery_condition()
+	_test_sleep_button_uses_animation_sequence()
+	_test_outdoor_enter_hotspot()
+	_test_house_button_context_gone()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -63,6 +73,14 @@ func check(label: String, ok: bool) -> void:
 func check_near(label: String, actual: float, expected: float, tolerance: float = 0.01) -> void:
 	check("%s (получено %.2f, ожидалось %.2f)" % [label, actual, expected],
 		absf(actual - expected) <= tolerance)
+
+
+## Список action'ов активных хотспотов вида (см. house_view.gd:active_hotspots).
+func _actions() -> Array:
+	var out: Array = []
+	for h in house._view.active_hotspots():
+		out.append(String(h["action"]))
+	return out
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +146,8 @@ func _test_forced_sleep_ignores_hunger() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Еда (ГДД п.7)
+# Еда (ГДД п.7) — чистая логика HouseFood/HouseConfig, не зависит от того,
+# что «Заказать» теперь открывает магазин, а не карточку прихожей.
 # ---------------------------------------------------------------------------
 
 func _test_food_delivery_and_eating() -> void:
@@ -277,6 +296,7 @@ func _test_enter_and_exit_keeps_state() -> void:
 	check("герой в доме", GameState.house_is_indoors)
 	check("физика героя заморожена", player.frozen)
 	check("комната запомнена", GameState.house_room == "hall")
+	check("вид открыл именно салон", house._view.room_id() == "hall")
 
 	house.exit_to_door()
 	var door := HouseConfig.door_cell()
@@ -292,34 +312,6 @@ func _test_enter_and_exit_keeps_state() -> void:
 	check("инвентарь цел", GameState.get_item_count("iron_ore") == iron_before)
 
 
-## Кнопки «Еда» на нижней полосе больше нет (решение владельца): она висела
-## там всю вылазку и путалась с инструментом. Едят из рюкзака — кнопкой в
-## строке предмета (scripts/ui/hud.gd), а контекстная кнопка дома остаётся
-## только под дверь.
-func _test_no_food_button() -> void:
-	var btn := Button.new()
-	btn.add_to_group("house_button")
-	add_child(btn)
-	house._button = btn
-	house._button_action = ""
-
-	if GameState.house_is_indoors:
-		house.exit_to_door()
-	GameState.inventory.clear()
-	GameState.add_item("food_soup", 1)
-	GameState.set_hunger(10.0)
-	var door := HouseConfig.door_cell()
-	player.x = float(door.x) + 20.0
-	player.y = 40.5
-	house._update_hud_button()
-	check("вдали от двери с едой в рюкзаке кнопки нет", not btn.visible)
-	check("действие «съесть» у кнопки не назначено", not house._button_action.begins_with("eat"))
-	check("есть из рюкзака по-прежнему можно", bool(HouseFood.eat("food_soup")["ok"]))
-
-	btn.queue_free()
-	house._button = null
-
-
 func _test_tunnel_transition() -> void:
 	# Люк отменён владельцем: после огорода Роберт пробивает вниз бетонный
 	# тоннель — колодец по клетке WorldGen.TUNNEL_X глубиной TUNNEL_DEPTH,
@@ -328,7 +320,7 @@ func _test_tunnel_transition() -> void:
 	# зовёт его и ставит героя в устье.
 	GameState.house_hatch_built = false
 	GameState.house_garden_closed = false
-	house.enter_house("basement")
+	house.enter_house("workshop")
 	check("без тоннеля спуститься нельзя", not house.exit_through_tunnel())
 	check("герой остался в доме", GameState.house_is_indoors)
 	check("до Роберта устье тоннеля не пробито",
@@ -385,7 +377,9 @@ func _test_tunnel_transition() -> void:
 	player.y = mouth.y + 0.5
 	house._auto_enter_tunnel_if_touched()
 	check("налетел на устье снизу — вернуло в дом без кнопки", GameState.house_is_indoors)
-	check("попал именно в подвал", GameState.house_room == "basement")
+	# «Подвал» слит с мастерской (решение владельца, 2026-09-16): устье
+	# поднимает героя туда же, где склад, верстак и стена с удочками.
+	check("попал именно в мастерскую", GameState.house_room == "workshop")
 
 	# Землетрясение стирает диффы: колодец обязан пробиваться заново, иначе
 	# спуск замуровывает героя в породе.
@@ -394,3 +388,185 @@ func _test_tunnel_transition() -> void:
 	check("устье снова пусто",
 		world.get_tile(mouth.x, mouth.y) == TileTypes.Type.EMPTY)
 	check("огород после землетрясения всё так же закрыт", world.is_garden_locked())
+
+
+# ---------------------------------------------------------------------------
+# Дом как пространство (решение владельца, 2026-09-16): хотспоты появляются
+# и гаснут по радиусу, несколько точек в радиусе дают несколько кнопок.
+# ---------------------------------------------------------------------------
+
+func _test_room_hotspots_appear_and_fade() -> void:
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	house.enter_house("hall")
+	check("вошёл в салон", house._view.room_id() == "hall")
+
+	# hall.door_workshop: x=0.8, radius=0.08 (data/rooms.json)
+	house._view.set_hero_x_fraction(0.8)
+	check("у правой двери — кнопка «Мастерская»", _actions().has("goto:workshop"))
+
+	# hall.front_door: x=0.5, radius=0.08 — не пересекается с door_workshop
+	house._view.set_hero_x_fraction(0.5)
+	var actions := _actions()
+	check("у входной двери — «Заказать»", actions.has("open_shop"))
+	check("кнопка мастерской вдали погасла", not actions.has("goto:workshop"))
+
+	# Далеко от всех точек — хотспотов нет вовсе.
+	house._view.set_hero_x_fraction(0.0)
+	check("вдали от всех точек хотспотов нет", _actions().is_empty())
+
+
+func _test_room_two_buttons_on_overlap() -> void:
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	house.enter_house("workshop")
+	# workshop.workbench x=0.45 r=0.1 → [0.35,0.55]; workshop.chest x=0.6
+	# r=0.1 → [0.5,0.7] — общий механизм радиусов пересекает их на [0.5,0.55],
+	# ровно то место, про которое владелец просил две кнопки на выбор.
+	house._view.set_hero_x_fraction(0.52)
+	var actions := _actions()
+	check("на стыке верстака и сундука — «Верстак»", actions.has("open_shop"))
+	check("на стыке верстака и сундука — «Склад»", actions.has("storage"))
+	check("ровно две кнопки, не одна и не три", actions.size() == 2)
+
+	# Чуть в стороне — только одна из двух.
+	house._view.set_hero_x_fraction(0.45)
+	actions = _actions()
+	check("у самого верстака — только «Верстак»", actions.has("open_shop") and not actions.has("storage"))
+
+
+func _test_room_transitions_use_enter_points() -> void:
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	house.enter_house("hall")
+	house._view.set_hero_x_fraction(0.8)
+	house._view.trigger_point_button("door_workshop")
+	check("нажатие у двери перевело в мастерскую", house._view.room_id() == "workshop")
+	check("GameState.house_room обновился (бухгалтерию ведёт дом)",
+		GameState.house_room == "workshop")
+	check_near("вошёл у лестницы (enter_x из data/rooms.json)",
+		house._view.hero_x_fraction(), 0.12, 0.001)
+
+	house._view.trigger_point_button("stairs", 0)  # index 0 — «Подняться в дом»
+	check("лестница ведёт обратно в салон", house._view.room_id() == "hall")
+	check_near("вошёл у той же двери, из которой уходил",
+		house._view.hero_x_fraction(), 0.8, 0.001)
+
+
+func _test_pickaxe_hotspot() -> void:
+	GameState.owned_tools = ["shovel"]
+	GameState.current_tool = "shovel"
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	house.enter_house("workshop")
+
+	house._view.set_hero_x_fraction(0.85)  # workshop.mops_wall
+	check("у стены с удочками — «Взять кирку»", _actions().has("take_pickaxe"))
+
+	house._view.trigger_point_button("mops_wall")
+	# Тест не заводит сюжетную систему (house._story остаётся null) — значит
+	# сработал запасной прямой путь выдачи, а не очередь сюжетной сцены.
+	check("инструмент переключён на кирку", GameState.current_tool == "rusty_pickaxe")
+	check("сцена мастерской отмечена просмотренной (гейт хотспота)",
+		StoryState.is_seen("workshop"))
+
+	house._view.refresh()
+	check("кнопка «Взять кирку» пропала — кирка уже есть", not _actions().has("take_pickaxe"))
+
+	# Запасной путь выдачи пишет StoryState на диск (user://story.json) —
+	# тест обязан не оставлять его «просмотренным» для других тестов и для
+	# настоящей игры, иначе сцена "workshop" молча не сыграет никому другому.
+	StoryState.clear_all()
+
+
+func _test_front_door_take_delivery_condition() -> void:
+	GameState.house_food_at_door.clear()
+	GameState.inventory.clear()
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	house.enter_house("hall")
+	house._view.set_hero_x_fraction(0.5)  # hall.front_door
+	var actions := _actions()
+	check("без доставки — только «Заказать»", actions.has("open_shop"))
+	check("без доставки кнопки «Забрать» нет", not actions.has("take_delivery"))
+
+	HouseFood.deliver("food_soup")
+	house._view.refresh()
+	actions = _actions()
+	check("доставка у двери — появилась «Забрать»", actions.has("take_delivery"))
+
+	house._view.trigger_point_button("front_door", 1)  # index 1 — «Забрать»
+	check("нажатие забрало доставку в рюкзак", GameState.get_item_count("food_soup") == 1)
+	house._view.refresh()
+	check("после «Забрать» кнопка снова пропала", not _actions().has("take_delivery"))
+
+
+func _test_sleep_button_uses_animation_sequence() -> void:
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	GameState.set_stamina(20.0)
+	GameState.set_hunger(100.0)
+	house.enter_house("bedroom")
+	house._view.set_hero_x_fraction(0.42)  # bedroom.bed
+	check("у кровати — кнопка «Спать»", _actions().has("sleep"))
+
+	house._view.trigger_point_button("bed")
+	check("сон начался (house_system держит комнату на паузе)", house._view.is_sleeping())
+	check_near("эффект сна ЕЩЁ не применился — идёт анимация", GameState.stamina, 20.0, 0.001)
+	check("хотспоты спрятаны, пока герой спит", house._view.active_hotspots().is_empty())
+	check_near("анимация — ровно house.sleep_animation_seconds из balance.json",
+		HouseConfig.sleep_animation_seconds(), 10.0, 0.001)
+
+	# house_system сам отсчитывает реальные секунды таймером; тест не ждёт их
+	# взаправду — зовёт тот же метод, которым таймер завершает сон.
+	house._finish_sleep_sequence()
+	check("анимация закончилась", not house._view.is_sleeping())
+	check("эффект сна применился по её концу", GameState.stamina > 20.0)
+
+
+func _test_outdoor_enter_hotspot() -> void:
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	var door := HouseConfig.door_cell()
+
+	player.x = door.x + 0.5
+	player.y = 0.5
+	house._update_outdoor_hotspot()
+	check("«Зайти» видна у окна веранды", house._outdoor_button.visible)
+	check("подпись — «Зайти» (не «Дом»)", house._outdoor_button.text == "Зайти")
+
+	player.x = door.x + 20.0
+	house._update_outdoor_hotspot()
+	check("кнопка гаснет вдали от двери", not house._outdoor_button.visible)
+
+	player.x = door.x + 0.5
+	house._update_outdoor_hotspot()
+	check("кнопка снова видна у двери", house._outdoor_button.visible)
+
+	house._outdoor_button.pressed.emit()
+	check("нажатие «Зайти» физически завело героя в салон",
+		GameState.house_is_indoors and GameState.house_room == "hall")
+
+
+## «Дом» как контекстная кнопка внизу экрана отменена (решение владельца):
+## house._button (группа "house_button" от HUD) больше ничего не показывает
+## и не подписывает — тест держит и его, чтобы регрессия не вернулась молча.
+func _test_house_button_context_gone() -> void:
+	var btn := Button.new()
+	btn.add_to_group("house_button")
+	add_child(btn)
+	house._button = btn
+	house._button_action = ""
+
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	var door := HouseConfig.door_cell()
+	player.x = float(door.x) + 0.5
+	player.y = 0.5
+	house._update_hud_button()
+	check("«Дом» больше не показывается даже у двери", not btn.visible)
+	check("действие у кнопки не назначается", house._button_action.is_empty())
+	house.on_hud_button()  # не должен падать без назначенного действия
+
+	btn.queue_free()
+	house._button = null

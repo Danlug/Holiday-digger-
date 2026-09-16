@@ -1,21 +1,35 @@
 extends CanvasLayer
-## HouseView — интерьер дома (сцена scenes/house.tscn).
+## HouseView — интерьер дома как НАСТОЯЩЕЕ пространство (сцена scenes/house.tscn).
 ##
-## Дом показан РАЗРЕЗОМ: второй этаж, первый этаж, подвал — сверху вниз одной
-## колонкой комнат. Ходьбы внутри дома нет намеренно: физика героя живёт в
-## мире-сетке (scripts/player), и пускать его ходить по интерьеру значило бы
-## заводить вторую, отдельную физику ради трёх дверей. Вместо этого герой
-## «переезжает» в комнату, по которой ткнули, — место в доме остаётся
-## читаемым, а действий ровно столько, сколько их есть.
+## Решение владельца (2026-09-16): «Дом» отменяется как контекстное меню с
+## карточками комнат — герой физически заходит внутрь и ходит по комнате
+## вдоль линии пола, камера едет за ним по горизонтали, а кнопки действий
+## всплывают НАД ГЕРОЕМ, когда он подошёл к нужному месту (дверь, кровать,
+## верстак, сундук...), и гаснут, когда отошёл. Если в радиусе сразу
+## несколько точек — показываются кнопки ВСЕХ них (см. рядом стоящие верстак
+## и сундук в мастерской) — это общий механизм (_update_hotspots), а не
+## частный случай одной пары точек.
 ##
-## Структура узлов строится кодом (_ensure_structure) и ровно этим же кодом
-## сгенерирована сама сцена: так файл сцены можно открыть и доработать в
-## редакторе, но потеря или порча сцены не ломает дом — узлы создадутся
-## заново при загрузке.
+## Комнат три: hall (салон), bedroom (спальня), workshop (мастерская, бывший
+## подвал). Прыжка и полёта внутри дома нет — герой только идёт влево-вправо,
+## поэтому у своя, упрощённая (не player.gd) физика: одна координата,
+## клавиатура (A/D, ←/→ — те же клавиши, что двигают героя в шахте, см.
+## scripts/ui/hud.gd:KEYS_LEFT/KEYS_RIGHT) и две кнопки ◀/▶ на экране.
+##
+## Геометрия комнат (доли точек, радиусы, переходы) — данные, не код, см.
+## data/rooms.json и scripts/house/house_rooms_config.gd. Фона art/env/room_*
+## пока нет — комната рисуется плашкой в тех же пропорциях, дом остаётся
+## полностью играбельным без художника.
+##
+## Структура узлов строится кодом (_ensure_structure) и им же сгенерирована
+## сама сцена (см. tools/gen_house_scenes.gd): открыть и доработать в
+## редакторе можно как обычно, а потеря сцены дом не ломает — узлы
+## создадутся заново при загрузке.
 ##
 ## Все действия уходят наружу сигналом action_requested: сама по себе панель
-## ничего не меняет в состоянии игры. Логика сна/еды/переходов — в
-## scripts/house/house_system.gd и house_sleep/house_food.
+## ничего не меняет в состоянии игры (кроме собственного положения героя в
+## комнате — это чисто визуальное состояние вида). Логика сна/еды/переходов —
+## в scripts/house/house_system.gd и house_sleep/house_food.
 
 signal action_requested(action: String, arg: String)
 
@@ -24,72 +38,89 @@ const PANEL_BG := Color8(0x1E, 0x18, 0x11)
 const PANEL_BORDER := Color8(0x3E, 0x31, 0x25)
 const ACCENT := Color8(0xE0, 0xA9, 0x3B)
 const DIM := Color8(0x9D, 0x8B, 0x73)
-const FLOOR_LABEL := Color8(0x6B, 0x5B, 0x45)
 
-## Комнаты дома (ГДД п.2, 9, 10): спальня наверху, прихожая с входной дверью
-## и музей на первом этаже, мастерская, торфоперегонка и ход к тоннелю
-## Роберта — в подвале.
-## Мастерская и музей заведены пустыми: их наполняют другие системы, дому
-## достаточно, чтобы туда можно было войти.
-const ROOMS := [
-	{"id": "bedroom", "floor": "Второй этаж", "title": "Спальня",
-		"icon": "res://art/env/bed.png",
-		"desc": "Кровать. Сон восстанавливает бодрость — 12.5% за игровой час."},
-	{"id": "hall", "floor": "Первый этаж", "title": "Прихожая",
-		"icon": "res://art/env/house_exterior.png",
-		"desc": "Входная дверь. Сюда привозят заказанную еду."},
-	{"id": "museum", "floor": "Первый этаж", "title": "Музей",
-		"icon": "res://art/ui/slot_frame.png",
-		"desc": "Витрины под коллекцию артефактов (ГДД п.10)."},
-	{"id": "workshop", "floor": "Подвал", "title": "Мастерская",
-		"icon": "res://art/env/workbench.png",
-		"desc": "Верстак деда, лавка и склад: сюда носят материалы на кирку (ГДД п.2, 14, 15)."},
-	{"id": "peat_still", "floor": "Подвал", "title": "Торфоперегонка",
-		"icon": "res://art/ui/slot_frame.png",
-		"desc": "Торф → топливные блоки и удобрение (ГДД п.5)."},
-	{"id": "basement", "floor": "Подвал", "title": "Ход в шахту",
-		"icon": "res://art/env/hatch.png",
-		"desc": "Ход из подвала к устью тоннеля Роберта — другого входа в копальню нет."},
-]
+## Высота игрового поля дома — вся высота экрана (480) минус тонкая шапка со
+## статами (HUD на время дома скрыт целиком, см. house_system.enter_house).
+const HEADER_HEIGHT := 40.0
+const STAGE_HEIGHT := 440.0
+const VIEW_W := 224.0  # project.godot: window/size/viewport_width
 
-# Комнаты, которые наполняют другие системы. Ключ — id комнаты, значение —
-# группа узла, который туда встраивается. Контракт для соседних систем:
-# добавить свой узел в группу и реализовать метод open() — дом сам покажет
-# кнопку «Открыть» вместо надписи «пока пусто».
-const EXTERNAL_PANELS := {
-	"workshop": "house_workshop_panel",
-	"museum": "house_museum_panel",
-	"peat_still": "house_peat_still_panel",
-}
+## Скорость ходьбы по комнате — тот же порядок величины, что WALK*TILE в
+## шахте (player.gd: 4.2 * 32 = 134.4 px/c), чтобы «те же органы управления»
+## ощущались так же и внутри дома.
+const WALK_SPEED_PX_S := 130.0
+const HERO_W := 48.0
+const HERO_H := 48.0
+## Запас от низа кадра до подошвы — то же число, что GROUND_Y в
+## character_view.gd (48 - 46 = 2): кадр героя шире тела, и без этого запаса
+## подошва повисала бы над полом.
+const FOOT_PAD := 2.0
+const WALK_FPS := 8.0
 
-# Уже существующие соседние системы, у которых есть статическая точка входа.
-# Загружаются ПО ПУТИ, а не через глобальное имя класса: если соседнюю
-# систему выкинут или она не соберётся, дом обязан остаться рабочим — еда и
-# сон не должны зависеть от того, доехал ли магазин.
-const EXTERNAL_STATIC := {
-	"workshop": {"path": "res://scripts/shop/shop_ui.gd", "method": "open_workshop", "arg": null},
-	"museum": {"path": "res://scripts/progress/progress_screen.gd", "method": "open", "arg": "museum"},
-}
+const IDLE_SHEET := "res://art/character/idle.png"
+const WALK_SHEET := "res://art/character/walk.png"
+## Спрайт-лист сна готовит другой агент (задание владельца): здесь только
+## проигрывается. Нет файла — играем статичную позу art/character/sleep.png
+## (уже есть в репозитории), нет и её — просто держим паузу без падения.
+const SLEEP_SHEET := "res://art/anim/sleep_sheet.png"
+const SLEEP_SHEET_META := "res://art/anim/sleep_sheet.json"
+const SLEEP_STATIC_POSE := "res://art/character/sleep.png"
+
+const KEY_LEFT_A: Key = KEY_A
+const KEY_LEFT_ARROW: Key = KEY_LEFT
+const KEY_RIGHT_D: Key = KEY_D
+const KEY_RIGHT_ARROW: Key = KEY_RIGHT
 
 var _root: Control
 var _title: Label
 var _clock: Label
 var _bars: Dictionary = {}       # "hp"|"hunger"|"stamina" -> ColorRect (заливка)
-var _rooms_box: VBoxContainer
-var _cards: Dictionary = {}      # room_id -> PanelContainer
+var _notice: Label
+var _notice_until_msec: float = 0.0
+
+var _stage: Control
+var _bg: TextureRect
+var _bg_fallback: ColorRect
+var _hero: TextureRect
+var _hotspot_layer: Control
+var _walk_left_btn: Button
+var _walk_right_btn: Button
+
 var _forced: Control
 var _forced_text: Label
 var _forced_button: Button
-
-var _menu_open: bool = false
 var _forced_mode: String = ""    # "" | "sleep"
-var _hero_tex: Texture2D
-var _notice: Label
-var _notice_until_msec: float = 0.0
-# Слепок содержимого прихожей: список блюд и рюкзак пересобираются только
-# когда что-то изменилось. Пересборка каждый кадр убивала бы нажатие —
-# кнопка исчезала бы раньше, чем палец успевал отпустить её.
-var _hall_signature: String = ""
+
+var _sleep_overlay: Control
+var _sleep_sprite: TextureRect
+var _sleep_label: Label
+
+var _idle_sheet: Texture2D
+var _walk_sheet: Texture2D
+var _sleep_sheet_tex: Texture2D
+var _sleep_meta: Dictionary = {}
+var _sleep_static_tex: Texture2D
+var _cur_frame_sheet: Texture2D = null
+var _cur_frame_idx: int = -1
+
+var _room_id: String = ""
+var _room_def: Dictionary = {}
+var _room_width_px: float = float(VIEW_W)
+var _floor_y_px: float = STAGE_HEIGHT * 0.86
+var _hero_x_px: float = 0.0
+var _facing: int = 1
+var _walk_dir: int = 0
+var _walk_frame_t: float = 0.0
+var _hold_left: bool = false
+var _hold_right: bool = false
+
+var _hotspot_buttons: Array = []
+var _hotspot_signature: String = ""
+var _locked: bool = false        # внешняя блокировка (форс-режим/сон — своя)
+
+var _sleeping: bool = false
+var _sleep_t: float = 0.0
+var _sleep_total: float = 10.0
 
 
 func _ready() -> void:
@@ -98,7 +129,6 @@ func _ready() -> void:
 	# поверх интерьера, а не под него.
 	layer = 9
 	_ensure_structure()
-	_wire_actions()
 	visible = false
 
 
@@ -107,7 +137,9 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 ## Создаёт недостающие узлы. Вызывается и при загрузке сцены (где всё уже
-## есть — тогда функция только находит узлы), и генератором сцены.
+## есть — тогда функция только находит узлы), и генератором сцены
+## (tools/gen_house_scenes.gd) — поэтому НЕ обращается к get_tree()/автолоадам
+## сверх того, что доступно узлу вне дерева.
 func _ensure_structure() -> void:
 	_root = _need(self, "Root", Control)
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -119,19 +151,20 @@ func _ensure_structure() -> void:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_build_header()
-	_build_rooms()
+	_build_stage()
 	_build_forced()
+	_load_hero_sheets()
 
 
 func _build_header() -> void:
 	var header := _need(_root, "Header", Panel) as Panel
 	header.anchor_right = 1.0
-	header.offset_bottom = 52
+	header.offset_bottom = HEADER_HEIGHT
 	header.add_theme_stylebox_override("panel", _box(PANEL_BG, PANEL_BORDER))
 
 	_title = _need(header, "Title", Label) as Label
-	_title.position = Vector2(8, 3)
-	_title.add_theme_font_size_override("font_size", 12)
+	_title.position = Vector2(8, 2)
+	_title.add_theme_font_size_override("font_size", 10)
 	_title.add_theme_color_override("font_color", ACCENT)
 	_title.text = "ДОМ"
 
@@ -139,146 +172,148 @@ func _build_header() -> void:
 	_clock.anchor_left = 1.0
 	_clock.anchor_right = 1.0
 	_clock.offset_left = -112
-	_clock.offset_right = -8
-	_clock.offset_top = 5
+	_clock.offset_right = -6
+	_clock.offset_top = 3
 	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_clock.add_theme_font_size_override("font_size", 9)
+	_clock.add_theme_font_size_override("font_size", 8)
 	_clock.add_theme_color_override("font_color", DIM)
 
-	# Полоски выживания дублируются здесь, потому что HUD на время дома
-	# скрывается: иначе его джойстик и нижняя полоса торчали бы поверх
-	# интерьера. А смотреть, как поднимается бодрость, игрок должен именно
-	# в тот момент, когда он на неё и жмёт.
+	# Полоски выживания дублируются здесь: HUD на время дома скрыт целиком
+	# (его джойстик и нижняя полоса иначе торчали бы поверх комнаты), а
+	# видеть, как поднимается бодрость, игрок должен именно в доме.
 	var bars := _need(header, "Bars", HBoxContainer) as HBoxContainer
-	bars.position = Vector2(8, 24)
+	bars.position = Vector2(8, 18)
 	bars.add_theme_constant_override("separation", 6)
 	_bars["hp"] = _bar_row(bars, "Hp", Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
 	_bars["hunger"] = _bar_row(bars, "Hunger", Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
 	_bars["stamina"] = _bar_row(bars, "Stamina", Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
 
-	# Своя строка сообщений: HUD с его тостами на время дома скрыт, а «заказ
-	# принят» и «проспал 8 часов» игрок обязан прочитать именно в доме.
 	_notice = _need(header, "Notice", Label) as Label
 	_notice.anchor_right = 1.0
-	_notice.offset_left = 8
-	_notice.offset_right = -8
-	_notice.offset_top = 38
+	_notice.offset_left = 96
+	_notice.offset_right = -6
+	_notice.offset_top = 4
+	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_notice.add_theme_font_size_override("font_size", 8)
 	_notice.add_theme_color_override("font_color", ACCENT)
 	_notice.clip_text = true
 
 
-func _bar_row(parent: Control, name: String, color: Color, icon_path: String) -> ColorRect:
-	var row := _need(parent, name, HBoxContainer) as HBoxContainer
+func _bar_row(parent: Control, bar_name: String, color: Color, icon_path: String) -> ColorRect:
+	var row := _need(parent, bar_name, HBoxContainer) as HBoxContainer
 	row.add_theme_constant_override("separation", 3)
 	if ResourceLoader.exists(icon_path):
 		var icon := _need(row, "Icon", TextureRect) as TextureRect
-		icon.custom_minimum_size = Vector2(11, 11)
+		icon.custom_minimum_size = Vector2(10, 10)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture = load(icon_path)
 	var track := _need(row, "Track", Panel) as Panel
-	track.custom_minimum_size = Vector2(48, 7)
+	track.custom_minimum_size = Vector2(44, 6)
 	track.add_theme_stylebox_override("panel", _box(Color(0.043, 0.035, 0.027, 0.85), Color(0, 0, 0, 0.55)))
 	var fill := _need(track, "Fill", ColorRect) as ColorRect
 	fill.color = color
 	fill.position = Vector2(1, 1)
-	fill.size = Vector2(46, 5)
+	fill.size = Vector2(42, 4)
 	return fill
 
 
-func _build_rooms() -> void:
-	var scroll := _need(_root, "Scroll", ScrollContainer) as ScrollContainer
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_top = 56
-	scroll.offset_left = 6
-	scroll.offset_right = -6
-	scroll.offset_bottom = -6
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	# Прокрутка перетаскиванием списка, а не только ползунком (решение
-	# владельца). _need переиспользует узел, поэтому вешаем один раз.
-	if scroll.get_node_or_null("DragScroll") == null:
-		DragScroll.attach(scroll)
+## Комната как пространство: плашка/фон, герой, слой хотспотов, кнопки хода.
+func _build_stage() -> void:
+	_stage = _need(_root, "Stage", Control) as Control
+	_stage.anchor_right = 1.0
+	_stage.anchor_bottom = 1.0
+	_stage.offset_top = HEADER_HEIGHT
+	_stage.clip_contents = true
+	# Тап по самому фону ничего не делает — ходьба только с кнопок ◀/▶ и
+	# клавиатуры (решение по аналогии с шахтой: там тоже не тапом ходят).
+	_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	_rooms_box = _need(scroll, "Rooms", VBoxContainer) as VBoxContainer
-	_rooms_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_rooms_box.add_theme_constant_override("separation", 5)
+	_bg_fallback = _need(_stage, "BgFallback", ColorRect) as ColorRect
+	_bg_fallback.color = Color8(0x2A, 0x22, 0x18)
+	_bg_fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var last_floor := ""
-	for room in ROOMS:
-		if String(room["floor"]) != last_floor:
-			last_floor = String(room["floor"])
-			var floor_label := _need(_rooms_box, "Floor_" + String(room["id"]), Label) as Label
-			floor_label.text = last_floor.to_upper()
-			floor_label.add_theme_font_size_override("font_size", 8)
-			floor_label.add_theme_color_override("font_color", FLOOR_LABEL)
-		_build_card(room)
+	_bg = _need(_stage, "Bg", TextureRect) as TextureRect
+	_bg.stretch_mode = TextureRect.STRETCH_SCALE
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	_hero = _need(_stage, "Hero", TextureRect) as TextureRect
+	_hero.stretch_mode = TextureRect.STRETCH_KEEP
+	_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hero.size = Vector2(HERO_W, HERO_H)
+
+	_hotspot_layer = _need(_stage, "Hotspots", Control) as Control
+	_hotspot_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hotspot_layer.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	_build_walk_buttons()
+	_build_sleep_overlay()
 
 
-func _build_card(room: Dictionary) -> void:
-	var id := String(room["id"])
-	var card := _need(_rooms_box, id.capitalize().replace(" ", ""), PanelContainer) as PanelContainer
-	card.add_theme_stylebox_override("panel", _box(PANEL_BG, PANEL_BORDER))
-	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	_cards[id] = card
+func _build_walk_buttons() -> void:
+	_walk_left_btn = _need(_stage, "WalkLeft", Button) as Button
+	_walk_left_btn.text = "◀"
+	_style_button(_walk_left_btn)
+	_walk_left_btn.anchor_top = 1.0
+	_walk_left_btn.anchor_bottom = 1.0
+	_walk_left_btn.offset_left = 6
+	_walk_left_btn.offset_right = 44
+	_walk_left_btn.offset_top = -40
+	_walk_left_btn.offset_bottom = -6
 
-	var box := _need(card, "Box", VBoxContainer) as VBoxContainer
-	box.add_theme_constant_override("separation", 2)
+	_walk_right_btn = _need(_stage, "WalkRight", Button) as Button
+	_walk_right_btn.text = "▶"
+	_style_button(_walk_right_btn)
+	_walk_right_btn.anchor_left = 1.0
+	_walk_right_btn.anchor_right = 1.0
+	_walk_right_btn.anchor_top = 1.0
+	_walk_right_btn.anchor_bottom = 1.0
+	_walk_right_btn.offset_left = -44
+	_walk_right_btn.offset_right = -6
+	_walk_right_btn.offset_top = -40
+	_walk_right_btn.offset_bottom = -6
 
-	var head := _need(box, "Head", HBoxContainer) as HBoxContainer
-	head.add_theme_constant_override("separation", 5)
 
-	var icon := _need(head, "Icon", TextureRect) as TextureRect
-	icon.custom_minimum_size = Vector2(22, 22)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	if ResourceLoader.exists(String(room["icon"])):
-		icon.texture = load(String(room["icon"]))
+func _build_sleep_overlay() -> void:
+	_sleep_overlay = _need(_stage, "SleepOverlay", Control) as Control
+	_sleep_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sleep_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_sleep_overlay.visible = false
 
-	var title := _need(head, "Title", Label) as Label
-	title.text = String(room["title"])
-	title.add_theme_font_size_override("font_size", 11)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var shade := _need(_sleep_overlay, "Shade", ColorRect) as ColorRect
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.03, 0.02, 0.02, 0.82)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Герой стоит в той комнате, где он сейчас: без него дом читается как
-	# меню, а не как место.
-	var hero := _need(head, "Hero", TextureRect) as TextureRect
-	hero.custom_minimum_size = Vector2(24, 24)
-	hero.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	hero.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	hero.visible = false
+	_sleep_sprite = _need(_sleep_overlay, "Sprite", TextureRect) as TextureRect
+	_sleep_sprite.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	_sleep_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sleep_sprite.anchor_left = 0.5
+	_sleep_sprite.anchor_right = 0.5
+	_sleep_sprite.anchor_top = 0.5
+	_sleep_sprite.anchor_bottom = 0.5
+	_sleep_sprite.offset_left = -48
+	_sleep_sprite.offset_right = 48
+	_sleep_sprite.offset_top = -70
+	_sleep_sprite.offset_bottom = 26
 
-	var desc := _need(box, "Desc", Label) as Label
-	desc.text = String(room["desc"])
-	desc.custom_minimum_size = Vector2(80, 0)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	desc.add_theme_font_size_override("font_size", 8)
-	desc.add_theme_color_override("font_color", DIM)
-
-	# Место под содержимое комнаты для соседних систем (мастерская, музей,
-	# торфоперегонка). Пустой контейнер — это и есть «явное место»: чужой
-	# узел кладётся сюда, и дом его не трогает.
-	var slot := _need(box, "Slot", VBoxContainer) as VBoxContainer
-	slot.add_theme_constant_override("separation", 2)
-
-	# Ряд действий переносится на вторую строку: три кнопки в строку шире
-	# экрана (224 точки), а ScrollContainer по горизонтали намеренно не
-	# крутится — карточку комнаты игрок должен видеть целиком.
-	var actions := _need(box, "Actions", HFlowContainer) as HFlowContainer
-	actions.add_theme_constant_override("h_separation", 4)
-	actions.add_theme_constant_override("v_separation", 3)
-
-	var note := _need(box, "Note", Label) as Label
-	note.custom_minimum_size = Vector2(80, 0)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	note.add_theme_font_size_override("font_size", 8)
-	note.add_theme_color_override("font_color", FLOOR_LABEL)
-	note.visible = false
+	_sleep_label = _need(_sleep_overlay, "Label", Label) as Label
+	_sleep_label.text = "Спит..."
+	_sleep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sleep_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sleep_label.anchor_left = 0.0
+	_sleep_label.anchor_right = 1.0
+	_sleep_label.anchor_top = 1.0
+	_sleep_label.anchor_bottom = 1.0
+	_sleep_label.offset_top = -40
+	_sleep_label.offset_bottom = -10
+	_sleep_label.add_theme_color_override("font_color", ACCENT)
 
 
 func _build_forced() -> void:
 	# Экран принудительного действия обучения (ГДД п.9): первое истощение
-	# ведёт героя в спальню и не отпускает, пока он не ляжет.
+	# ведёт героя в спальню и не отпускает, пока он не ляжет. Поведение и имя
+	# методов не менялись — house_system.gd зовёт их как раньше.
 	_forced = _need(_root, "Forced", Control) as Control
 	_forced.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_forced.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -309,94 +344,413 @@ func _build_forced() -> void:
 	_forced_button = _need(box, "Button", Button) as Button
 	_style_button(_forced_button)
 	_forced_button.text = "Лечь спать"
+	if not _forced_button.pressed.is_connected(_on_forced_pressed):
+		_forced_button.pressed.connect(_on_forced_pressed)
+
+
+func _on_forced_pressed() -> void:
+	action_requested.emit("forced_confirm", _forced_mode)
+
+
+func _load_hero_sheets() -> void:
+	_idle_sheet = load(IDLE_SHEET) if ResourceLoader.exists(IDLE_SHEET) else null
+	_walk_sheet = load(WALK_SHEET) if ResourceLoader.exists(WALK_SHEET) else null
+	if ResourceLoader.exists(SLEEP_SHEET):
+		_sleep_sheet_tex = load(SLEEP_SHEET)
+		_sleep_meta = HouseRoomsConfig.read_json(SLEEP_SHEET_META)
+	elif ResourceLoader.exists(SLEEP_STATIC_POSE):
+		_sleep_static_tex = load(SLEEP_STATIC_POSE)
 
 
 # ---------------------------------------------------------------------------
-# Действия
+# Открытие/закрытие/переходы между комнатами
 # ---------------------------------------------------------------------------
 
-func _wire_actions() -> void:
-	_hero_tex = load("res://art/character/idle.png") if ResourceLoader.exists("res://art/character/idle.png") else null
-
-	for room in ROOMS:
-		var id := String(room["id"])
-		var card: PanelContainer = _cards[id]
-		# Тап по самой карточке переводит героя в эту комнату: комната без
-		# действий (пустой музей) всё равно должна быть местом, куда можно
-		# войти — этого требует задание и это нужно соседним системам.
-		card.gui_input.connect(func(event: InputEvent): _on_card_input(event, id))
-
-	_add_button("bedroom", "Спать", "sleep")
-	_add_button("hall", "Заказать", "toggle_menu")
-	_add_button("hall", "Забрать", "take_delivery")
-	_add_button("hall", "На улицу", "exit_door")
-	_add_button("basement", "В шахту", "exit_tunnel")
-	_add_button("workshop", "Склад", "storage")
-	for room_id in EXTERNAL_PANELS.keys():
-		_add_button(String(room_id), "Открыть", "open_panel:" + String(room_id))
-
-	if _forced_button != null:
-		_forced_button.pressed.connect(func(): action_requested.emit("forced_confirm", _forced_mode))
-
-
-func _on_card_input(event: InputEvent, room_id: String) -> void:
-	var pressed := (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) \
-		or (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed)
-	if pressed:
-		action_requested.emit("goto", room_id)
-
-
-func _add_button(room_id: String, text: String, action: String) -> Button:
-	var actions := _cards[room_id].get_node("Box/Actions") as HFlowContainer
-	var name := action.replace(":", "_").capitalize().replace(" ", "") + "Btn"
-	var b := _need(actions, name, Button) as Button
-	b.text = text
-	_style_button(b)
-	b.pressed.connect(func(): _emit_action(action))
-	return b
-
-
-func _emit_action(action: String) -> void:
-	var parts := action.split(":", true, 1)
-	if action == "toggle_menu":
-		_menu_open = not _menu_open
-		_hall_signature = ""
-		refresh()
-		return
-	if parts.size() == 2:
-		action_requested.emit(parts[0], parts[1])
-	else:
-		action_requested.emit(action, "")
-
-
-# ---------------------------------------------------------------------------
-# Открытие/закрытие и обновление
-# ---------------------------------------------------------------------------
-
-func open(room: String) -> void:
-	_menu_open = false
-	_hall_signature = ""
+## enter_x — доля 0..1, где герой появится в комнате (обычно дверь, из
+## которой он вышел в предыдущей); -1 (по умолчанию) — spawn_x комнаты.
+func open(room: String, enter_x: float = -1.0) -> void:
 	visible = true
-	go_to_room(room)
+	_sleeping = false
+	if _sleep_overlay != null:
+		_sleep_overlay.visible = false
+	go_to_room(room, enter_x)
 
 
 func close() -> void:
 	visible = false
-	_menu_open = false
+	_sleeping = false
+	if _sleep_overlay != null:
+		_sleep_overlay.visible = false
 
 
-func go_to_room(room: String) -> void:
-	for id in _cards.keys():
-		var hero := _cards[id].get_node("Box/Head/Hero") as TextureRect
-		hero.visible = (id == room)
-		if hero.visible and _hero_tex != null:
-			# idle.png — горизонтальная лента кадров 48×48; берём первый кадр.
-			var atlas := AtlasTexture.new()
-			atlas.atlas = _hero_tex
-			atlas.region = Rect2(0, 0, 48, 48)
-			hero.texture = atlas
+func go_to_room(id: String, enter_x: float = -1.0) -> void:
+	var changed := id != _room_id
+	_room_id = id
+	_room_def = HouseRoomsConfig.room(id)
+	if changed:
+		_load_background()
+	var frac: float = enter_x if enter_x >= 0.0 else float(_room_def.get("spawn_x", 0.5))
+	_hero_x_px = clampf(frac, 0.0, 1.0) * _room_width_px
+	_hold_left = false
+	_hold_right = false
+	_walk_dir = 0
+	_hotspot_signature = ""  # гарантированно пересобрать кнопки на новом месте
 	refresh()
 
+
+## Фон комнаты. Настоящей картинки может не быть (художник ещё не положил
+## art/env/room_<id>.png) — тогда рисуем плашку тех же пропорций: хотспоты и
+## переходы работают одинаково что с картинкой, что без.
+func _load_background() -> void:
+	var path := HouseRoomsConfig.bg_path(_room_id)
+	var size := HouseRoomsConfig.declared_size(_room_id)
+	if ResourceLoader.exists(path):
+		var tex := load(path) as Texture2D
+		_bg.texture = tex
+		size = tex.get_size()
+		_bg.visible = true
+		_bg_fallback.visible = false
+	else:
+		_bg.texture = null
+		_bg.visible = false
+		_bg_fallback.visible = true
+	var h: float = maxf(1.0, size.y)
+	var scale_to_stage: float = STAGE_HEIGHT / h
+	_room_width_px = maxf(float(VIEW_W), size.x * scale_to_stage)
+	_bg.size = Vector2(_room_width_px, STAGE_HEIGHT)
+	_bg_fallback.size = Vector2(_room_width_px, STAGE_HEIGHT)
+	_floor_y_px = HouseRoomsConfig.floor_y(_room_id) * STAGE_HEIGHT
+
+
+# ---------------------------------------------------------------------------
+# Кадр: ходьба, камера, хотспоты, заголовок
+# ---------------------------------------------------------------------------
+
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	if _sleeping:
+		_sleep_t += delta
+		_update_sleep_frame()
+
+	if _is_locked():
+		_walk_dir = 0
+		_hold_left = false
+		_hold_right = false
+	else:
+		_hold_left = _walk_left_btn != null and _walk_left_btn.is_pressed()
+		_hold_right = _walk_right_btn != null and _walk_right_btn.is_pressed()
+		_update_walk(delta)
+
+	refresh()
+
+
+func _is_locked() -> bool:
+	return _locked or _sleeping or _forced_mode != ""
+
+
+func _update_walk(delta: float) -> void:
+	var dir := 0
+	if Input.is_key_pressed(KEY_LEFT_A) or Input.is_key_pressed(KEY_LEFT_ARROW) or _hold_left:
+		dir -= 1
+	if Input.is_key_pressed(KEY_RIGHT_D) or Input.is_key_pressed(KEY_RIGHT_ARROW) or _hold_right:
+		dir += 1
+	_walk_dir = dir
+	if dir != 0:
+		_facing = dir
+		_hero_x_px = clampf(_hero_x_px + float(dir) * WALK_SPEED_PX_S * delta, 0.0, _room_width_px)
+		_walk_frame_t += delta
+	else:
+		_walk_frame_t = 0.0
+
+
+## Перерисовывает камеру/героя/хотспоты/шапку по текущему состоянию. Вызывается
+## и из _process (пока комната открыта), и напрямую — при go_to_room() и из
+## тестов, которым нужен результат без ожидания кадра движка.
+func refresh() -> void:
+	if not visible:
+		return
+	_refresh_header()
+	_update_camera_and_hero()
+	if _is_locked():
+		_clear_hotspots()
+		_hotspot_signature = "@locked"
+	else:
+		_update_hotspots()
+
+
+func _refresh_header() -> void:
+	_set_bar("hp", GameState.hp / maxf(1.0, GameState.get_max_hp()))
+	_set_bar("hunger", GameState.hunger / 100.0)
+	_set_bar("stamina", GameState.stamina / 100.0)
+
+	var total: float = GameState.game_clock_hours
+	var day := int(total / 24.0) + 1
+	var hour := int(total) % 24
+	var minute := int((total - floor(total)) * 60.0)
+	_clock.text = "День %d, %02d:%02d" % [day, hour, minute]
+
+	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
+		_notice.text = ""
+
+
+func _set_bar(id: String, fraction: float) -> void:
+	var fill: ColorRect = _bars.get(id)
+	if fill != null:
+		fill.size = Vector2(42.0 * clampf(fraction, 0.0, 1.0), 4)
+
+
+func _update_camera_and_hero() -> void:
+	var cam_x: float = clampf(_hero_x_px - VIEW_W / 2.0, 0.0, maxf(0.0, _room_width_px - VIEW_W))
+	_bg.position.x = -cam_x
+	_bg_fallback.position.x = -cam_x
+
+	_update_hero_frame()
+	var screen_x: float = _hero_x_px - cam_x
+	_hero.position = Vector2(screen_x - HERO_W / 2.0, _floor_y_px - HERO_H + FOOT_PAD)
+	_hero.flip_h = _facing < 0
+
+
+func _update_hero_frame() -> void:
+	var moving := _walk_dir != 0 and not _is_locked()
+	var sheet: Texture2D = _walk_sheet if (moving and _walk_sheet != null) else _idle_sheet
+	if sheet == null:
+		_hero.texture = null
+		return
+	var frame_w := int(HERO_W)
+	var frame_count: int = maxi(1, int(sheet.get_width()) / frame_w)
+	var idx := 0
+	if moving:
+		idx = int(_walk_frame_t * WALK_FPS) % frame_count
+	if sheet == _cur_frame_sheet and idx == _cur_frame_idx:
+		return
+	_cur_frame_sheet = sheet
+	_cur_frame_idx = idx
+	var atlas := AtlasTexture.new()
+	atlas.atlas = sheet
+	atlas.region = Rect2(idx * frame_w, 0, frame_w, int(HERO_H))
+	_hero.texture = atlas
+
+
+# ---------------------------------------------------------------------------
+# Хотспоты — общий механизм (ГДД: «кнопка загорается над героем»)
+# ---------------------------------------------------------------------------
+
+## Точки текущей комнаты, в радиусе которых сейчас стоит герой, со всеми их
+## кнопками разом (несколько точек в радиусе — несколько кнопок, как просил
+## владелец про сундук и верстак).
+func _collect_active_buttons() -> Array:
+	var active: Array = []
+	var points: Dictionary = _room_def.get("points", {})
+	for key in points.keys():
+		var p: Dictionary = points[key]
+		var px: float = float(p.get("x", 0.5)) * _room_width_px
+		var radius: float = float(p.get("radius", 0.08)) * _room_width_px
+		if absf(_hero_x_px - px) > radius:
+			continue
+		for b in (p.get("buttons", []) as Array):
+			if _condition_met(String(b.get("condition", ""))):
+				active.append(b)
+	return active
+
+
+func _condition_met(id: String) -> bool:
+	match id:
+		"":
+			return true
+		"food_at_door":
+			return HouseFood.food_at_door_count() > 0
+		"tunnel_built":
+			return GameState.house_hatch_built
+		"pickaxe_available":
+			# GameState.owns_tool() тут не годится: ржавая кирка — бесплатная
+			# сюжетная ступень (is_tool_free), и owns_tool() на неё всегда
+			# отвечает true, ещё до того, как её вообще взяли. Просмотр сцены
+			# "workshop" — тот самый момент, когда кирка попадает в руки (см.
+			# house_system.take_starting_pickaxe), и после него хотспот больше
+			# не нужен.
+			return not StoryState.is_seen("workshop")
+		_:
+			return true
+
+
+func _update_hotspots() -> void:
+	var active := _collect_active_buttons()
+	var sig := _signature_for(active)
+	if sig != _hotspot_signature:
+		_hotspot_signature = sig
+		_clear_hotspots()
+		for def in active:
+			_hotspot_buttons.append(_make_hotspot_button(def))
+	_position_hotspot_buttons()
+
+
+func _signature_for(active: Array) -> String:
+	var parts: Array = []
+	for def in active:
+		parts.append(String(def.get("action", "")))
+	return "|".join(parts)
+
+
+func _clear_hotspots() -> void:
+	for b in _hotspot_buttons:
+		if is_instance_valid(b):
+			b.queue_free()
+	_hotspot_buttons.clear()
+
+
+func _make_hotspot_button(def: Dictionary) -> Button:
+	var btn := Button.new()
+	btn.text = String(def.get("label", ""))
+	_style_button(btn)
+	btn.custom_minimum_size = Vector2(0, 22)
+	btn.set_meta("action", String(def.get("action", "")))
+	btn.set_meta("label", String(def.get("label", "")))
+	btn.pressed.connect(func(): _fire(def))
+	_hotspot_layer.add_child(btn)
+	return btn
+
+
+## Кнопки всегда всплывают НАД ГЕРОЕМ (решение владельца), не над самой
+## точкой на фоне: несколько кнопок ложатся в ряд вокруг его макушки.
+func _position_hotspot_buttons() -> void:
+	var n := _hotspot_buttons.size()
+	if n == 0:
+		return
+	var hero_center_x: float = _hero.position.x + HERO_W / 2.0
+	var top_y: float = _hero.position.y - 28.0
+	var gap := 4.0
+	var widths: Array = []
+	var total := 0.0
+	for b in _hotspot_buttons:
+		var w: float = maxf(56.0, b.get_minimum_size().x + 16.0)
+		widths.append(w)
+		total += w
+	total += gap * float(maxi(0, n - 1))
+	var hi: float = maxf(4.0, VIEW_W - total - 4.0)
+	var start_x: float = clampf(hero_center_x - total / 2.0, 4.0, hi)
+	var x := start_x
+	for i in range(n):
+		var b: Button = _hotspot_buttons[i]
+		var w: float = widths[i]
+		b.position = Vector2(x, top_y)
+		b.size = Vector2(w, 22)
+		x += w + gap
+
+
+## Нажатие кнопки хотспота. "goto:<room>" дом решает сам (это чисто вид —
+## переезд героя между комнатами), остальные действия уходят наружу сигналом.
+func _fire(def: Dictionary) -> void:
+	var action := String(def.get("action", ""))
+	var parts := action.split(":", true, 1)
+	if parts.size() == 2 and parts[0] == "goto":
+		var enter_x: float = float(def.get("enter_x", -1.0))
+		go_to_room(parts[1], enter_x)
+		action_requested.emit("goto", parts[1])
+		return
+	action_requested.emit(action, "")
+
+
+# ---------------------------------------------------------------------------
+# Публичные хуки для тестов (tests/test_house.gd) и отладки
+# ---------------------------------------------------------------------------
+
+func room_id() -> String:
+	return _room_id
+
+
+func hero_x_fraction() -> float:
+	return _hero_x_px / maxf(1.0, _room_width_px)
+
+
+func room_width_px() -> float:
+	return _room_width_px
+
+
+## Ставит героя в долю ширины комнаты напрямую — тестам незачем ждать
+## реального движения, чтобы проверить появление/исчезновение хотспотов.
+func set_hero_x_fraction(f: float) -> void:
+	_hero_x_px = clampf(f, 0.0, 1.0) * _room_width_px
+	refresh()
+
+
+func active_hotspots() -> Array:
+	var out: Array = []
+	for b in _hotspot_buttons:
+		out.append({"action": String(b.get_meta("action", "")), "label": String(b.get_meta("label", ""))})
+	return out
+
+
+## Нажимает кнопку точки напрямую (мимо расстояния до героя) — тот же
+## _fire(), которым отвечает настоящий тап, так что тест проверяет ровно то,
+## что происходит по нажатию, а не имитацию.
+func trigger_point_button(point_id: String, index: int = 0) -> void:
+	var pts: Dictionary = _room_def.get("points", {})
+	if not pts.has(point_id):
+		return
+	var buttons: Array = pts[point_id].get("buttons", [])
+	if index < 0 or index >= buttons.size():
+		return
+	_fire(buttons[index])
+
+
+func is_sleeping() -> bool:
+	return _sleeping
+
+
+## Внешняя блокировка ходьбы/хотспотов (форс-режим обучения и т.п.) — своя,
+## отдельная от _forced_mode, потому что тому её незачем знать про сон.
+func set_locked(value: bool) -> void:
+	_locked = value
+
+
+# ---------------------------------------------------------------------------
+# Сон по кнопке «Спать» — короткая анимация вместо мгновенного эффекта
+# ---------------------------------------------------------------------------
+
+## house_system.gd отсчитывает реальные ~10 секунд отдельным таймером и в
+## это время держит комнату «на паузе» (see set_locked); здесь только
+## визуальная часть — оверлей и проигрывание кадров.
+func play_sleep_animation(seconds: float) -> void:
+	_sleeping = true
+	_sleep_t = 0.0
+	_sleep_total = maxf(0.1, seconds)
+	if _sleep_overlay != null:
+		_sleep_overlay.visible = true
+	_hotspot_signature = "@sleeping"
+	_clear_hotspots()
+	_update_sleep_frame()
+
+
+func stop_sleep_animation() -> void:
+	_sleeping = false
+	if _sleep_overlay != null:
+		_sleep_overlay.visible = false
+
+
+func _update_sleep_frame() -> void:
+	if _sleep_sprite == null:
+		return
+	if _sleep_sheet_tex != null:
+		var fw: int = int(_sleep_meta.get("frame_width", 48))
+		var fh: int = int(_sleep_meta.get("frame_height", 48))
+		var frames: int = maxi(1, int(_sleep_meta.get("frames", 1)))
+		var fps: float = maxf(0.1, float(_sleep_meta.get("fps", 4.0)))
+		var idx: int = int(_sleep_t * fps) % frames
+		var atlas := AtlasTexture.new()
+		atlas.atlas = _sleep_sheet_tex
+		atlas.region = Rect2(idx * fw, 0, fw, fh)
+		_sleep_sprite.texture = atlas
+	elif _sleep_static_tex != null:
+		_sleep_sprite.texture = _sleep_static_tex
+	else:
+		_sleep_sprite.texture = null
+
+
+# ---------------------------------------------------------------------------
+# Форс-режим обучения и сообщения (имена/сигнатуры не менялись — их зовёт
+# house_system.gd)
+# ---------------------------------------------------------------------------
 
 ## Сообщение в шапке дома (замена тостов HUD, который на время дома скрыт).
 func notify(text: String, seconds: float = 3.0) -> void:
@@ -414,225 +768,12 @@ func forced_mode() -> String:
 ## экран поверх интерьера, который отпускает только после сна.
 func set_forced(mode: String, text: String = "", button_text: String = "") -> void:
 	_forced_mode = mode
-	_forced.visible = mode != ""
+	if _forced != null:
+		_forced.visible = mode != ""
 	if mode != "":
 		_forced_text.text = text
 		_forced_button.text = button_text
-
-
-## Перерисовывает подписи и доступность кнопок по текущему состоянию.
-## Вызывается системой дома каждый кадр, пока интерьер открыт: полоски
-## поднимаются и доставка приезжает в реальном времени.
-func refresh() -> void:
-	if not visible:
-		return
-	_refresh_bars()
-	_refresh_clock()
-	_refresh_bedroom()
-	_refresh_hall()
-	_refresh_basement()
-	_refresh_external_rooms()
-	_refresh_storage()
-	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
-		_notice.text = ""
-
-
-func _refresh_bars() -> void:
-	_set_bar("hp", GameState.hp / maxf(1.0, GameState.get_max_hp()))
-	_set_bar("hunger", GameState.hunger / 100.0)
-	_set_bar("stamina", GameState.stamina / 100.0)
-
-
-func _set_bar(id: String, fraction: float) -> void:
-	var fill: ColorRect = _bars.get(id)
-	if fill != null:
-		fill.size = Vector2(46.0 * clampf(fraction, 0.0, 1.0), 5)
-
-
-func _refresh_clock() -> void:
-	var total: float = GameState.game_clock_hours
-	var day := int(total / 24.0) + 1
-	var hour := int(total) % 24
-	var minute := int((total - floor(total)) * 60.0)
-	_clock.text = "День %d, %02d:%02d" % [day, hour, minute]
-
-
-func _refresh_bedroom() -> void:
-	var plan := HouseSleep.plan(GameState.stamina, GameState.hunger)
-	var button := _button("bedroom", "sleep")
-	button.disabled = not bool(plan["ok"])
-	button.text = "Спать %d ч" % int(round(float(plan["hours"])))
-	var note := _note("bedroom")
-	if bool(plan["ok"]):
-		note.text = "+%d%% бодрости, −%d%% сытости" % [
-			int(round(float(plan["stamina_gain"]))), int(round(float(plan["hunger_cost"])))]
-	else:
-		note.text = String(plan["reason"])
-	note.visible = true
-
-
-func _refresh_hall() -> void:
-	var at_door := HouseFood.food_at_door_count()
-	var take := _button("hall", "take_delivery")
-	take.disabled = at_door <= 0
-	take.text = "Забрать (%d)" % at_door if at_door > 0 else "Забрать"
-
-	var menu_button := _button("hall", "toggle_menu")
-	menu_button.text = "Закрыть" if _menu_open else "Заказать"
-
-	var signature := "%s|%d|%d|%d|%s" % [_menu_open, at_door, HouseFood.free_orders_left(),
-		GameState.coins, str(HouseFood.food_in_inventory())]
-	if signature == _hall_signature:
-		return
-	_hall_signature = signature
-
-	var slot := _cards["hall"].get_node("Box/Slot") as VBoxContainer
-	for child in slot.get_children():
-		slot.remove_child(child)
-		child.queue_free()
-
-	if _menu_open:
-		var left := HouseFood.free_orders_left()
-		var head := _slot_label(slot, "Доставка к двери за %d сек. Бесплатных заказов сегодня: %d."
-			% [int(HouseConfig.delivery_seconds()), left])
-		head.add_theme_color_override("font_color", ACCENT)
-		for item in HouseConfig.delivery_menu():
-			var id := String(item["id"])
-			var check := HouseFood.can_order(id)
-			var row := HBoxContainer.new()
-			slot.add_child(row)
-			var label := Label.new()
-			label.text = "%s +%d%%" % [HouseConfig.food_name(id), int(HouseConfig.food_hunger_percent(id))]
-			label.add_theme_font_size_override("font_size", 9)
-			label.clip_text = true
-			label.custom_minimum_size = Vector2(70, 0)
-			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(label)
-			var order := Button.new()
-			_style_button(order)
-			order.text = "бесплатно" if bool(check["free"]) else "%d монет" % HouseConfig.food_price_coins(id)
-			order.disabled = not bool(check["ok"])
-			order.pressed.connect(func(): action_requested.emit("order", id))
-			row.add_child(order)
-
-	# Еда, которую уже носит герой: съесть можно прямо здесь, не открывая
-	# инвентарь — в доме это самое частое действие после сна.
-	for entry in HouseFood.food_in_inventory():
-		var row2 := HBoxContainer.new()
-		slot.add_child(row2)
-		var label2 := Label.new()
-		label2.text = "В рюкзаке: %s ×%d" % [entry["name"], entry["count"]]
-		label2.add_theme_font_size_override("font_size", 9)
-		label2.clip_text = true
-		label2.custom_minimum_size = Vector2(70, 0)
-		label2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row2.add_child(label2)
-		var eat := Button.new()
-		_style_button(eat)
-		eat.text = "Съесть"
-		var food_id: String = entry["id"]
-		eat.pressed.connect(func(): action_requested.emit("eat", food_id))
-		row2.add_child(eat)
-
-
-func _slot_label(slot: VBoxContainer, text: String) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.add_theme_font_size_override("font_size", 8)
-	slot.add_child(l)
-	return l
-
-
-func _refresh_basement() -> void:
-	var button := _button("basement", "exit_tunnel")
-	# Флаг остался с прежним именем (house_hatch_built), но значит он теперь
-	# одно: Роберт пробил тоннель. Переименование поля — за scripts/core.
-	button.disabled = not GameState.house_hatch_built
-	var note := _note("basement")
-	note.visible = true
-	if GameState.house_hatch_built:
-		var mouth := HouseConfig.tunnel_mouth_cell()
-		note.text = "Ход выводит в устье тоннеля — клетка (%d, %d). Вниз только по колодцу: стенки бетонные." % [mouth.x, mouth.y]
-	else:
-		note.text = "Тоннеля ещё нет: его пробьёт Роберт, которого пришлёт бабка (ГДД п.9)."
-
-
-## Строка склада в мастерской: сколько там лежит и сколько это весит. Вес
-## важнее числа позиций — по нему видно, сколько ходок в эту кучу вложено.
-func _refresh_storage() -> void:
-	var note := _note("workshop")
-	note.visible = true
-	var items := HouseStorage.total_items()
-	if items <= 0:
-		note.text = "Склад пуст. Материалы на кирку копятся здесь: 160 кг за один рюкзак не принести."
-	else:
-		note.text = "На складе: %d шт, %.0f кг. Верстак берёт материалы отсюда." % [
-			items, HouseStorage.total_weight()]
-
-
-func _refresh_external_rooms() -> void:
-	for room_id in EXTERNAL_PANELS.keys():
-		var id := String(room_id)
-		var button := _button(id, "open_panel:" + id)
-		var available := has_external_panel(id)
-		button.visible = available
-		if id == "workshop":
-			continue  # у мастерской своя подпись — про склад, см. _refresh_storage
-		var note := _note(id)
-		note.visible = not available
-		note.text = "Комната есть, содержимого пока нет — место под систему, которая её наполнит."
-
-
-## Есть ли кому открыть эту комнату: либо чужой узел в группе (контракт
-## EXTERNAL_PANELS), либо статическая точка входа соседней системы.
-func has_external_panel(room_id: String) -> bool:
-	var group := String(EXTERNAL_PANELS.get(room_id, ""))
-	if not group.is_empty():
-		var node := get_tree().get_first_node_in_group(group)
-		if node != null and node.has_method("open"):
-			return true
-	return _external_static_script(room_id) != null
-
-
-func _external_static_script(room_id: String):
-	var entry: Dictionary = EXTERNAL_STATIC.get(room_id, {})
-	if entry.is_empty():
-		return null
-	var path := String(entry["path"])
-	if not ResourceLoader.exists(path):
-		return null
-	return load(path)
-
-
-## Открывает комнату, которую наполняет соседняя система. Возвращает false,
-## если открывать пока нечего — тогда дом сам скажет, что комната пустая.
-func open_external_panel(room_id: String) -> bool:
-	var group := String(EXTERNAL_PANELS.get(room_id, ""))
-	if not group.is_empty():
-		var node := get_tree().get_first_node_in_group(group)
-		if node != null and node.has_method("open"):
-			node.call("open")
-			return true
-	var script = _external_static_script(room_id)
-	if script == null:
-		return false
-	var entry: Dictionary = EXTERNAL_STATIC[room_id]
-	var method := String(entry["method"])
-	if entry["arg"] == null:
-		script.call(method)
-	else:
-		script.call(method, entry["arg"])
-	return true
-
-
-func _button(room_id: String, action: String) -> Button:
-	var name := action.replace(":", "_").capitalize().replace(" ", "") + "Btn"
-	return _cards[room_id].get_node("Box/Actions/" + name) as Button
-
-
-func _note(room_id: String) -> Label:
-	return _cards[room_id].get_node("Box/Note") as Label
+	refresh()
 
 
 # ---------------------------------------------------------------------------
@@ -641,12 +782,12 @@ func _note(room_id: String) -> Label:
 
 ## Находит дочерний узел по имени или создаёт его. Благодаря этому один и тот
 ## же код и строит сцену с нуля, и подхватывает готовую из .tscn.
-func _need(parent: Node, name: String, type) -> Node:
-	var existing := parent.get_node_or_null(NodePath(name))
+func _need(parent: Node, node_name: String, type) -> Node:
+	var existing := parent.get_node_or_null(NodePath(node_name))
 	if existing != null:
 		return existing
 	var node = type.new()
-	node.name = name
+	node.name = node_name
 	parent.add_child(node)
 	return node
 
@@ -668,7 +809,7 @@ func _style_button(b: Button) -> void:
 	b.custom_minimum_size = Vector2(0, 22)
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0)
+		sb.bg_color = Color(0.06, 0.05, 0.04, 0.82)
 		sb.border_color = PANEL_BORDER if state != "pressed" else ACCENT
 		sb.set_border_width_all(1)
 		sb.content_margin_top = 2
@@ -679,4 +820,4 @@ func _style_button(b: Button) -> void:
 	b.add_theme_color_override("font_color", DIM)
 	b.add_theme_color_override("font_hover_color", ACCENT)
 	b.add_theme_color_override("font_pressed_color", ACCENT)
-	b.add_theme_color_override("font_disabled_color", FLOOR_LABEL)
+	b.add_theme_color_override("font_disabled_color", PANEL_BORDER)

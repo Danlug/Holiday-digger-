@@ -90,7 +90,13 @@ func _ready() -> void:
 	add_child(story)
 	# --- конец блока сюжета ---
 
-	hud.toast("Бабка улетела в Таиланд. Огород твой — копай.", 3.6)
+	# Скважина работала, пока игрока не было (решение владельца): показываем
+	# отчёт сразу при заходе, до всякого приветствия.
+	var well_report := IdleWell.collect()
+	if not well_report.is_empty():
+		hud.show_well_report(well_report)
+	else:
+		hud.toast("Бабка улетела в Таиланд. Огород твой — копай.", 3.6)
 
 
 func _view_w() -> int:

@@ -194,6 +194,10 @@ func _build_rooms() -> void:
 	scroll.offset_right = -6
 	scroll.offset_bottom = -6
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Прокрутка перетаскиванием списка, а не только ползунком (решение
+	# владельца). _need переиспользует узел, поэтому вешаем один раз.
+	if scroll.get_node_or_null("DragScroll") == null:
+		DragScroll.attach(scroll)
 
 	_rooms_box = _need(scroll, "Rooms", VBoxContainer) as VBoxContainer
 	_rooms_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL

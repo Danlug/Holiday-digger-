@@ -32,6 +32,8 @@ func _build() -> void:
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
+	# Прокрутка перетаскиванием списка, а не только ползунком (решение владельца).
+	DragScroll.attach(scroll)
 
 	var column := VBoxContainer.new()
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL

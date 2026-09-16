@@ -27,6 +27,7 @@ func _ready() -> void:
 
 	_test_gravity_and_landing()
 	_test_resolve_dir_zones()
+	_test_six_direction_snap()
 	_test_keyboard_intent()
 	_test_dig_earth_gives_xp_not_coins()
 	_test_shovel_cannot_dig_stone()
@@ -105,6 +106,42 @@ func _test_resolve_dir_zones() -> void:
 ## Магнетизм придуман против неточного пальца на стекле, клавиша дискретна —
 ## и правила у неё те же, что палец получает ПОСЛЕ магнетизма: вниз строго под
 ## собой без шага, вверх можно вместе с шагом.
+## Шесть направлений джойстика (решение владельца): ← → ↑ ↖ ↗ ↓. Вниз по
+## диагонали нет — копка всегда строго под собой. Ручка встаёт ровно на
+## направление, а не туда, куда указывает палец.
+func _test_six_direction_snap() -> void:
+	player.release_control()
+	var s1 = player.resolve_dir(1.0, -0.2, 0.26)      # ~11° вверх — всё ещё шаг
+	check("до 45° — чистый шаг вбок, ручка на горизонтали",
+		s1 != null and is_equal_approx(s1.x, 1.0) and is_zero_approx(s1.y)
+		and player.hold_dx == 1 and not player.hold_up)
+
+	player.release_control()
+	var s2 = player.resolve_dir(1.0, -1.0, 0.26)      # ровно 45° — диагональ
+	check("45° — диагональ ↗: бежит и прыгает",
+		s2 != null and player.hold_dx == 1 and player.hold_up)
+	check("ручка на диагонали стоит ровно на 45°",
+		s2 != null and is_equal_approx(s2.x, player.DIAG) and is_equal_approx(s2.y, -player.DIAG))
+
+	player.release_control()
+	var s3 = player.resolve_dir(-1.0, -1.0, 0.26)
+	check("зеркальная диагональ ↖", s3 != null and player.hold_dx == -1 and player.hold_up
+		and is_equal_approx(s3.x, -player.DIAG))
+
+	player.release_control()
+	var s4 = player.resolve_dir(0.2, -1.0, 0.26)      # ~79° — чистый верх
+	check("круче 67.5° — чистое ↑ без шага",
+		s4 != null and player.hold_dx == 0 and player.hold_up
+		and is_zero_approx(s4.x) and is_equal_approx(s4.y, -1.0))
+
+	player.release_control()
+	var s5 = player.resolve_dir(0.7, 1.0, 0.26)       # вниз по диагонали
+	check("вниз по диагонали не существует — это ↓ строго под собой",
+		s5 != null and player.hold_dx == 0 and player.hold_down
+		and is_zero_approx(s5.x) and is_equal_approx(s5.y, 1.0))
+	player.release_control()
+
+
 func _test_keyboard_intent() -> void:
 	player.set_intent(1, false, false)
 	check("клавиша вправо — шаг вправо, без верха и низа",

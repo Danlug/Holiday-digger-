@@ -90,6 +90,10 @@ func _build() -> void:
 	scroll.offset_top = 72
 	scroll.offset_bottom = -34
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Прокрутка перетаскиванием списка (решение владельца). _need переиспользует
+	# узел между открытиями, поэтому вешаем один раз.
+	if scroll.get_node_or_null("DragScroll") == null:
+		DragScroll.attach(scroll)
 
 	_list = _need(scroll, "List", VBoxContainer) as VBoxContainer
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

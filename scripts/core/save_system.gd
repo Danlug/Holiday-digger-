@@ -105,6 +105,9 @@ static func _serialize() -> Dictionary:
 		"economy": {
 			"owned_tools": gs.owned_tools,
 			"owned_gear": gs.owned_gear,
+			"rare_find_toasts_shown": gs.rare_find_toasts_shown,
+			"well_level": gs.well_level,
+			"well_last_collect_unix": gs.well_last_collect_unix,
 			"workshop_visited": gs.workshop_visited,
 			"next_sale_doubled": gs.next_sale_doubled,
 			"lifetime_coins_from_sales": gs.lifetime_coins_from_sales,
@@ -193,6 +196,9 @@ static func _apply(data: Dictionary) -> void:
 	# Сейвы до появления верстачного джетпака: снаряжение там считалось от
 	# глубины, поэтому дошедшему до 100 джетпак отдаём — отбирать уже
 	# заработанное при обновлении нельзя.
+	gs.rare_find_toasts_shown = int(economy.get("rare_find_toasts_shown", 0))
+	gs.well_level = int(economy.get("well_level", 0))
+	gs.well_last_collect_unix = int(economy.get("well_last_collect_unix", 0))
 	gs.owned_gear = economy.get("owned_gear",
 		["jetpack"] if gs.max_depth_reached >= 100 else [])
 	gs.workshop_visited = bool(economy.get("workshop_visited", gs.workshop_visited))

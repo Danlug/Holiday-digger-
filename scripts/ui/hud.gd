@@ -14,6 +14,12 @@ const STRIP_H := 40.0
 # экрана. 15% полуширины дают ту же долю экрана, что и в демо.
 const STICK_FRACTION := 0.15
 const STICK_R_MIN := 30.0
+
+# Порог «редкой находки» для отдельного тоста и сколько раз его вообще
+# показывать за игру (решение владельца: 5-10, взято 6 — дальше это уже не
+# событие). Цена в монетах в самом тосте не пишется: монет за копку не дают.
+const RARE_FIND_COINS := 100
+const RARE_FIND_TOAST_LIMIT := 6
 var stick_r := 34.0
 var knob_r := 13.0
 const STICK_DEAD := 0.26
@@ -61,7 +67,28 @@ var _toast_timer: Timer
 var _stick: Control
 var _knob: Control
 var _hold_hint: Label
+
+# --- третий режим: экранные стрелки ---
+## Шесть кнопок ровно по шести направлениям магнетизма: ↖ ↑ ↗ / ← → / ↓.
+## Вниз по диагонали нет — копка всегда строго под собой, и кнопки под неё
+## быть не должно, иначе игрок ищет её и не находит.
+## Стрелки РИСУЮТСЯ треугольниками, а не пишутся символами: ↑ ↖ ↗ ← → ↓
+## (U+2190…U+2197) в шрифте темы по умолчанию отсутствуют и выходят пустыми
+## квадратами с шестнадцатеричным кодом внутри — та же ловушка, что с ✕ и ↺.
+## Вектор здесь — направление острия.
+const ARROW_CELLS: Array = [
+	{"dir": "upleft", "col": 0, "row": 0, "v": Vector2(-0.7071, -0.7071)},
+	{"dir": "up", "col": 1, "row": 0, "v": Vector2(0, -1)},
+	{"dir": "upright", "col": 2, "row": 0, "v": Vector2(0.7071, -0.7071)},
+	{"dir": "left", "col": 0, "row": 1, "v": Vector2(-1, 0)},
+	{"dir": "right", "col": 2, "row": 1, "v": Vector2(1, 0)},
+	{"dir": "down", "col": 1, "row": 2, "v": Vector2(0, 1)},
+]
+var _arrows_panel: Control
+var _arrow_buttons: Dictionary = {}   # dir -> Button
+var _arrow_held: String = ""
 var _tool_button: Button
+var _well_panel: Control
 var _objective_panel: PanelContainer
 var _objective_label: Label
 var _tool_name_panel: PanelContainer
@@ -137,6 +164,7 @@ func _build_ui() -> void:
 	_build_toast(stage)
 	_build_stick(stage)
 	_build_hold_hint(stage)
+	_build_arrows(stage)
 	_build_inventory_sheet(stage)
 	_build_strip()
 
@@ -329,6 +357,104 @@ func _build_hold_hint(parent: Control) -> void:
 	parent.add_child(_hold_hint)
 
 
+## Экранные стрелки — третий режим управления (решение владельца). Шесть
+## кнопок в сетке 3×3 справа внизу, там же, где джойстик: рука не переучивается
+## при переключении режима.
+##
+## Кнопки держат намерение, а не «нажимают шаг»: удержание — единственный
+## способ вести героя, который есть у остальных двух режимов, и третий не
+## должен вести себя иначе.
+func _build_arrows(parent: Control) -> void:
+	_arrows_panel = Control.new()
+	_arrows_panel.name = "Arrows"
+	_arrows_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_arrows_panel.visible = false
+	parent.add_child(_arrows_panel)
+
+	for cell in ARROW_CELLS:
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		var dir := String(cell["dir"])
+		b.button_down.connect(func(): _on_arrow_down(dir))
+		b.button_up.connect(func(): _on_arrow_up(dir))
+		_arrows_panel.add_child(b)
+
+		var glyph := Control.new()
+		glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		glyph.set_anchors_preset(Control.PRESET_FULL_RECT)
+		var v: Vector2 = cell["v"]
+		glyph.draw.connect(func(): _draw_arrow(glyph, v))
+		b.add_child(glyph)
+
+		_arrow_buttons[dir] = b
+
+
+## Треугольник остриём в сторону v, вписанный в кнопку.
+##
+## Пропорции важны: треугольник должен быть заметно ВЫТЯНУТ вдоль v. Первый
+## заход дал почти равносторонний — у вертикальной и горизонтальных стрелок
+## он читался за счёт горизонтального основания, а у диагоналей основание
+## тоже под 45°, и куда он смотрит, было не понять вовсе.
+func _draw_arrow(canvas: Control, v: Vector2) -> void:
+	var c: Vector2 = canvas.size * 0.5
+	var r: float = minf(canvas.size.x, canvas.size.y) * 0.30
+	var tip: Vector2 = c + v * r * 1.30
+	var back: Vector2 = c - v * r * 0.45
+	var side: Vector2 = Vector2(-v.y, v.x) * r * 0.58
+	canvas.draw_colored_polygon(
+		PackedVector2Array([tip, back + side, back - side]),
+		Color8(0xE0, 0xA9, 0x3B))
+
+
+func _layout_arrows() -> void:
+	if _arrows_panel == null or _arrow_buttons.is_empty():
+		return
+	# Сетка садится ровно на место джойстика — та же рука, то же место.
+	var cell_size: float = maxf(22.0, stick_r * 0.66)
+	var gap := 3.0
+	var grid: float = cell_size * 3.0 + gap * 2.0
+	var origin := Vector2(size.x - 12.0 - grid, stage_rect.size.y - 12.0 - grid)
+	_arrows_panel.position = origin
+	_arrows_panel.size = Vector2(grid, grid)
+	for cell in ARROW_CELLS:
+		var b: Button = _arrow_buttons[String(cell["dir"])]
+		b.custom_minimum_size = Vector2(cell_size, cell_size)
+		b.size = Vector2(cell_size, cell_size)
+		b.position = Vector2(float(cell["col"]) * (cell_size + gap),
+			float(cell["row"]) * (cell_size + gap))
+		for g in b.get_children():
+			(g as Control).queue_redraw()
+
+
+func _on_arrow_down(dir: String) -> void:
+	_arrow_held = dir
+	_apply_arrow(dir)
+
+
+func _on_arrow_up(dir: String) -> void:
+	if _arrow_held != dir:
+		return
+	_arrow_held = ""
+	if player != null:
+		player.release_control()
+		player.digging = null
+
+
+## Стрелка — это уже выбранное направление, магнетизм ей не нужен: он против
+## неточного пальца, а кнопка неточной не бывает.
+func _apply_arrow(dir: String) -> void:
+	if player == null:
+		return
+	match dir:
+		"left": player.set_intent(-1, false, false)
+		"right": player.set_intent(1, false, false)
+		"up": player.set_intent(0, true, false)
+		"upleft": player.set_intent(-1, true, false)
+		"upright": player.set_intent(1, true, false)
+		"down": player.set_intent(0, false, true)
+	player.cancel_wrong_dig()
+
+
 func _build_inventory_sheet(parent: Control) -> void:
 	_inv_sheet = Control.new()
 	_inv_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -372,6 +498,8 @@ func _build_inventory_sheet(parent: Control) -> void:
 	scroll.offset_left = 10; scroll.offset_right = -10
 	scroll.offset_top = 36; scroll.offset_bottom = -30
 	_inv_sheet.add_child(scroll)
+	# Прокрутка перетаскиванием списка, а не только ползунком (решение владельца).
+	DragScroll.attach(scroll)
 
 	_inv_list = VBoxContainer.new()
 	_inv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -723,6 +851,122 @@ func _build_more_menu() -> VBoxContainer:
 	return box
 
 
+## Всплывающая надпись над выкопанной клеткой: «Золото +1». Живёт секунду,
+## поднимается и тает. Это не тост: тост занимает всю ширину и перебивает
+## экран, а тут нужна отметка ровно там, где копнули, — иначе на каждую
+## клетку земли экран мигал бы полосой.
+func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	label.add_theme_constant_override("outline_size", 3)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(label)
+
+	var from := Vector2(
+		(float(cell_x) + 0.5 - current_cam.x) * TILE - 40.0,
+		(float(cell_y) - current_cam.y) * TILE - 6.0)
+	label.size = Vector2(80, 14)
+	label.position = from
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position:y", from.y - 18.0, 0.9)
+	tween.tween_property(label, "modulate:a", 0.0, 0.9).set_delay(0.25)
+	tween.chain().tween_callback(label.queue_free)
+
+
+## Отчёт скважины при возвращении в игру (решение владельца): показать, что
+## накопала за время отсутствия. Карточка со списком и одной кнопкой —
+## закрывается ею же и тапом мимо, как остальные меню.
+func show_well_report(report: Dictionary) -> void:
+	if report.is_empty() or _well_panel != null:
+		return
+	_well_panel = Control.new()
+	_well_panel.name = "WellReport"
+	_well_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_well_panel)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_well_panel.add_child(dim)
+
+	var card := PanelContainer.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	card.custom_minimum_size = Vector2(200, 0)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
+	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(8)
+	card.add_theme_stylebox_override("panel", sb)
+	_well_panel.add_child(card)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 5)
+	card.add_child(box)
+
+	var title := Label.new()
+	title.text = "Скважина работала без тебя"
+	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	box.add_child(title)
+
+	var since := Label.new()
+	since.text = "За %s накопала:" % _humanize_seconds(float(report.get("seconds", 0.0)))
+	since.add_theme_font_size_override("font_size", 10)
+	box.add_child(since)
+
+	for id in report.get("items", {}).keys():
+		var row := HBoxContainer.new()
+		var name_label := Label.new()
+		name_label.text = String(Balance.get_mineral(String(id)).get("name_ru", id))
+		name_label.add_theme_font_size_override("font_size", 10)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name_label)
+		var count_label := Label.new()
+		count_label.text = "×%d" % int(report["items"][id])
+		count_label.add_theme_font_size_override("font_size", 10)
+		count_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+		row.add_child(count_label)
+		box.add_child(row)
+
+	var note := Label.new()
+	note.text = "Всё сложено на склад в мастерской."
+	note.add_theme_font_size_override("font_size", 9)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	note.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
+	box.add_child(note)
+
+	var ok := Button.new()
+	ok.text = "Хорошо"
+	ok.add_theme_font_size_override("font_size", 10)
+	ok.pressed.connect(close_well_report)
+	box.add_child(ok)
+
+
+func close_well_report() -> void:
+	if _well_panel == null:
+		return
+	_well_panel.queue_free()
+	_well_panel = null
+
+
+static func _humanize_seconds(seconds: float) -> String:
+	var total := int(seconds)
+	var h := total / 3600
+	var m := (total % 3600) / 60
+	if h > 0:
+		return "%d ч %d мин" % [h, m]
+	return "%d мин" % maxi(m, 1)
+
+
 ## Строка текущего обучающего задания — над полосой, поверх экрана. Держится,
 ## пока задание не выполнено: это не подсказка, а условие, без которого игра
 ## дальше не пускает (ГДД п.9). Тостом её сделать нельзя — тост гаснет, а
@@ -880,10 +1124,13 @@ func _update_layout() -> void:
 	_knob.custom_minimum_size = Vector2(knob_r * 2, knob_r * 2)
 	_knob.size = Vector2(knob_r * 2, knob_r * 2)
 	_knob.position = Vector2(stick_r - knob_r, stick_r - knob_r)
-	_stick.position = Vector2(12, stage_rect.size.y - 12 - stick_r * 2)
+	# Джойстик справа внизу (решение владельца): большой палец правой руки
+	# сам ложится туда, а левый край экрана остаётся под кошелёк и подсказки.
+	_stick.position = Vector2(vp.x - 12 - stick_r * 2, stage_rect.size.y - 12 - stick_r * 2)
 	_stick_center = _stick.position + Vector2(stick_r, stick_r)
 	_stick.queue_redraw()
 	_knob.queue_redraw()
+	_layout_arrows()
 
 
 func get_view_cells() -> Vector2i:
@@ -1003,12 +1250,20 @@ func _on_dig_blocked(tile_type: int) -> void:
 	toast(Balance.get_tool_name_ru(GameState.current_tool) + " звенит о " + name_ru.to_lower() + ". Стан от вибрации.")
 
 
-func _on_dig_finished(_x: int, _y: int, tile_type: int, mineral_id: String, was_loot: bool, coins: int) -> void:
+func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_loot: bool, coins: int) -> void:
 	if was_loot and coins == 0 and not mineral_id.is_empty():
 		toast(Balance.get_mineral(mineral_id).get("name_ru", "Находка") + " — рюкзак полон, пришлось оставить.")
-	elif was_loot and coins >= 100:
-		toast("%s! +%d монет" % [Balance.get_mineral(mineral_id).get("name_ru", ""), coins])
-	if _y == 80 and tile_type == TileTypes.Type.DIAMOND:
+	elif was_loot and not mineral_id.is_empty():
+		var name_ru := String(Balance.get_mineral(mineral_id).get("name_ru", ""))
+		float_pickup(x, y, "%s +1" % name_ru)
+		# Крупная находка отмечается тостом — но БЕЗ суммы в монетах: монет
+		# за копку не дают вовсе, их дают при продаже, а «+100 монет» читается
+		# как «уже на счету» (решение владельца). И не больше нескольких раз
+		# за игру: на десятый раз это уже не событие, а помеха.
+		if coins >= RARE_FIND_COINS and GameState.rare_find_toasts_shown < RARE_FIND_TOAST_LIMIT:
+			GameState.rare_find_toasts_shown += 1
+			toast("%s! Редкая находка." % name_ru)
+	if y == 80 and tile_type == TileTypes.Type.DIAMOND:
 		toast("Алмаз замурован в камне. Дедова кирка трескается — минус 25% скорости.", 4.0)
 
 
@@ -1126,22 +1381,33 @@ func _render_inventory() -> void:
 	_inv_load_label.text = "%.1f / %.0f кг" % [load_kg, max_kg]
 
 
+## Три режима по кругу: джойстик → палец → стрелки (решение владельца).
+const MODES: Array[String] = ["stick", "hold", "arrows"]
+
+
 func _on_mode_button_pressed() -> void:
-	_set_mode("hold" if mode == "stick" else "stick")
+	var i := MODES.find(mode)
+	_set_mode(MODES[(i + 1) % MODES.size()])
 
 
 func _set_mode(m: String) -> void:
 	mode = m
 	_release_stick()
 	_has_touch = false
+	_arrow_held = ""
 	if player != null:
 		player.release_control()
-	var is_stick := mode == "stick"
 	# Коротко: полная подпись («Джойстик»/«Удержание») не помещается в ряд
 	# шириной 224 вместе с инвентарём, инструментом и снаряжением.
-	_mode_button.text = "Стик" if is_stick else "Палец"
-	_stick.visible = is_stick
-	_hold_hint.visible = not is_stick
+	match mode:
+		"stick": _mode_button.text = "Стик"
+		"hold": _mode_button.text = "Палец"
+		_: _mode_button.text = "Стрелки"
+	_stick.visible = mode == "stick"
+	_hold_hint.visible = mode == "hold"
+	if _arrows_panel != null:
+		_arrows_panel.visible = mode == "arrows"
+		_layout_arrows()
 
 
 func _on_reset_pressed() -> void:
@@ -1163,13 +1429,68 @@ func _on_reset_pressed() -> void:
 # ---------------------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
+	# Тап мимо меню закрывает меню (решение владельца). Разбирается ДО общей
+	# заглушки ввода: пока меню открыто, мир ввод не получает, и закрыть его
+	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
+	if _dismiss_on_outside_press(event):
+		return
 	if player == null or _inv_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
 		return
 
-	if mode == "stick":
-		_handle_stick_input(event)
-	else:
-		_handle_hold_input(event)
+	match mode:
+		"stick": _handle_stick_input(event)
+		"hold": _handle_hold_input(event)
+		# «Стрелки» ловятся самими кнопками (Control-ами), здесь ничего не
+		# перехватываем — иначе тап по стрелке ушёл бы ещё и в мир.
+		_: pass
+
+
+## Закрывает открытое меню, если нажатие пришлось за его границей.
+## Возвращает true, если событие на этом и закончилось.
+##
+## Касается только меню, у которых эта граница есть: всплывающего «•••» и
+## окна выброса. Шторка инвентаря, мастерская, экран героя и дом занимают
+## экран целиком — «за границей» у них нет места, и закрывает их крестик.
+##
+## Принудительная подсказка дома (батончик в шахте) намеренно не закрывается:
+## она замораживает героя и ждёт одного конкретного действия — закрыть её
+## мимо значило бы оставить игрока замороженным.
+func _dismiss_on_outside_press(event: InputEvent) -> bool:
+	var e := _normalize_pointer_event(event)
+	if e.kind != "press":
+		return false
+	if _well_panel != null:
+		if not _panel_card_rect(_well_panel).has_point(e.pos):
+			close_well_report()
+			get_viewport().set_input_as_handled()
+			return true
+		return false
+	if _drop_panel != null and _drop_panel.visible:
+		if not _drop_card_rect().has_point(e.pos):
+			_close_drop()
+			get_viewport().set_input_as_handled()
+			return true
+		return false
+	if is_more_menu_open():
+		if not Rect2(_more_panel.global_position, _more_panel.size).has_point(e.pos):
+			close_more_menu()
+			get_viewport().set_input_as_handled()
+			return true
+	return false
+
+
+## Карточка окна — не сама панель (та во весь экран, это затемнение), а её
+## внутренний PanelContainer.
+func _panel_card_rect(panel: Control) -> Rect2:
+	for child in panel.get_children():
+		if child is PanelContainer:
+			var c := child as PanelContainer
+			return Rect2(c.global_position, c.size)
+	return Rect2()
+
+
+func _drop_card_rect() -> Rect2:
+	return _panel_card_rect(_drop_panel)
 
 
 ## Приводит мышь/тач-события к одному виду: {kind:"press"|"release"|"move",
@@ -1272,6 +1593,10 @@ func update_input_intent() -> void:
 	if player == null or ProgressScreen.is_open() or is_more_menu_open():
 		return
 	if _apply_keyboard():
+		return
+	if mode == "arrows":
+		if not _arrow_held.is_empty():
+			_apply_arrow(_arrow_held)
 		return
 	if mode != "hold":
 		return

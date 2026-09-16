@@ -61,7 +61,15 @@ const COAST_DECEL := G * 6.0
 # --- магнетизм направления (см. resolveDir в web-демо) ---
 const ANG_ON := 45.0
 const ANG_OFF := 33.0
-const ANG_PURE := 72.0
+# Граница между «вверх по диагонали» и «строго вверх». 67.5° — середина между
+# идеальной диагональю (45°) и идеальной вертикалью (90°): вектор достаётся
+# тому из шести направлений, к которому он ближе. Было 72° — диагональ
+# забирала лишние четыре с половиной градуса у вертикали без причины.
+const ANG_PURE := 67.5
+
+# Косинус и синус 45° — ручка джойстика на диагонали должна стоять ровно на
+# диагонали, а не «примерно там».
+const DIAG := 0.70710678
 const STICK_DEAD := 0.26
 
 # --- состояние ---
@@ -106,11 +114,19 @@ func _ready() -> void:
 # Публичное намерение движения (пишут joystick/hold-контроллер из hud.gd)
 # ---------------------------------------------------------------------------
 
-## Магнетизм по углу вектора, не по осям — см. GDD п.6 и комментарий в
-## web/index.html: до 45° от горизонтали всегда читается как шаг, вверх/вниз
-## включаются только за 45°, гистерезис 45°/33° против дрожания на границе.
-## Возвращает вектор "залипания" для отрисовки ручки джойстика (или null,
-## если вектор внутри мёртвой зоны).
+## Магнетизм по углу вектора, не по осям — см. ГДД п.6 и комментарий в
+## web/index.html.
+##
+## Направлений ровно ШЕСТЬ (решение владельца): ← → ↑ ↖ ↗ ↓. Вниз по
+## диагонали нет вовсе — копка всегда строго под собой. Вектор достаётся
+## тому направлению, к которому он ближе, с одной поправкой: вверх и вниз
+## включаются только за 45° от горизонтали. Эта поправка старше и важнее
+## близости — без неё шаг вбок от неточного пальца превращался в яму под
+## ногами. Гистерезис 45°/33° держит режим на самой границе.
+##
+## Возвращает единичный вектор направления — ручку джойстика ставим ровно на
+## него, а не куда указывает палец: так видно, что игра поняла.
+## null — вектор внутри мёртвой зоны.
 func resolve_dir(vx_in: float, vy_in: float, dead: float) -> Variant:
 	var length := Vector2(vx_in, vy_in).length()
 	if length < dead:
@@ -120,12 +136,14 @@ func resolve_dir(vx_in: float, vy_in: float, dead: float) -> Variant:
 
 	var ang := rad_to_deg(atan2(-vy_in, absf(vx_in)))  # -90..90
 	var zone: String
+	# Границы включающие: ровно 45° — это идеальная диагональ ↗, и отдавать её
+	# шагу вбок нельзя. «До 45° — шаг, от 45° — вверх».
 	if _dir_zone == "up":
-		zone = "up" if ang > ANG_OFF else ("down" if ang < -ANG_ON else "side")
+		zone = "up" if ang >= ANG_OFF else ("down" if ang <= -ANG_ON else "side")
 	elif _dir_zone == "down":
-		zone = "down" if ang < -ANG_OFF else ("up" if ang > ANG_ON else "side")
+		zone = "down" if ang <= -ANG_OFF else ("up" if ang >= ANG_ON else "side")
 	else:
-		zone = "up" if ang > ANG_ON else ("down" if ang < -ANG_ON else "side")
+		zone = "up" if ang >= ANG_ON else ("down" if ang <= -ANG_ON else "side")
 	_dir_zone = zone
 
 	var side: int = 0 if vx_in == 0.0 else (1 if vx_in > 0.0 else -1)
@@ -133,10 +151,12 @@ func resolve_dir(vx_in: float, vy_in: float, dead: float) -> Variant:
 		hold_dx = side; hold_up = false; hold_down = false
 		return Vector2(side, 0)
 	if zone == "up":
-		# до 72° можно бежать и прыгать одновременно, круче — чистая вертикаль
+		# ↗ и ↖ — бежать и прыгать одновременно; круче 67.5° — чистое ↑
 		hold_dx = side if ang < ANG_PURE else 0
 		hold_up = true; hold_down = false
-		return Vector2(hold_dx * 0.55, -1)
+		if hold_dx == 0:
+			return Vector2(0, -1)
+		return Vector2(hold_dx * DIAG, -DIAG)
 	# вниз — строго под собой, это всегда осознанное действие
 	hold_dx = 0; hold_up = false; hold_down = true
 	return Vector2(0, 1)

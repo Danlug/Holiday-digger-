@@ -697,6 +697,17 @@ var owned_tools: Array = ["shovel"]
 ## (решение владельца), и глубина про него больше ничего не знает.
 var owned_gear: Array = []
 
+## Сколько раз уже показывали тост о редкой находке. Решение владельца: такое
+## уведомление перестаёт быть событием, если повторять его бесконечно, —
+## показываем считанные разы за игру и больше не трогаем игрока.
+var rare_find_toasts_shown: int = 0
+
+## Буровая скважина (ГДД п.1) — единственная idle-механика. 0 — не построена.
+var well_level: int = 0
+## Когда с неё забирали в последний раз (реальное время). По нему считается
+## офлайн-доход при заходе в игру.
+var well_last_collect_unix: int = 0
+
 ## Игрок уже спускался в мастерскую. Первый спуск — сюжетная сцена с дедовой
 ## киркой среди швабр и грабель (ГДД п.2), поэтому её нельзя выдать дважды.
 var workshop_visited: bool = false
@@ -787,6 +798,9 @@ func clear_invested(recipe_id: String) -> void:
 func reset_economy() -> void:
 	owned_tools = ["shovel"]
 	owned_gear = []
+	rare_find_toasts_shown = 0
+	well_level = 0
+	well_last_collect_unix = 0
 	workshop_visited = false
 	next_sale_doubled = false
 	lifetime_coins_from_sales = 0

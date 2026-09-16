@@ -40,6 +40,11 @@ var _button: Button = null
 var _button_action: String = ""
 var _storage_button: Button = null
 var _prompt_action: String = ""
+
+## Люк втягивает в дом при касании (решение владельца), но только после того,
+## как от него отошли. Без этой защёлки выход через люк превращается в петлю:
+## герой выходит, стоит на люке, люк тут же забирает его обратно.
+var _hatch_armed: bool = false
 var _story: Node = null
 
 
@@ -159,6 +164,7 @@ func _process(_dt: float) -> void:
 	_resolve_refs()
 	_sync_world_props()
 	_tick_tutorial()
+	_auto_enter_hatch_if_touched()
 	_update_hud_button()
 	if _view != null and _view.visible:
 		_view.refresh()
@@ -216,7 +222,10 @@ func exit_through_hatch() -> bool:
 		return false
 	var hatch := HouseConfig.hatch_cell()
 	_carve_hatch_cell()
-	_leave_house(Vector2(hatch.x + 0.5, hatch.y + 0.5))
+	# Ставим не В люк, а на клетку НИЖЕ — внутрь расчищенной площадки: это и
+	# читается как «спустился», и не оставляет героя стоять в самой дыре.
+	_hatch_armed = false
+	_leave_house(Vector2(hatch.x + 0.5, hatch.y + 1.5))
 	return true
 
 
@@ -237,17 +246,33 @@ func _leave_house(world_pos: Vector2) -> void:
 	_freeze_player(false)
 
 
-## Клетка люка обязана быть пустой каждый раз, когда через неё выходят:
-## землетрясение (ГДД п.8) стирает диффы и «зарастает» её обратно, и герой
-## оказался бы замурован в породе на глубине 6.
+## Площадка под люком: 3×3 пустых клетки вокруг него (решение владельца).
+##
+## Одной пустой клетки мало по двум причинам сразу. Первая: спускаясь, герой
+## выпадает ровно в неё и тут же упирается плечами в породу — шага в сторону
+## нет, и единственное, что можно сделать, это копать. Вторая: люк втягивает
+## обратно при касании, а значит приземляться прямо в него нельзя — нужно
+## место, куда отойти, иначе спуск и подъём зациклятся.
+##
+## Перекапывается каждый раз, когда через люк выходят: землетрясение (ГДД п.8)
+## стирает диффы и зарастает площадку обратно.
+const HATCH_CLEARING := 1   # радиус в клетках: 1 -> 3×3
+
+
 func _carve_hatch_cell() -> void:
 	if world == null:
 		world = GameState.world_ref
 	if world == null:
 		return
 	var hatch := HouseConfig.hatch_cell()
-	if world.get_tile(hatch.x, hatch.y) != TileTypes.Type.EMPTY:
-		world.dig_cell(hatch.x, hatch.y)
+	for dy in range(-HATCH_CLEARING, HATCH_CLEARING + 1):
+		for dx in range(-HATCH_CLEARING, HATCH_CLEARING + 1):
+			var cx := hatch.x + dx
+			var cy := hatch.y + dy
+			if cy < 1:
+				continue   # выше поверхности копать нечего
+			if world.get_tile(cx, cy) != TileTypes.Type.EMPTY:
+				world.dig_cell(cx, cy)
 	if GameState.fog_ref != null:
 		GameState.fog_ref.reveal_around_cell(hatch.x, hatch.y,
 			GameState.get_vision_terrain_radius(), GameState.get_vision_resource_radius())
@@ -275,13 +300,41 @@ func build_hatch() -> void:
 func robert_finished_garden() -> void:
 	GameState.house_hatch_built = true
 	GameState.house_garden_closed = true
+	# Огород выравнивается и засыпается землёй (решение владельца): Роберт
+	# приводит его в порядок, и оставлять после него поле воронок нельзя.
+	# Выкопанное сценарное золото не отрастает — оно зафиксировано и уже
+	# унесено игроком.
+	if world == null:
+		world = GameState.world_ref
+	if world != null:
+		world.restore_garden()
 	_sync_world_props()
-	_toast("Роберт закончил: огород закрыт, из подвала есть люк в шахту.", 4.0)
+	_toast("Роберт закончил: огород выровнял и засыпал, из подвала есть люк в шахту.", 4.0)
 
 
 # ---------------------------------------------------------------------------
 # Контекстная кнопка HUD
 # ---------------------------------------------------------------------------
+
+## Люк втягивает героя в дом сам, как только он на него налетел (решение
+## владельца): подтверждение у дырки в полу, через которую только что вылез,
+## — лишний тап на каждом подъёме.
+##
+## Дверь так НЕ работает намеренно: мимо неё ходят по огороду постоянно, и
+## дом хватал бы игрока при каждом проходе.
+func _auto_enter_hatch_if_touched() -> void:
+	if GameState.house_is_indoors or not GameState.is_alive:
+		return
+	if not GameState.house_hatch_built or player == null or player.frozen:
+		return
+	if not near_hatch():
+		_hatch_armed = true
+		return
+	if not _hatch_armed:
+		return
+	_hatch_armed = false
+	enter_house("basement")
+
 
 func _update_hud_button() -> void:
 	if _button == null:
@@ -294,8 +347,11 @@ func _update_hud_button() -> void:
 		_button_action = "enter_door"
 		_button.text = "Дом"
 	elif near_hatch():
-		_button_action = "enter_hatch"
-		_button.text = "Люк"
+		# Кнопки у люка больше нет: в него просто влетаешь (решение
+		# владельца). Строку оставляем пустой, чтобы она не мигала у ног.
+		_button_action = ""
+		_button.visible = false
+		return
 	else:
 		var food := HouseFood.best_food_for_now()
 		if food.is_empty():
@@ -316,8 +372,6 @@ func on_hud_button() -> void:
 	match parts[0]:
 		"enter_door":
 			enter_house("hall")
-		"enter_hatch":
-			enter_house("basement")
 		"eat":
 			_eat(parts[1])
 

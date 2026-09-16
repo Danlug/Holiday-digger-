@@ -21,6 +21,8 @@ func _ready() -> void:
 	_test_not_bought()
 	_test_craft_bronze()
 	_test_craft_fuel_block()
+	_test_craft_jetpack()
+	_test_idle_well_payout()
 	_test_craft_without_materials()
 	_test_iron_pickaxe_from_storage()
 	_test_tool_requires_ownership()
@@ -139,6 +141,68 @@ func _test_craft_fuel_block() -> void:
 	check("с четырьмя торфами блок делается", bool(ShopService.craft("fuel_block")["ok"]))
 	check("торф списан весь", GameState.get_item_count("peat") == 0)
 	check("блок лежит в рюкзаке", GameState.get_item_count("fuel_block") == 1)
+
+
+## Джетпак собирается на верстаке (решение владельца), а не выдаётся по
+## глубине. Снаряжение не берут в руки и оно не занимает вес.
+func _test_craft_jetpack() -> void:
+	var r := ShopCatalog.recipe("jetpack")
+	check("рецепт джетпака есть на верстаке", not r.is_empty())
+	if r.is_empty():
+		return
+	check("джетпак — снаряжение, а не инструмент", String(r["kind"]) == "gear")
+	check("рецепт открывается с глубины", int(r["unlock_depth"]) > 0)
+
+	GameState.owned_gear.clear()
+	GameState.coins = 999999
+	for id in r["inputs"].keys():
+		GameState.house_storage[String(id)] = int(r["inputs"][id]) * 2
+	var res := ShopService.craft("jetpack")
+	check("джетпак собрался: " + String(res.get("message", "")), bool(res["ok"]))
+	check("джетпак теперь есть", GameState.has_gear("jetpack"))
+	check("в руках остался прежний инструмент, джетпак в руки не берут",
+		GameState.current_tool != "jetpack")
+	check("джетпак не лёг в рюкзак и не занял вес",
+		GameState.get_item_count("jetpack") == 0)
+
+
+## Скважина платит рудой и золотом и никогда — донатной валютой
+## (решение владельца).
+func _test_idle_well_payout() -> void:
+	GameState.dollars = 0
+	GameState.house_storage.clear()
+	GameState.max_depth_reached = 400
+	GameState.well_level = 0
+	GameState.well_last_collect_unix = int(Time.get_unix_time_from_system()) - 3600 * 5
+	check("непостроенная скважина не платит вовсе", IdleWell.collect().is_empty())
+
+	GameState.well_level = 1
+	GameState.well_last_collect_unix = int(Time.get_unix_time_from_system()) - 3600 * 5
+	var report := IdleWell.collect()
+	check("скважина что-то накопала", not report.is_empty())
+	if report.is_empty():
+		return
+	check("донатной валюты не дала", GameState.dollars == 0)
+	check("добыча легла на склад, а не в рюкзак", not GameState.house_storage.is_empty())
+	var has_ore := false
+	var has_crafted := false
+	for id in report["items"].keys():
+		if String(Balance.get_mineral(String(id)).get("category", "")) == "crafted":
+			has_crafted = true
+		else:
+			has_ore = true
+	check("в отчёте есть добыча", has_ore)
+	check("выплавленного (бронзы) скважина не производит", not has_crafted)
+
+	# Офлайн-кап: сутки простоя не дают больше, чем кап в часах.
+	GameState.well_last_collect_unix = int(Time.get_unix_time_from_system()) - 3600 * 24
+	var day: int = IdleWell.income_coins_for_seconds(IdleWell.pending_seconds())
+	GameState.well_last_collect_unix = int(Time.get_unix_time_from_system()) - 3600 * 8
+	var capped: int = IdleWell.income_coins_for_seconds(IdleWell.pending_seconds())
+	check("офлайн-кап работает: сутки не дороже капа", day <= capped)
+
+	GameState.well_level = 0
+	GameState.house_storage.clear()
 
 
 func _test_craft_without_materials() -> void:

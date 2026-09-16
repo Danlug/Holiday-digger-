@@ -301,17 +301,48 @@ func _test_hatch_transition() -> void:
 	# Роберт закончил работу: люк построен, огород закрыт (ГДД п.9).
 	# Вызываем ровно тем именем, которым дом зовёт сюжетная сцена Роберта
 	# (data/story.json: {"do":"hook","target":"house","method":"build_hatch"}).
+	# Копаем клетку огорода, чтобы было что засыпать.
+	world.dig_cell(25, 2)
+	check("клетка огорода выкопана до прихода Роберта", world.is_dug(25, 2))
 	check("хук сюжета build_hatch на месте", house.has_method("build_hatch"))
 	house.build_hatch()
 	check("после Роберта люк построен", GameState.house_hatch_built)
 	check("после Роберта огород закрыт", GameState.house_garden_closed)
+	check("после Роберта огород засыпан землёй", not world.is_dug(25, 2))
 
 	check("спуск через люк сработал", house.exit_through_hatch())
 	check("герой снаружи", not GameState.house_is_indoors)
-	check_near("герой стоит в клетке люка по x", player.x, hatch.x + 0.5, 0.001)
-	check_near("герой стоит в клетке люка по y", player.y, hatch.y + 0.5, 0.001)
+	check_near("герой стоит под люком по x", player.x, hatch.x + 0.5, 0.001)
+	# Ставим на клетку НИЖЕ люка: люк втягивает при касании, и приземляться
+	# прямо в него нельзя — спуск и подъём зациклились бы.
+	check_near("герой стоит на клетку ниже люка", player.y, hatch.y + 1.5, 0.001)
 	check("клетка люка пробита", world.get_tile(hatch.x, hatch.y) == TileTypes.Type.EMPTY)
 	check("люк лежит прямо под фундаментом", hatch.y == 6)
+
+	# Под люком расчищена площадка 3×3 (решение владельца): иначе спустившийся
+	# герой упирается плечами в породу, и шага в сторону у него нет.
+	var clear := true
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if hatch.y + dy < 1:
+				continue
+			if world.get_tile(hatch.x + dx, hatch.y + dy) != TileTypes.Type.EMPTY:
+				clear = false
+	check("под люком расчищено 3×3", clear)
+
+	# Люк втягивает в дом сам, но только после того, как от него отошли:
+	# иначе выход через люк — петля.
+	house._auto_enter_hatch_if_touched()
+	check("сразу после спуска люк обратно не затягивает", not GameState.house_is_indoors)
+	var away_x: float = player.x
+	player.x = hatch.x + 6.5
+	house._auto_enter_hatch_if_touched()      # отошёл — люк взводится
+	player.x = away_x
+	player.y = hatch.y + 0.5
+	house._auto_enter_hatch_if_touched()
+	check("вернулся на люк — втянуло в дом без кнопки", GameState.house_is_indoors)
+	check("попал именно в подвал", GameState.house_room == "basement")
+	house.exit_through_hatch()
 
 	# Землетрясение стирает диффы: клетка люка обязана пробиваться заново,
 	# иначе спуск замуровывает героя в породе.

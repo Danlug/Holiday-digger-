@@ -883,6 +883,18 @@ func _build_strip() -> void:
 	reset_btn.pressed.connect(_on_reset_pressed)
 	more_menu.add_child(reset_btn)
 
+	# Метка сборки. Владелец несколько раз открывал игру и не видел изменений,
+	# и по переписке нельзя было отличить «раздача отстала» от «браузер отдал
+	# старую копию из кэша». Теперь версия видна на экране, и один взгляд
+	# отвечает на вопрос. Пишется tools/make_build_info.py перед экспортом.
+	var build_label := Label.new()
+	build_label.text = _build_stamp()
+	build_label.add_theme_font_size_override("font_size", 7)
+	build_label.add_theme_color_override("font_color", Color8(0x6B, 0x5D, 0x4C))
+	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	more_menu.add_child(build_label)
+
 	# «⋯» встаёт последним, чтобы контекстная кнопка дома, появляясь и
 	# исчезая, не сдвигала его под пальцем.
 	_more_button = _make_chip("•••")
@@ -1161,6 +1173,26 @@ func is_more_menu_open() -> bool:
 # Кнопка нижней полосы: у темы Godot по умолчанию минимальная высота около
 # 40px, а полоса ровно в одну кнопку толщиной (STRIP_H). Поджимаем отступы и
 # кегль, иначе ряд вылезает за нижний край экрана.
+## «сборка 17.09 04:13 · 32b66e5» — или пусто, если файла нет: метка
+## необязательна, из редактора игра запускается и без неё.
+func _build_stamp() -> String:
+	var f := FileAccess.open("res://data/build_info.json", FileAccess.READ)
+	if f == null:
+		return ""
+	var raw = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(raw) != TYPE_DICTIONARY:
+		return ""
+	var build := String(raw.get("build", ""))
+	if build.length() < 13:
+		return build
+	# 20260917-0413 -> 17.09 04:13
+	var pretty := "%s.%s %s:%s" % [build.substr(6, 2), build.substr(4, 2),
+		build.substr(9, 2), build.substr(11, 2)]
+	var commit := String(raw.get("commit", ""))
+	return "сборка %s%s" % [pretty, (" · " + commit) if not commit.is_empty() else ""]
+
+
 func _make_chip(text: String) -> Button:
 	var b := Button.new()
 	b.text = text

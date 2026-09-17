@@ -52,8 +52,19 @@ godot --headless --path . --quit-after 30
 
 ```bash
 mkdir -p build/web
+python3 tools/make_build_info.py                                   # метка сборки
 godot --headless --path . --export-release "Web" build/web/index.html
+python3 tools/stamp_web_build.py                                   # сброс кэша
 ```
+
+Два скрипта вокруг экспорта обязательны, и вот почему. `make_build_info.py`
+пишет `data/build_info.json` — метку времени и коммит; она попадает в пак и
+видна в игре в меню «•••». `stamp_web_build.py` дописывает ту же метку в
+адреса `index.js`, `index.wasm` и `index.pck` внутри `build/web/index.html`.
+Имена файлов у экспорта Godot постоянные, и браузер, один раз забравший
+43-мегабайтный wasm, охотно отдаёт его из кэша и после обновления раздачи —
+игрок открывает игру и видит прошлую сборку. Заголовки на GitHub Pages нам
+не подчиняются, поэтому меняются сами адреса.
 
 Результат — статический набор файлов в `build/web/` (`index.html`, `index.js`, `index.wasm`, `index.pck`, иконки). Отдать любым статическим HTTP-сервером с поддержкой байтового `Range` (нужно WASM-рантайму), например:
 

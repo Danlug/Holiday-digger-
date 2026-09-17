@@ -109,9 +109,46 @@ body {
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="index.js"></script>
+		<!-- cache-bust -->
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6645424,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
+// Сброс кэша: у экспорта Godot постоянные имена файлов, и браузер отдаёт
+// прошлую сборку из кэша. Адреса получают ?v=<метка>, и старый кэш до них
+// не дотягивается. Подмена стоит ДО загрузки index.js: движок просит wasm,
+// пак и ворклеты сам.
+(function () {
+	const V = "20260917-0413";
+	const TOUCH = /index(\.[a-z.]+)?\.(js|wasm|pck)(\?|$)/;
+	function bust(url) {
+		if (typeof url !== "string" || !TOUCH.test(url) || url.indexOf("v=" + V) !== -1) {
+			return url;
+		}
+		return url + (url.indexOf("?") === -1 ? "?" : "&") + "v=" + V;
+	}
+	const _fetch = window.fetch;
+	window.fetch = function (input, init) {
+		try {
+			if (typeof input === "string") {
+				input = bust(input);
+			} else if (input && typeof input.url === "string") {
+				const next = bust(input.url);
+				if (next !== input.url) {
+					input = new Request(next, input);
+				}
+			}
+		} catch (e) { /* адрес не наш — пусть идёт как есть */ }
+		return _fetch.call(this, input, init);
+	};
+	if (window.AudioWorklet && AudioWorklet.prototype.addModule) {
+		const _add = AudioWorklet.prototype.addModule;
+		AudioWorklet.prototype.addModule = function (url, options) {
+			return _add.call(this, bust(url), options);
+		};
+	}
+}());
+		</script>
+		<script src="index.js?v=20260917-0413"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6646496,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

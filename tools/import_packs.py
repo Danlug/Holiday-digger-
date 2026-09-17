@@ -55,7 +55,7 @@ import sys
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from import_art import BODY_H, shrink  # noqa: E402
+from import_art import BODY_H, shrink, tone_match  # noqa: E402
 from import_dig import drop_slivers  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -277,6 +277,9 @@ def main(path):
     sheet = Image.open(path).convert("RGB")
     print("лист:", sheet.size)
     mask = background_mask(sheet)
+    # Лист снят со своей экспозицией: без приведения к эталону герой сереет,
+    # стоило смениться анимации (см. import_art.tone_match).
+    sheet = tone_match(sheet, mask)
     rows, cols = grid(mask, sheet.size)
     print("ряды:", rows)
 

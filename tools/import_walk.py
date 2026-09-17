@@ -35,6 +35,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import (BODY_H, FOOT_PAD, FRAME_H, FRAME_W,  # noqa: E402
+                        tone_match,
                         head_anchor, shrink)
 from import_move import background_mask  # noqa: E402
 
@@ -78,6 +79,9 @@ def main(path):
     sheet = Image.open(path).convert("RGB")
     w, h = sheet.size
     mask = background_mask(sheet, BG, BG_TOL)
+    # Лист снят со своей экспозицией: без приведения к эталону герой сереет,
+    # стоило смениться анимации (см. import_art.tone_match).
+    sheet = tone_match(sheet, mask)
 
     cols_all, rows_all = _content_counts(mask, w, (0, 0, w - 1, h - 1))
     row_bands = [b for b in _bands(rows_all) if b[1] - b[0] >= 40]

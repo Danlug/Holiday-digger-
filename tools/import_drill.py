@@ -40,7 +40,8 @@ import sys
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from import_art import BODY_H, FOOT_PAD, FRAME_H, FRAME_W, TILE, shrink  # noqa: E402
+from import_art import (ART_SCALE, BODY_H, FOOT_PAD, FRAME_H,  # noqa: E402
+                        FRAME_W, TILE, shrink, tone_match)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -77,9 +78,11 @@ GROUND_Y = FRAME_H - FOOT_PAD
 # Высота: 44 px машины над землёй + запас сверху на буровую мачту ряда
 # «вниз» (она выше корпуса) + 6 px ниже линии земли под бур, который уходит
 # в клетку под машиной.
-RIG_FRAME_W = 80
-RIG_FRAME_H = 56
-RIG_GROUND_Y = 50
+# Кадр машины крупнее героя и, как весь арт, режется в ART_SCALE раз
+# подробнее логических координат (см. import_art.py).
+RIG_FRAME_W = 80 * ART_SCALE
+RIG_FRAME_H = 56 * ART_SCALE
+RIG_GROUND_Y = 50 * ART_SCALE
 
 # Ширина машины в клетках (ГДД п.5: бурмобиль занимает 2×1). По ней считается
 # масштаб рядов бурмобиля — от полной ширины кадра 1 ряда «вбок».
@@ -271,6 +274,9 @@ def main(path):
     w, h = sheet.size
     print("лист:", sheet.size)
     mask = background_mask(sheet)
+    # Лист снят со своей экспозицией: без приведения к эталону герой сереет,
+    # стоило смениться анимации (см. import_art.tone_match).
+    sheet = tone_match(sheet, mask)
 
     # 1. кадры всех рядов как есть
     cells = {}

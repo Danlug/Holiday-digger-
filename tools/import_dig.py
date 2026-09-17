@@ -42,6 +42,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import (BODY_H, FOOT_PAD, FRAME_H, FRAME_W,  # noqa: E402
+                        tone_match,
                         head_x, shrink)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -151,6 +152,9 @@ def main(path):
     sheet = Image.open(path).convert("RGB")
     print("лист:", sheet.size)
     mask = background_mask(sheet)
+    # Лист снят со своей экспозицией: без приведения к эталону герой сереет,
+    # стоило смениться анимации (см. import_art.tone_match).
+    sheet = tone_match(sheet, mask)
 
     # 1. вырезаем все 24 кадра как есть
     cells = {}

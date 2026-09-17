@@ -1,0 +1,83 @@
+{
+	"source": "art/_source/pickaxes_sheet.jpg",
+	"box": 32,
+	"scale": 0.13734,
+	"items": {
+		"pickaxe_rusty": {
+			"source_px": [
+				120,
+				165
+			],
+			"px": [
+				16,
+				23
+			],
+			"relative": 0.67,
+			"black_lift": 9.0
+		},
+		"pickaxe_iron": {
+			"source_px": [
+				133,
+				175
+			],
+			"px": [
+				18,
+				24
+			],
+			"relative": 0.753,
+			"black_lift": 38.0
+		},
+		"pickaxe_titanium": {
+			"source_px": [
+				155,
+				196
+			],
+			"px": [
+				21,
+				27
+			],
+			"relative": 0.879,
+			"black_lift": 38.0
+		},
+		"pickaxe_platinum": {
+			"source_px": [
+				151,
+				204
+			],
+			"px": [
+				21,
+				28
+			],
+			"relative": 0.879,
+			"black_lift": 38.0
+		},
+		"pickaxe_diamond": {
+			"source_px": [
+				144,
+				212
+			],
+			"px": [
+				20,
+				29
+			],
+			"relative": 0.837,
+			"black_lift": 38.0
+		},
+		"pickaxe_obsidian": {
+			"source_px": [
+				174,
+				233
+			],
+			"px": [
+				24,
+				32
+			],
+			"relative": 1.004,
+			"black_lift": 29.0
+		},
+		"pickaxe_rusty_cracked": {
+			"from": "pickaxe_rusty",
+			"note": "щербина в бойке, цвет глуше"
+		}
+	}
+}

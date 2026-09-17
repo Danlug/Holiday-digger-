@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3shoptest7k2x"]
+
+[ext_resource type="Script" path="res://tests/test_shop_harness.gd" id="1_shop_test"]
+
+[node name="TestShopHarness" type="Node"]
+script = ExtResource("1_shop_test")

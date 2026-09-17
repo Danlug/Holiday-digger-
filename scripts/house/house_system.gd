@@ -79,7 +79,6 @@ var _sleeping: bool = false
 ## после того, как от него отошли. Без этой защёлки спуск превращается в
 ## петлю: герой выходит в устье, стоит в нём, и устье тут же забирает его
 ## обратно. Раньше тем же латчем был защищён люк.
-var _tunnel_armed: bool = false
 var _story: Node = null
 
 
@@ -227,7 +226,6 @@ func _style_outdoor_button(b: Button) -> void:
 func _process(_dt: float) -> void:
 	_resolve_refs()
 	_tick_tutorial()
-	_auto_enter_tunnel_if_touched()
 	_update_hud_button()
 	_update_outdoor_hotspot()
 	if _view != null and _view.visible:
@@ -350,9 +348,6 @@ func exit_through_tunnel() -> bool:
 	var mouth := world.tunnel_mouth()
 	# Герой встаёт РОВНО в устье (решение владельца): вниз ведёт только
 	# колодец, шага в сторону из него нет — стенки 16 и 18 железобетонные.
-	# Латч гасится ДО выхода, иначе устье тут же утащит героя обратно в дом
-	# (см. _auto_enter_tunnel_if_touched).
-	_tunnel_armed = false
 	_reveal_around(mouth)
 	_leave_house(Vector2(mouth.x + 0.5, mouth.y + 0.5))
 	return true
@@ -440,28 +435,10 @@ func robert_finished_garden() -> void:
 # Контекстная кнопка HUD
 # ---------------------------------------------------------------------------
 
-## Устье тоннеля втягивает героя в дом само, как только он в него налетел
-## (решение владельца, раньше так же работал люк): подтверждение у дыры, из
-## которой только что поднялся, — лишний тап на каждом возвращении.
-##
-## Дверь так НЕ работает намеренно: мимо неё ходят по огороду постоянно, и
-## дом хватал бы игрока при каждом проходе.
-func _auto_enter_tunnel_if_touched() -> void:
-	if GameState.house_is_indoors or not GameState.is_alive:
-		return
-	if not GameState.house_hatch_built or player == null or player.frozen:
-		return
-	if not near_tunnel_mouth():
-		_tunnel_armed = true
-		return
-	if not _tunnel_armed:
-		return
-	_tunnel_armed = false
-	# «Подвал» слит с мастерской (решение владельца, 2026-09-16): устье
-	# тоннеля поднимает героя туда же, где стена с удочками, верстак и склад.
-	enter_house("workshop")
-
-
+## Устье тоннеля героя НИКУДА НЕ ТЯНЕТ (решение владельца): из шахты он
+## просто вылетает наверх, а в дом заходит сам — кнопкой «Зайти» у окна
+## веранды. Автоматический перенос читался как непонятный телепорт: игрок
+## поднимался по стволу и без спроса оказывался в подвале.
 ## «Дом» как контекстная кнопка внизу экрана ОТМЕНЕНА владельцем (2026-09-16):
 ## вход теперь через плавающую кнопку «Зайти» над героем у окна веранды (см.
 ## _update_outdoor_hotspot). Метод и поле _button оставлены пустой обёрткой —

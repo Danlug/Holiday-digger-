@@ -110,8 +110,12 @@ REF = ("падение", 0)
 # один раз на весь лист: иначе герой при взлёте скакнёт по вертикали.
 
 
-def background_mask(im):
+def background_mask(im, bg=None, tol=None):
     """True там, где фон. Заливка от краёв.
+
+    bg/tol задаются, когда лист другой: import_walk.py зовёт эту же заливку
+    для листа ходьбы, а фон там темнее (29,25,22). Значения по умолчанию —
+    для листа движения, ради которого функция и написана.
 
     Порогом яркости этот лист резать нельзя: фон (41,46,49) темнее многих
     пикселей джинсов и светлее обводки, и любой порог либо оставит фон, либо
@@ -123,9 +127,11 @@ def background_mask(im):
     """
     px = im.load()
     w, h = im.size
+    bg = BG if bg is None else bg
+    tol = BG_TOL if tol is None else tol
 
     def bg_like(p):
-        return max(abs(p[i] - BG[i]) for i in range(3)) <= BG_TOL
+        return max(abs(p[i] - bg[i]) for i in range(3)) <= tol
 
     mask = bytearray(w * h)
     seen = bytearray(w * h)

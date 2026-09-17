@@ -51,6 +51,13 @@ const VIEW_W := 224.0  # project.godot: window/size/viewport_width
 const WALK_SPEED_PX_S := 130.0
 const HERO_W := 48.0
 const HERO_H := 48.0
+
+## Герой в доме крупнее, чем в шахте (решение владельца: «в доме он должен
+## быть в 5 раз больше»). Комнаты нарисованы в другом масштабе — дверь в
+## салоне высотой почти в половину экрана, — и кадр 48×48 рядом с ней читался
+## как игрушечный. Пиксель героя при этом становится крупнее пикселя фона:
+## это цена того, чтобы он был одного роста с мебелью.
+const HERO_SCALE := 5.0
 ## Запас от низа кадра до подошвы — то же число, что GROUND_Y в
 ## character_view.gd (48 - 46 = 2): кадр героя шире тела, и без этого запаса
 ## подошва повисала бы над полом.
@@ -253,6 +260,8 @@ func _build_stage() -> void:
 	_hero.stretch_mode = TextureRect.STRETCH_KEEP
 	_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hero.size = Vector2(HERO_W, HERO_H)
+	_hero.scale = Vector2(HERO_SCALE, HERO_SCALE)
+	_hero.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 	_hotspot_layer = _need(_stage, "Hotspots", Control) as Control
 	_hotspot_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -529,7 +538,11 @@ func _update_camera_and_hero() -> void:
 
 	_update_hero_frame()
 	var screen_x: float = _hero_x_px - cam_x
-	_hero.position = Vector2(screen_x - HERO_W / 2.0, _floor_y_px - HERO_H + FOOT_PAD)
+	# Масштаб растёт от левого верхнего угла, поэтому и ширина, и высота, и
+	# отступ подошвы считаются уже увеличенными — иначе герой уедет вправо и
+	# провалится под пол.
+	_hero.position = Vector2(screen_x - HERO_W * HERO_SCALE / 2.0,
+		_floor_y_px - (HERO_H - FOOT_PAD) * HERO_SCALE)
 	_hero.flip_h = _facing < 0
 
 
@@ -639,8 +652,11 @@ func _position_hotspot_buttons() -> void:
 	var n := _hotspot_buttons.size()
 	if n == 0:
 		return
-	var hero_center_x: float = _hero.position.x + HERO_W / 2.0
-	var top_y: float = _hero.position.y - 28.0
+	var hero_center_x: float = _hero.position.x + HERO_W * HERO_SCALE / 2.0
+	# Над макушкой, а не над рамкой кадра: в кадре 48×48 у героя сверху шесть
+	# пустых пикселей, и после увеличения это уже тридцать — кнопка висела бы
+	# заметно выше головы.
+	var top_y: float = _hero.position.y + 6.0 * HERO_SCALE - 26.0
 	var gap := 4.0
 	var widths: Array = []
 	var total := 0.0

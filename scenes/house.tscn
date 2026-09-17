@@ -415,9 +415,11 @@ layout_mode = 0
 mouse_filter = 2
 
 [node name="Hero" type="TextureRect" parent="Root/Stage"]
+texture_filter = 1
 layout_mode = 0
 offset_right = 48.0
 offset_bottom = 48.0
+scale = Vector2(5, 5)
 mouse_filter = 2
 stretch_mode = 2
 

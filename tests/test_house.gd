@@ -365,21 +365,32 @@ func _test_tunnel_transition() -> void:
 	check_near("герой стоит в устье по x", player.x, mouth.x + 0.5, 0.001)
 	check_near("герой стоит в устье по y", player.y, mouth.y + 0.5, 0.001)
 
-	# Устье втягивает в дом само, но только после того, как от него отошли:
-	# иначе спуск — петля «вышел и тут же затянуло обратно».
-	house._auto_enter_tunnel_if_touched()
-	check("сразу после спуска устье обратно не затягивает", not GameState.house_is_indoors)
-	player.x = mouth.x + 0.5
+	# Устье НИКУДА НЕ ТЯНЕТ (решение владельца): из шахты герой просто
+	# вылетает наверх, а в дом заходит сам, кнопкой у окна веранды. Прежний
+	# автоматический перенос читался как непонятный телепорт.
+	for step in range(30):
+		house._process(0.016)
+	check("на устье в дом не затягивает", not GameState.house_is_indoors)
 	player.y = mouth.y + WorldGen.TUNNEL_DEPTH - 0.5
-	house._auto_enter_tunnel_if_touched()      # ушёл вглубь — устье взводится
-	check("в глубине колодца в дом не затягивает", not GameState.house_is_indoors)
-	# Поднялся снизу и налетел на устье — возврат домой без кнопки.
+	for step in range(10):
+		house._process(0.016)
+	check("в глубине колодца тоже не затягивает", not GameState.house_is_indoors)
 	player.y = mouth.y + 0.5
-	house._auto_enter_tunnel_if_touched()
-	check("налетел на устье снизу — вернуло в дом без кнопки", GameState.house_is_indoors)
-	# «Подвал» слит с мастерской (решение владельца, 2026-09-16): устье
-	# поднимает героя туда же, где склад, верстак и стена с удочками.
-	check("попал именно в мастерскую", GameState.house_room == "workshop")
+	for step in range(10):
+		house._process(0.016)
+	check("подъём к устью снизу героя не переносит", not GameState.house_is_indoors)
+	check("автоматического переноса из шахты в дом больше нет",
+		not house.has_method("_auto_enter_tunnel_if_touched"))
+
+	# Кнопки «В шахту» в мастерской тоже нет: из дома выходят на улицу и
+	# спускаются в тоннель ногами.
+	var stairs: Dictionary = HouseRoomsConfig.points("workshop").get("stairs", {})
+	var stairs_actions: Array = []
+	for b in stairs.get("buttons", []):
+		stairs_actions.append(String(b.get("action", "")))
+	check("у лестницы в мастерской нет кнопки в шахту",
+		not stairs_actions.has("exit_tunnel"))
+	check("подъём в салон у лестницы остался", stairs_actions.has("goto:hall"))
 
 	# Землетрясение стирает диффы: колодец обязан пробиваться заново, иначе
 	# спуск замуровывает героя в породе.

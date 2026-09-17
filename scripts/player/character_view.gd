@@ -45,6 +45,22 @@ const SHEET_FRAME := {
 ## 3 — джетпак, 4 — топовый джетпак. 0 — снаряжения нет.
 const FLY_SHEETS := ["fly_1", "fly_2", "fly_3", "fly_4"]
 
+## Сколько единиц счётчика anim держится один кадр. Меньше — быстрее.
+const ANIM_DIV := 7.0
+
+## Свой темп у листов, где кадров не четыре.
+##
+## Ходьба нарисована на шестнадцать кадров, и это ЧЕТЫРЕ шага, а не один
+## цикл: узкие позы (ноги вместе) приходятся на кадры 1, 5, 9 и 13. При общем
+## темпе 7.0 шаг растянулся бы вчетверо, и герой поехал бы по земле как на
+## коньках. Считано от скорости: 4.2 клетки/с — это 134 px/с, шаг в рисунке
+## около 17 px, значит на шаг отведено 0.13 с, то есть четыре кадра за 0.13 с
+## при 60 кадрах в секунду (anim растёт на 2 за кадр) — это 3.8 единицы на
+## кадр. Захочется бодрее или ленивее — крутится здесь, одним числом.
+const SHEET_ANIM_DIV := {
+	"walk": 3.8,
+}
+
 ## Листы копки, нарисованные отдельно для копки вниз и для копки вбок.
 ## Ключ — общее имя набора, к нему приписывается "_down" или "_side".
 const DIG_SHEETS := ["idle", "walk", "fall", "fly", "fly_jet",
@@ -159,13 +175,14 @@ func _process(_dt: float) -> void:
 		sheet_name = "walk" if player.vx != 0.0 else "idle"
 
 	var geom: Array = SHEET_FRAME.get(sheet_name, [CHAR_W, CHAR_H, GROUND_Y])
+	var anim_div: float = SHEET_ANIM_DIV.get(sheet_name, ANIM_DIV)
 	var fw: int = geom[0]
 	var fh: int = geom[1]
 	var tex: Texture2D = _sheets.get(sheet_name)
 	if tex != null:
 		_sprite.texture = tex
 		var frames: int = maxi(1, int(round(tex.get_width() / float(fw))))
-		var frame: int = int(floor(player.anim / 7.0)) % frames if frames > 1 else 0
+		var frame: int = int(floor(player.anim / anim_div)) % frames if frames > 1 else 0
 		_sprite.region_rect = Rect2(frame * fw, 0, fw, fh)
 	_sprite.flip_h = player.facing < 0
 	# Линия земли листа должна лечь туда же, куда ложится подошва у кадра

@@ -245,6 +245,40 @@ def tone_match(sheet, mask):
     return out
 
 
+# Подрезкость после уменьшения: насколько её добавлять и с какого запаса
+# подробностей она уже не нужна.
+SHARPEN_RADIUS = 1.2
+SHARPEN_MAX_PERCENT = 100
+SHARPEN_THRESHOLD = 2
+SHARPEN_RICH_RATIO = 2.0    # исходник вдвое крупнее цели — резкости и так вдоволь
+SHARPEN_POOR_RATIO = 1.2    # почти впритык — добавляем на полную
+
+
+def _restore_bite(img, src_h, dst_h):
+    """Вернуть кадру резкость, потерянную при масштабировании.
+
+    Сила зависит от того, сколько подробностей было в исходнике. Лист
+    персонажей даёт фигуру в 287 px на кадр в 120 — там после уменьшения край
+    и так звонкий, и подрезать его значит получить ореолы. Листы анимаций
+    дают 106-150 px, то есть почти впритык, и после масштабирования картинка
+    мягкая — вот там подрезкость и нужна.
+
+    Ничего не выдумывает: подчёркивает то, что в кадре уже есть. Разницу в
+    подробности исходников это не отменяет — см. docs/BUILD.md.
+    """
+    ratio = src_h / max(1.0, float(dst_h))
+    t = (SHARPEN_RICH_RATIO - ratio) / (SHARPEN_RICH_RATIO - SHARPEN_POOR_RATIO)
+    t = max(0.0, min(1.0, t))
+    if t <= 0.0:
+        return img
+    percent = int(round(SHARPEN_MAX_PERCENT * t))
+    if percent <= 0:
+        return img
+    rgb = img.convert("RGB").filter(ImageFilter.UnsharpMask(
+        radius=SHARPEN_RADIUS, percent=percent, threshold=SHARPEN_THRESHOLD))
+    return Image.merge("RGBA", rgb.split() + (img.getchannel("A"),))
+
+
 def shrink(img, size, colors=0):
     """Уменьшение с премультиплированной альфой.
 
@@ -292,6 +326,8 @@ def shrink(img, size, colors=0):
             k = 255.0 / a         # снимаем премультипликацию
             op[x, y] = (min(255, int(r * k)), min(255, int(g * k)),
                         min(255, int(b * k)), a)
+
+    out = _restore_bite(out, h, th)
 
     if colors > 0:
         rgb = Image.new("RGB", (tw, th), (0, 0, 0))

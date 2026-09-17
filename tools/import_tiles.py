@@ -36,7 +36,7 @@ import math
 import os
 import sys
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -236,6 +236,12 @@ def cells(sheet, trim=TRIM):
             dx, dy = round(w * trim), round(h * trim)
             box = (x0 + dx, y0 + dy, x1 + 1 - dx, y1 + 1 - dy)
             img = sheet.crop(box).resize((TILE, TILE), Image.LANCZOS)
+            # Ячейка на листе ~61 px, а тайл 96: картинка растягивается и
+            # мягчает. Подрезкость возвращает ей зернистость породы. Радиус
+            # маленький и без порога: у тайла нет контура, который можно
+            # обвести ореолом, зато есть мелкая крошка, ради которой всё и
+            # делается. За швами следит проверка ниже — она печатает худший.
+            img = img.filter(ImageFilter.UnsharpMask(radius=1.0, percent=70, threshold=0))
             # пустые ячейки в конце листа пропускаем
             if sum(img.getpixel((TILE // 2, TILE // 2))) > 40:
                 out[(r, c)] = img

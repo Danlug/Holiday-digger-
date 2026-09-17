@@ -570,6 +570,39 @@ func take_starting_pickaxe() -> void:
 	_toast("Ржавая кирка деда — теперь твоя.", 3.0)
 
 
+## Заказ еды из магазина у входной двери. Магазин только берёт деньги и зовёт
+## сюда: доставка — дело дома (таймер и порция у двери), а знать про него
+## магазину незачем.
+##
+## Непереносимую еду (стейк, пельмени — решение владельца) нести некуда,
+## поэтому её не доставляют, а съедают сразу: игрок и так стоит у своей двери.
+static func order_food(id: String) -> Dictionary:
+	if not HouseFood.pay_for_order(id):
+		return {"ok": false, "message": String(HouseFood.can_order(id).get("reason", "Заказать нельзя."))}
+	var name := HouseConfig.food_name(id)
+	if not HouseConfig.is_portable(id):
+		var eaten := HouseFood.eat_now(id)
+		return {"ok": true, "message": "%s — съедено на месте: голод +%d%%." % [
+			name, int(eaten.get("hunger", 0.0))]}
+	if instance != null:
+		instance._start_delivery(id)
+	else:
+		HouseFood.deliver(id)
+	return {"ok": true, "message": "%s: курьер будет у двери через %d с." % [
+		name, int(round(HouseConfig.delivery_seconds()))]}
+
+
+## Курьер едет к двери — порция появляется там через delivery_seconds (ГДД
+## п.7). Таймер именно здесь: заказ из шахты иначе телепортировал бы обед
+## прямо в руки, и «сбегать домой» перестало бы быть решением игрока.
+func _start_delivery(id: String) -> void:
+	var timer := get_tree().create_timer(HouseConfig.delivery_seconds())
+	timer.timeout.connect(func():
+		HouseFood.deliver(id)
+		_toast("Доставка у двери: %s." % HouseConfig.food_name(id), 3.0)
+	)
+
+
 ## Заказ и доставка еды (HouseFood.pay_for_order/deliver) больше не ведутся
 ## отсюда: «Заказать» в салоне и «Верстак» в мастерской открывают магазин
 ## (_open_shop), и заказ теперь его забота — см. отчёт агента дома. Здесь

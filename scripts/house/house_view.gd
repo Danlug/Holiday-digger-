@@ -58,6 +58,11 @@ const HERO_H := 48.0
 ## как игрушечный. Пиксель героя при этом становится крупнее пикселя фона:
 ## это цена того, чтобы он был одного роста с мебелью.
 const HERO_SCALE := 5.0
+
+## Кадр героя на диске в ART_SCALE раз крупнее логических 48×48 (см.
+## tools/import_art.py). В доме он к тому же увеличен впятеро, поэтому
+## подробность текстуры здесь нужнее всего.
+const ART_SCALE := 3.0
 ## Запас от низа кадра до подошвы — то же число, что GROUND_Y в
 ## character_view.gd (48 - 46 = 2): кадр героя шире тела, и без этого запаса
 ## подошва повисала бы над полом.
@@ -178,12 +183,30 @@ func _build_header() -> void:
 	_clock = _need(header, "Clock", Label) as Label
 	_clock.anchor_left = 1.0
 	_clock.anchor_right = 1.0
-	_clock.offset_left = -112
-	_clock.offset_right = -6
+	_clock.offset_left = -122
+	_clock.offset_right = -62
 	_clock.offset_top = 3
 	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_clock.add_theme_font_size_override("font_size", 8)
 	_clock.add_theme_color_override("font_color", DIM)
+
+	# Кнопка «Магазин» есть и дома (решение владельца: «и дома и вне дома»).
+	# На время дома HUD скрыт целиком, поэтому его кнопку сюда не дотянуть —
+	# в шапке комнаты стоит своя, зовущая ту же премиум-витрину.
+	var premium := _need(header, "Premium", Button) as Button
+	premium.text = "Магазин"
+	premium.add_theme_font_size_override("font_size", 8)
+	premium.focus_mode = Control.FOCUS_NONE
+	premium.anchor_left = 1.0
+	premium.anchor_right = 1.0
+	# Верхняя строка, справа: ниже идут полоски выживания на всю ширину, и
+	# кнопка там налезала на бодрость.
+	premium.offset_left = -56
+	premium.offset_right = -6
+	premium.offset_top = 1
+	premium.offset_bottom = 15
+	if not premium.pressed.is_connected(_on_premium_pressed):
+		premium.pressed.connect(_on_premium_pressed)
 
 	# Полоски выживания дублируются здесь: HUD на время дома скрыт целиком
 	# (его джойстик и нижняя полоса иначе торчали бы поверх комнаты), а
@@ -259,9 +282,8 @@ func _build_stage() -> void:
 	_hero = _need(_stage, "Hero", TextureRect) as TextureRect
 	_hero.stretch_mode = TextureRect.STRETCH_KEEP
 	_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hero.size = Vector2(HERO_W, HERO_H)
-	_hero.scale = Vector2(HERO_SCALE, HERO_SCALE)
-	_hero.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_hero.size = Vector2(HERO_W * ART_SCALE, HERO_H * ART_SCALE)
+	_hero.scale = Vector2(HERO_SCALE / ART_SCALE, HERO_SCALE / ART_SCALE)
 
 	_hotspot_layer = _need(_stage, "Hotspots", Control) as Control
 	_hotspot_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -552,7 +574,7 @@ func _update_hero_frame() -> void:
 	if sheet == null:
 		_hero.texture = null
 		return
-	var frame_w := int(HERO_W)
+	var frame_w := int(HERO_W * ART_SCALE)
 	var frame_count: int = maxi(1, int(sheet.get_width()) / frame_w)
 	var idx := 0
 	if moving:
@@ -563,7 +585,7 @@ func _update_hero_frame() -> void:
 	_cur_frame_idx = idx
 	var atlas := AtlasTexture.new()
 	atlas.atlas = sheet
-	atlas.region = Rect2(idx * frame_w, 0, frame_w, int(HERO_H))
+	atlas.region = Rect2(idx * frame_w, 0, frame_w, int(HERO_H * ART_SCALE))
 	_hero.texture = atlas
 
 
@@ -799,6 +821,14 @@ func _update_sleep_frame() -> void:
 # ---------------------------------------------------------------------------
 
 ## Сообщение в шапке дома (замена тостов HUD, который на время дома скрыт).
+## Премиум-витрина открывается и из комнаты. Зовём по пути, а не по классу:
+## магазин — чужая система, и дом не должен падать в сборке без неё.
+func _on_premium_pressed() -> void:
+	var path := "res://scripts/shop/shop_ui.gd"
+	if ResourceLoader.exists(path):
+		load(path).call("open_premium")
+
+
 func notify(text: String, seconds: float = 3.0) -> void:
 	if _notice == null:
 		return

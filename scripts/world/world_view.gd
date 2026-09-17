@@ -89,9 +89,15 @@ func _set_color(s: Sprite2D, color: Color) -> void:
 	s.modulate = color
 
 
+## Тайл на диске в ART_SCALE раз крупнее клетки (см. tools/import_art.py):
+## рисуем уменьшенным, чтобы клетка осталась клеткой, а подробности достались
+## экрану телефона.
+const ART_SCALE := 3.0
+
+
 func _set_texture(s: Sprite2D, tex: Texture2D) -> void:
 	s.texture = tex
-	s.scale = Vector2.ONE
+	s.scale = Vector2(1.0 / ART_SCALE, 1.0 / ART_SCALE)
 	s.modulate = Color.WHITE
 
 

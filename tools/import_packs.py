@@ -344,7 +344,7 @@ def main(path):
             piece = cell.crop(box)
             tw = max(1, round(piece.size[0] * k))
             th = max(1, round(piece.size[1] * k))
-            small = shrink(piece, (tw, th), colors=32)
+            small = shrink(piece, (tw, th))
             cx = (faces[(r, i)][0] + faces[(r, i)][2]) / 2.0
             dx = i * fw + fw // 2 - round((cx - box[0]) * k)
             dy = gy - round((ground - box[1]) * k)

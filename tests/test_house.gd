@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_sleep_refuses_when_hungry()
 	_test_forced_sleep_ignores_hunger()
 	_test_food_delivery_and_eating()
+	_test_non_portable_food_is_eaten_at_home()
 	_test_paid_order_needs_coins()
 	_test_energy_bar_effect()
 	_test_enter_and_exit_keeps_state()
@@ -158,35 +159,56 @@ func _test_food_delivery_and_eating() -> void:
 
 	var free_before := HouseFood.free_orders_left()
 	check("бесплатные заказы вообще есть", free_before > 0)
-	check("заказ супа разрешён", bool(HouseFood.can_order("food_soup")["ok"]))
-	check("оплата заказа прошла", HouseFood.pay_for_order("food_soup"))
+	check("заказ лапши разрешён", bool(HouseFood.can_order("food_buldak")["ok"]))
+	check("оплата заказа прошла", HouseFood.pay_for_order("food_buldak"))
 	check("бесплатных заказов стало меньше", HouseFood.free_orders_left() == free_before - 1)
 
 	check("до доставки у двери пусто", HouseFood.food_at_door_count() == 0)
-	HouseFood.deliver("food_soup")
+	HouseFood.deliver("food_buldak")
 	check("после доставки у двери одна порция", HouseFood.food_at_door_count() == 1)
-	check("в рюкзаке еды ещё нет", GameState.get_item_count("food_soup") == 0)
+	check("в рюкзаке еды ещё нет", GameState.get_item_count("food_buldak") == 0)
 
 	check("забрал доставку", HouseFood.take_from_door() == 1)
-	check("порция в рюкзаке", GameState.get_item_count("food_soup") == 1)
+	check("порция в рюкзаке", GameState.get_item_count("food_buldak") == 1)
 	check("у двери снова пусто", HouseFood.food_at_door_count() == 0)
 
-	var eaten := HouseFood.eat("food_soup")
+	var eaten := HouseFood.eat("food_buldak")
 	check("съел", bool(eaten["ok"]))
-	check_near("суп восстановил 50% сытости", GameState.hunger, 70.0, 0.2)
-	check("порция израсходована", GameState.get_item_count("food_soup") == 0)
+	check_near("лапша восстановила 50% сытости", GameState.hunger, 70.0, 0.2)
+	check("порция израсходована", GameState.get_item_count("food_buldak") == 0)
+
+
+## Стейк и пельмени нельзя взять с собой на вылазку (решение владельца):
+## такая порция съедается сразу, дома, и в рюкзак не попадает.
+func _test_non_portable_food_is_eaten_at_home() -> void:
+	GameState.inventory.clear()
+	GameState.house_food_at_door.clear()
+	GameState.house_free_orders_used_today = 0
+	GameState.set_hunger(20.0)
+	GameState.coins = 1000
+
+	check("лапшу с собой унести можно", HouseConfig.is_portable("food_buldak"))
+	check("стейк с собой унести нельзя", not HouseConfig.is_portable("food_steak"))
+	check("пельмени с собой унести нельзя", not HouseConfig.is_portable("food_dumplings"))
+
+	var before := GameState.hunger
+	var r := HouseSystem.order_food("food_steak")
+	check("стейк заказан", bool(r.get("ok", false)))
+	check("стейк восстановил голод сразу", GameState.hunger > before)
+	check("стейка нет в рюкзаке", GameState.get_item_count("food_steak") == 0)
+	check("стейка нет и у двери", not GameState.house_food_at_door.has("food_steak"))
 
 
 func _test_paid_order_needs_coins() -> void:
 	# Бесплатные заказы кончились: дальше еда стоит монет.
 	GameState.house_free_orders_used_today = HouseConfig.free_orders_per_day()
 	GameState.coins = 0
-	check("без монет заказать нельзя", not bool(HouseFood.can_order("food_soup")["ok"]))
+	check("без монет заказать нельзя", not bool(HouseFood.can_order("food_buldak")["ok"]))
 
-	var price := HouseConfig.food_price_coins("food_soup")
+	var price := HouseConfig.food_price_coins("food_buldak")
 	GameState.add_coins(price)
-	check("с монетами заказать можно", bool(HouseFood.can_order("food_soup")["ok"]))
-	check("оплата прошла", HouseFood.pay_for_order("food_soup"))
+	check("с монетами заказать можно", bool(HouseFood.can_order("food_buldak")["ok"]))
+	check("оплата прошла", HouseFood.pay_for_order("food_buldak"))
 	check("монеты списаны", GameState.coins == 0)
 
 
@@ -512,13 +534,13 @@ func _test_front_door_take_delivery_condition() -> void:
 	check("без доставки — только «Заказать»", actions.has("open_shop"))
 	check("без доставки кнопки «Забрать» нет", not actions.has("take_delivery"))
 
-	HouseFood.deliver("food_soup")
+	HouseFood.deliver("food_buldak")
 	house._view.refresh()
 	actions = _actions()
 	check("доставка у двери — появилась «Забрать»", actions.has("take_delivery"))
 
 	house._view.trigger_point_button("front_door", 1)  # index 1 — «Забрать»
-	check("нажатие забрало доставку в рюкзак", GameState.get_item_count("food_soup") == 1)
+	check("нажатие забрало доставку в рюкзак", GameState.get_item_count("food_buldak") == 1)
 	house._view.refresh()
 	check("после «Забрать» кнопка снова пропала", not _actions().has("take_delivery"))
 

@@ -235,7 +235,7 @@ def main(path):
             piece = cell.crop(b)
             tw = max(1, round(piece.size[0] * k))
             th = max(1, round(piece.size[1] * k))
-            small = shrink(piece, (tw, th), colors=28)
+            small = shrink(piece, (tw, th))
 
             # голова — в середину кадра по X, земля группы — на линию подошв
             dx = n * FRAME_W + FRAME_W // 2 - round((heads[key][0] - b[0]) * k)

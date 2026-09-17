@@ -264,7 +264,16 @@ func get_vision_radius(branch_id: String, stage: int) -> int:
 	var effect: Dictionary = b.get("effect", {})
 	var base := int(_v(effect.get("base", 0)))
 	var per_stage := int(_v(effect.get("per_stage", 0)))
-	return base + per_stage * stage
+	var maximum := int(_v(effect.get("max", 0)))
+	var r := base + per_stage * stage
+	return mini(r, maximum) if maximum > 0 else r
+
+
+## На сколько клеток рельеф видно дальше ресурсов (решение владельца: всегда
+## на одну). Число лежит в ветке «Обзор», а не в коде: это баланс.
+func get_vision_terrain_bonus() -> int:
+	var effect: Dictionary = get_upgrade_branch("vision").get("effect", {})
+	return int(_v(effect.get("terrain_bonus_cells", 1)))
 
 
 ## Максимальное HP персонажа на заданной ступени ветки "hp".

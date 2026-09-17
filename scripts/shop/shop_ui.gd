@@ -36,6 +36,7 @@ const TAB_SELL := "sell"
 ## Экипировка — не пятая вкладка магазина, а отдельный экран: у верстака своя
 ## дверь (кнопка в мастерской) и вкладок над ним нет.
 const SCREEN_EQUIP := "equip"
+const SCREEN_PREMIUM := "premium"
 
 ## Доллары (премиум-валюта) остались на месте, но БЕЗ своей вкладки: на экране
 ## в 224 точки четыре вкладки уже по 52 точки каждая, пятая начала бы резать
@@ -104,16 +105,17 @@ static func open_shop() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
 		return
-	instance.open(TAB_PICKS)
+	instance.open(TAB_FOOD)
 
 
-## Доллары доступны всегда и везде (ГДД раздел 15). Своей вкладки у них нет —
-## ведём в «Еду», где лежат товары за доллары.
+## Премиум-магазин: всё, что за доллары (решение владельца — вынести из
+## разделов заказа в отдельную витрину). Доступен всегда и везде, в том числе
+## из шахты: кнопка «Магазин» висит в правом верхнем углу экрана.
 static func open_premium() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
 		return
-	instance.open(TAB_FOOD)
+	instance.open(SCREEN_PREMIUM)
 
 
 func _ready() -> void:
@@ -243,9 +245,12 @@ func _build() -> void:
 	tabs.add_theme_constant_override("separation", 3)
 	_root.add_child(tabs)
 	_tabs_row = tabs
-	_tab_buttons[TAB_PICKS] = _make_tab(tabs, TAB_PICKS, "Кирки")
-	_tab_buttons[TAB_TECH] = _make_tab(tabs, TAB_TECH, "Техника")
+	# Порядок и названия — решение владельца: «первый раздел продовольствие,
+	# второй экипировка, третий техника». «Продать» он не называл, но убрать
+	# её некуда: руду больше нигде не сдать, а без этого вылазка бессмысленна.
 	_tab_buttons[TAB_FOOD] = _make_tab(tabs, TAB_FOOD, "Еда")
+	_tab_buttons[TAB_PICKS] = _make_tab(tabs, TAB_PICKS, "Снаряга")
+	_tab_buttons[TAB_TECH] = _make_tab(tabs, TAB_TECH, "Техника")
 	_tab_buttons[TAB_SELL] = _make_tab(tabs, TAB_SELL, "Продать")
 
 	var scroll := ScrollContainer.new()
@@ -364,13 +369,14 @@ func _set_tab(tab: String) -> void:
 	for id in _tab_buttons.keys():
 		_tab_buttons[id].button_pressed = (id == tab)
 	if _tabs_row != null:
-		_tabs_row.visible = tab != SCREEN_EQUIP
+		_tabs_row.visible = tab != SCREEN_EQUIP and tab != SCREEN_PREMIUM
 	match tab:
 		TAB_PICKS: _title.text = "Кирки и ранцы"
 		TAB_TECH: _title.text = "Техника"
 		TAB_FOOD: _title.text = "Еда"
 		TAB_SELL: _title.text = "Скупка сырья"
 		SCREEN_EQUIP: _title.text = "Экипировка"
+		SCREEN_PREMIUM: _title.text = "Премиум-магазин"
 	_render()
 
 
@@ -384,6 +390,7 @@ func _render() -> void:
 		TAB_FOOD: _render_food()
 		TAB_SELL: _render_sell()
 		SCREEN_EQUIP: _render_equip()
+		SCREEN_PREMIUM: _render_premium_screen()
 
 
 func _add_hint(text: String, color: Color = DIM) -> void:
@@ -556,7 +563,6 @@ func _render_sell() -> void:
 		_footer_button.text = "Продать"
 		_footer_button.disabled = true
 		_show_unsellable_hint()
-		_add_dollars_block()
 		return
 
 	for row in rows:
@@ -570,7 +576,6 @@ func _render_sell() -> void:
 			r.button_pressed = false
 		_list.add_child(r)
 	_show_unsellable_hint()
-	_add_dollars_block()
 	_update_sell_footer()
 
 
@@ -821,31 +826,93 @@ func _do_craft(recipe_id: String) -> void:
 ## это ровно такие же расходники (батончик, энергетик, таблетка, часы), и
 ## разложить их по валютам значит заставить игрока помнить, в каком кармане
 ## что лежит. Цена на кнопке всегда со своим знаком — монеты или $.
+## Продовольствие — первый раздел заказа у двери (решение владельца). Всё,
+## что за доллары, отсюда ушло в премиум-магазин.
 func _render_food() -> void:
 	_footer.visible = false
-	var goods := ShopCatalog.goods_coins()
-	if goods.is_empty():
-		_add_hint("За монеты пока ничего нет.")
-	for g in goods:
-		_list.add_child(_make_good_row(g, "coins"))
+	var free_left := HouseFood.free_orders_left()
+	if free_left > 0:
+		_add_hint("Бабка оставила денег: бесплатных заказов сегодня — %d." % free_left)
+	for f in HouseConfig.delivery_menu():
+		_list.add_child(_make_food_row(f))
 
-	var premium := ShopCatalog.goods_dollars()
-	if not premium.is_empty():
-		_add_section("За доллары")
-		_add_hint("Доллары в игре нельзя купить: платежей в этой сборке нет. Их дают ролики, клады и закрытые ветки коллекции.", DIM)
-		for g in premium:
-			_list.add_child(_make_good_row(g, "dollars"))
+	var goods := ShopCatalog.goods_coins()
+	if not goods.is_empty():
+		_add_section("Допинги")
+		for g in goods:
+			_list.add_child(_make_good_row(g, "coins"))
 
 	_add_hint("Ролики (лимит на сегодня, ГДД раздел 15):")
 	for a in ShopCatalog.ad_rewards():
 		if String(a.get("id", "")) == "small_premium_currency":
-			continue  # ролик за доллары — внизу «Продать», рядом с обменом
+			continue  # ролик за доллары — в премиум-магазине
 		_list.add_child(_make_ad_row(a))
 
 
-## Доллары внизу вкладки «Продать»: обмен на монеты и ролик за доллары. Обе
-## строки про одно — как в кошельке появляются деньги, а именно этим вкладка
-## и занимается. Пятой вкладки ради двух строк на экране в 224 точки не будет.
+## Строка блюда. Непереносимое помечено прямо в подписи: узнать об этом уже в
+## шахте, когда рюкзак пуст, — худший момент.
+func _make_food_row(f: Dictionary) -> Control:
+	var id := String(f.get("id", ""))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+
+	var head := HBoxContainer.new()
+	var name_label := Label.new()
+	name_label.text = HouseConfig.food_name(id)
+	name_label.add_theme_font_size_override("font_size", 10)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.clip_text = true
+	name_label.custom_minimum_size = Vector2(40, 0)
+	head.add_child(name_label)
+
+	var check := HouseFood.can_order(id)
+	var price := HouseConfig.food_price_coins(id)
+	var btn := _make_button("даром" if bool(check.get("free", false)) else "%d" % price)
+	btn.disabled = not bool(check.get("ok", false))
+	btn.custom_minimum_size = Vector2(52, 18)
+	btn.pressed.connect(func(): _do_order_food(id))
+	head.add_child(btn)
+	box.add_child(head)
+
+	var desc := Label.new()
+	var hunger := int(round(HouseConfig.food_hunger_percent(id)))
+	var stamina := int(round(HouseConfig.food_stamina_percent(id)))
+	var parts: Array = ["голод +%d%%" % hunger]
+	if stamina > 0:
+		parts.append("бодрость +%d%%" % stamina)
+	parts.append("с собой" if HouseConfig.is_portable(id) else "только дома")
+	desc.text = "  ·  ".join(parts)
+	desc.add_theme_font_size_override("font_size", 8)
+	desc.add_theme_color_override("font_color",
+		DIM if HouseConfig.is_portable(id) else Color8(0xB8, 0x8A, 0x52))
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(desc)
+
+	box.add_child(HSeparator.new())
+	return box
+
+
+func _do_order_food(id: String) -> void:
+	var r := HouseSystem.order_food(id)
+	notice(String(r.get("message", "")), 3.0)
+	_render()
+
+
+## Премиум-магазин: отдельная витрина за доллары (решение владельца). Сюда же
+## обмен и ролик за доллары — всё про вторую валюту в одном месте.
+func _render_premium_screen() -> void:
+	_footer.visible = false
+	_add_hint("Доллары в этой сборке нельзя купить: платежей нет. Их дают ролики, клады и закрытые ветки коллекции.", DIM)
+	var premium := ShopCatalog.goods_dollars()
+	if premium.is_empty():
+		_add_hint("За доллары пока ничего нет.")
+	for g in premium:
+		_list.add_child(_make_good_row(g, "dollars"))
+	_add_dollars_block()
+
+
+## Обмен долларов на монеты и ролик за доллары. Живёт в премиум-магазине:
+## владелец попросил вынести туда всё, что связано с долларами.
 func _add_dollars_block() -> void:
 	_add_section("Доллары")
 	var ex := HBoxContainer.new()

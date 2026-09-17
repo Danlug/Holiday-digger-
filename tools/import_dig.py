@@ -201,7 +201,7 @@ def main(path):
             piece = cell.crop((x0, b[1], b[2], b[3]))
             tw = max(1, round(piece.size[0] * k))
             th = max(1, round(piece.size[1] * k))
-            small = shrink(piece, (tw, th), colors=28)
+            small = shrink(piece, (tw, th))
 
             # якорь: голова на оси кадра по X, земля ряда по Y
             dy = FRAME_H - FOOT_PAD - round((ground - b[1]) * k)

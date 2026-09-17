@@ -1,847 +1,848 @@
 {
-	"version": 1,
-	"_source": "docs/GDD.md разделы 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15",
-	"_legend": "поле {value, proposed:true, note} = число не задано в GDD и предложено геймдизайнеру на утверждение",
-	"world": {
-		"width_cells": 32,
-		"house_x_range": [
-			0,
-			14
-		],
-		"garden_x_range": [
-			15,
-			31
-		],
-		"hatch_position": [
-			15,
-			-6
-		],
-		"max_depth_cells": 10000,
-		"tile_size_px": 32,
-		"viewport_px": [
-			224,
-			480
-		],
-		"fixed_staircase": {
-			"x_side": "house",
-			"steps": [
-				1,
-				2,
-				3,
-				4
-			],
-			"note": "клеток на уровнях 1-4 соответственно; нерушима, не разрушается событиями сброса (см. GDD п.3)"
-		},
-		"fixed_foundation_depth": 5,
-		"fixed_peat_layer_depth_range": [
-			450,
-			455
-		],
-		"raid_boss_depth": {
-			"value": 10000,
-			"proposed": true,
-			"note": "владелец: на дне рейдбосс; механика боя ещё не описана"
-		}
-	},
-	"digging": {
-		"base_seconds_per_cell": 3.0,
-		"can_dig_upward": false,
-		"tap_same_direction_cancels": true,
-		"shovel_stun_on_stone_or_gold_seconds": 1.0,
-		"_shovel_stun_note": "решение владельца: стан символический — секунда и быстрая тряска героя на 3 пикселя вправо-влево (её рисует character_view). Минута, стоявшая здесь раньше, означала, что одно неверное касание камня вынимает игрока из игры дольше, чем длится сама вылазка, и лечится это только тем, что игрок откладывает телефон. Число — скаляр, а не {value, proposed}: так в этом файле записаны все решения владельца.",
-		"global_speed_multiplier": 1.3,
-		"_global_speed_multiplier_note": "решение владельца: со старта копается в 1.3 раза быстрее. Множитель ОБЩИЙ, а не переписанные секунды у каждого минерала: поминутные значения в minerals.json заданы по твёрдости и должны оставаться читаемыми как есть, а темп игры крутится одним числом."
-	},
-	"carry_capacity": {
-		"base_kg": 60,
-		"overload_threshold_fraction": 0.85,
-		"overload_band_fraction": 0.15,
-		"overload_min_speed_multiplier": 0.35,
-		"formula": "t = clamp((load/max - 0.85) / 0.15, 0, 1); speed_mult = 0.35^t"
-	},
-	"fall_damage": {
-		"coefficient": 0.154,
-		"exponent": 2.16,
-		"min_height_cells": 5,
-		"formula": "damage = 0.154 * height^2.16, height < 5 -> 0",
-		"reference_points": {
-			"5": 5,
-			"8": 14,
-			"10": 22,
-			"15": 54,
-			"20": 100,
-			"25": 160,
-			"30": 233
-		}
-	},
-	"backpack": {
-		"max_lift_per_use_cells": 10,
-		"cooldown_seconds": 10,
-		"max_speed_cells_per_sec": 3,
-		"base_accel_time_seconds": 3,
-		"formula": "accel_time = 3 / 0.85^(load_kg / 20)",
-		"reference_point": {
-			"load_kg": 60,
-			"accel_time_seconds": 4.9
-		},
-		"speed_ceiling_unaffected_by_load": true
-	},
-	"jetpack": {
-		"max_speed_cells_per_sec": 20,
-		"accel_time_seconds": 5,
-		"safe_speed_ratio": 0.8,
-		"head_bump_damage_coefficient": 20,
-		"formula": "damage = 20 * (speed_ratio - 0.8) / 0.2, speed_ratio <= 0.8 -> 0",
-		"free_fall_behavior": "активация полёта сначала гасит скорость падения до нуля, затем разгоняет вверх (см. GDD п.6)",
-		"fuel_source": {
-			"value": "coal_or_uranium",
-			"proposed": true,
-			"note": "точный вид топлива джетпака отдельно не назван в GDD (п.5 говорит про топливо техники в целом: торф→уголь→уран); принято общее с буровой машиной"
-		},
-		"no_fuel_fallback": "медленный ранец (backpack)",
-		"_purchase_note": "Джетпак больше не собирается на верстаке и не выдаётся по глубине: он куплен за 5000 монет как третья ступень линейки ранцев (см. gear выше). Здесь остаётся только физика удара головой и топлива. max_speed_cells_per_sec (20) — прежнее число GDD; фактический потолок подъёма теперь считается линейкой."
-	},
-	"survival": {
-		"bars": [
-			"hp",
-			"stamina",
-			"hunger"
-		],
-		"stamina_depletion": {
-			"full_depletion_seconds_idle": 3600,
-			"full_depletion_seconds_digging": 1200,
-			"dig_multiplier": 3,
-			"note": "полное истощение за 1 час простоя, при копке в 3 раза быстрее = 20 минут (см. GDD п.7)"
-		},
-		"hunger_depletion": {
-			"full_depletion_seconds_idle": 3600,
-			"full_depletion_seconds_digging": 1200,
-			"dig_multiplier": 3,
-			"note": "расход голода идентичен бодрости по GDD п.7 ('то же')"
-		},
-		"hp_drain_on_depletion": {
-			"hunger_hp_per_second": 1.0,
-			"stamina_hp_per_second": 0.0,
-			"both_empty_hp_per_second": 2.0,
-			"note": "решение владельца: пустая бодрость HP не трогает вовсе, она даёт штраф к скорости и расходу голода (см. exhausted_penalty). Убивает только голод."
-		},
-		"death": {
-			"loses_all_minerals_except_black_box": true,
-			"respawn_location": "house"
-		},
-		"hazards": {
-			"hot_rock_burn": {
-				"ref": "minerals.json -> terrain_hazards.hot_rock"
-			},
-			"mercury_poisoning": {
-				"hp_drain_per_second": {
-					"value": 0.5,
-					"proposed": true,
-					"note": "скорость утечки HP от отравления ртутью не задана в GDD (только факт 'медленно тратит HP', п.13)"
-				},
-				"skill_penalty_percent": {
-					"value": 20,
-					"proposed": true,
-					"note": "процент ухудшения навыков/замедления не задан в GDD"
-				},
-				"cured_by": [
-					"medicine",
-					"milk_at_home"
-				]
-			},
-			"drill_overheat": {
-				"note": {
-					"value": "механика перегрева бура/буровой машины упомянута как нерешённая (см. GDD п.18: 'буровая машина: перегрев, охлаждение'); числовые параметры не предложены — недостаточно данных даже для оценки, требуется решение гейм-дизайнера",
-					"proposed": true,
-					"note": "качественная заметка, не числовой параметр"
-				}
-			},
-			"lava": {
-				"depth_min": 3000,
-				"hp_damage_per_second": 20.0,
-				"dig_seconds": 5.0,
-				"note": "решения владельца: лава начинается с глубины 3000, жжёт 20 HP/с всё время копки, копается 5 секунд. 5×20 = 100 HP — ровно вся базовая полоска: без прокачки стойкости к температурам и запаса HP первая же лава убивает.",
-				"heat_resistance_stages": {
-					"value": null,
-					"proposed": true,
-					"note": "ступени стойкости к температурам владельцем не заданы: сколько ступеней, сколько процентов урона каждая снимает и чего стоит. Дизайн лавы владелец пришлёт отдельно."
-				}
-			}
-		},
-		"exhausted_penalty": {
-			"speed_multiplier": 0.5,
-			"hunger_drain_multiplier_while_working": 1.2,
-			"note": "решение владельца: бодрость на нуле — −50% ко всем скоростям и +20% к расходу голода при работе. Усталость гонит домой спать, а не убивает, и наказывает сама себя."
-		},
-		"warnings": {
-			"notice_percent": 25,
-			"severe_percent": 10,
-			"severe_shake": true,
-			"severe_red_flash_seconds": 2.0,
-			"note": "решение владельца: на 25% предупреждение на экране, на 10% — сотрясение и 2 секунды красного мигания. Предупреждать надо ДО того, как поздно: игрок должен успеть подняться."
-		}
-	},
-	"game_time": {
-		"game_hours_per_real_hour": 8,
-		"sleep": {
-			"stamina_restore_percent_per_game_hour": 12.5,
-			"full_restore_game_hours": 8,
-			"min_sleep_game_hours": 2,
-			"min_sleep_restore_percent": 25,
-			"skip_animation": true,
-			"risky_in_mine": true
-		}
-	},
-	"daily_reset": {
-		"basis": "real_time_utc_midnight",
-		"note": "КРИТИЧНО: сброс дневных лимитов считается по реальному времени (UTC-полночь), а не по игровому дню — иначе спам мгновенного сна в кровати фармит рекламные награды (см. GDD п.7, 15). game_state.gd хранит last_reset_utc_date отдельно от игрового времени."
-	},
-	"food": {
-		"delivery_seconds": 5,
-		"vegetable_satiety_percent": 20,
-		"vegetable_max_per_day": 5,
-		"fertilizer_unlocks_vegetables": true,
-		"_house_comment": "ниже — данные системы дома (scripts/house): что можно заказать, сколько это стоит и что восстанавливает. Существующие поля выше не менялись. Вес порций лежит в minerals.json (одно место: оттуда его берёт GameState.get_total_weight).",
-		"free_orders_per_day": {
-			"value": 3,
-			"proposed": true,
-			"note": "в GDD цены еды нет вовсе, а монеты в игре пока взять негде: копка даёт только опыт (п.4), магазин продажи ещё не построен. Без бесплатных заказов полоска голода нечем закрывается и герой умирает на первом часу. Сюжетное объяснение — деньги, оставленные бабкой на еду; лимит считается по РЕАЛЬНЫМ суткам (UTC), как рекламные лимиты, иначе мгновенный сон прокручивает игровые сутки и кормит бесплатно"
-		},
-		"order_arrives_at_door": true,
-		"items": [
-			{
-				"id": "food_soup",
-				"name_ru": "Суп в банке",
-				"source": "delivery",
-				"hunger_percent": {
-					"value": 50,
-					"proposed": true,
-					"note": "в GDD задана сытость только овощей с огорода (20%); половина полоски за половину цены полного обеда"
-				},
-				"stamina_percent": 0,
-				"price_coins": {
-					"value": 40,
-					"proposed": true,
-					"note": "цен еды в GDD нет. 40 монет = 8 клеток железа или ~1/2 золотого самородка: обед должен стоить заметной части вылазки, иначе голод перестаёт быть механикой"
-				}
-			},
-			{
-				"id": "food_dumplings",
-				"name_ru": "Пельмени",
-				"source": "delivery",
-				"hunger_percent": {
-					"value": 100,
-					"proposed": true,
-					"note": "полное восстановление голода одной порцией — чтобы перед долгой вылазкой можно было закрыть полоску одним действием"
-				},
-				"stamina_percent": {
-					"value": 10,
-					"proposed": true,
-					"note": "сытный обед немного бодрит; десятая часть полоски, чтобы не подменять сон"
-				},
-				"price_coins": {
-					"value": 90,
-					"proposed": true,
-					"note": "дороже двух супов на 10 монет: полный обед удобнее, но за удобство платят"
-				}
-			},
-			{
-				"id": "energy_drink",
-				"name_ru": "Энергетик",
-				"source": "shop",
-				"hunger_percent": 0,
-				"stamina_percent": 50,
-				"price_coins": {
-					"value": 120,
-					"proposed": true,
-					"note": "эффект задан в GDD (п.7: 50% выносливости), цена — нет. Дороже полного обеда: бодрость иначе восстанавливается только сном дома, то есть возвращением из шахты"
-				}
-			},
-			{
-				"id": "energy_bar",
-				"name_ru": "Энергетический батончик",
-				"source": "premium",
-				"hunger_percent": 50,
-				"stamina_percent": 100,
-				"price_dollars": {
-					"value": 1,
-					"proposed": true,
-					"note": "GDD (п.7) говорит только 'за донат'; 1 доллар = 100 монет по курсу economy.coins_per_premium_currency_unit"
-				},
-				"note": "этим же батончиком система учит есть при втором истощении в шахте (GDD п.9) — тогда он выдаётся бесплатно"
-			}
-		]
-	},
-	"house": {
-		"_source": "docs/GDD.md разделы 3, 7, 9 — планировка дома, сон, переходы. Числа, которых в GDD нет, помечены proposed",
-		"x_range": [
-			0,
-			14
-		],
-		"door_cell": {
-			"value": [
-				11,
-				0
-			],
-			"note": "подобрано под присланный владельцем рисунок дома: спрайт прижат правым краем к границе огорода (клетка 15), а входная группа на нём приходится на клетку 11. Раньше стояло 12 под старый рисунок шириной в четыре клетки."
-		},
-		"tunnel_mouth_cell": {
-			"value": [
-				17,
-				1
-			],
-			"note": "устье тоннеля Роберта: владелец отменил люк — вместо лестницы Роберт пробивает вниз колодец по клетке 17 (стенки 16 и 18 — железобетонный фундамент, копать их нельзя), и это единственный вход в копальню. Настоящий хозяин числа — WorldGen.TUNNEL_X и world.tunnel_mouth(); здесь оно продублировано как запасное для дома, когда мира ещё нет. Менять — вместе с миром"
-		},
-		"interact_radius_cells": {
-			"value": 1.2,
-			"proposed": true,
-			"note": "на каком расстоянии от двери и от устья тоннеля срабатывает вход; чуть больше полуклетки в каждую сторону, чтобы не приходилось ловить пиксель"
-		},
-		"sleep_min_deficit_percent": {
-			"value": 10,
-			"proposed": true,
-			"note": "минимальный сон по GDD — 2 игровых часа, и они отдают 25% бодрости. Если лечь с почти полной полоской, лишнее сгорает, а сытость за эти два часа спишется целиком: игрок платит едой ни за что. Кровать отказывает, пока бодрости не просело хотя бы на эти 10%"
-		},
-		"sleep_hunger_factor": {
-			"value": 0.5,
-			"proposed": true,
-			"note": "GDD не говорит, тратится ли голод во сне. Если не тратится, кровать — бесплатная кнопка 'снять усталость' и полоска бодрости перестаёт значить что-либо. Если тратится по обычной скорости простоя (12.5% за игровой час), полный сон 8 часов съедает ровно всю полоску голода и убивает спящего. Половина обычной скорости: полный сон стоит 50% голода, то есть одной порции супа — сон и еда держатся друг за друга"
-		},
-		"sleep_animation_seconds": {
-			"value": 10,
-			"proposed": true,
-			"note": "владелец: 'спит быстро, буквально 10 секунд, показывая анимацию'. Кнопка «Спать» у кровати держит комнату на паузе ровно это время (реальные секунды, не игровые часы — см. house_animation_seconds в house_view.gd/house_system.gd), потом применяется обычный эффект сна (см. sleep_min_deficit_percent/sleep_hunger_factor — их этот таймер не трогает)"
-		},
-		"rooms": [
-			"hall",
-			"bedroom",
-			"workshop"
-		],
-		"_rooms_comment": "Дом отменён как контекстное меню (решение владельца, 2026-09-16): герой физически ходит по трём комнатам — hall (салон), bedroom (спальня), workshop (мастерская, бывший подвал; включает склад и верстак). Геометрия комнат (двери, кровать, верстак, сундук, стена с удочками) — в data/rooms.json, не здесь: это доли по картинке, а не баланс. Музея и торфоперегонки в доме больше нет — это были пустые карточки-заглушки под системы, которых никто не построил; торфоперегонка по ГДД п.5 в любом случае должна стоять в огороде, а не в доме"
-	},
-	"dopings": {
-		"energy_drink": {
-			"stamina_restore_percent": 50,
-			"source": "shop"
-		},
-		"energy_bar": {
-			"stamina_restore_percent": 100,
-			"hunger_restore_percent": 50,
-			"source": "premium_currency"
-		}
-	},
-	"hazmat_containers": {
-		"mercury_bottle": {
-			"capacity_units": 1,
-			"weight_kg_full": 2.0,
-			"stackable": false,
-			"spill_behavior": {
-				"flows_down_if_empty_below_seconds": 2,
-				"flows_sideways": false,
-				"evaporates_after_seconds": 60,
-				"gas_cloud_spread_cells": 8,
-				"gas_cloud_duration_seconds": 300
-			}
-		},
-		"lead_container": {
-			"capacity_units": 4,
-			"weight_kg_full": 10.0,
-			"weight_kg_lead": 9.0,
-			"weight_kg_uranium": 1.0,
-			"cells_separated": true,
-			"stackable": false,
-			"note": "соты разделены, чтобы не носить критическую массу урана вместе (см. GDD п.13)"
-		}
-	},
-	"tools": {
-		"shovel": {
-			"name_ru": "Лопата",
-			"max_depth": 4,
-			"speed_multiplier": 1.0,
-			"can_mine": [
-				"earth",
-				"peat",
-				"scrap"
-			],
-			"cannot_mine": [
-				"stone",
-				"gold"
-			],
-			"cost": {
-				"coins": 0
-			},
-			"acquired": "старт игры",
-			"line": "starter",
-			"icon": "res://art/items/shovel.png",
-			"_max_depth_note": "Ограничение по глубине оставлено ТОЛЬКО лопате (решение агента, см. отчёт): лопата про землю, а не про породу, и глубже фундамента ей делать нечего. У кирок max_depth убран: воротами прогресса теперь служат деньги, и вторые ворота по глубине означали бы, что купленная за 50 000 обсидиановая кирка всё равно упирается в невидимую стену."
-		},
-		"rusty_pickaxe": {
-			"name_ru": "Ржавая кирка",
-			"max_depth": null,
-			"speed_multiplier": 1.0,
-			"breaks_at_depth": 80,
-			"broken_speed_multiplier": 0.75,
-			"cost": {
-				"coins": 0
-			},
-			"acquired": "находится в мастерской среди удочек, лопат и палок (решение владельца)",
-			"note": "трескается на сценарной клетке алмаза глубины 80 -> -25% скорости навсегда",
-			"line": "pickaxe",
-			"tier": 0,
-			"icon": "res://art/items/pickaxe_rusty.png"
-		},
-		"iron_pickaxe": {
-			"name_ru": "Железная кирка",
-			"line": "pickaxe",
-			"tier": 1,
-			"max_depth": null,
-			"speed_multiplier": 1.3,
-			"cost": {
-				"coins": 500
-			},
-			"icon": "res://art/items/pickaxe_iron.png",
-			"note": "цена и множитель заданы владельцем напрямую. Рецепта больше нет: кирки покупаются за монеты, из материалов собирается только техника."
-		},
-		"titanium_pickaxe": {
-			"name_ru": "Титановая кирка",
-			"line": "pickaxe",
-			"tier": 2,
-			"max_depth": null,
-			"speed_multiplier": 1.6,
-			"cost": {
-				"coins": 1500
-			},
-			"icon": "res://art/items/pickaxe_titanium.png",
-			"note": "цена и множитель заданы владельцем напрямую"
-		},
-		"platinum_pickaxe": {
-			"name_ru": "Платиновая кирка",
-			"line": "pickaxe",
-			"tier": 3,
-			"max_depth": null,
-			"speed_multiplier": 2.5,
-			"cost": {
-				"coins": 10000
-			},
-			"icon": "res://art/items/pickaxe_platinum.png",
-			"note": "цена и множитель заданы владельцем напрямую"
-		},
-		"diamond_pickaxe": {
-			"name_ru": "Алмазная кирка",
-			"line": "pickaxe",
-			"tier": 4,
-			"max_depth": null,
-			"speed_multiplier": 3.5,
-			"cost": {
-				"coins": 20000
-			},
-			"icon": "res://art/items/pickaxe_diamond.png",
-			"note": "цена и множитель заданы владельцем напрямую"
-		},
-		"obsidian_pickaxe": {
-			"name_ru": "Обсидиановая кирка",
-			"line": "pickaxe",
-			"tier": 5,
-			"max_depth": null,
-			"speed_multiplier": 5.0,
-			"cost": {
-				"coins": 50000
-			},
-			"icon": "res://art/items/pickaxe_obsidian.png",
-			"note": "цена и множитель заданы владельцем напрямую; последняя ступень линейки"
-		},
-		"hand_drill": {
-			"name_ru": "Ручной бур",
-			"max_depth": 500,
-			"speed_multiplier": {
-				"value": 2.0,
-				"proposed": true,
-				"note": "множитель скорости не задан в GDD; выбран как следующая ступень после железной кирки. Линейка кирок переписана владельцем (железная теперь ×1.3), и бур с ×2.0 встал между титановой (×1.6) и платиновой (×2.5) — техника и кирки идут параллельными ветками, а не одной лестницей."
-			},
-			"cost": {
-				"value": {
-					"iron_ore": 500,
-					"bronze": 100,
-					"silver": 50,
-					"coins": 2000
-				},
-				"proposed": true,
-				"note": "цена ступени апгрейда не задана в GDD (п.18: 'цены ступеней апгрейда лопаты, кирки, бура'); масштабирована ×10 от рецепта железной кирки"
-			},
-			"fuel": "peat_or_coal",
-			"triggers_quest": "сборка буровой установки (см. GDD п.5)",
-			"line": "tech",
-			"tier": 1,
-			"icon": "res://art/items/hand_drill.png"
-		},
-		"drill_rig": {
-			"name_ru": "Буровая машина (кабина)",
-			"max_depth": null,
-			"speed_multiplier": {
-				"value": 3.0,
-				"proposed": true,
-				"note": "множитель скорости не задан в GDD; следующая ступень после ручного бура"
-			},
-			"cost": {
-				"value": {
-					"nickel": 50,
-					"platinum": 20,
-					"coins": 10000
-				},
-				"proposed": true,
-				"note": "цена не задана в GDD (п.18); компоненты взяты из материалов, доступных к этой глубине"
-			},
-			"fuel": "coal_or_uranium",
-			"note": "герой залезает внутрь (см. GDD п.5); ширина копки, движение вбок/вверх, перегрев — нерешённые механики (п.18), не предложены числами",
-			"line": "tech",
-			"tier": 2,
-			"icon": "res://art/items/hand_drill.png"
-		},
-		"peat_distillery": {
-			"name_ru": "Торфоперегонка",
-			"location": "огород, с разрешения бабки",
-			"output": {
-				"fuel_blocks": "торф -> топливные блоки",
-				"fertilizer": "торф -> удобрение"
-			},
-			"note": "конверсия торфа в блоки/удобрение количественно не задана в GDD; см. fuel_consumption ниже для расхода на стороне потребления"
-		}
-	},
-	"fuel_consumption": {
-		"_comment": "4 торфа = 1 топливный блок (значение владельца). Добыча топлива не должна становиться основным занятием: блоки копятся про запас и тратятся по мере надобности.",
-		"peat_per_fuel_block": 4,
-		"coal_per_fuel_block": {
-			"value": 2,
-			"proposed": true,
-			"note": "уголь плотнее торфа"
-		},
-		"uranium_per_fuel_block": {
-			"value": 1,
-			"proposed": true,
-			"note": "после 1500 техника переходит на уран, нужен апгрейд"
-		},
-		"blocks_per_cell": {
-			"hand_drill": {
-				"value": 0.05,
-				"proposed": true,
-				"note": "20 клеток на блок"
-			},
-			"drill_machine": {
-				"value": 0.1,
-				"proposed": true,
-				"note": "10 клеток на блок"
-			}
-		},
-		"uranium_upgrade_depth": 1500
-	},
-	"idle_well": {
-		"base_income_coins_per_hour": {
-			"value": 50,
-			"proposed": true,
-			"note": "формула дохода не задана в GDD (п.18: 'доход idle-скважины: f(глубина, уровень)')"
-		},
-		"depth_factor_formula": {
-			"value": "1 + max_depth_reached / 100",
-			"proposed": true,
-			"note": "не задано в GDD; линейный рост с максимальной достигнутой глубиной, без потолка кроме офлайн-капа времени"
-		},
-		"level_multiplier_formula": {
-			"value": "1 + 0.1 * well_level",
-			"proposed": true,
-			"note": "не задано в GDD; +10% за уровень скважины"
-		},
-		"offline_cap_hours": {
-			"value": 8,
-			"proposed": true,
-			"note": "офлайн-кап не задан в GDD; выбран равным игровому дню (8 игровых часов = 1 реальный час, см. game_time), чтобы соответствовать общему ритму суток"
-		},
-		"formula_full": "income(t_hours) = min(t_hours, offline_cap_hours) * base_income * (1 + max_depth_reached/100) * (1 + 0.1*well_level)",
-		"ad_double_income_applies": true,
-		"pays": {
-			"coins": true,
-			"premium_currency": false,
-			"minerals": true,
-			"note": "решение владельца: скважина даёт ресурсы и золото, донатную валюту — никогда. Иначе премиум-валюта капает сама и покупать её незачем."
-		},
-		"offline_report": {
-			"show_on_return": true,
-			"note": "решение владельца: при заходе после отсутствия показывается окно с тем, что скважина накопала."
-		},
-		"name_ru": "Буровая скважина",
-		"build_cost": {
-			"value": {
-				"iron_ore": 100,
-				"bronze": 20,
-				"lead": 50,
-				"coins": 2000
-			},
-			"proposed": true,
-			"note": "состав сборки скважины владельцем не задан. Скважина — техника, а технику владелец оставил на материалах: взято примерно вчетверо от прежнего рецепта железной кирки (25/10/30/200), потому что скважина копает сама и окупается бесконечно, а кирка — нет."
-		},
-		"build_unlock_depth": {
-			"value": 100,
-			"proposed": true,
-			"note": "глубина открытия рецепта не задана. Та же, что у ручного бура: доход скважины считается от max_depth_reached, и на нулевой глубине она платила бы копейки."
-		}
-	},
-	"economy": {
-		"currencies": [
-			"coins",
-			"premium_currency"
-		],
-		"premium_currency_name_ru": "доллары",
-		"coins_per_premium_currency_unit": 1000,
-		"known_mineral_prices_ref": "см. minerals.json -> price_coins"
-	},
-	"monetization": {
-		"iap_products": [
-			{
-				"id": "remove_ads",
-				"name_ru": "Антиреклама",
-				"price_usd": 2.99,
-				"grants": [
-					"no_ads"
-				]
-			},
-			{
-				"id": "black_box_plus_1",
-				"name_ru": "Чёрный ящик +1",
-				"price_usd": 2.9,
-				"grants": [
-					"black_box_slot+1"
-				]
-			},
-			{
-				"id": "premium_monthly",
-				"name_ru": "Премиум / мес",
-				"price_usd": 9.9,
-				"grants": [
-					"no_ads",
-					"inventory_boost",
-					"strength_boost",
-					{
-						"premium_currency_onetime": {
-							"value": 50,
-							"proposed": true,
-							"note": "'немного премиум-валюты' не квантифицировано в GDD"
-						}
-					}
-				]
-			},
-			{
-				"id": "premium_plus_monthly",
-				"name_ru": "Премиум+ / мес",
-				"price_usd": 14.9,
-				"grants": [
-					"premium_monthly_benefits",
-					{
-						"premium_currency_daily": {
-							"value": 5,
-							"proposed": true,
-							"note": "'ежедневная премиум-валюта' не квантифицирована в GDD"
-						}
-					}
-				]
-			}
-		],
-		"gadgets_premium_currency": [
-			"teleport_watch_instant_home",
-			"full_restore_pill",
-			"energy_drink"
-		]
-	},
-	"black_box": {
-		"tiers": {
-			"base": 1,
-			"premium": 2,
-			"premium_plus": 3
-		},
-		"note": "клеток в ящике; клетки ящика не увеличивают грузоподъёмность (см. GDD п.14)"
-	},
-	"inventory": {
-		"default_max_stack": 99
-	},
-	"ads": {
-		"daily_limits": {
-			"skip_sleep_at_home": 5,
-			"double_income_on_sale": 3,
-			"restore_stamina_hunger_in_mine": 3,
-			"cancel_loot_loss_on_death": 1,
-			"small_premium_currency": 3,
-			"small_coins": 3,
-			"remote_dump_loot_for_sale": 3
-		},
-		"reset_basis": "real_time_utc_midnight"
-	},
-	"fog_of_war": {
-		"states": [
-			"black",
-			"gray_terrain_known",
-			"full_resource_visible"
-		],
-		"start_terrain_radius_cells": 2,
-		"start_resource_radius_cells": 1,
-		"persists_until_reset_event": true,
-		"dissipation_speed": {
-			"value": "instant_on_proximity",
-			"proposed": true,
-			"note": "скорость рассеивания тумана не задана в GDD (п.18); предложено мгновенное раскрытие при входе в радиус ауры, без анимации — простейший вариант, легко заменить позже"
-		}
-	},
-	"reset_events": {
-		"chunk_collapse": {
-			"frequency": "решение владельца",
-			"sizes": [
-				[
-					5,
-					5
-				],
-				[
-					10,
-					10
-				],
-				[
-					5,
-					32
-				],
-				[
-					10,
-					32
-				]
-			],
-			"check_every_seconds": 300,
-			"chance_percent": 7
-		},
-		"mine_earthquake": {
-			"frequency": "решение владельца",
-			"effect": "resets_and_randomizes_all_unfixed_cells",
-			"check_every_seconds": 600,
-			"chance_percent": 3
-		},
-		"permanently_fixed": [
-			"fixed_staircase",
-			"fixed_foundation",
-			"unmined_peat_layer_450_455"
-		],
-		"fog_resets_after_any_event": true
-	},
-	"drilling": {
-		"_comment": "Бурение: время на клетку и перегрев. Значения владельца — камень 10 сек, пороги перегрева и охлаждение 6 сек. Остальные времена бурения выведены по тиру ценности.",
-		"stone_seconds": 10.0,
-		"overheat": {
-			"_comment": "Нагрев до максимума. Указано, сколько клеток данного материала доводят бур до перегрева; вклад одной клетки = 1 / cells_to_overheat.",
-			"applies_to": [
-				"hand_drill",
-				"drill_mobile",
-				"drill_machine"
-			],
-			"cells_to_overheat": {
-				"earth": 20,
-				"iron_ore": 5,
-				"diamond": 3,
-				"stone": 1
-			},
-			"default_cells_to_overheat": {
-				"value": 8,
-				"proposed": true,
-				"note": "для материалов, не названных владельцем: между железом и алмазом"
-			},
-			"cooldown_seconds": 6.0,
-			"cooldown_curve": "exponential_tail",
-			"cooldown_exponent": {
-				"value": 3.0,
-				"proposed": true,
-				"note": "остывание доля = 1-(1-t)^3: сначала держится горячим, к концу 6 сек падает резко"
-			},
-			"overheat_hp_damage_per_second": {
-				"value": 5.0,
-				"proposed": true,
-				"note": "ГДД говорит \"перегрев вызывает потерю HP\", величина не задана"
-			}
-		},
-		"dig_directions": [
-			"down",
-			"left",
-			"right"
-		],
-		"_dig_directions_comment": "Вверх копать нельзя — ни персонажу, ни технике. Техника бурит ровно одну клетку за раз.",
-		"machine_dig_width_cells": 1
-	},
-	"crafting": {
-		"scrap_per_bronze": 1,
-		"_scrap_comment": "Владелец: \"1 металлолом - 1 кирка\". Прочитано как 1 металлолом -> 1 бронза, потому что бронза иначе нигде не добывается, а железная кирка требует 10 бронзы. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ."
-	},
-	"shops": {
-		"workshop": {
-			"name_ru": "Магазин в мастерской",
-			"name_en": "Workshop shop",
-			"unlock": "после первой вылазки с ресурсами",
-			"can_sell_resources": true,
-			"shows_prices": true,
-			"shows_total_before_confirm": true
-		},
-		"premium": {
-			"name_ru": "Магазин долларов",
-			"name_en": "Premium shop",
-			"unlock": "доступен всегда и везде",
-			"currency": "dollars"
-		}
-	},
-	"localization": {
-		"default": "ru",
-		"shipped": [
-			"ru",
-			"en"
-		],
-		"_comment": "RU и EN обязательны на старте. Все строки через систему перевода Godot, ключами, а не литералами — чтобы добавление языка не требовало правок кода."
-	},
-	"gear": {
-		"_note": "Линейка ранцев (решение владельца): четыре ступени, все — только за монеты, никаких рецептов. Множитель умножает ПОТОЛОК скорости подъёма базового ранца (base_max_speed_cells_per_sec ниже), а не ускорение: «×2 скорости полёта» — это вдвое быстрее лететь. Время разгона до потолка остаётся временем ступени, поэтому само ускорение (потолок / время разгона) растёт вместе с потолком — иначе на топовом джетпаке герой десять секунд набирал бы обещанную скорость и «×10» ощущалось бы как «×10 разгона». Надета всегда ровно одна ступень, выбор — на верстаке в мастерской (верстак = экипировка).",
-		"base_max_speed_cells_per_sec": 2.5,
-		"_base_note": "Прежняя константа PROP_SPEED из scripts/player/player.gd (эталон ощущений из web-демо). Переехала сюда, потому что теперь её умножает линейка: держать базу в коде, а множители в данных — значит развести их при первой правке. Поле backpack.max_speed_cells_per_sec (3) — число из GDD, кодом оно никогда не использовалось; трогать его не стали, чтобы не выдавать правку за уточнение GDD.",
-		"backpack": {
-			"name_ru": "Ранец",
-			"tier": 1,
-			"kind": "prop",
-			"fly_speed_multiplier": 1.0,
-			"cost": {
-				"coins": 100
-			},
-			"icon": "res://art/items/backpack_propeller.png",
-			"note": "базовая ступень: от неё считаются множители остальных, поэтому у неё ×1.0. Потолок подъёма 2.5 кл/с."
-		},
-		"backpack_plus": {
-			"name_ru": "Улучшенный ранец",
-			"tier": 2,
-			"kind": "prop",
-			"fly_speed_multiplier": 2.0,
-			"cost": {
-				"coins": 1000
-			},
-			"icon": "res://art/items/backpack_plus.png",
-			"note": "цена и множитель заданы владельцем. Потолок подъёма 5.0 кл/с. Иконка вырезана из авторского листа полёта (винт из art/character/fly_2.png)."
-		},
-		"jetpack": {
-			"name_ru": "Джетпак",
-			"tier": 3,
-			"kind": "jet",
-			"fly_speed_multiplier": 3.0,
-			"cost": {
-				"coins": 5000
-			},
-			"icon": "res://art/items/jetpack.png",
-			"note": "цена и множитель заданы владельцем. Потолок подъёма 7.5 кл/с. kind=jet — своё время разгона (5 с, без поправки на груз) и своя анимация полёта."
-		},
-		"jetpack_top": {
-			"name_ru": "Топовый джетпак",
-			"tier": 4,
-			"kind": "jet",
-			"fly_speed_multiplier": 10.0,
-			"cost": {
-				"coins": 20000
-			},
-			"icon": "res://art/items/jetpack_top.png",
-			"note": "цена и множитель заданы владельцем. Потолок подъёма 25.0 кл/с — ниже предела скорости падения V_TERM=32, так что герой всё ещё падает быстрее, чем взлетает. Иконка вырезана из авторского листа полёта (ракеты из art/character/fly_4.png)."
-		}
-	}
+ "version": 1,
+ "_source": "docs/GDD.md разделы 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15",
+ "_legend": "поле {value, proposed:true, note} = число не задано в GDD и предложено геймдизайнеру на утверждение",
+ "world": {
+  "width_cells": 32,
+  "house_x_range": [
+   0,
+   14
+  ],
+  "garden_x_range": [
+   15,
+   31
+  ],
+  "hatch_position": [
+   15,
+   -6
+  ],
+  "max_depth_cells": 10000,
+  "tile_size_px": 32,
+  "viewport_px": [
+   224,
+   480
+  ],
+  "fixed_staircase": {
+   "x_side": "house",
+   "steps": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "note": "клеток на уровнях 1-4 соответственно; нерушима, не разрушается событиями сброса (см. GDD п.3)"
+  },
+  "fixed_foundation_depth": 5,
+  "fixed_peat_layer_depth_range": [
+   450,
+   455
+  ],
+  "raid_boss_depth": {
+   "value": 10000,
+   "proposed": true,
+   "note": "владелец: на дне рейдбосс; механика боя ещё не описана"
+  }
+ },
+ "digging": {
+  "base_seconds_per_cell": 3.0,
+  "can_dig_upward": false,
+  "tap_same_direction_cancels": true,
+  "shovel_stun_on_stone_or_gold_seconds": 1.0,
+  "_shovel_stun_note": "решение владельца: стан символический — секунда и быстрая тряска героя на 3 пикселя вправо-влево (её рисует character_view). Минута, стоявшая здесь раньше, означала, что одно неверное касание камня вынимает игрока из игры дольше, чем длится сама вылазка, и лечится это только тем, что игрок откладывает телефон. Число — скаляр, а не {value, proposed}: так в этом файле записаны все решения владельца.",
+  "global_speed_multiplier": 1.3,
+  "_global_speed_multiplier_note": "решение владельца: со старта копается в 1.3 раза быстрее. Множитель ОБЩИЙ, а не переписанные секунды у каждого минерала: поминутные значения в minerals.json заданы по твёрдости и должны оставаться читаемыми как есть, а темп игры крутится одним числом."
+ },
+ "carry_capacity": {
+  "base_kg": 60,
+  "overload_threshold_fraction": 0.85,
+  "overload_band_fraction": 0.15,
+  "overload_min_speed_multiplier": 0.35,
+  "formula": "t = clamp((load/max - 0.85) / 0.15, 0, 1); speed_mult = 0.35^t"
+ },
+ "fall_damage": {
+  "coefficient": 0.154,
+  "exponent": 2.16,
+  "min_height_cells": 5,
+  "formula": "damage = 0.154 * height^2.16, height < 5 -> 0",
+  "reference_points": {
+   "5": 5,
+   "8": 14,
+   "10": 22,
+   "15": 54,
+   "20": 100,
+   "25": 160,
+   "30": 233
+  }
+ },
+ "backpack": {
+  "max_lift_per_use_cells": 10,
+  "cooldown_seconds": 10,
+  "max_speed_cells_per_sec": 3,
+  "base_accel_time_seconds": 3,
+  "formula": "accel_time = 3 / 0.85^(load_kg / 20)",
+  "reference_point": {
+   "load_kg": 60,
+   "accel_time_seconds": 4.9
+  },
+  "speed_ceiling_unaffected_by_load": true
+ },
+ "jetpack": {
+  "max_speed_cells_per_sec": 20,
+  "accel_time_seconds": 5,
+  "safe_speed_ratio": 0.8,
+  "head_bump_damage_coefficient": 20,
+  "formula": "damage = 20 * (speed_ratio - 0.8) / 0.2, speed_ratio <= 0.8 -> 0",
+  "free_fall_behavior": "активация полёта сначала гасит скорость падения до нуля, затем разгоняет вверх (см. GDD п.6)",
+  "fuel_source": {
+   "value": "coal_or_uranium",
+   "proposed": true,
+   "note": "точный вид топлива джетпака отдельно не назван в GDD (п.5 говорит про топливо техники в целом: торф→уголь→уран); принято общее с буровой машиной"
+  },
+  "no_fuel_fallback": "медленный ранец (backpack)",
+  "_purchase_note": "Джетпак больше не собирается на верстаке и не выдаётся по глубине: он куплен за 5000 монет как третья ступень линейки ранцев (см. gear выше). Здесь остаётся только физика удара головой и топлива. max_speed_cells_per_sec (20) — прежнее число GDD; фактический потолок подъёма теперь считается линейкой."
+ },
+ "survival": {
+  "bars": [
+   "hp",
+   "stamina",
+   "hunger"
+  ],
+  "stamina_depletion": {
+   "full_depletion_seconds_idle": 3600,
+   "full_depletion_seconds_digging": 1200,
+   "dig_multiplier": 3,
+   "note": "полное истощение за 1 час простоя, при копке в 3 раза быстрее = 20 минут (см. GDD п.7)"
+  },
+  "hunger_depletion": {
+   "full_depletion_seconds_idle": 3600,
+   "full_depletion_seconds_digging": 1200,
+   "dig_multiplier": 3,
+   "note": "расход голода идентичен бодрости по GDD п.7 ('то же')"
+  },
+  "hp_drain_on_depletion": {
+   "hunger_hp_per_second": 1.0,
+   "stamina_hp_per_second": 0.0,
+   "both_empty_hp_per_second": 2.0,
+   "note": "решение владельца: пустая бодрость HP не трогает вовсе, она даёт штраф к скорости и расходу голода (см. exhausted_penalty). Убивает только голод."
+  },
+  "death": {
+   "loses_all_minerals_except_black_box": true,
+   "respawn_location": "house"
+  },
+  "hazards": {
+   "hot_rock_burn": {
+    "ref": "minerals.json -> terrain_hazards.hot_rock"
+   },
+   "mercury_poisoning": {
+    "hp_drain_per_second": {
+     "value": 0.5,
+     "proposed": true,
+     "note": "скорость утечки HP от отравления ртутью не задана в GDD (только факт 'медленно тратит HP', п.13)"
+    },
+    "skill_penalty_percent": {
+     "value": 20,
+     "proposed": true,
+     "note": "процент ухудшения навыков/замедления не задан в GDD"
+    },
+    "cured_by": [
+     "medicine",
+     "milk_at_home"
+    ]
+   },
+   "drill_overheat": {
+    "note": {
+     "value": "механика перегрева бура/буровой машины упомянута как нерешённая (см. GDD п.18: 'буровая машина: перегрев, охлаждение'); числовые параметры не предложены — недостаточно данных даже для оценки, требуется решение гейм-дизайнера",
+     "proposed": true,
+     "note": "качественная заметка, не числовой параметр"
+    }
+   },
+   "lava": {
+    "depth_min": 3000,
+    "hp_damage_per_second": 20.0,
+    "dig_seconds": 5.0,
+    "note": "решения владельца: лава начинается с глубины 3000, жжёт 20 HP/с всё время копки, копается 5 секунд. 5×20 = 100 HP — ровно вся базовая полоска: без прокачки стойкости к температурам и запаса HP первая же лава убивает.",
+    "heat_resistance_stages": {
+     "value": null,
+     "proposed": true,
+     "note": "ступени стойкости к температурам владельцем не заданы: сколько ступеней, сколько процентов урона каждая снимает и чего стоит. Дизайн лавы владелец пришлёт отдельно."
+    }
+   }
+  },
+  "exhausted_penalty": {
+   "speed_multiplier": 0.5,
+   "hunger_drain_multiplier_while_working": 1.2,
+   "note": "решение владельца: бодрость на нуле — −50% ко всем скоростям и +20% к расходу голода при работе. Усталость гонит домой спать, а не убивает, и наказывает сама себя."
+  },
+  "warnings": {
+   "notice_percent": 25,
+   "severe_percent": 10,
+   "severe_shake": true,
+   "severe_red_flash_seconds": 2.0,
+   "note": "решение владельца: на 25% предупреждение на экране, на 10% — сотрясение и 2 секунды красного мигания. Предупреждать надо ДО того, как поздно: игрок должен успеть подняться."
+  }
+ },
+ "game_time": {
+  "game_hours_per_real_hour": 8,
+  "sleep": {
+   "stamina_restore_percent_per_game_hour": 12.5,
+   "full_restore_game_hours": 8,
+   "min_sleep_game_hours": 2,
+   "min_sleep_restore_percent": 25,
+   "skip_animation": true,
+   "risky_in_mine": true
+  }
+ },
+ "daily_reset": {
+  "basis": "real_time_utc_midnight",
+  "note": "КРИТИЧНО: сброс дневных лимитов считается по реальному времени (UTC-полночь), а не по игровому дню — иначе спам мгновенного сна в кровати фармит рекламные награды (см. GDD п.7, 15). game_state.gd хранит last_reset_utc_date отдельно от игрового времени."
+ },
+ "food": {
+  "delivery_seconds": 5,
+  "vegetable_satiety_percent": 20,
+  "vegetable_max_per_day": 5,
+  "fertilizer_unlocks_vegetables": true,
+  "_house_comment": "ниже — данные системы дома (scripts/house): что можно заказать, сколько это стоит и что восстанавливает. Существующие поля выше не менялись. Вес порций лежит в minerals.json (одно место: оттуда его берёт GameState.get_total_weight).",
+  "free_orders_per_day": {
+   "value": 3,
+   "proposed": true,
+   "note": "в GDD цены еды нет вовсе, а монеты в игре пока взять негде: копка даёт только опыт (п.4), магазин продажи ещё не построен. Без бесплатных заказов полоска голода нечем закрывается и герой умирает на первом часу. Сюжетное объяснение — деньги, оставленные бабкой на еду; лимит считается по РЕАЛЬНЫМ суткам (UTC), как рекламные лимиты, иначе мгновенный сон прокручивает игровые сутки и кормит бесплатно"
+  },
+  "order_arrives_at_door": true,
+  "items": [
+   {
+    "id": "food_bar",
+    "name_ru": "Белковый батончик",
+    "source": "delivery",
+    "hunger_percent": 20,
+    "stamina_percent": 0,
+    "price_coins": 50,
+    "portable": true
+   },
+   {
+    "id": "food_buldak",
+    "name_ru": "Лапша «Булдак»",
+    "source": "delivery",
+    "hunger_percent": 50,
+    "stamina_percent": 0,
+    "price_coins": 120,
+    "portable": true
+   },
+   {
+    "id": "food_dumplings",
+    "name_ru": "Пельмени «Пельмени»",
+    "source": "delivery",
+    "hunger_percent": 75,
+    "stamina_percent": 0,
+    "price_coins": 150,
+    "portable": false
+   },
+   {
+    "id": "food_steak",
+    "name_ru": "Стейк с пюре и салатом",
+    "source": "delivery",
+    "hunger_percent": 100,
+    "stamina_percent": 0,
+    "price_coins": 200,
+    "portable": false
+   },
+   {
+    "id": "energy_drink",
+    "name_ru": "Энергетик",
+    "source": "shop",
+    "hunger_percent": 0,
+    "stamina_percent": 50,
+    "price_coins": {
+     "value": 120,
+     "proposed": true,
+     "note": "эффект задан в GDD (п.7: 50% выносливости), цена — нет. Дороже полного обеда: бодрость иначе восстанавливается только сном дома, то есть возвращением из шахты"
+    }
+   },
+   {
+    "id": "energy_bar",
+    "name_ru": "Энергетический батончик",
+    "source": "premium",
+    "hunger_percent": 50,
+    "stamina_percent": 100,
+    "price_dollars": {
+     "value": 1,
+     "proposed": true,
+     "note": "GDD (п.7) говорит только 'за донат'; 1 доллар = 100 монет по курсу economy.coins_per_premium_currency_unit"
+    },
+    "note": "этим же батончиком система учит есть при втором истощении в шахте (GDD п.9) — тогда он выдаётся бесплатно"
+   }
+  ],
+  "_items_note": "Цены и проценты голода заданы владельцем. portable=false — «нельзя взять с собой на вылазку»: такая еда съедается сразу при заказе, дома, и в рюкзак не кладётся. Поэтому же у неё нет доставки к двери: нести её некуда."
+ },
+ "house": {
+  "_source": "docs/GDD.md разделы 3, 7, 9 — планировка дома, сон, переходы. Числа, которых в GDD нет, помечены proposed",
+  "x_range": [
+   0,
+   14
+  ],
+  "door_cell": {
+   "value": [
+    11,
+    0
+   ],
+   "note": "подобрано под присланный владельцем рисунок дома: спрайт прижат правым краем к границе огорода (клетка 15), а входная группа на нём приходится на клетку 11. Раньше стояло 12 под старый рисунок шириной в четыре клетки."
+  },
+  "tunnel_mouth_cell": {
+   "value": [
+    17,
+    1
+   ],
+   "note": "устье тоннеля Роберта: владелец отменил люк — вместо лестницы Роберт пробивает вниз колодец по клетке 17 (стенки 16 и 18 — железобетонный фундамент, копать их нельзя), и это единственный вход в копальню. Настоящий хозяин числа — WorldGen.TUNNEL_X и world.tunnel_mouth(); здесь оно продублировано как запасное для дома, когда мира ещё нет. Менять — вместе с миром"
+  },
+  "interact_radius_cells": {
+   "value": 1.2,
+   "proposed": true,
+   "note": "на каком расстоянии от двери и от устья тоннеля срабатывает вход; чуть больше полуклетки в каждую сторону, чтобы не приходилось ловить пиксель"
+  },
+  "sleep_min_deficit_percent": {
+   "value": 10,
+   "proposed": true,
+   "note": "минимальный сон по GDD — 2 игровых часа, и они отдают 25% бодрости. Если лечь с почти полной полоской, лишнее сгорает, а сытость за эти два часа спишется целиком: игрок платит едой ни за что. Кровать отказывает, пока бодрости не просело хотя бы на эти 10%"
+  },
+  "sleep_hunger_factor": {
+   "value": 0.5,
+   "proposed": true,
+   "note": "GDD не говорит, тратится ли голод во сне. Если не тратится, кровать — бесплатная кнопка 'снять усталость' и полоска бодрости перестаёт значить что-либо. Если тратится по обычной скорости простоя (12.5% за игровой час), полный сон 8 часов съедает ровно всю полоску голода и убивает спящего. Половина обычной скорости: полный сон стоит 50% голода, то есть одной порции супа — сон и еда держатся друг за друга"
+  },
+  "sleep_animation_seconds": {
+   "value": 10,
+   "proposed": true,
+   "note": "владелец: 'спит быстро, буквально 10 секунд, показывая анимацию'. Кнопка «Спать» у кровати держит комнату на паузе ровно это время (реальные секунды, не игровые часы — см. house_animation_seconds в house_view.gd/house_system.gd), потом применяется обычный эффект сна (см. sleep_min_deficit_percent/sleep_hunger_factor — их этот таймер не трогает)"
+  },
+  "rooms": [
+   "hall",
+   "bedroom",
+   "workshop"
+  ],
+  "_rooms_comment": "Дом отменён как контекстное меню (решение владельца, 2026-09-16): герой физически ходит по трём комнатам — hall (салон), bedroom (спальня), workshop (мастерская, бывший подвал; включает склад и верстак). Геометрия комнат (двери, кровать, верстак, сундук, стена с удочками) — в data/rooms.json, не здесь: это доли по картинке, а не баланс. Музея и торфоперегонки в доме больше нет — это были пустые карточки-заглушки под системы, которых никто не построил; торфоперегонка по ГДД п.5 в любом случае должна стоять в огороде, а не в доме"
+ },
+ "dopings": {
+  "energy_drink": {
+   "stamina_restore_percent": 50,
+   "source": "shop"
+  },
+  "energy_bar": {
+   "stamina_restore_percent": 100,
+   "hunger_restore_percent": 50,
+   "source": "premium_currency"
+  }
+ },
+ "hazmat_containers": {
+  "mercury_bottle": {
+   "capacity_units": 1,
+   "weight_kg_full": 2.0,
+   "stackable": false,
+   "spill_behavior": {
+    "flows_down_if_empty_below_seconds": 2,
+    "flows_sideways": false,
+    "evaporates_after_seconds": 60,
+    "gas_cloud_spread_cells": 8,
+    "gas_cloud_duration_seconds": 300
+   }
+  },
+  "lead_container": {
+   "capacity_units": 4,
+   "weight_kg_full": 10.0,
+   "weight_kg_lead": 9.0,
+   "weight_kg_uranium": 1.0,
+   "cells_separated": true,
+   "stackable": false,
+   "note": "соты разделены, чтобы не носить критическую массу урана вместе (см. GDD п.13)"
+  }
+ },
+ "tools": {
+  "shovel": {
+   "name_ru": "Лопата",
+   "max_depth": 4,
+   "speed_multiplier": 1.0,
+   "can_mine": [
+    "earth",
+    "peat",
+    "scrap"
+   ],
+   "cannot_mine": [
+    "stone",
+    "gold"
+   ],
+   "cost": {
+    "coins": 0
+   },
+   "acquired": "старт игры",
+   "line": "starter",
+   "icon": "res://art/items/shovel.png",
+   "_max_depth_note": "Ограничение по глубине оставлено ТОЛЬКО лопате (решение агента, см. отчёт): лопата про землю, а не про породу, и глубже фундамента ей делать нечего. У кирок max_depth убран: воротами прогресса теперь служат деньги, и вторые ворота по глубине означали бы, что купленная за 50 000 обсидиановая кирка всё равно упирается в невидимую стену."
+  },
+  "rusty_pickaxe": {
+   "name_ru": "Ржавая кирка",
+   "max_depth": null,
+   "speed_multiplier": 1.0,
+   "breaks_at_depth": 80,
+   "broken_speed_multiplier": 0.75,
+   "cost": {
+    "coins": 0
+   },
+   "acquired": "находится в мастерской среди удочек, лопат и палок (решение владельца)",
+   "note": "трескается на сценарной клетке алмаза глубины 80 -> -25% скорости навсегда",
+   "line": "pickaxe",
+   "tier": 0,
+   "icon": "res://art/items/pickaxe_rusty.png"
+  },
+  "iron_pickaxe": {
+   "name_ru": "Железная кирка",
+   "line": "pickaxe",
+   "tier": 1,
+   "max_depth": null,
+   "speed_multiplier": 1.3,
+   "cost": {
+    "coins": 500
+   },
+   "icon": "res://art/items/pickaxe_iron.png",
+   "note": "цена и множитель заданы владельцем напрямую. Рецепта больше нет: кирки покупаются за монеты, из материалов собирается только техника."
+  },
+  "titanium_pickaxe": {
+   "name_ru": "Титановая кирка",
+   "line": "pickaxe",
+   "tier": 2,
+   "max_depth": null,
+   "speed_multiplier": 1.6,
+   "cost": {
+    "coins": 1500
+   },
+   "icon": "res://art/items/pickaxe_titanium.png",
+   "note": "цена и множитель заданы владельцем напрямую"
+  },
+  "platinum_pickaxe": {
+   "name_ru": "Платиновая кирка",
+   "line": "pickaxe",
+   "tier": 3,
+   "max_depth": null,
+   "speed_multiplier": 2.5,
+   "cost": {
+    "coins": 10000
+   },
+   "icon": "res://art/items/pickaxe_platinum.png",
+   "note": "цена и множитель заданы владельцем напрямую"
+  },
+  "diamond_pickaxe": {
+   "name_ru": "Алмазная кирка",
+   "line": "pickaxe",
+   "tier": 4,
+   "max_depth": null,
+   "speed_multiplier": 3.5,
+   "cost": {
+    "coins": 20000
+   },
+   "icon": "res://art/items/pickaxe_diamond.png",
+   "note": "цена и множитель заданы владельцем напрямую"
+  },
+  "obsidian_pickaxe": {
+   "name_ru": "Обсидиановая кирка",
+   "line": "pickaxe",
+   "tier": 5,
+   "max_depth": null,
+   "speed_multiplier": 5.0,
+   "cost": {
+    "coins": 50000
+   },
+   "icon": "res://art/items/pickaxe_obsidian.png",
+   "note": "цена и множитель заданы владельцем напрямую; последняя ступень линейки"
+  },
+  "hand_drill": {
+   "name_ru": "Ручной бур",
+   "max_depth": 500,
+   "speed_multiplier": {
+    "value": 2.0,
+    "proposed": true,
+    "note": "множитель скорости не задан в GDD; выбран как следующая ступень после железной кирки. Линейка кирок переписана владельцем (железная теперь ×1.3), и бур с ×2.0 встал между титановой (×1.6) и платиновой (×2.5) — техника и кирки идут параллельными ветками, а не одной лестницей."
+   },
+   "cost": {
+    "value": {
+     "iron_ore": 500,
+     "bronze": 100,
+     "silver": 50,
+     "coins": 2000
+    },
+    "proposed": true,
+    "note": "цена ступени апгрейда не задана в GDD (п.18: 'цены ступеней апгрейда лопаты, кирки, бура'); масштабирована ×10 от рецепта железной кирки"
+   },
+   "fuel": "peat_or_coal",
+   "triggers_quest": "сборка буровой установки (см. GDD п.5)",
+   "line": "tech",
+   "tier": 1,
+   "icon": "res://art/items/hand_drill.png"
+  },
+  "drill_rig": {
+   "name_ru": "Буровая машина (кабина)",
+   "max_depth": null,
+   "speed_multiplier": {
+    "value": 3.0,
+    "proposed": true,
+    "note": "множитель скорости не задан в GDD; следующая ступень после ручного бура"
+   },
+   "cost": {
+    "value": {
+     "nickel": 50,
+     "platinum": 20,
+     "coins": 10000
+    },
+    "proposed": true,
+    "note": "цена не задана в GDD (п.18); компоненты взяты из материалов, доступных к этой глубине"
+   },
+   "fuel": "coal_or_uranium",
+   "note": "герой залезает внутрь (см. GDD п.5); ширина копки, движение вбок/вверх, перегрев — нерешённые механики (п.18), не предложены числами",
+   "line": "tech",
+   "tier": 2,
+   "icon": "res://art/items/hand_drill.png"
+  },
+  "peat_distillery": {
+   "name_ru": "Торфоперегонка",
+   "location": "огород, с разрешения бабки",
+   "output": {
+    "fuel_blocks": "торф -> топливные блоки",
+    "fertilizer": "торф -> удобрение"
+   },
+   "note": "конверсия торфа в блоки/удобрение количественно не задана в GDD; см. fuel_consumption ниже для расхода на стороне потребления"
+  }
+ },
+ "fuel_consumption": {
+  "_comment": "4 торфа = 1 топливный блок (значение владельца). Добыча топлива не должна становиться основным занятием: блоки копятся про запас и тратятся по мере надобности.",
+  "peat_per_fuel_block": 4,
+  "coal_per_fuel_block": {
+   "value": 2,
+   "proposed": true,
+   "note": "уголь плотнее торфа"
+  },
+  "uranium_per_fuel_block": {
+   "value": 1,
+   "proposed": true,
+   "note": "после 1500 техника переходит на уран, нужен апгрейд"
+  },
+  "blocks_per_cell": {
+   "hand_drill": {
+    "value": 0.05,
+    "proposed": true,
+    "note": "20 клеток на блок"
+   },
+   "drill_machine": {
+    "value": 0.1,
+    "proposed": true,
+    "note": "10 клеток на блок"
+   }
+  },
+  "uranium_upgrade_depth": 1500
+ },
+ "idle_well": {
+  "base_income_coins_per_hour": {
+   "value": 50,
+   "proposed": true,
+   "note": "формула дохода не задана в GDD (п.18: 'доход idle-скважины: f(глубина, уровень)')"
+  },
+  "depth_factor_formula": {
+   "value": "1 + max_depth_reached / 100",
+   "proposed": true,
+   "note": "не задано в GDD; линейный рост с максимальной достигнутой глубиной, без потолка кроме офлайн-капа времени"
+  },
+  "level_multiplier_formula": {
+   "value": "1 + 0.1 * well_level",
+   "proposed": true,
+   "note": "не задано в GDD; +10% за уровень скважины"
+  },
+  "offline_cap_hours": {
+   "value": 8,
+   "proposed": true,
+   "note": "офлайн-кап не задан в GDD; выбран равным игровому дню (8 игровых часов = 1 реальный час, см. game_time), чтобы соответствовать общему ритму суток"
+  },
+  "formula_full": "income(t_hours) = min(t_hours, offline_cap_hours) * base_income * (1 + max_depth_reached/100) * (1 + 0.1*well_level)",
+  "ad_double_income_applies": true,
+  "pays": {
+   "coins": true,
+   "premium_currency": false,
+   "minerals": true,
+   "note": "решение владельца: скважина даёт ресурсы и золото, донатную валюту — никогда. Иначе премиум-валюта капает сама и покупать её незачем."
+  },
+  "offline_report": {
+   "show_on_return": true,
+   "note": "решение владельца: при заходе после отсутствия показывается окно с тем, что скважина накопала."
+  },
+  "name_ru": "Буровая скважина",
+  "build_cost": {
+   "value": {
+    "iron_ore": 100,
+    "bronze": 20,
+    "lead": 50,
+    "coins": 2000
+   },
+   "proposed": true,
+   "note": "состав сборки скважины владельцем не задан. Скважина — техника, а технику владелец оставил на материалах: взято примерно вчетверо от прежнего рецепта железной кирки (25/10/30/200), потому что скважина копает сама и окупается бесконечно, а кирка — нет."
+  },
+  "build_unlock_depth": {
+   "value": 100,
+   "proposed": true,
+   "note": "глубина открытия рецепта не задана. Та же, что у ручного бура: доход скважины считается от max_depth_reached, и на нулевой глубине она платила бы копейки."
+  }
+ },
+ "economy": {
+  "currencies": [
+   "coins",
+   "premium_currency"
+  ],
+  "premium_currency_name_ru": "доллары",
+  "coins_per_premium_currency_unit": 1000,
+  "known_mineral_prices_ref": "см. minerals.json -> price_coins"
+ },
+ "monetization": {
+  "iap_products": [
+   {
+    "id": "remove_ads",
+    "name_ru": "Антиреклама",
+    "price_usd": 2.99,
+    "grants": [
+     "no_ads"
+    ]
+   },
+   {
+    "id": "black_box_plus_1",
+    "name_ru": "Чёрный ящик +1",
+    "price_usd": 2.9,
+    "grants": [
+     "black_box_slot+1"
+    ]
+   },
+   {
+    "id": "premium_monthly",
+    "name_ru": "Премиум / мес",
+    "price_usd": 9.9,
+    "grants": [
+     "no_ads",
+     "inventory_boost",
+     "strength_boost",
+     {
+      "premium_currency_onetime": {
+       "value": 50,
+       "proposed": true,
+       "note": "'немного премиум-валюты' не квантифицировано в GDD"
+      }
+     }
+    ]
+   },
+   {
+    "id": "premium_plus_monthly",
+    "name_ru": "Премиум+ / мес",
+    "price_usd": 14.9,
+    "grants": [
+     "premium_monthly_benefits",
+     {
+      "premium_currency_daily": {
+       "value": 5,
+       "proposed": true,
+       "note": "'ежедневная премиум-валюта' не квантифицирована в GDD"
+      }
+     }
+    ]
+   }
+  ],
+  "gadgets_premium_currency": [
+   "teleport_watch_instant_home",
+   "full_restore_pill",
+   "energy_drink"
+  ]
+ },
+ "black_box": {
+  "tiers": {
+   "base": 1,
+   "premium": 2,
+   "premium_plus": 3
+  },
+  "note": "клеток в ящике; клетки ящика не увеличивают грузоподъёмность (см. GDD п.14)"
+ },
+ "inventory": {
+  "default_max_stack": 99
+ },
+ "ads": {
+  "daily_limits": {
+   "skip_sleep_at_home": 5,
+   "double_income_on_sale": 3,
+   "restore_stamina_hunger_in_mine": 3,
+   "cancel_loot_loss_on_death": 1,
+   "small_premium_currency": 3,
+   "small_coins": 3,
+   "remote_dump_loot_for_sale": 3
+  },
+  "reset_basis": "real_time_utc_midnight"
+ },
+ "fog_of_war": {
+  "states": [
+   "black",
+   "gray_terrain_known",
+   "full_resource_visible"
+  ],
+  "start_terrain_radius_cells": 2,
+  "start_resource_radius_cells": 1,
+  "persists_until_reset_event": true,
+  "dissipation_speed": {
+   "value": "instant_on_proximity",
+   "proposed": true,
+   "note": "скорость рассеивания тумана не задана в GDD (п.18); предложено мгновенное раскрытие при входе в радиус ауры, без анимации — простейший вариант, легко заменить позже"
+  }
+ },
+ "reset_events": {
+  "chunk_collapse": {
+   "frequency": "решение владельца",
+   "sizes": [
+    [
+     5,
+     5
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     5,
+     32
+    ],
+    [
+     10,
+     32
+    ]
+   ],
+   "check_every_seconds": 300,
+   "chance_percent": 7
+  },
+  "mine_earthquake": {
+   "frequency": "решение владельца",
+   "effect": "resets_and_randomizes_all_unfixed_cells",
+   "check_every_seconds": 600,
+   "chance_percent": 3
+  },
+  "permanently_fixed": [
+   "fixed_staircase",
+   "fixed_foundation",
+   "unmined_peat_layer_450_455"
+  ],
+  "fog_resets_after_any_event": true
+ },
+ "drilling": {
+  "_comment": "Бурение: время на клетку и перегрев. Значения владельца — камень 10 сек, пороги перегрева и охлаждение 6 сек. Остальные времена бурения выведены по тиру ценности.",
+  "stone_seconds": 10.0,
+  "overheat": {
+   "_comment": "Нагрев до максимума. Указано, сколько клеток данного материала доводят бур до перегрева; вклад одной клетки = 1 / cells_to_overheat.",
+   "applies_to": [
+    "hand_drill",
+    "drill_mobile",
+    "drill_machine"
+   ],
+   "cells_to_overheat": {
+    "earth": 20,
+    "iron_ore": 5,
+    "diamond": 3,
+    "stone": 1
+   },
+   "default_cells_to_overheat": {
+    "value": 8,
+    "proposed": true,
+    "note": "для материалов, не названных владельцем: между железом и алмазом"
+   },
+   "cooldown_seconds": 6.0,
+   "cooldown_curve": "exponential_tail",
+   "cooldown_exponent": {
+    "value": 3.0,
+    "proposed": true,
+    "note": "остывание доля = 1-(1-t)^3: сначала держится горячим, к концу 6 сек падает резко"
+   },
+   "overheat_hp_damage_per_second": {
+    "value": 5.0,
+    "proposed": true,
+    "note": "ГДД говорит \"перегрев вызывает потерю HP\", величина не задана"
+   }
+  },
+  "dig_directions": [
+   "down",
+   "left",
+   "right"
+  ],
+  "_dig_directions_comment": "Вверх копать нельзя — ни персонажу, ни технике. Техника бурит ровно одну клетку за раз.",
+  "machine_dig_width_cells": 1
+ },
+ "crafting": {
+  "scrap_per_bronze": 1,
+  "_scrap_comment": "Владелец: \"1 металлолом - 1 кирка\". Прочитано как 1 металлолом -> 1 бронза, потому что бронза иначе нигде не добывается, а железная кирка требует 10 бронзы. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ."
+ },
+ "shops": {
+  "workshop": {
+   "name_ru": "Магазин в мастерской",
+   "name_en": "Workshop shop",
+   "unlock": "после первой вылазки с ресурсами",
+   "can_sell_resources": true,
+   "shows_prices": true,
+   "shows_total_before_confirm": true
+  },
+  "premium": {
+   "name_ru": "Магазин долларов",
+   "name_en": "Premium shop",
+   "unlock": "доступен всегда и везде",
+   "currency": "dollars"
+  }
+ },
+ "localization": {
+  "default": "ru",
+  "shipped": [
+   "ru",
+   "en"
+  ],
+  "_comment": "RU и EN обязательны на старте. Все строки через систему перевода Godot, ключами, а не литералами — чтобы добавление языка не требовало правок кода."
+ },
+ "gear": {
+  "_note": "Линейка ранцев (решение владельца): четыре ступени, все — только за монеты, никаких рецептов. Множитель умножает ПОТОЛОК скорости подъёма базового ранца (base_max_speed_cells_per_sec ниже), а не ускорение: «×2 скорости полёта» — это вдвое быстрее лететь. Время разгона до потолка остаётся временем ступени, поэтому само ускорение (потолок / время разгона) растёт вместе с потолком — иначе на топовом джетпаке герой десять секунд набирал бы обещанную скорость и «×10» ощущалось бы как «×10 разгона». Надета всегда ровно одна ступень, выбор — на верстаке в мастерской (верстак = экипировка).",
+  "base_max_speed_cells_per_sec": 2.5,
+  "_base_note": "Прежняя константа PROP_SPEED из scripts/player/player.gd (эталон ощущений из web-демо). Переехала сюда, потому что теперь её умножает линейка: держать базу в коде, а множители в данных — значит развести их при первой правке. Поле backpack.max_speed_cells_per_sec (3) — число из GDD, кодом оно никогда не использовалось; трогать его не стали, чтобы не выдавать правку за уточнение GDD.",
+  "backpack": {
+   "name_ru": "Ранец",
+   "tier": 1,
+   "kind": "prop",
+   "fly_speed_multiplier": 1.0,
+   "cost": {
+    "coins": 100
+   },
+   "icon": "res://art/items/backpack_propeller.png",
+   "note": "базовая ступень: от неё считаются множители остальных, поэтому у неё ×1.0. Потолок подъёма 2.5 кл/с."
+  },
+  "backpack_plus": {
+   "name_ru": "Улучшенный ранец",
+   "tier": 2,
+   "kind": "prop",
+   "fly_speed_multiplier": 2.0,
+   "cost": {
+    "coins": 1000
+   },
+   "icon": "res://art/items/backpack_plus.png",
+   "note": "цена и множитель заданы владельцем. Потолок подъёма 5.0 кл/с. Иконка вырезана из авторского листа полёта (винт из art/character/fly_2.png)."
+  },
+  "jetpack": {
+   "name_ru": "Джетпак",
+   "tier": 3,
+   "kind": "jet",
+   "fly_speed_multiplier": 3.0,
+   "cost": {
+    "coins": 5000
+   },
+   "icon": "res://art/items/jetpack.png",
+   "note": "цена и множитель заданы владельцем. Потолок подъёма 7.5 кл/с. kind=jet — своё время разгона (5 с, без поправки на груз) и своя анимация полёта."
+  },
+  "jetpack_top": {
+   "name_ru": "Топовый джетпак",
+   "tier": 4,
+   "kind": "jet",
+   "fly_speed_multiplier": 10.0,
+   "cost": {
+    "coins": 20000
+   },
+   "icon": "res://art/items/jetpack_top.png",
+   "note": "цена и множитель заданы владельцем. Потолок подъёма 25.0 кл/с — ниже предела скорости падения V_TERM=32, так что герой всё ещё падает быстрее, чем взлетает. Иконка вырезана из авторского листа полёта (ракеты из art/character/fly_4.png)."
+  }
+ }
 }

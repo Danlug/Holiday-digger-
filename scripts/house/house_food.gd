@@ -44,6 +44,18 @@ static func pay_for_order(id: String) -> bool:
 	return GameState.spend_coins(int(check["price"]))
 
 
+## Съесть прямо сейчас, не заводя порцию в рюкзак: так работает еда, которую
+## нельзя унести (стейк, пельмени). Возвращает то же, что eat().
+static func eat_now(id: String) -> Dictionary:
+	if not HouseConfig.is_food(id):
+		return {"ok": false, "hunger": 0.0, "stamina": 0.0, "reason": "Это несъедобно."}
+	var hunger_gain: float = minf(HouseConfig.food_hunger_percent(id), 100.0 - GameState.hunger)
+	var stamina_gain: float = minf(HouseConfig.food_stamina_percent(id), 100.0 - GameState.stamina)
+	GameState.set_hunger(GameState.hunger + HouseConfig.food_hunger_percent(id))
+	GameState.set_stamina(GameState.stamina + HouseConfig.food_stamina_percent(id))
+	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "reason": ""}
+
+
 ## Доставка приехала: порция ложится у входной двери.
 static func deliver(id: String, count: int = 1) -> void:
 	if count <= 0:

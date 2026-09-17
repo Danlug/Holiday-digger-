@@ -39,7 +39,14 @@ import sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TILE = 32
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from import_art import ART_SCALE  # noqa: E402
+
+# Тайл режется в ART_SCALE раз крупнее логической клетки — см. пояснение в
+# import_art.py. Ячейка на листе ~61 px, то есть до 96 картинка немного
+# растягивается; это всё равно втрое подробнее прежних 32 px, а на экране
+# телефона именно эта подробность и видна.
+TILE = 32 * ART_SCALE
 
 # Сетка листа: границы ячеек по осям, найдены по яркостному профилю и
 # записаны числами, чтобы нарезка была повторяемой.
@@ -228,7 +235,7 @@ def cells(sheet, trim=TRIM):
             w, h = x1 - x0 + 1, y1 - y0 + 1
             dx, dy = round(w * trim), round(h * trim)
             box = (x0 + dx, y0 + dy, x1 + 1 - dx, y1 + 1 - dy)
-            img = sheet.crop(box).resize((TILE, TILE), Image.BOX)
+            img = sheet.crop(box).resize((TILE, TILE), Image.LANCZOS)
             # пустые ячейки в конце листа пропускаем
             if sum(img.getpixel((TILE // 2, TILE // 2))) > 40:
                 out[(r, c)] = img
@@ -319,7 +326,11 @@ def edge_match(px, weights):
                             min(255, round(b * f)))
 
 
-def finish(img, colors=24):
+def finish(img, colors=0):
+    """Квантование палитры выключено: именно оно превращало породу в плоские
+    пятна. Параметр оставлен на случай, когда палитра нужна намеренно."""
+    if colors <= 0:
+        return img
     return img.quantize(colors=colors, method=Image.MEDIANCUT).convert("RGB")
 
 

@@ -1,258 +1,236 @@
 {
-  "version": 1,
-  "_source": "docs/GDD.md раздел 11",
-  "_legend": "поле {value, proposed:true, note} = число не задано в GDD и предложено геймдизайнеру на утверждение; таблицы cost_points, помеченные как 'задано в GDD', — прямое продолжение арифметических паттернов, явно указанных в таблице раздела 11 (напр. '1,2,3,4…')",
-  "xp_formula": {
-    "formula": "XP(n) = 100 * n^1.5",
-    "level_cap": 100
+ "version": 1,
+ "_source": "docs/GDD.md раздел 11",
+ "_legend": "поле {value, proposed:true, note} = число не задано в GDD и предложено геймдизайнеру на утверждение; таблицы cost_points, помеченные как 'задано в GDD', — прямое продолжение арифметических паттернов, явно указанных в таблице раздела 11 (напр. '1,2,3,4…')",
+ "xp_formula": {
+  "formula": "XP(n) = 100 * n^1.5",
+  "level_cap": 100
+ },
+ "xp_sources": {
+  "earth_cell": 1,
+  "stone_cell": 2,
+  "ore_cell": "цена_ресурса / 5",
+  "artifact_find": {
+   "min": 500,
+   "max": 5000,
+   "note": "точное распределение по предметам см. artifacts.json"
   },
-  "xp_sources": {
-    "earth_cell": 1,
-    "stone_cell": 2,
-    "ore_cell": "цена_ресурса / 5",
-    "artifact_find": {
-      "min": 500,
-      "max": 5000,
-      "note": "точное распределение по предметам см. artifacts.json"
-    },
-    "quest": {
-      "min": 200,
-      "max": 2000
-    },
-    "depth_milestone_every_10_cells": {
-      "formula": "50 * (глубина / 10)"
+  "quest": {
+   "min": 200,
+   "max": 2000
+  },
+  "depth_milestone_every_10_cells": {
+   "formula": "50 * (глубина / 10)"
+  }
+ },
+ "skill_points": {
+  "per_level": 1,
+  "bonus_every_5th_level": 2,
+  "total_by_level_100_approx": 140,
+  "total_points_needed_for_full_maxout_approx": 500,
+  "note": "игрок не может закрыть все ветки — обязан выбирать билд (см. GDD п.11)"
+ },
+ "total_points_to_max_all_branches": 540,
+ "branches": [
+  {
+   "id": "vision",
+   "name_ru": "Обзор",
+   "stages": 10,
+   "effect": {
+    "type": "radius_add_cells",
+    "per_stage": 1,
+    "base": 1,
+    "max": 11,
+    "terrain_bonus_cells": 1,
+    "note": "Решение владельца: рельеф и ресурсы больше не качаются порознь. База и прибавка — про РЕСУРСЫ; рельеф всегда видно на terrain_bonus_cells дальше, и ступень поднимает оба радиуса разом."
+   },
+   "cost_points": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "notes": "Слитая ветка: раньше были terrain_vision (база 2, цены 1..10) и resource_vision (база 1, цены 2..11). Цена взята от ресурсов — более дорогой из двух: ступень теперь двигает оба радиуса сразу, и платить по дешёвой таблице за двойной эффект было бы подарком. Старые ступени переносятся в сейве (save_system.gd)."
+  },
+  {
+   "id": "dig_speed",
+   "name_ru": "Скорость копки",
+   "stages": 15,
+   "effect": {
+    "type": "multiplicative_time_reduction",
+    "percent_per_stage": 4,
+    "formula": "time(stage) = 3.0 * 0.96^stage",
+    "note_formula": "GDD задаёт '−4% времени' за ступень, но не уточняет аддитивно или мультипликативно; выбрано мультипликативное накопление (0.96^stage), чтобы время копки никогда не уходило в ноль/отрицательные значения на всех 15 ступенях"
+   },
+   "cost_points": [
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    4,
+    5,
+    5,
+    6,
+    6,
+    7,
+    7,
+    8
+   ],
+   "notes": "база копки 3 сек/клетку (см. GDD п.6)"
+  },
+  {
+   "id": "hp",
+   "name_ru": "HP",
+   "stages": 10,
+   "effect": {
+    "type": "flat_add",
+    "per_stage": 20,
+    "base": {
+     "value": 100,
+     "proposed": true,
+     "note": "базовое HP персонажа не задано в GDD ни разу; выбрано круглое число, согласованное со шкалой урона от падения (100 HP на высоте 20 клеток из GDD п.6)"
     }
+   },
+   "cost_points": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ]
   },
-  "skill_points": {
-    "per_level": 1,
-    "bonus_every_5th_level": 2,
-    "total_by_level_100_approx": 140,
-    "total_points_needed_for_full_maxout_approx": 500,
-    "note": "игрок не может закрыть все ветки — обязан выбирать билд (см. GDD п.11)"
+  {
+   "id": "stamina",
+   "name_ru": "Выносливость",
+   "stages": 10,
+   "effect": {
+    "type": "percent_of_base_duration",
+    "percent_per_stage": 15,
+    "formula": "depletion_seconds(stage) = base_seconds * (1 + 0.15 * stage)",
+    "note_formula": "GDD задаёт '+15% до истощения' за ступень, аддитивно от базового времени истощения (см. balance.json survival)"
+   },
+   "cost_points": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ]
   },
-  "total_points_to_max_all_branches": 540,
-  "branches": [
-    {
-      "id": "terrain_vision",
-      "name_ru": "Видимость рельефа",
-      "stages": 10,
-      "effect": {
-        "type": "radius_add_cells",
-        "per_stage": 1,
-        "base": 2,
-        "max": 12
-      },
-      "cost_points": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10
-      ],
-      "notes": "радиус большой ауры (серая зона — известен рельеф), старт 2 клетки (см. GDD п.12)"
-    },
-    {
-      "id": "resource_vision",
-      "name_ru": "Видимость ресурсов",
-      "stages": 10,
-      "effect": {
-        "type": "radius_add_cells",
-        "per_stage": 1,
-        "base": 1,
-        "max": 11
-      },
-      "cost_points": [
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11
-      ],
-      "notes": "радиус малой ауры (виден ресурс), старт 1 клетка (см. GDD п.12)"
-    },
-    {
-      "id": "dig_speed",
-      "name_ru": "Скорость копки",
-      "stages": 15,
-      "effect": {
-        "type": "multiplicative_time_reduction",
-        "percent_per_stage": 4,
-        "formula": "time(stage) = 3.0 * 0.96^stage",
-        "note_formula": "GDD задаёт '−4% времени' за ступень, но не уточняет аддитивно или мультипликативно; выбрано мультипликативное накопление (0.96^stage), чтобы время копки никогда не уходило в ноль/отрицательные значения на всех 15 ступенях"
-      },
-      "cost_points": [
-        1,
-        1,
-        2,
-        2,
-        3,
-        3,
-        4,
-        4,
-        5,
-        5,
-        6,
-        6,
-        7,
-        7,
-        8
-      ],
-      "notes": "база копки 3 сек/клетку (см. GDD п.6)"
-    },
-    {
-      "id": "hp",
-      "name_ru": "HP",
-      "stages": 10,
-      "effect": {
-        "type": "flat_add",
-        "per_stage": 20,
-        "base": {
-          "value": 100,
-          "proposed": true,
-          "note": "базовое HP персонажа не задано в GDD ни разу; выбрано круглое число, согласованное со шкалой урона от падения (100 HP на высоте 20 клеток из GDD п.6)"
-        }
-      },
-      "cost_points": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10
-      ]
-    },
-    {
-      "id": "stamina",
-      "name_ru": "Выносливость",
-      "stages": 10,
-      "effect": {
-        "type": "percent_of_base_duration",
-        "percent_per_stage": 15,
-        "formula": "depletion_seconds(stage) = base_seconds * (1 + 0.15 * stage)",
-        "note_formula": "GDD задаёт '+15% до истощения' за ступень, аддитивно от базового времени истощения (см. balance.json survival)"
-      },
-      "cost_points": [
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11
-      ]
-    },
-    {
-      "id": "hunger",
-      "name_ru": "Голод",
-      "stages": 10,
-      "effect": {
-        "type": "percent_consumption_reduction",
-        "percent_per_stage": 8,
-        "formula": "rate(stage) = base_rate * (1 - 0.08 * stage)",
-        "cap_note": "на 10 ступени расход = 20% от базового (не уходит в ноль/отрицательные значения)"
-      },
-      "cost_points": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10
-      ]
-    },
-    {
-      "id": "strength",
-      "name_ru": "Сила",
-      "stages": 10,
-      "effect": {
-        "type": "flat_add_kg",
-        "per_stage": 8,
-        "base": 60,
-        "max": 140
-      },
-      "cost_points": [
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11
-      ],
-      "notes": "базовая грузоподъёмность 60 кг задана в GDD п.6"
-    },
-    {
-      "id": "luck_multiplier",
-      "name_ru": "Удача — множитель",
-      "stages": 3,
-      "effect": {
-        "type": "table",
-        "values": [
-          2,
-          3,
-          4
-        ],
-        "note": "множитель общий на находку земли и ресурса (см. GDD п.11)"
-      },
-      "cost_points": [
-        8,
-        16,
-        32
-      ]
-    },
-    {
-      "id": "luck_chance",
-      "name_ru": "Удача — шанс",
-      "stages": 5,
-      "effect": {
-        "type": "table_dual",
-        "earth_percent": [
-          2,
-          4,
-          6,
-          8,
-          10
-        ],
-        "resource_percent": [
-          1,
-          2,
-          3,
-          4,
-          5
-        ],
-        "note": "качается на оба одновременно единым апгрейдом, но с разными базовыми значениями (см. GDD п.11)"
-      },
-      "cost_points": [
-        4,
-        8,
-        12,
-        16,
-        20
-      ]
-    }
-  ]
+  {
+   "id": "hunger",
+   "name_ru": "Голод",
+   "stages": 10,
+   "effect": {
+    "type": "percent_consumption_reduction",
+    "percent_per_stage": 8,
+    "formula": "rate(stage) = base_rate * (1 - 0.08 * stage)",
+    "cap_note": "на 10 ступени расход = 20% от базового (не уходит в ноль/отрицательные значения)"
+   },
+   "cost_points": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ]
+  },
+  {
+   "id": "strength",
+   "name_ru": "Сила",
+   "stages": 10,
+   "effect": {
+    "type": "flat_add_kg",
+    "per_stage": 8,
+    "base": 60,
+    "max": 140
+   },
+   "cost_points": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "notes": "базовая грузоподъёмность 60 кг задана в GDD п.6"
+  },
+  {
+   "id": "luck_multiplier",
+   "name_ru": "Удача — множитель",
+   "stages": 3,
+   "effect": {
+    "type": "table",
+    "values": [
+     2,
+     3,
+     4
+    ],
+    "note": "множитель общий на находку земли и ресурса (см. GDD п.11)"
+   },
+   "cost_points": [
+    8,
+    16,
+    32
+   ]
+  },
+  {
+   "id": "luck_chance",
+   "name_ru": "Удача — шанс",
+   "stages": 5,
+   "effect": {
+    "type": "table_dual",
+    "earth_percent": [
+     2,
+     4,
+     6,
+     8,
+     10
+    ],
+    "resource_percent": [
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "note": "качается на оба одновременно единым апгрейдом, но с разными базовыми значениями (см. GDD п.11)"
+   },
+   "cost_points": [
+    4,
+    8,
+    12,
+    16,
+    20
+   ]
+  }
+ ]
 }

@@ -383,13 +383,15 @@ func get_max_carry_kg() -> float:
 
 
 ## Радиусы аур тумана войны (ГДД раздел 12): большая — рельеф, маленькая —
-## ресурсы. Растут прокачкой веток terrain_vision/resource_vision.
+## ресурсы. Качается ОДНА ветка «Обзор» (решение владельца): порознь эти два
+## радиуса игроку ничего не говорили, а рельеф всегда видно на клетку дальше
+## ресурсов. Ступень поднимает оба разом.
 func get_vision_terrain_radius() -> int:
-	return Balance.get_vision_radius("terrain_vision", get_skill_stage("terrain_vision"))
+	return get_vision_resource_radius() + Balance.get_vision_terrain_bonus()
 
 
 func get_vision_resource_radius() -> int:
-	return Balance.get_vision_radius("resource_vision", get_skill_stage("resource_vision"))
+	return Balance.get_vision_radius("vision", get_skill_stage("vision"))
 
 
 ## Пытается положить count единиц mineral_id в инвентарь, учитывая макс. стак

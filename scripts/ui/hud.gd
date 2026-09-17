@@ -101,6 +101,12 @@ var _tool_button: Button
 var _well_panel: Control
 var _objective_panel: PanelContainer
 var _objective_label: Label
+var _quest_button: Button
+var _objective_text: String = ""
+var _objective_hide_at_msec: float = 0.0
+
+## Сколько секунд держать баннер задания, прежде чем свернуть его в кнопку.
+const OBJECTIVE_SHOW_SECONDS := 6.0
 var _tool_name_panel: PanelContainer
 var _tool_name_label: Label
 var _tool_name_timer: Timer
@@ -260,6 +266,23 @@ func _build_hero_button(parent: Control) -> void:
 	_hero_plus.visible = false
 	row.add_child(_hero_plus)
 
+	_build_quest_button(parent)
+
+
+## Кнопка «Задания» под «Героем» (решение владельца). Баннер задания висел на
+## экране всё время — он закрывал треть огорода и переставал читаться уже на
+## втором взгляде. Теперь новое задание показывается ненадолго и сворачивается
+## сюда; нажатие разворачивает его обратно.
+func _build_quest_button(parent: Control) -> void:
+	_quest_button = Button.new()
+	_quest_button.text = "Задания"
+	_quest_button.add_theme_font_size_override("font_size", 9)
+	_quest_button.focus_mode = Control.FOCUS_NONE
+	_quest_button.custom_minimum_size = Vector2(52, 16)
+	_quest_button.visible = false
+	_quest_button.pressed.connect(_on_quest_button_pressed)
+	parent.add_child(_quest_button)
+
 
 func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> ColorRect:
 	var row := HBoxContainer.new()
@@ -295,7 +318,7 @@ func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> C
 
 func _build_purse(parent: Control) -> void:
 	var box := VBoxContainer.new()
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Магазин» внутри
 	box.anchor_left = 1.0; box.anchor_right = 1.0
 	box.offset_left = -100; box.offset_right = -8
 	box.offset_top = 8
@@ -305,6 +328,20 @@ func _build_purse(parent: Control) -> void:
 	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B), "res://art/ui/icon_coin.png")
 	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B), "res://art/ui/icon_dollar.png")
 	_load_label = _make_purse_row(box, Color8(0x8F, 0xA3, 0x5C), "res://art/ui/icon_inventory.png")
+
+	# Кнопка «Магазин» под кошельком (решение владельца): премиум-витрина
+	# открывается откуда угодно — и дома, и со дна шахты. Кладётся в тот же
+	# столбик, поэтому не спорит за место с монетами и глубиной.
+	var shop_row := HBoxContainer.new()
+	shop_row.alignment = BoxContainer.ALIGNMENT_END
+	box.add_child(shop_row)
+	var shop_btn := Button.new()
+	shop_btn.text = "Магазин"
+	shop_btn.add_theme_font_size_override("font_size", 9)
+	shop_btn.focus_mode = Control.FOCUS_NONE
+	shop_btn.custom_minimum_size = Vector2(52, 16)
+	shop_btn.pressed.connect(func(): ShopUI.open_premium())
+	shop_row.add_child(shop_btn)
 
 
 func _make_purse_row(parent: Control, color: Color, icon_path: String) -> Label:
@@ -1099,13 +1136,40 @@ func _place_objective() -> void:
 	_objective_panel.offset_top = top
 
 
-## Ставит текст задания; пустая строка убирает строку с экрана.
+## Ставит текст задания. Зовётся каждый кадр, поэтому разворачивает баннер
+## только когда задание СМЕНИЛОСЬ: иначе он снова висел бы всё время.
 func set_objective(text: String) -> void:
 	if _objective_panel == null:
 		return
+	if text == _objective_text:
+		return
+	_objective_text = text
 	_objective_label.text = text
-	_objective_panel.visible = not text.is_empty()
+	if text.is_empty():
+		_objective_panel.visible = false
+		if _quest_button != null:
+			_quest_button.visible = false
+		return
+	_show_objective_banner()
+	if _quest_button != null:
+		_quest_button.visible = true
+
+
+func _show_objective_banner() -> void:
+	if _objective_panel == null or _objective_text.is_empty():
+		return
+	_objective_panel.visible = true
+	_objective_hide_at_msec = Time.get_ticks_msec() + OBJECTIVE_SHOW_SECONDS * 1000.0
 	_place_objective()
+
+
+func _on_quest_button_pressed() -> void:
+	# Повторное нажатие сворачивает: кнопка — переключатель, а не «показать
+	# ещё раз», иначе баннер нечем убрать досрочно.
+	if _objective_panel != null and _objective_panel.visible:
+		_objective_panel.visible = false
+		return
+	_show_objective_banner()
 
 
 ## Всплывающая подпись инструмента: панелька над полосой, по центру, гаснет
@@ -1284,6 +1348,9 @@ func get_view_cells() -> Vector2i:
 # ---------------------------------------------------------------------------
 
 func _process(_dt: float) -> void:
+	if _objective_panel != null and _objective_panel.visible \
+			and Time.get_ticks_msec() > _objective_hide_at_msec:
+		_objective_panel.visible = false
 	if player != null:
 		_stick.queue_redraw()
 		_knob.queue_redraw()

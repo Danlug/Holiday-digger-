@@ -301,6 +301,21 @@ static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	economy["owned_gear"] = gear
 	economy["current_gear"] = best
 	data["economy"] = economy
+
+	# Видимость рельефа и ресурсов слиты в одну ветку «Обзор» (решение
+	# владельца). Берём БОЛЬШУЮ из двух старых ступеней, а не сумму: ступени
+	# шли параллельно, и сумма выдала бы игроку вдвое больший обзор, чем он
+	# купил. Очки за вторую ветку не возвращаются — они и раньше были
+	# потрачены на то, что человек получил.
+	var progression: Dictionary = data.get("progression", {})
+	var stages: Dictionary = progression.get("skill_stages", {})
+	if stages.has("terrain_vision") or stages.has("resource_vision"):
+		var merged := maxi(int(stages.get("terrain_vision", 0)), int(stages.get("resource_vision", 0)))
+		stages["vision"] = maxi(int(stages.get("vision", 0)), merged)
+		stages.erase("terrain_vision")
+		stages.erase("resource_vision")
+		progression["skill_stages"] = stages
+		data["progression"] = progression
 	return data
 
 

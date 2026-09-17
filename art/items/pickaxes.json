@@ -12,7 +12,8 @@
 				16,
 				23
 			],
-			"relative": 0.67
+			"relative": 0.67,
+			"black_lift": 9.0
 		},
 		"pickaxe_iron": {
 			"source_px": [
@@ -23,7 +24,8 @@
 				18,
 				24
 			],
-			"relative": 0.753
+			"relative": 0.753,
+			"black_lift": 38.0
 		},
 		"pickaxe_titanium": {
 			"source_px": [
@@ -34,7 +36,8 @@
 				21,
 				27
 			],
-			"relative": 0.879
+			"relative": 0.879,
+			"black_lift": 38.0
 		},
 		"pickaxe_platinum": {
 			"source_px": [
@@ -45,7 +48,8 @@
 				21,
 				28
 			],
-			"relative": 0.879
+			"relative": 0.879,
+			"black_lift": 38.0
 		},
 		"pickaxe_diamond": {
 			"source_px": [
@@ -57,7 +61,7 @@
 				29
 			],
 			"relative": 0.837,
-			"black_lift": 17.0
+			"black_lift": 38.0
 		},
 		"pickaxe_obsidian": {
 			"source_px": [
@@ -69,7 +73,7 @@
 				32
 			],
 			"relative": 1.004,
-			"black_lift": 22.3
+			"black_lift": 29.0
 		},
 		"pickaxe_rusty_cracked": {
 			"from": "pickaxe_rusty",

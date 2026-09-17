@@ -314,7 +314,7 @@ func _test_tutorial_quests() -> void:
 	check("проданное золото закрывает задание", StoryState.has_flag("gold_sold"))
 	check("следующее задание — еда", director._objective.contains("еду"))
 
-	GameState.house_food_at_door["food_soup"] = 1
+	GameState.house_food_at_door["food_buldak"] = 1
 	director._update_quests()
 	check("заказанная еда закрывает обучение", StoryState.has_flag("food_ordered"))
 	check("заданий больше нет", director._objective.is_empty())

@@ -238,7 +238,7 @@ def main():
     for name, piece in zip(NAMES, pieces):
         tw = max(1, round(piece.size[0] * k))
         th = max(1, round(piece.size[1] * k))
-        small = shrink(piece, (tw, th), colors=COLORS)
+        small = shrink(piece, (tw, th))
         img = Image.new("RGBA", (BOX, BOX), (0, 0, 0, 0))
         # по центру кадра: в ряду кнопок предметы должны стоять на одной оси,
         # а разница в размере — читаться как разница в размере, а не как

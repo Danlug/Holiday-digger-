@@ -69,7 +69,7 @@ func _test_spend_point_applies_effect() -> void:
 	check_near("грузоподъёмность выросла на 8 кг", GameState.get_max_carry_kg(), carry_before + 8.0)
 
 	var radius_before := GameState.get_vision_terrain_radius()
-	check("видимость рельефа куплена", GameState.spend_skill_point("terrain_vision"))
+	check("обзор куплен", GameState.spend_skill_point("vision"))
 	check_eq("радиус обзора рельефа +1", GameState.get_vision_terrain_radius(), radius_before + 1)
 
 	var dig_before := Balance.get_dig_time_seconds(GameState.get_skill_stage("dig_speed"))
@@ -102,15 +102,15 @@ func _test_spend_point_applies_effect() -> void:
 func _test_point_is_spent_only_once() -> void:
 	print("--- Очко тратится ровно один раз ---")
 	GameState.reset_progress()
-	var cost := Balance.get_upgrade_stage_cost("terrain_vision", 1)
+	var cost := Balance.get_upgrade_stage_cost("vision", 1)
 	GameState.skill_points_available = cost
 
-	check("первая покупка проходит", GameState.spend_skill_point("terrain_vision"))
+	check("первая покупка проходит", GameState.spend_skill_point("vision"))
 	check_eq("очки списаны ровно по цене", GameState.skill_points_available, 0)
-	check_eq("ступень поднялась на 1", GameState.get_skill_stage("terrain_vision"), 1)
+	check_eq("ступень поднялась на 1", GameState.get_skill_stage("vision"), 1)
 
-	check("вторая покупка без очков отклонена", not GameState.spend_skill_point("terrain_vision"))
-	check_eq("ступень не изменилась", GameState.get_skill_stage("terrain_vision"), 1)
+	check("вторая покупка без очков отклонена", not GameState.spend_skill_point("vision"))
+	check_eq("ступень не изменилась", GameState.get_skill_stage("vision"), 1)
 	check_eq("очки не ушли в минус", GameState.skill_points_available, 0)
 
 	# Ветка на максимуме больше ничего не берёт, даже когда очков вагон.
@@ -127,8 +127,9 @@ func _test_point_is_spent_only_once() -> void:
 ## Цены ступеней из ГДД раздела 11 и суммарная стоимость полной прокачки.
 func _test_costs_follow_gdd() -> void:
 	print("--- Цены ступеней ---")
-	check_eq("видимость рельефа: 1-я ступень стоит 1", Balance.get_upgrade_stage_cost("terrain_vision", 1), 1)
-	check_eq("видимость ресурсов: 1-я ступень стоит 2", Balance.get_upgrade_stage_cost("resource_vision", 1), 2)
+	check_eq("обзор: 1-я ступень стоит 2", Balance.get_upgrade_stage_cost("vision", 1), 2)
+	check_eq("обзор: рельеф всегда на клетку дальше ресурсов",
+		GameState.get_vision_terrain_radius() - GameState.get_vision_resource_radius(), 1)
 	check_eq("удача-множитель: ступени 8/16/32",
 		[Balance.get_upgrade_stage_cost("luck_multiplier", 1),
 		 Balance.get_upgrade_stage_cost("luck_multiplier", 2),

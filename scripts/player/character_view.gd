@@ -9,13 +9,20 @@ extends Node2D
 ## копать. Тело по-прежнему ~20 px, просто вокруг него есть поле.
 
 const TILE := 32
-const CHAR_W := 48
-const CHAR_H := 48
+
+## Во сколько раз текстуры подробнее игровых координат (см. пояснение в
+## tools/import_art.py). Кадр героя на диске — 144×144, а на экране он занимает
+## те же 48 логических точек: спрайт рисуется уменьшенным втрое, и телефону
+## достаётся втрое больше настоящих пикселей вместо растянутых квадратов.
+const ART_SCALE := 3.0
+
+const CHAR_W := int(48 * ART_SCALE)
+const CHAR_H := int(48 * ART_SCALE)
 const HH := 0.46
 
 ## Линия земли внутри кадра: подошва героя стоит на CHAR_H - FOOT_PAD.
 ## На этом держится вся вертикальная привязка спрайта — см. SHEET_FRAME.
-const GROUND_Y := 46
+const GROUND_Y := int(46 * ART_SCALE)
 
 ## Листы, у которых кадр не 48×48: имя листа -> [ширина, высота, линия земли].
 ##
@@ -33,12 +40,12 @@ const GROUND_Y := 46
 ## уносит на 43 px назад, — а ужимать под них героя нельзя: он станет мельче
 ## себя же пешком. Числа берутся из печати импортёра, менять их руками не надо.
 const SHEET_FRAME := {
-	"dig_rig_down": [80, 56, 50],
-	"dig_rig_side": [80, 56, 50],
-	"fly_1": [54, 56, 53],
-	"fly_2": [70, 57, 55],
-	"fly_3": [52, 49, 45],
-	"fly_4": [90, 47, 42],
+	"dig_rig_down": [240, 168, 150],
+	"dig_rig_side": [240, 168, 150],
+	"fly_1": [154, 162, 156],
+	"fly_2": [204, 164, 162],
+	"fly_3": [152, 141, 131],
+	"fly_4": [264, 137, 124],
 }
 
 ## Лента полёта по уровню снаряжения: 1 — ранец, 2 — улучшенный ранец,
@@ -87,6 +94,7 @@ func _ready() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.centered = false
 	_sprite.region_enabled = true
+	_sprite.scale = Vector2(1.0 / ART_SCALE, 1.0 / ART_SCALE)
 	add_child(_sprite)
 	for sheet: String in DIG_SHEETS:
 		var path: String = "res://art/character/" + sheet + ".png"
@@ -187,8 +195,10 @@ func _process(_dt: float) -> void:
 	_sprite.flip_h = player.facing < 0
 	# Линия земли листа должна лечь туда же, куда ложится подошва у кадра
 	# 48×48, иначе высокий кадр повиснет над землёй.
-	_sprite.position = Vector2(-fw / 2.0 + _stun_shake(),
-			-HH * TILE - 16.0 + float(GROUND_Y - int(geom[2])))
+	# Позиция — в логических точках, а текстура в ART_SCALE раз крупнее,
+	# поэтому её размеры сюда попадают делёными.
+	_sprite.position = Vector2(-fw / (2.0 * ART_SCALE) + _stun_shake(),
+			-HH * TILE - 16.0 + float(GROUND_Y - int(geom[2])) / ART_SCALE)
 
 
 ## Стан показывается тряской, а не простоем: секунда без движения выглядит как

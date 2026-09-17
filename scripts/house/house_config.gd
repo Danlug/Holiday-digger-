@@ -110,6 +110,13 @@ static func delivery_menu() -> Array:
 	return out
 
 
+## Можно ли унести порцию на вылазку (решение владельца: стейк и пельмени —
+## нельзя). Непереносимая еда съедается сразу при заказе, дома, и в рюкзак не
+## кладётся: нести её некуда, а значит и доставлять к двери незачем.
+static func is_portable(id: String) -> bool:
+	return bool(Balance.unwrap(food_item(id).get("portable", true)))
+
+
 static func is_food(id: String) -> bool:
 	return not food_item(id).is_empty()
 

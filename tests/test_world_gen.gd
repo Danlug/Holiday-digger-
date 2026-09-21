@@ -35,6 +35,8 @@ func _init() -> void:
 	test_collapse_never_touches_house()
 	test_tunnel_absent_before_robert()
 	test_tunnel_mouth_save_load_roundtrip()
+	# --- задача «Огород до автокопки: копать только правее лестницы» ---
+	test_pre_autodig_gate()
 	print("=== Итог: %d проверок, %d провалов ===" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -954,3 +956,58 @@ func _scripted_scrap_count(w: WorldGen) -> int:
 			if w.get_tile(x, y) == TileTypes.Type.SCRAP_METAL:
 				n += 1
 	return n
+
+
+## Правило владельца (ГДД п.9): "в начале игры ему можно копать только
+## справа от дома и лестницы, пока не запустится сценарий со скоростным
+## копанием". Гейт по умолчанию снят (голый WorldGen.new(seed) в тестах и
+## утилитах копается как и раньше — ломать чужие тесты этой задаче нельзя),
+## взводит его явно StoryDirector для новой/незавершённой обучением игры.
+func test_pre_autodig_gate() -> void:
+	print("-- Гейт «до автокопки — только правее лестницы» --")
+
+	# is_pre_autodig_locked_cell — чистая функция от координат (тайл не
+	# спрашивает), поэтому границу можно проверить на любой глубине без риска
+	# попасть в «пустоту» глубоких слоёв.
+	var w := WorldGen.new(777)
+	check("по умолчанию гейт снят (как было всегда, до этой задачи)",
+		not w.is_pre_autodig_locked_cell(16, 50))
+	w.lock_pre_autodig_garden()
+
+	var ok_locked := true
+	for x in range(WorldGen.GARDEN_X_MIN, 19):  # 15..18 — вкл. правый край лестницы на 4-м уровне
+		if not w.is_pre_autodig_locked_cell(x, 1) or not w.is_pre_autodig_locked_cell(x, 50):
+			ok_locked = false
+	check("15..18 заперты на любой глубине, включая ниже лестницы", ok_locked)
+
+	var ok_free := true
+	for x in range(19, WorldGen.WIDTH):
+		if w.is_pre_autodig_locked_cell(x, 1) or w.is_pre_autodig_locked_cell(x, 50):
+			ok_free = false
+	check("19 и правее свободны на любой глубине", ok_free)
+	check("дом (x<=14) — не забота этого гейта, им ведает dig_cell отдельно",
+		not w.is_pre_autodig_locked_cell(10, 1))
+
+	# Реальная копка: (16, 1) вне самой лестницы (на первом уровне она
+	# занимает только x=15), поэтому без гейта копается свободно, а с гейтом —
+	# только из-за него, не из-за типа клетки.
+	var w2 := WorldGen.new(777)
+	check("без гейта (16,1) копается", w2.dig_cell(16, 1))
+
+	var w3 := WorldGen.new(777)
+	w3.lock_pre_autodig_garden()
+	check("с гейтом (16,1) не копается", not w3.dig_cell(16, 1))
+	check("выкопать так и не удалось — клетка не EMPTY", w3.get_tile(16, 1) != TileTypes.Type.EMPTY)
+	check("с гейтом (19,1), сразу правее лестницы, копается", w3.dig_cell(19, 1))
+	check("под домом отказ по-прежнему свой (x=10)", not w3.dig_cell(10, 1))
+
+	w3.unlock_pre_autodig_garden()
+	check("после unlock (17,2) снова копается", w3.dig_cell(17, 2))
+
+	# Страховка: build_robert_tunnel снимает гейт сама, даже если его забыли
+	# снять раньше (тест зовёт метод напрямую, минуя обучение).
+	var w4 := WorldGen.new(777)
+	w4.lock_pre_autodig_garden()
+	w4.build_robert_tunnel()
+	check("build_robert_tunnel снимает гейт как страховку",
+		not w4.is_pre_autodig_locked_cell(16, 1))

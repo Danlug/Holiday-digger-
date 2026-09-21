@@ -59,6 +59,12 @@ var _ores: Array = []
 var _label_ids: Dictionary = {}
 var _staircase_x_start: int = GARDEN_X_MIN
 var _staircase_y_max: int = 4
+# Граница гейта "до автокопки — только правее лестницы" (решение владельца,
+# см. is_pre_autodig_locked_cell). Правый край лестницы на её самом широком,
+# четвёртом уровне: _staircase_x_start + _staircase_y_max. Пересчитывается в
+# _apply_layers вместе с самой лестницей, а не хардкодится — расходиться с
+# геометрией лестницы ей нельзя.
+var _pre_autodig_min_x: int = GARDEN_X_MIN
 var _foundation_y: int = 5
 var _peat_seam_y_min: int = 450
 var _peat_seam_y_max: int = 455
@@ -76,6 +82,17 @@ var _scripted_loot: Dictionary = {}  # "x,y" -> TileTypes.Type
 # тесты). Дом выставляет его через build_robert_tunnel и держит у себя
 # GameState.house_garden_closed для своей половины логики.
 var _garden_locked: bool = false
+
+# Гейт "до сценария со скоростной копкой копать можно только справа от дома
+# и лестницы" (решение владельца, ГДД п.9: "в начале игры ему можно копать
+# только справа от дома и лестницы, пока не запустится сценарий со
+# скоростным копанием"). По умолчанию снят (как и раньше) — взводит его
+# явно тот, кто знает, что игра только начинается (StoryDirector.boot для
+# новой/незавершённой обучением игры), а не WorldGen сам по себе: голый
+# WorldGen.new(seed) в тестах и утилитах остаётся таким же копаемым, каким
+# был всегда. Снимает — AutoDigTutorial.begin(), см. комментарий там: это и
+# есть тот самый "запустился сценарий со скоростным копанием".
+var _pre_autodig_locked: bool = false
 
 
 func _init(p_world_seed: int) -> void:
@@ -128,6 +145,7 @@ func _apply_layers() -> void:
 	var st: Dictionary = layers.get("staircase", {})
 	_staircase_x_start = int(st.get("x_start", GARDEN_X_MIN))
 	_staircase_y_max = int(st.get("y_max", 4))
+	_pre_autodig_min_x = _staircase_x_start + _staircase_y_max
 
 	var seam: Dictionary = layers.get("peat_seam", {})
 	_peat_seam_y_min = int(seam.get("y_min", 450))
@@ -196,6 +214,8 @@ func dig_cell(x: int, y: int) -> bool:
 		return false
 	if is_garden_sealed_cell(x, y):
 		return false
+	if is_pre_autodig_locked_cell(x, y):
+		return false
 	var current := get_tile(x, y)
 	if current == TileTypes.Type.EMPTY:
 		return false
@@ -222,6 +242,41 @@ func is_garden_sealed_cell(x: int, y: int) -> bool:
 	# TUNNEL_DEPTH совпадает с _foundation_y - 1: тоннель идёт до фундамента,
 	# и запечатано ровно то же, что он прошивает.
 	return y >= 1 and y <= TUNNEL_DEPTH
+
+
+## До сценария со скоростной копкой (см. поле _pre_autodig_locked выше)
+## огород левее правого края лестницы не копается вообще — герою и так есть
+## куда копать (справа), а спускаться слева, где вот-вот будет расчищенный
+## автокопкой участок, ещё незачем. Граница — единая вертикальная линия по
+## самому широкому (четвёртому) уровню лестницы, а не только её клетки:
+## объяснить игроку "копай правее лестницы" одной линией проще, чем
+## ступенчатым краем, да и слева от лестницы до раскопки там всё равно
+## копать особо нечего.
+##
+## Дом (x <= HOUSE_X_MAX) сюда не входит — за него отвечает отдельная
+## проверка в dig_cell/player, эта функция про огород.
+func is_pre_autodig_locked_cell(x: int, y: int) -> bool:
+	if not _pre_autodig_locked:
+		return false
+	if x < GARDEN_X_MIN:
+		return false
+	return x < _pre_autodig_min_x
+
+
+## Взводит гейт "до автокопки — только правее лестницы" (см. поле выше).
+## Зовёт StoryDirector.boot() для новой или ещё не дошедшей до автокопки
+## игры — голый WorldGen.new(seed) в тестах/утилитах гейт не взводит сам,
+## остаётся копаемым как раньше.
+func lock_pre_autodig_garden() -> void:
+	_pre_autodig_locked = true
+
+
+## Снимает гейт: сценарий со скоростной копкой запустился (решение
+## владельца). Зовёт AutoDigTutorial.begin() — это и есть тот самый момент,
+## единой точкой независимо от того, что именно его вызвало (обычная игра,
+## тест, пропуск ролика). Идемпотентно — повторный вызов ничего не меняет.
+func unlock_pre_autodig_garden() -> void:
+	_pre_autodig_locked = false
 
 
 ## Сценарные клетки огорода (сейчас — пять самородков золота на 4 уровне).
@@ -279,6 +334,12 @@ func restore_garden() -> void:
 ## diffs, замок уже взведён.
 func build_robert_tunnel() -> void:
 	_garden_locked = true
+	# Страховка: к этому моменту автокопка уже давно сняла гейт "только
+	# правее лестницы" (Роберт приходит куда позже неё по сюжету) — лестницы
+	# больше нет вовсе, держать гейт взведённым не для чего. Явный вызов, а
+	# не расчёт на порядок сцен, потому что build_robert_tunnel зовут и тесты
+	# напрямую, минуя обучение.
+	unlock_pre_autodig_garden()
 	restore_garden()
 
 	# Ствол и стены Роберт кладёт заново, поэтому старые диффы обучения на

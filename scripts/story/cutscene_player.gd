@@ -435,8 +435,13 @@ func play(id: String, opts: Dictionary = {}) -> void:
 	# сплошной заливки _sky. Явно НЕ трогаем сцены без этого поля — 11 из 12
 	# сцен его не задают и продолжают выглядеть ровно как раньше (задание:
 	# "не переписывай сцены"). Сейчас поле стоит только у intro_grandpa.
+	# В режиме мира (opts.world) свой забор НЕ создаём: он лежал бы в этом же
+	# CanvasLayer поверх живой карты и закрывал бы актёров (дед пропадал за
+	# полосой забора) — эпоху живого задника там переключает
+	# _enter_world_mode через Backdrop.set_era.
 	var scene_data := StoryData.scene(id)
-	if scene_data.has("era"):
+	var world_mode := bool(opts.get("world", false))
+	if scene_data.has("era") and not world_mode:
 		set_backdrop_era(String(scene_data.get("era")))
 	else:
 		set_backdrop_era("")

@@ -1500,8 +1500,9 @@ func _tool_icon_path(tool_id: String) -> String:
 		return "res://art/items/pickaxe_rusty_cracked.png"
 	var path := Balance.get_tool_icon(tool_id)
 	if path.is_empty():
-		# Своей иконки у буровой машины нет — на полосе остаётся бур: машина
-		# и есть бур, только с кабиной и гусеницами.
+		# Своей иконки у бурмобиля в data/balance.json быть обязано
+		# (tools.drill_rig.icon) — но если её всё же нет, лучше показать бур,
+		# чем пустую кнопку: бурмобиль это и есть бур, только с кабиной.
 		if tool_id == "drill_rig":
 			return "res://art/items/hand_drill.png"
 		return ""
@@ -1565,7 +1566,7 @@ func _on_gear_unlocked(gear_id: String) -> void:
 	# Ранцы и джетпаки больше не выдаются глубиной — их покупают, и о покупке
 	# говорит магазин. Здесь остались только вещи, которые открывает глубина.
 	if gear_id == "drill_rig":
-		toast("Глубина 1000. Собрана буровая машина — копает втрое быстрее бура.", 5.0)
+		toast("Глубина 1000. Собран бурмобиль — копает вдвое быстрее бура.", 5.0)
 
 
 func _on_tool_switched(tool_id: String) -> void:

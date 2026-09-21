@@ -667,9 +667,11 @@ func _can_dig(type: int) -> bool:
 
 
 ## Множитель скорости копки текущего инструмента. Источник чисел —
-## data/balance.json -> tools (единый источник, а не отдельная демо-константа
-## DRILL_MULT из web/index.html — та дублировала бы tools.hand_drill.speed_multiplier
-## другим числом; см. итоговый отчёт).
+## Balance.get_tool_speed_multiplier() (data/balance.json -> tools; бур и
+## бурмобиль считаются ОТ лучшей кирки, см. комментарий там) — единый
+## источник, а не отдельная демо-константа DRILL_MULT из web/index.html
+## (устаревший статический прототип до Godot-версии, не собирается и не
+## тестируется вместе с игрой: та дублировала бы это число своим, другим).
 func _tool_speed_multiplier() -> float:
 	var mult := Balance.get_tool_speed_multiplier(GameState.current_tool)
 	if GameState.current_tool == "rusty_pickaxe" and rusty_pickaxe_cracked:

@@ -479,7 +479,34 @@ func get_tool(id: String) -> Dictionary:
 	return balance.get("tools", {}).get(id, {})
 
 
+## Скорость копки лучшей кирки прямо сейчас — максимум speed_multiplier
+## среди инструментов линии "pickaxe". Живой максимум, а не хардкод «5»:
+## подрастёт кирка — подрастёт и бур с бурмобилем без правки кода (см.
+## get_tool_speed_multiplier).
+func get_best_pickaxe_speed_multiplier() -> float:
+	var best := 0.0
+	for id in balance.get("tools", {}).keys():
+		var t = balance["tools"][id]
+		if typeof(t) != TYPE_DICTIONARY or String(t.get("line", "")) != "pickaxe":
+			continue
+		best = maxf(best, float(_v(t.get("speed_multiplier", 0.0))))
+	return best
+
+
+## Множитель скорости копки инструмента. У кирок и лопаты число лежит прямо
+## в balance.json. У бура и бурмобиля числа НЕТ — оно решением владельца
+## привязано к другому инструменту («ручной бур копает в 2 раза быстрее, чем
+## лучшая кирка»; «бурмобиль — в 2 раза лучше бура»), поэтому считаем здесь,
+## одним местом, а не храним 10/20 отдельными числами, которые разъедутся
+## при следующей правке линейки кирок (balance.json -> tools.hand_drill
+## .speed_vs_best_pickaxe, tools.drill_rig.speed_vs_hand_drill).
 func get_tool_speed_multiplier(id: String) -> float:
+	if id == "hand_drill":
+		var factor := float(_v(get_tool("hand_drill").get("speed_vs_best_pickaxe", 2.0)))
+		return get_best_pickaxe_speed_multiplier() * factor
+	if id == "drill_rig":
+		var factor := float(_v(get_tool("drill_rig").get("speed_vs_hand_drill", 2.0)))
+		return get_tool_speed_multiplier("hand_drill") * factor
 	return float(_v(get_tool(id).get("speed_multiplier", 1.0)))
 
 
@@ -524,7 +551,7 @@ func get_tool_icon(id: String) -> String:
 
 
 ## Идентификаторы одной линейки инструментов ("pickaxe" — шесть кирок,
-## "tech" — бур и буровая машина), отсортированные по ступени.
+## "tech" — бур и бурмобиль), отсортированные по ступени.
 ## Порядок берётся из поля tier, а не из порядка ключей в JSON: линейку будут
 ## дополнять, и вставленная в середину ступень не должна менять смысл файла.
 func get_tools_in_line(line: String) -> Array:

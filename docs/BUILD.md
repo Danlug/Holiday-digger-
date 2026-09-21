@@ -51,7 +51,7 @@ godot --headless --path . --quit-after 30
 ## Сборка веб-версии (проверено, собирается)
 
 ```bash
-mkdir -p build/web
+mkdir -p build/web && touch build/.gdignore                       # иначе Godot реимпортирует свой же экспорт и пакует его в pck
 python3 tools/make_build_info.py                                   # метка сборки
 godot --headless --path . --export-release "Web" build/web/index.html
 python3 tools/stamp_web_build.py                                   # сброс кэша

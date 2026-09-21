@@ -44,7 +44,10 @@ const AIR_CTRL := 0.82         # насколько слушается руля 
 const V_TERM := 32.0           # предел скорости падения, клеток/с
 const HW := 0.38
 const HH := 0.46
-const CORNER := 5.0 / 32.0     # скругление углов коллизии
+const CORNER := 7.0 / 32.0     # скругление углов коллизии (решение владельца:
+# герой сильно застревал на углах тайлов при прежних 5 px — см. отчёт агента,
+# tests/test_player_harness.gd:_test_corner_rounding_* — форгив до 7 px
+# проскальзывает, 8+ px по-прежнему честно блокирует)
 
 # --- потолок неба ---
 # Высоту неба знает рендер мира (world_view.gd:SKY_HEIGHT) — второго числа
@@ -540,7 +543,25 @@ func _move_y(dt: float) -> void:
 
 	if vy > 0.0:
 		var b := y + HH
-		if _solid_at(left, b) or _solid_at(right, b):
+		var hit_lb := _solid_at(left, b)
+		var hit_rb := _solid_at(right, b)
+		var slipped_b := false
+		# Тот же угловой допуск, что и при взлёте ниже (раздельная коллизия по
+		# осям иначе сажала героя на карниз шахты шириной в клетку, стоило ему
+		# при падении/копке вниз оказаться смещённым от центра на пиксели —
+		# решение владельца, см. отчёт агента): падение в шахту соскальзывает
+		# к центру, а не садится на угол, который герой всё равно бы прошёл.
+		if hit_lb and not hit_rb:
+			var over_b: float = (floor(left) + 1.0) - left
+			if over_b <= CORNER:
+				x += over_b + 0.002
+				slipped_b = true
+		elif hit_rb and not hit_lb:
+			var over2_b: float = right - floor(right)
+			if over2_b <= CORNER:
+				x -= over2_b + 0.002
+				slipped_b = true
+		if (hit_lb or hit_rb) and not slipped_b:
 			y = floor(b) - HH - 0.001
 			_land()
 			vy = 0.0
@@ -713,6 +734,15 @@ func _start_dig(tx: int, ty: int) -> void:
 		return
 
 	if type == TileTypes.Type.STAIRCASE:
+		return
+
+	# Под домом (x 0..14) не копают никогда — решение владельца, никаким
+	# инструментом. world.dig_cell() и так откажет в конце анимации (единая
+	# точка правды — см. world_gen.gd), но отказывать нужно ДО удара, тем же
+	# приёмом, что и запечатанный огород ниже: иначе стан/опыт/топливо успели
+	# бы примениться за удар, который ничего не выкопал.
+	if tx <= WorldGen.HOUSE_X_MAX:
+		digging = null
 		return
 
 	# Бурмобиль без топлива глохнет под землёй: копать нечем, но идти по уже

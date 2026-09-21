@@ -7,8 +7,9 @@ extends RefCounted
 ## планировщик триггеров (таймер, глубина игрока и т.п.) не наша зона,
 ## это должен вызывать вызывающий код (core/сцены) с нужным интервалом.
 
-## Формы обвала чанка: {h: глубина, w: ширина}. 5×32 и 10×32 — полосы на
-## всю ширину мира (совпадает с шириной мира — WorldGen.WIDTH).
+## Формы обвала чанка: {h: глубина, w: ширина}. 5×32 и 10×32 задуманы как
+## полосы во всю ширину — trigger_chunk_collapse обрезает их до ширины
+## огорода (дом, x 0..14, обвал не трогает никогда, см. её же комментарий).
 static var CHUNK_SHAPES: Array[Dictionary] = [
 	{"h": 5, "w": 5},
 	{"h": 10, "w": 10},
@@ -37,12 +38,17 @@ static func trigger_chunk_collapse(world: WorldGen, fog: FogOfWar,
 		rng: RandomNumberGenerator = null, player_cell_y: int = -1) -> Dictionary:
 	var r := _rng(rng)
 	var shape: Dictionary = CHUNK_SHAPES[r.randi_range(0, CHUNK_SHAPES.size() - 1)]
-	var w: int = shape.w
 	var h: int = shape.h
+	# Дом (x 0..14) не копается никогда (решение владельца) — обвал туда не
+	# лезет тоже: ширина чанка обрезается по огороду (17 клеток), а сам чанк
+	# всегда кладётся внутри него. "Полоса на всю ширину мира" из формы шейпа
+	# теперь означает "на всю ширину огорода".
+	var garden_w := WorldGen.WIDTH - WorldGen.GARDEN_X_MIN
+	var w: int = mini(int(shape.w), garden_w)
 
-	var x0 := 0
-	if w < WorldGen.WIDTH:
-		x0 = r.randi_range(0, WorldGen.WIDTH - w)
+	var x0 := WorldGen.GARDEN_X_MIN
+	if w < garden_w:
+		x0 = r.randi_range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH - w)
 
 	var y_min := 1
 	if player_cell_y >= 0:

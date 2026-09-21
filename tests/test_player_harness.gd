@@ -46,6 +46,13 @@ func _ready() -> void:
 	_test_rig_fuel_consumption_accumulator()
 	_test_rig_stalls_digging_without_fuel()
 
+	# --- задача «Скругление углов / огород под домом» (правила A и B) ---
+	_test_corner_rounding_horizontal_step()
+	_test_corner_rounding_vertical_ascend_shaft()
+	_test_corner_rounding_vertical_descend_shaft()
+	_test_corner_rounding_diagonal_input_along_staircase()
+	_test_house_never_diggable_by_any_tool()
+
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
 
@@ -64,9 +71,29 @@ func _tick(n: int, dt: float = 1.0 / 30.0) -> void:
 		player.physics_tick(dt)
 
 
-func _find_tile(type: int, x_max: int = 15, y_min: int = 1, y_max: int = 4) -> Vector2i:
+## Задача A («скругление углов»): после любого шага хитбокс героя не имеет
+## права заходить в твёрдую клетку глубже CORNER — иначе "скругление" на самом
+## деле означает "герой проваливается в стену". Проверяет все четыре угла
+## хитбокса, отступив внутрь на CORNER с каждой стороны: если хоть один угол
+## всё ещё в твёрдой клетке — где-то заехали глубже дозволенного.
+func _hitbox_overlap_clear(label: String) -> void:
+	var inset: float = player.CORNER
+	var l: float = player.x - player.HW + inset
+	var r: float = player.x + player.HW - inset
+	var t: float = player.y - player.HH + inset
+	var b: float = player.y + player.HH - inset
+	var deep: bool = player._solid_at(l, t) or player._solid_at(r, t) \
+		or player._solid_at(l, b) or player._solid_at(r, b)
+	check(label, not deep)
+
+
+## Дом (x 0..14) не копается никогда (решение владельца) — по умолчанию ищем
+## только в огороде (x 15..31), иначе тест находит клетку, которую сам же
+## player.gd теперь честно отказывается копать.
+func _find_tile(type: int, x_min: int = WorldGen.GARDEN_X_MIN, x_max: int = WorldGen.WIDTH,
+		y_min: int = 1, y_max: int = 4) -> Vector2i:
 	for y in range(y_min, y_max + 1):
-		for x in range(0, x_max):
+		for x in range(x_min, x_max):
 			if world.get_tile(x, y) == type:
 				return Vector2i(x, y)
 	return Vector2i(-1, -1)
@@ -570,9 +597,17 @@ func _setup_rig_world() -> WorldGen:
 	return w
 
 
-func _teardown_rig_world(prev_world: WorldGen) -> void:
-	player.world = prev_world
-	GameState.world_ref = prev_world
+## Параметр исторически звался prev_world, но оба вызывающих места передают
+## сюда тот же запечатанный `w`, что вернул _setup_rig_world, а не мир ДО
+## него — восстанавливать в таком случае нечего, игрок так и остаётся в
+## запечатанном мире. Пока это не задело ни одну проверку (см. отчёт агента:
+## задело, когда _find_tile стал по умолчанию искать в огороде, а не под
+## домом), но название параметра лгало о поведении — восстанавливаем и правда
+## ИСХОДНЫЙ мир теста (module-level `world`, никогда не запечатанный),
+## параметр же оставлен ради обратной совместимости вызова.
+func _teardown_rig_world(_locked_world: WorldGen) -> void:
+	player.world = world
+	GameState.world_ref = world
 	GameState.reset_progress()
 
 
@@ -685,4 +720,219 @@ func _test_rig_stalls_digging_without_fuel() -> void:
 	check("тост про копку без топлива не спамит каждый кадр (пришёл один раз, а не %d)" % warnings.size(),
 		warnings.size() == 1)
 
+	GameState.reset_progress()
+
+
+# ---------------------------------------------------------------------------
+# A: скругление углов коллизии (решение владельца: CORNER 5 px -> 7 px, "он
+# застревает сильно на углах тайлов"). Тесты дёргают _move_x/_move_y напрямую
+# (как _consume_rig_fuel/_check_gear_unlocks выше — приватность в GDScript не
+# защищена) ради точного контроля субпиксельного смещения; каждый — со своим
+# WorldGen, чтобы не зависеть от того, что уже нарыли другие тесты.
+# ---------------------------------------------------------------------------
+
+## Горизонтальный коридор высотой 2 клетки, впереди — потолочный выступ
+## («ступенька»): нижняя строка пробита, верхняя цела. Смещение по y задаёт,
+## на сколько px голова героя задевает выступ. 1..7 px обязаны проскальзывать
+## (герой продолжает идти), 8 px — честный блок (это и есть граница CORNER).
+func _test_corner_rounding_horizontal_step() -> void:
+	var w := WorldGen.new(90001)
+	player.world = w
+
+	var cx := 25
+	var ledge_row := 200    # цел только в x=cx+1 — потолочный выступ
+	var open_row := 201     # пробит в обоих столбцах — по нему идёт коридор
+	w.dig_cell(cx, ledge_row)
+	w.dig_cell(cx, open_row)
+	w.dig_cell(cx + 1, open_row)
+	check("геометрия теста: потолок выступа цел", w.get_tile(cx + 1, ledge_row) != TileTypes.Type.EMPTY)
+	check("геометрия теста: коридор впереди пробит на уровне пола", w.get_tile(cx + 1, open_row) == TileTypes.Type.EMPTY)
+
+	var boundary := float(ledge_row + 1)
+	print("  -- A: горизонтальный выступ, CORNER = %.5f клеток (%.1f px) --" % [player.CORNER, player.CORNER * 32.0])
+	for px in range(1, 9):
+		var over := float(px) / 32.0
+		player.x = float(cx + 1) + 0.5 - player.HW
+		player.y = boundary - over + player.HH - 0.02
+		player.vx = player.WALK
+		player.vy = 0.0
+		player.on_ground = true
+		player._move_x(1.0 / 600.0)  # ничтожный dt: проверяем именно угол, не пробег
+		var slipped: bool = player.vx != 0.0
+		var expect_slip: bool = px <= 7
+		check("выступ %d px: %s" % [px, "проскользнул, идёт дальше" if expect_slip else "остановлен честным блоком"],
+			slipped == expect_slip)
+		_hitbox_overlap_clear("выступ %d px: хитбокс не глубже CORNER в стене" % px)
+		print("     %d px -> vx=%.3f (%s)" % [px, player.vx, "slip" if slipped else "block"])
+
+	player.world = world
+
+
+## Взлёт (тяга/прыжок) в шахту шириной ровно в клетку с горизонтальным
+## смещением 1..8 px от центра. Раздельная коллизия по осям без скругления
+## сажала бы героя на карниз стены — 1..7 px обязаны соскальзывать к центру
+## шахты, 8 px — честный блок.
+func _test_corner_rounding_vertical_ascend_shaft() -> void:
+	var w := WorldGen.new(90002)
+	player.world = w
+
+	var shaft_x := 22
+	var wall_l := 21
+	var wall_r := 23
+	for y in range(1, 5):
+		w.dig_cell(shaft_x, y)
+	check("геометрия теста: шахта 1×4 пробита", w.get_tile(shaft_x, 2) == TileTypes.Type.EMPTY)
+	check("геометрия теста: левая стена цела", w.get_tile(wall_l, 2) != TileTypes.Type.EMPTY)
+	check("геометрия теста: правая стена цела", w.get_tile(wall_r, 2) != TileTypes.Type.EMPTY)
+
+	print("  -- A: взлёт в шахту шириной в клетку, смещение к левой стене --")
+	for px in range(1, 9):
+		var over := float(px) / 32.0
+		player.x = float(shaft_x) + player.HW - 0.02 - over
+		player.y = 3.0
+		player.vx = 0.0
+		player.vy = -3.0
+		player.on_ground = false
+		player.thrust = ""
+		player.coasting = false
+		player._move_y(1.0 / 30.0)
+		var slipped: bool = player.vy < 0.0
+		var expect_slip: bool = px <= 7
+		check("шахта, взлёт, смещение %d px: %s" % [px,
+			"соскользнул к центру, летит дальше" if expect_slip else "сел на карниз (честный блок)"],
+			slipped == expect_slip)
+		if expect_slip:
+			_hitbox_overlap_clear("шахта, взлёт %d px: хитбокс не глубже CORNER в стене" % px)
+		print("     %d px -> x=%.4f vy=%.3f (%s)" % [px, player.x, player.vy, "slip" if slipped else "block"])
+
+	player.world = world
+
+
+## То же самое, но падение (копка вниз/полёт вниз) в ту же шахту — раньше у
+## спуска не было НИКАКОГО скругления углов вовсе (см. отчёт агента): герой
+## садился на карниз стены вместо того, чтобы соскользнуть в шахту. Починка —
+## тот же угловой допуск, что и при взлёте, симметрично для vy > 0.
+func _test_corner_rounding_vertical_descend_shaft() -> void:
+	var w := WorldGen.new(90003)
+	player.world = w
+
+	var shaft_x := 22
+	for y in range(1, 5):
+		w.dig_cell(shaft_x, y)
+
+	print("  -- A: падение в шахту шириной в клетку, смещение к левой стене --")
+	for px in range(1, 9):
+		var over := float(px) / 32.0
+		player.x = float(shaft_x) + player.HW - 0.02 - over
+		player.y = 1.5
+		player.vx = 0.0
+		player.vy = 3.0
+		player.on_ground = false
+		player.thrust = ""
+		player.coasting = false
+		player._move_y(1.0 / 30.0)
+		var slipped: bool = player.vy > 0.0 and not player.on_ground
+		var expect_slip: bool = px <= 7
+		check("шахта, падение, смещение %d px: %s" % [px,
+			"соскользнул к центру, летит дальше" if expect_slip else "сел на карниз (честный блок)"],
+			slipped == expect_slip)
+		if expect_slip:
+			_hitbox_overlap_clear("шахта, падение %d px: хитбокс не глубже CORNER в стене" % px)
+		print("     %d px -> x=%.4f vy=%.3f on_ground=%s (%s)" \
+			% [px, player.x, player.vy, player.on_ground, "slip" if slipped else "block"])
+
+	player.world = world
+
+
+## Джойстиковый случай владельца: диагональный ввод, "как палец на стекле" —
+## герой держит вправо (к стене шахты) и вверх одновременно. Не должен
+## залипать на углу шахты — числа (дистанция за 1 игровую секунду) идут в
+## отчёт агента вместе со сравнением против старого допуска 5/32 клетки.
+func _test_corner_rounding_diagonal_input_along_staircase() -> void:
+	var w := WorldGen.new(90004)
+	player.world = w
+	var shaft_x := 22
+	for y in range(1, 5):
+		w.dig_cell(shaft_x, y)
+
+	GameState.reset_progress()
+	GameState.grant_gear("backpack")
+	check("подготовка: полёт доступен (ранец надет)", player.has_backpack())
+
+	# "Палец на стекле": держим вправо (к правой стене шахты) и вверх разом —
+	# диагональ ↗ ровно как в resolve_dir (hold_dx=1, hold_up=true).
+	player.x = float(shaft_x) + 0.5
+	player.y = 3.9
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = false
+	player.thrust = ""
+	player.coasting = false
+	player.digging = null
+	player.set_intent(1, true, false)
+
+	var start_y: float = player.y
+	var min_x: float = player.x
+	var max_x: float = player.x
+	var dt := 1.0 / 30.0
+	for i in range(30):  # ровно 1 игровая секунда
+		player._fly_arm_at_msec = 0.0  # снимаем паузу прыжок->тяга, см. _test_sky_ceiling
+		player.physics_tick(dt)
+		min_x = minf(min_x, float(player.x))
+		max_x = maxf(max_x, float(player.x))
+
+	var climbed: float = start_y - player.y
+	print("  -- A: диагональный ввод (↗) в шахте за 1 игровую секунду --")
+	print("     подъём за 1с: %.4f клеток (было бы 5/32=%.4f клетки — старый допуск на один угол)"
+		% [climbed, 5.0 / 32.0])
+	print("     разброс x за это время: [%.4f; %.4f] (безопасное окно шахты — 0.28 клетки)" % [min_x, max_x])
+	# Разгон ранца ступенчатый (3 с до потолка скорости, ГДД раздел 5) — за
+	# первую секунду полного 2.5 кл/с ещё нет, поэтому порог не "почти клетка
+	# в секунду", а просто "заметно больше нуля": застрявший на углу герой
+	# показал бы climbed ~= 0 (vy обнулялась бы каждый кадр честным блоком),
+	# а не плавный рост от разгона тяги.
+	check("диагональный ввод у стены шахты не залипает (заметный подъём за 1с, а не почти ноль)",
+		climbed > 0.15)
+	check("герой не провалился под стартовую точку (движение не пошло вспять)", climbed >= -0.001)
+	_hitbox_overlap_clear("после 1с диагонального подъёма у стены хитбокс не глубже CORNER в стене")
+
+	player.set_intent(0, false, false)
+	player.world = world
+	GameState.reset_progress()
+
+
+# ---------------------------------------------------------------------------
+# B.1: под домом (x 0..14) не копают никогда, никаким инструментом
+# ---------------------------------------------------------------------------
+
+## world.dig_cell() уже отказывает под домом безусловно (см. test_world_gen.gd
+## :test_house_never_diggable) — здесь проверяем интеграцию: player._start_dig
+## отказывает ДО удара (без стана, без опыта, без траты топлива бурмобиля) для
+## лопаты, кирки и бурмобиля разом.
+func _test_house_never_diggable_by_any_tool() -> void:
+	var w := WorldGen.new(90005)
+	player.world = w
+	var hx := 10   # заведомо под домом: hx <= WorldGen.HOUSE_X_MAX (14)
+	var hy := 2
+
+	for tool_id in ["shovel", "rusty_pickaxe", "drill_rig"]:
+		GameState.current_tool = tool_id
+		GameState.owned_tools = ["shovel", "rusty_pickaxe", "drill_rig"]
+		if tool_id == "drill_rig":
+			GameState.add_item("fuel_block", 5)  # отказ должен быть про дом, не про топливо
+		var xp_before := GameState.xp
+		player.x = float(hx) + 0.5
+		player.y = float(hy) - 0.5
+		player.vx = 0.0; player.vy = 0.0
+		player.on_ground = true
+		player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+		player.digging = null
+		player.stun_until_msec = 0.0
+		_tick(90)
+		check("под домом (x=%d) инструмент «%s» клетку не берёт" % [hx, tool_id],
+			w.get_tile(hx, hy) != TileTypes.Type.EMPTY)
+		check("под домом «%s»: копка даже не начинается" % tool_id, player.digging == null)
+		check("под домом «%s»: опыт не начислен" % tool_id, GameState.xp == xp_before)
+
+	player.hold_down = false
+	player.world = world
 	GameState.reset_progress()

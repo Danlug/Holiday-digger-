@@ -1,6 +1,6 @@
 {
-	"entrance_x": 297,
-	"width": 416,
-	"height": 224,
+	"entrance_x": 337,
+	"width": 448,
+	"height": 256,
 	"_note": "entrance_x — точка спрайта, которая должна прийтись на клетку двери"
 }

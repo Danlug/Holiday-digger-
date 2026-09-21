@@ -791,26 +791,39 @@ func test_full_reset_waits_for_player() -> void:
 ## (лопата/кирка/бур/бурмобиль/автокопка идут через неё же), поэтому
 ## запрет здесь закрывает все инструменты разом.
 func test_house_never_diggable() -> void:
-	print("-- Под домом (x 0..14) не копают никогда --")
+	print("-- Под домом (x 0..14) верхние пять уровней не копают никогда --")
 	var w := WorldGen.new(2026)
 
 	# и до, и после Роберта: замок огорода тут ни при чём, запрет безусловный
 	var ok_before := true
 	for x in range(0, WorldGen.HOUSE_X_MAX + 1):
-		for y in [1, 2, 3, 4, 5, 100]:
+		for y in [1, 2, 3, 4, 5]:
 			if w.dig_cell(x, y):
 				ok_before = false
 			if w.is_dug(x, y):
 				ok_before = false
-	check("до Роберта под домом ничего не выкопать (x=0..14, разные y)", ok_before)
+	check("до Роберта под домом верхние 5 уровней не выкопать (x=0..14, y=1..5)", ok_before)
 
 	w.build_robert_tunnel()
 	var ok_after := true
 	for x in range(0, WorldGen.HOUSE_X_MAX + 1):
-		for y in [1, 2, 3, 4, 5, 100]:
+		for y in [1, 2, 3, 4, 5]:
 			if w.dig_cell(x, y):
 				ok_after = false
-	check("после Роберта под домом по-прежнему ничего не выкопать", ok_after)
+	check("после Роберта под домом верхние 5 уровней по-прежнему не выкопать", ok_after)
+
+	# С шестой клетки под дом копают как в любую сторону шахты (уточнение
+	# владельца): граница ровно по HOUSE_LOCK_DEPTH, и до, и после Роберта.
+	check("HOUSE_LOCK_DEPTH = 5", WorldGen.HOUSE_LOCK_DEPTH == 5)
+	var w6 := WorldGen.new(2026)
+	var dug_deep := 0
+	for x in range(0, WorldGen.HOUSE_X_MAX + 1):
+		for y in [6, 7, 40, 100]:
+			if TileTypes.is_diggable(w6.get_tile(x, y)) and w6.dig_cell(x, y):
+				dug_deep += 1
+	check("под домом с y=6 копается (выкопано %d клеток)" % dug_deep, dug_deep > 0)
+	check("is_house_locked_cell: (3,5) заперта, (3,6) — нет",
+		w6.is_house_locked_cell(3, 5) and not w6.is_house_locked_cell(3, 6))
 
 	# Огород (x >= 15) копается как обычно — граница ровно по HOUSE_X_MAX, не
 	# сдвинута ни в одну из сторон. (25, 2) — мелкий слой без камня (см. другие
@@ -999,7 +1012,7 @@ func test_pre_autodig_gate() -> void:
 	check("с гейтом (16,1) не копается", not w3.dig_cell(16, 1))
 	check("выкопать так и не удалось — клетка не EMPTY", w3.get_tile(16, 1) != TileTypes.Type.EMPTY)
 	check("с гейтом (19,1), сразу правее лестницы, копается", w3.dig_cell(19, 1))
-	check("под домом отказ по-прежнему свой (x=10)", not w3.dig_cell(10, 1))
+	check("под домом отказ по-прежнему свой (x=10, y=1)", not w3.dig_cell(10, 1))
 
 	w3.unlock_pre_autodig_garden()
 	check("после unlock (17,2) снова копается", w3.dig_cell(17, 2))

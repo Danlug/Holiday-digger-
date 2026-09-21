@@ -21,6 +21,10 @@ extends RefCounted
 
 const WIDTH := 32               # ГДД: "ширина ровно 32", это структурное правило, не баланс
 const HOUSE_X_MAX := 14         # дом: 0..14
+## Под домом не копаются только верхние пять уровней (y 1..5 — до фундамента
+## включительно). Глубже дом ничем не отличается от остальной шахты: с шестой
+## клетки можно копать и вправо, и влево (уточнение владельца 2026-09-21).
+const HOUSE_LOCK_DEPTH := 5
 const GARDEN_X_MIN := 15        # огород: 15..31
 
 const LAYERS_PATH := "res://data/world_layers.json"
@@ -205,12 +209,12 @@ func get_tile(x: int, y: int) -> int:
 func dig_cell(x: int, y: int) -> bool:
 	if x < 0 or x >= WIDTH or y < 1:
 		return false
-	# Под домом (x 0..14) не копают никогда — ни лопатой, ни киркой, ни буром,
-	# ни бурмобилем, ни автокопкой, ни обвалом (решение владельца). Это
-	# единственная точка входа для ЛЮБОЙ копки (player._start_dig,
-	# AutoDigTutorial._dig и build_robert_tunnel идут через неё же), поэтому
-	# запрет здесь закрывает все пути разом, а не по одному в каждом вызывающем.
-	if x <= HOUSE_X_MAX:
+	# Под домом (x 0..14) верхние пять уровней не копают никогда — ни лопатой,
+	# ни киркой, ни буром, ни бурмобилем, ни автокопкой, ни обвалом (решение
+	# владельца). Это единственная точка входа для ЛЮБОЙ копки
+	# (player._start_dig, AutoDigTutorial._dig и build_robert_tunnel идут через
+	# неё же), поэтому запрет здесь закрывает все пути разом.
+	if is_house_locked_cell(x, y):
 		return false
 	if is_garden_sealed_cell(x, y):
 		return false
@@ -234,6 +238,12 @@ func dig_cell(x: int, y: int) -> bool:
 ## остаётся землёй и выглядит как ухоженный огород, а не как бетонная плита.
 ## До Роберта функция всегда false — обучение копает первые четыре уровня
 ## как раньше.
+## Клетка под домом в его неприкосновенной толще: x 0..14 и y 1..HOUSE_LOCK_DEPTH.
+## Ниже (y >= 6) под дом можно копать как в любую сторону шахты.
+func is_house_locked_cell(x: int, y: int) -> bool:
+	return x <= HOUSE_X_MAX and y >= 1 and y <= HOUSE_LOCK_DEPTH
+
+
 func is_garden_sealed_cell(x: int, y: int) -> bool:
 	if not _garden_locked:
 		return false

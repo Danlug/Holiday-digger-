@@ -39,6 +39,12 @@ func _ready() -> void:
 	_test_sky_colors()
 	_test_sealed_garden_gives_no_xp()
 
+	# --- бурмобиль как транспорт (задача «Бурмобиль — транспорт») ---
+	_test_rig_blocks_tunnel_without_fuel()
+	_test_rig_auto_seats_with_fuel()
+	_test_rig_fuel_consumption_accumulator()
+	_test_rig_stalls_digging_without_fuel()
+
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
 
@@ -483,3 +489,143 @@ func _test_sky_colors() -> void:
 	check("строка выше верха неба тоже покрашена",
 		view._sky_color(-view.SKY_HEIGHT - 1) == at_top)
 	view.queue_free()
+
+
+# ---------------------------------------------------------------------------
+# Бурмобиль как транспорт (решение владельца, задача «Бурмобиль —
+# транспорт»): «спускаясь под землю он должен быть только в нём»; «если он
+# экипирован бурмобилем, он должен иметь на себе топливо (брикеты каменного
+# угля)». Единственная истина — GameState.current_tool == "drill_rig"
+# (player.is_in_rig()).
+# ---------------------------------------------------------------------------
+
+## Общая подготовка: настоящий тоннель Роберта (build_robert_tunnel) вместо
+## произвольной дырки — граница поверхность/под землёй проверяется в player.gd
+## по y, а не по конкретному тоннелю, но тест должен ходить тем же путём, что
+## и игрок.
+func _setup_rig_world() -> WorldGen:
+	var w := WorldGen.new(4242)
+	w.build_robert_tunnel()
+	player.world = w
+	GameState.world_ref = w
+	GameState.reset_progress()
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.current_tool = "shovel"
+	GameState.max_depth_reached = player.RIG_DEPTH
+	GameState.house_is_indoors = false
+	player._was_underground = false
+	player.frozen = false
+	var mouth := w.tunnel_mouth()
+	player.x = float(mouth.x) + 0.5
+	player.y = 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = false
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = false
+	player.digging = null
+	return w
+
+
+func _teardown_rig_world(prev_world: WorldGen) -> void:
+	player.world = prev_world
+	GameState.world_ref = prev_world
+	GameState.reset_progress()
+
+
+## На поверхности без брикетов бурмобиль в собственности не пускает в
+## тоннель вовсе — герой висит у входа, как перед невидимой стеной.
+func _test_rig_blocks_tunnel_without_fuel() -> void:
+	var w := _setup_rig_world()
+	GameState.inventory.clear()  # брикетов нет
+
+	var warnings: Array = []
+	var cb := func(m): warnings.append(m)
+	player.rig_fuel_warning.connect(cb)
+	_tick(120)
+	player.rig_fuel_warning.disconnect(cb)
+
+	check("без топлива герой остаётся на поверхности", player.cell_y() == 0)
+	check("инструмент не переключился без топлива", GameState.current_tool == "shovel")
+	check("тост «нет брикетов» пришёл",
+		warnings.has("Нет брикетов — сделай на верстаке из угля"))
+
+	_teardown_rig_world(w)
+
+
+## С брикетами в рюкзаке герой спускается в тоннель и автоматически садится
+## в бурмобиль, даже если перед этим ходил пешком с киркой.
+func _test_rig_auto_seats_with_fuel() -> void:
+	var w := _setup_rig_world()
+	GameState.add_item("fuel_block", 5)
+
+	# Массив, а не bool: лямбда в GDScript захватывает локальную bool-переменную
+	# КОПИЕЙ по значению, и cb() внутри менял бы только свою копию — Array
+	# захватывается тем же указателем на общее хранилище, и append снаружи виден.
+	var entered_events: Array = []
+	var cb := func(): entered_events.append(true)
+	player.entered_rig.connect(cb)
+	_tick(120)
+	player.entered_rig.disconnect(cb)
+
+	check("с топливом герой уходит под тоннель", player.cell_y() >= 1)
+	check("бурмобиль сел на инструмент автоматически", GameState.current_tool == "drill_rig")
+	check("is_in_rig() согласуется с current_tool", player.is_in_rig())
+	check("сигнал \"сел в бурмобиль\" пришёл ровно один раз", entered_events.size() == 1)
+
+	_teardown_rig_world(w)
+
+
+## Расход топлива копится дробно (blocks_per_cell < 1) и списывает ровно один
+## блок, когда накопится полная единица — не раньше и не позже.
+func _test_rig_fuel_consumption_accumulator() -> void:
+	GameState.reset_progress()
+	GameState.inventory.clear()
+	GameState.add_item("fuel_block", 3)
+	player._rig_fuel_progress = 0.0
+
+	var rate := Balance.get_drill_rig_fuel_per_cell()
+	check("расход топлива на клетку задан (> 0, ПРЕДЛОЖЕНО)", rate > 0.0)
+	var cells_per_block: int = int(round(1.0 / rate)) if rate > 0.0 else 1
+
+	for i in range(maxi(cells_per_block - 1, 0)):
+		player._consume_rig_fuel()
+	check("до полной клеточной нормы блок цел",
+		GameState.get_item_count("fuel_block") == 3)
+
+	player._consume_rig_fuel()
+	check("на %d-й клетке блок расходуется" % cells_per_block,
+		GameState.get_item_count("fuel_block") == 2)
+
+	GameState.reset_progress()
+
+
+## Под землёй без топлива бурмобиль глохнет: копка не запускается вовсе
+## (движение по уже прорытому при этом не трогается — эта проверка про
+## копку, не про ходьбу).
+func _test_rig_stalls_digging_without_fuel() -> void:
+	var cell := _find_tile(TileTypes.Type.DIRT)
+	check("нашлась клетка земли для теста бурмобиля без топлива", cell.x >= 0)
+	if cell.x < 0:
+		return
+
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.current_tool = "drill_rig"
+	GameState.inventory.clear()  # брикетов нет
+	player.x = float(cell.x) - 1.0 + player.HW + 0.5
+	player.y = float(cell.y) + 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 1; player.hold_up = false; player.hold_down = false
+	player.digging = null
+
+	var warnings: Array = []
+	var cb := func(m): warnings.append(m)
+	player.rig_fuel_warning.connect(cb)
+	_tick(30)
+	player.rig_fuel_warning.disconnect(cb)
+	player.hold_dx = 0
+
+	check("без топлива бурмобиль клетку не берёт", world.get_tile(cell.x, cell.y) != TileTypes.Type.EMPTY)
+	check("копка даже не начинается", player.digging == null)
+	check("тост «кончилось топливо» пришёл", warnings.has("Кончилось топливо"))
+
+	GameState.reset_progress()

@@ -614,6 +614,14 @@ func get_gear_icon(id: String) -> String:
 	return String(get_gear(id).get("icon", ""))
 
 
+## Расход топливных блоков на одну прокопанную клетку у бурмобиля (ГДД
+## раздел 5: «если он экипирован бурмобилем, он должен иметь на себе
+## топливо» — решение владельца, число расхода не задано, см. balance.json
+## -> fuel_consumption.blocks_per_cell.drill_rig, proposed).
+func get_drill_rig_fuel_per_cell() -> float:
+	return float(_v(balance.get("fuel_consumption", {}).get("blocks_per_cell", {}).get("drill_rig", 0.1)))
+
+
 ## Время бурения клетки минерала id базовым инструментом (drill_seconds из
 ## minerals.json), с запасным значением, если минерал не описан явно.
 func get_mineral_drill_seconds(id: String) -> float:

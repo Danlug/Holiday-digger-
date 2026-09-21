@@ -166,11 +166,23 @@ func _process(_dt: float) -> void:
 		return
 	position = Vector2(player.x * TILE, player.y * TILE)
 
+	# Бурмобиль под землёй — герой ВСЕГДА в кабине (решение владельца, задача
+	# «Бурмобиль — транспорт»): никаких листов ходьбы/полёта/падения пешком,
+	# пока едет машина. Отдельных кадров простоя/ходьбы/падения у машины нет
+	# (владелец прислал только dig_rig_down/side, нарисованные под копку) —
+	# статичный боковой кадр как временная замена, до отдельной анимации
+	# машины на месте (ПРЕДЛОЖЕНО: см. отчёт агента).
+	var in_rig: bool = player.has_method("is_in_rig") and player.is_in_rig() and player.cell_y() >= 1
+
 	var sheet_name: String
+	var force_static_frame := false
 	if player.digging != null:
 		# Для каждого инструмента нарисована своя анимация, а для бура и
 		# бурмобиля — ещё и своя на каждое направление копки.
 		sheet_name = _dig_sheet_name()
+	elif in_rig:
+		sheet_name = "dig_rig_side" if _sheets.has("dig_rig_side") else "dig_pick"
+		force_static_frame = true
 	elif not player.on_ground:
 		# Все четыре уровня снаряжения выглядят по-разному, и по кадру должно
 		# быть видно, на чём герой висит: пропеллер, большой винт, джетпак с
@@ -190,7 +202,8 @@ func _process(_dt: float) -> void:
 	if tex != null:
 		_sprite.texture = tex
 		var frames: int = maxi(1, int(round(tex.get_width() / float(fw))))
-		var frame: int = int(floor(player.anim / anim_div)) % frames if frames > 1 else 0
+		var frame: int = 0 if force_static_frame else \
+				(int(floor(player.anim / anim_div)) % frames if frames > 1 else 0)
 		_sprite.region_rect = Rect2(frame * fw, 0, fw, fh)
 	_sprite.flip_h = player.facing < 0
 	# Линия земли листа должна лечь туда же, куда ложится подошва у кадра

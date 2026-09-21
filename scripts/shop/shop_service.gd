@@ -311,6 +311,13 @@ static func buy_tool(tool_id: String) -> Dictionary:
 		return {"ok": false, "message": "Уже есть"}
 	if Balance.tool_needs_materials(tool_id):
 		return {"ok": false, "message": "Это собирается на верстаке, а не покупается"}
+	# Магазин у входной двери работает откуда угодно (can_shop_here() ==
+	# true всегда), а бурмобиль под землёй бросить нельзя (решение владельца)
+	# — иначе покупка чужой кирки прямо в шахте тихо ссаживала бы героя с
+	# машины мимо единственной точки проверки (GameState.set_current_tool).
+	if GameState.current_tool == "drill_rig" and tool_id != "drill_rig" \
+			and GameState.player_depth >= 1 and not GameState.house_is_indoors:
+		return {"ok": false, "message": "Бурмобиль под землёй не бросить — сначала наверх или домой."}
 	var price := Balance.get_tool_cost_coins(tool_id)
 	if price <= 0:
 		return {"ok": false, "message": "Это не продаётся"}

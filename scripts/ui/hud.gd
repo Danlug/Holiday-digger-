@@ -98,6 +98,10 @@ var _arrow_buttons: Dictionary = {}   # dir -> Button
 ## под двумя пальцами — это диагональ.
 var _arrows_held: Dictionary = {}
 var _tool_button: Button
+## Число брикетов топлива у бурмобиля — видно только пока он надет (решение
+## владельца: «если он экипирован бурмобилем, он должен иметь на себе
+## топливо», см. отчёт агента «Бурмобиль — транспорт»).
+var _fuel_label: Label
 var _well_panel: Control
 var _objective_panel: PanelContainer
 var _objective_label: Label
@@ -160,6 +164,10 @@ func set_player(p: Node) -> void:
 	player.dig_finished.connect(_on_dig_finished)
 	player.gear_unlocked.connect(_on_gear_unlocked)
 	player.tool_auto_switched.connect(_on_tool_switched)
+	if player.has_signal("entered_rig"):
+		player.entered_rig.connect(_on_entered_rig)
+	if player.has_signal("rig_fuel_warning"):
+		player.rig_fuel_warning.connect(_on_rig_fuel_warning)
 	_sync_tool()
 
 
@@ -853,6 +861,16 @@ func _build_strip() -> void:
 	_tool_button.pressed.connect(_show_tool_name)
 	strip.add_child(_tool_button)
 
+	# Брикеты топлива — числом, рядом с иконкой инструмента. Спрятан, пока
+	# бурмобиль не надет: у остальных инструментов топлива нет, и пустая
+	# метка на полосе шириной 224 только крала бы место зря.
+	_fuel_label = Label.new()
+	_fuel_label.add_theme_font_size_override("font_size", 9)
+	_fuel_label.visible = false
+	_fuel_label.tooltip_text = "Брикеты угля для бурмобиля"
+	_fuel_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	strip.add_child(_fuel_label)
+
 	var gear_box := HBoxContainer.new()
 	_gear_pack = _make_gear_icon(gear_box, "")
 	_gear_jet = null
@@ -1366,10 +1384,13 @@ func _connect_game_state() -> void:
 	GameState.gear_changed.connect(func(_g): _sync_gear_icon())
 	GameState.inventory_changed.connect(func():
 		_sync_purse()
+		_sync_fuel()
 		if _inv_sheet.visible:
 			_render_inventory()
 	)
 	GameState.tool_changed.connect(func(_t): _sync_tool())
+	GameState.rig_dismount_blocked.connect(func(_id):
+		toast("Бурмобиль под землёй не бросить — сначала наверх или домой."))
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
 	GameState.leveled_up.connect(func(_lvl, _pts): _sync_xp())
 	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
@@ -1382,6 +1403,7 @@ func _sync_all() -> void:
 	_sync_xp()
 	_sync_hero_button()
 	_sync_purse()
+	_sync_fuel()
 	_sync_tool()
 
 
@@ -1432,6 +1454,23 @@ func _sync_tool() -> void:
 	if _tool_name_panel != null and _tool_name_panel.visible:
 		_tool_name_label.text = tool_name
 	_sync_gear_icon()
+	_sync_fuel()
+
+
+## Индикатор брикетов: виден только когда бурмобиль надет. Красный на нуле —
+## того же цвета, что перегруз рюкзака (BAD в остальных экранах), чтобы
+## тревожный цвет читался одинаково по всему интерфейсу.
+func _sync_fuel() -> void:
+	if _fuel_label == null:
+		return
+	var in_rig := GameState.current_tool == "drill_rig"
+	_fuel_label.visible = in_rig
+	if not in_rig:
+		return
+	var n := GameState.get_item_count("fuel_block")
+	_fuel_label.text = "Топливо %d" % n
+	_fuel_label.add_theme_color_override("font_color",
+		Color8(0xB8, 0x5A, 0x52) if n <= 0 else Color8(0x9D, 0x8B, 0x73))
 
 
 ## На полосе — один значок: то, что надето. Тёмная иконка недоступного
@@ -1534,6 +1573,20 @@ func _on_tool_switched(tool_id: String) -> void:
 	_show_tool_name()
 	if tool_id == "rusty_pickaxe":
 		toast("Лопата упёрлась в старый фундамент. В мастерской нашлась дедова кирка.", 3.6)
+
+
+## Герой сам сел за руль, войдя в тоннель с машиной в собственности, но не в
+## руках (решение владельца: «спускаясь под землю он должен быть только в
+## нём»). tool_changed уже пересинхронизировал иконку — здесь только тост.
+func _on_entered_rig() -> void:
+	toast("Ты сел в бурмобиль.", 2.6)
+
+
+## Бурмобиль без топлива: либо не пускает в тоннель с поверхности, либо
+## глохнет прямо под землёй. Текст сообщения решает player.gd — здесь он
+## просто показывается (см. player.gd:_move_y и :_start_dig).
+func _on_rig_fuel_warning(message: String) -> void:
+	toast(message)
 
 
 # ---------------------------------------------------------------------------

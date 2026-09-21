@@ -240,6 +240,7 @@ func reset_progress() -> void:
 	current_tool = "shovel"
 	current_gear = ""
 	max_depth_reached = 0
+	player_depth = 0
 	collected_artifacts.clear()
 	completed_branches.clear()
 	game_clock_hours = 0.0
@@ -490,6 +491,14 @@ func set_current_tool(tool_id: String) -> void:
 	if not owns_tool(tool_id):
 		tool_purchase_required.emit(tool_id)
 		return
+	# Бурмобиль — транспорт, не кирка (решение владельца): пока герой в нём и
+	# под землёй, высадиться нельзя — только на поверхности (player_depth<=0)
+	# или дома (house_is_indoors). Переход В машину эта проверка не трогает:
+	# она смотрит только на current_tool == "drill_rig" СЕЙЧАС.
+	if current_tool == "drill_rig" and tool_id != "drill_rig" \
+			and player_depth >= 1 and not house_is_indoors:
+		rig_dismount_blocked.emit(tool_id)
+		return
 	current_tool = tool_id
 	tool_changed.emit(tool_id)
 
@@ -708,6 +717,13 @@ func reset_house() -> void:
 ## собирается на верстаке, а не выдаётся по глубине.
 signal tool_purchase_required(tool_id: String)
 
+## Попытались снять бурмобиль (сменить current_tool на что-то ещё), пока
+## герой физически под землёй и не дома. Решение владельца (задача
+## «Бурмобиль — транспорт»): «спускаясь под землю он должен быть только в
+## нём» — значит и бросить его посреди шахты нельзя, высадка только на
+## поверхности или дома. UI слушает сигнал, чтобы объяснить отказ тостом.
+signal rig_dismount_blocked(tool_id: String)
+
 ## Инструменты, которые игрок реально получил. Лопата есть с самого начала
 ## (ГДД п.5: "acquired: старт игры"), дедова кирка приходит квестом мастерской,
 ## остальное — покупка и крафт.
@@ -720,6 +736,13 @@ var owned_tools: Array = ["shovel"]
 ## Хранится, а не вычисляется от глубины: вся линейка покупается за монеты
 ## (решение владельца), и глубина про неё больше ничего не знает.
 var owned_gear: Array = []
+
+## Клетка глубины героя ПРЯМО СЕЙЧАС (0 — поверхность, растёт вниз). Пишется
+## каждый кадр из player.gd (как is_digging чуть выше по файлу) — GameState
+## сам позицию не считает, но она нужна ровно одной проверке ниже
+## (set_current_tool: бурмобиль нельзя бросить под землёй), а протаскивать
+## ссылку на героя через автолоад ради одного числа не стоит.
+var player_depth: int = 0
 
 ## Сколько раз уже показывали тост о редкой находке. Решение владельца: такое
 ## уведомление перестаёт быть событием, если повторять его бесконечно, —

@@ -27,6 +27,7 @@ func _ready() -> void:
 	_check_textures()
 	await _check_layout_across_days()
 	_check_visibility_by_hour()
+	await _check_drift()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
@@ -99,6 +100,61 @@ func _check_layout_across_days() -> void:
 	var cov5b: float = clouds.debug_coverage()
 	check("одинаковый день даёт одинаковую раскладку (детерминизм)",
 		n5a == n5b and absf(cov5a - cov5b) < 0.0001)
+
+	clouds.queue_free()
+
+
+## Дрейф (решение владельца 2026-09-21): скорость своя у каждого облака
+## (0.1..0.5 клетки/с), направление — общее на день (право/лево), позиция
+## оборачивается по ширине полосы, не убегает насовсем.
+func _check_drift() -> void:
+	var clouds := preload("res://scripts/world/clouds_view.gd").new()
+	add_child(clouds)
+	await get_tree().process_frame
+	clouds.debug_regenerate_for_day(7)
+
+	var n := clouds.debug_cloud_count()
+	var speeds: Array = []
+	var signs: Array = []
+	for i in range(n):
+		var s: float = clouds.debug_cloud_drift_px_s(i)
+		speeds.append(absf(s))
+		signs.append(signf(s))
+		var tiles_per_sec: float = absf(s) / clouds.TILE
+		check("облако %d: скорость дрейфа в 0.1..0.5 кл/с (%.3f)" % [i, tiles_per_sec],
+			tiles_per_sec >= clouds.DRIFT_SPEED_MIN_TILES - 0.0001
+				and tiles_per_sec <= clouds.DRIFT_SPEED_MAX_TILES + 0.0001)
+
+	var all_same_sign := true
+	for sgn in signs:
+		if sgn != signs[0]:
+			all_same_sign = false
+	check("направление дрейфа общее на весь день (%d облаков, один знак)" % n, all_same_sign)
+
+	var distinct_speeds := {}
+	for sp in speeds:
+		distinct_speeds[snappedf(sp, 0.01)] = true
+	check("скорость у облаков разная, не одна на всех (%d уникальных из %d)" %
+		[distinct_speeds.size(), n], n < 2 or distinct_speeds.size() > 1)
+
+	var x0: float = clouds.debug_cloud_x(0)
+	clouds.debug_advance(2.0)
+	var x1: float = clouds.debug_cloud_x(0)
+	var moved: float = x1 - x0
+	if moved > clouds.CLOUDS_W_LOGICAL * 0.5:
+		moved -= clouds.CLOUDS_W_LOGICAL
+	elif moved < -clouds.CLOUDS_W_LOGICAL * 0.5:
+		moved += clouds.CLOUDS_W_LOGICAL
+	var expected: float = clouds.debug_cloud_drift_px_s(0) * 2.0
+	check("за 2 реальные секунды облако сдвинулось на своей скорости (%.2f ~ %.2f)" %
+		[moved, expected], absf(moved - expected) < 0.5)
+
+	# Оборот по ширине полосы: гоним долго вперёд — x должен остаться в
+	# [0, CLOUDS_W_LOGICAL), а не улететь в бесконечность.
+	clouds.debug_advance(600.0)
+	var x_far: float = clouds.debug_cloud_x(0)
+	check("после долгого дрейфа x завёрнут в пределы полосы (%.1f)" % x_far,
+		x_far >= -0.001 and x_far <= clouds.CLOUDS_W_LOGICAL + 0.001)
 
 	clouds.queue_free()
 

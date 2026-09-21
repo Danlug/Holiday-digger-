@@ -84,6 +84,15 @@ const SCALE_MAX := 1.3
 const ALPHA_MIN := 0.55
 const ALPHA_MAX := 0.95
 
+## Дрейф (решение владельца 2026-09-21): "облака потихонечку плывут по небу,
+## очень медленно, каждый день в рандомном направлении, либо направо, либо
+## налево" — направление ОБЩЕЕ на весь день (один знак для всех облаков
+## этого дня, тот же сид, что и раскладка), "облака имеют рандомно разную
+## скорость, некоторые 0.1 тайла в секунду, некоторые до 0.5" — скорость
+## СВОЯ у каждого облака, в клетках/с, умножается на общий знак дня.
+const DRIFT_SPEED_MIN_TILES := 0.1
+const DRIFT_SPEED_MAX_TILES := 0.5
+
 var _textures: Array[Texture2D] = []
 var _clouds: Array = []          # [{"tex","x","y","scale","alpha"}, ...]
 var _last_day: int = -1
@@ -136,15 +145,23 @@ func _regenerate(day: int) -> void:
 	var count: int = clampi(int(round(lerpf(float(CLOUD_COUNT_MIN), float(CLOUD_COUNT_MAX), t))),
 		CLOUD_COUNT_MIN, CLOUD_COUNT_MAX)
 
+	# Знак дрейфа — один на весь день (владелец: "каждый день в рандомном
+	# направлении"), выбирается тем же rng, что и раскладка, ПОСЛЕ coverage/
+	# count — так их подсчёт не сдвигается на единицу вызовов randf() между
+	# версиями кода, а порядок вызовов внутри одного _regenerate стабилен.
+	var day_dir: float = 1.0 if rng.randf() < 0.5 else -1.0
+
 	for i in range(count):
 		var tex_index: int = rng.randi_range(0, maxi(0, _textures.size() - 1))
 		var row: float = rng.randf_range(CLOUD_ROW_MIN, CLOUD_ROW_MAX)
+		var speed_tiles: float = rng.randf_range(DRIFT_SPEED_MIN_TILES, DRIFT_SPEED_MAX_TILES)
 		_clouds.append({
 			"tex_index": tex_index,
 			"x": rng.randf_range(0.0, CLOUDS_W_LOGICAL),
 			"y": -row * TILE,
 			"scale": rng.randf_range(SCALE_MIN, SCALE_MAX),
 			"alpha": rng.randf_range(ALPHA_MIN, ALPHA_MAX),
+			"drift_px_s": speed_tiles * TILE * day_dir,
 		})
 
 
@@ -162,7 +179,15 @@ func update(cam: Vector2) -> void:
 		_regenerate(day)
 
 
-func _process(_dt: float) -> void:
+## Дрейф копится в реальном времени, а не в игровых часах (владелец сказал
+## "очень медленно" в ощущаемом темпе, не привязывая к суточному циклу) —
+## оборачивается по ширине полосы CLOUDS_W_LOGICAL, чтобы облако, уплывшее
+## за край, тут же появлялось с другого: полоса шире окна параллакса (см.
+## шапку файла), поэтому шов заворота никогда не виден на экране разом с
+## тем местом, откуда облако "вышло".
+func _process(dt: float) -> void:
+	for cloud in _clouds:
+		cloud.x = wrapf(cloud.x + float(cloud.drift_px_s) * dt, 0.0, CLOUDS_W_LOGICAL)
 	queue_redraw()
 
 
@@ -212,6 +237,18 @@ func debug_coverage() -> float:
 
 func debug_regenerate_for_day(day: int) -> void:
 	_regenerate(day)
+
+
+func debug_cloud_drift_px_s(i: int) -> float:
+	return float(_clouds[i].drift_px_s) if i >= 0 and i < _clouds.size() else 0.0
+
+
+func debug_cloud_x(i: int) -> float:
+	return float(_clouds[i].x) if i >= 0 and i < _clouds.size() else 0.0
+
+
+func debug_advance(dt: float) -> void:
+	_process(dt)
 
 
 func debug_visibility_alpha() -> float:

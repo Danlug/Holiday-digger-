@@ -139,6 +139,73 @@ def test_robert():
         check("portrait.png не пустой", Image.open(portrait).getbbox() is not None)
 
 
+## Фоновые подложки (tools/import_backdrops.py): гора вдали (небо вырезано,
+## 5 клеток высотой) и забор среднего плана в двух эпохах (2 клетки высотой,
+## низ подогнан по тону под grass_1.png с альфа-градиентом).
+def test_backdrops():
+    d = os.path.join(ROOT, "art", "env")
+
+    for name in ("backdrop_fence_white", "backdrop_fence_old"):
+        p = os.path.join(d, name + ".png")
+        check(f"art/env/{name}.png существует", os.path.exists(p))
+        if not os.path.exists(p):
+            continue
+        im = Image.open(p)
+        check(f"{name}.png: 960×192 (10×2 клетки, TILE*ART_SCALE)", im.size == (960, 192))
+        check(f"{name}.png: RGBA (нужна альфа для градиента низа)", im.mode == "RGBA")
+        a = np.asarray(im.convert("RGBA")).astype(float)
+        bottom_alpha = a[-1, :, 3]
+        check(f"{name}.png: низ полностью прозрачен (альфа=0 в последней строке)",
+              bottom_alpha.max() < 1.0)
+        top_alpha = a[0, :, 3]
+        check(f"{name}.png: верх картинки непрозрачен (альфа-градиент только снизу)",
+              top_alpha.min() > 250.0)
+        # шов по X — та же метрика, что и у травы
+        rgb = a[:, :, :3]
+        seam = np.mean((rgb[:, -1, :] - rgb[:, 0, :]) ** 2)
+        neighbor = np.mean((rgb[:, 1:, :] - rgb[:, :-1, :]) ** 2)
+        ratio = seam / max(1.0, neighbor)
+        check(f"{name}.png: шов по X не в разы заметнее обычного перехода (ratio={ratio:.2f} < 6)",
+              ratio < 6.0)
+
+    # тон низа забора должен быть близко к grass_1.png (см. import_backdrops.tone_match)
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from import_backdrops import mean_lab, GRASS_STRIP_PX
+    grass_lab = mean_lab(os.path.join(ROOT, "art", "tiles", "grass_1.png"))
+    for name in ("backdrop_fence_white", "backdrop_fence_old"):
+        p = os.path.join(d, name + ".png")
+        if not os.path.exists(p):
+            continue
+        im = Image.open(p).convert("RGB")
+        a = np.asarray(im)
+        from import_backdrops import rgb2lab_np
+        strip = a[-GRASS_STRIP_PX:, :, :]
+        strip_lab = rgb2lab_np(strip).reshape(-1, 3).mean(axis=0)
+        dist = float(np.linalg.norm(strip_lab - grass_lab))
+        check(f"{name}.png: тон нижней полосы близок к grass_1.png (Lab-расстояние={dist:.1f} < 15)",
+              dist < 15.0)
+
+    mp = os.path.join(d, "backdrop_mountain.png")
+    check("art/env/backdrop_mountain.png существует", os.path.exists(mp))
+    if os.path.exists(mp):
+        im = Image.open(mp)
+        check("backdrop_mountain.png: 2400×480 (25×5 клеток, TILE*ART_SCALE)", im.size == (2400, 480))
+        check("backdrop_mountain.png: RGBA (небо вырезано альфой)", im.mode == "RGBA")
+        a = np.asarray(im.convert("RGBA")).astype(float)
+        top_alpha = a[0, :, 3]
+        check("backdrop_mountain.png: верхняя строка прозрачна (небо вырезано)",
+              top_alpha.mean() < 5.0)
+        bottom_alpha = a[-1, :, 3]
+        check("backdrop_mountain.png: нижняя строка (луг) непрозрачна",
+              bottom_alpha.mean() > 250.0)
+        rgb = a[:, :, :3]
+        seam = np.mean((rgb[:, -1, :] - rgb[:, 0, :]) ** 2)
+        neighbor = np.mean((rgb[:, 1:, :] - rgb[:, :-1, :]) ** 2)
+        ratio = seam / max(1.0, neighbor)
+        check(f"backdrop_mountain.png: шов по X не в разы заметнее обычного перехода (ratio={ratio:.2f} < 6)",
+              ratio < 6.0)
+
+
 def main():
     test_garden_objects()
     test_grass_seamless()
@@ -146,6 +213,7 @@ def main():
     test_ages()
     test_rig_exit()
     test_robert()
+    test_backdrops()
     print(f"\n=== Итог: {'OK' if not failures else str(len(failures)) + ' провалов'} ===")
     return 1 if failures else 0
 

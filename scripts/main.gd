@@ -9,6 +9,7 @@ var world: WorldGen
 var fog: FogOfWar
 var player: Node2D
 var world_view: Node2D
+var backdrop: Backdrop
 var hud: Control
 var view_root: Node2D
 
@@ -31,6 +32,14 @@ func _ready() -> void:
 	view_root = Node2D.new()
 	view_root.name = "ViewRoot"
 	add_child(view_root)
+
+	# Задник (гора вдали, забор со средним планом) — ПЕРВЫЙ ребёнок view_root,
+	# то есть рисуется раньше (за) тайлов, декора и дома. Небо — отдельный слой
+	# другого агента (SkyView, см. scripts/world/backdrop.gd шапку файла) и
+	# ложится ещё раньше него; сам Backdrop про небо ничего не знает.
+	backdrop = preload("res://scripts/world/backdrop.gd").new()
+	backdrop.name = "Backdrop"
+	view_root.add_child(backdrop)
 
 	world_view = preload("res://scripts/world/world_view.gd").new()
 	world_view.name = "WorldView"
@@ -143,6 +152,7 @@ func _process(delta: float) -> void:
 
 	var cam: Vector2 = _camera()
 	view_root.position = Vector2(-cam.x * TILE, -cam.y * TILE)
+	backdrop.update(cam)
 	hud.set_camera(cam)
 
 	world_view.render(cam)

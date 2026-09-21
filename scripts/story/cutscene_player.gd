@@ -24,7 +24,17 @@ const LAYER := 100
 const STAGE_TOP := 0.06        # доля высоты, где начинается "небо" сцены
 const GROUND_LINE := 0.56      # доля высоты, на которой проходит линия земли
 const BOX_H := 108.0           # высота реплики: шесть строк, длинные фразы не режутся
-const CHAR_FRAME := 48
+## Лист персонажа режется в ART_SCALE раз крупнее логических координат (см.
+## tools/import_art.py:ART_SCALE и scripts/player/character_view.gd:CHAR_W) —
+## реальный кадр 48×48 ЛОГИЧЕСКИХ пикселей занимает на диске 144×144.
+## CHAR_FRAME раньше был "48" без поправки на ART_SCALE: это не будило бы
+## ошибку явно (лист резался на 48-пиксельные ломти, arithmetически честно),
+## но резало кадр НЕ по границам настоящих поз, а поперёк них — на 12 узких
+## горизонтальных полосок вместо 4-6 нарисованных кадров. Актёр на сцене
+## оставался неподвижным огрызком тела вместо дыхания/шага/замаха, и ровно
+## это владелец увидел как "анимации сценариев отсутствуют".
+const ART_SCALE := 3.0
+const CHAR_FRAME := int(48 * ART_SCALE)
 const TYPE_CHARS_PER_SEC := 42.0
 const ANIM_FPS := 7.0
 
@@ -581,7 +591,14 @@ func _show_actor(beat: Dictionary) -> void:
 		# Спрайта нет (Роберт, родители) — реплика идёт голосом за кадром.
 		return
 	var tex: Texture2D = load(path)
-	var frames: int = maxi(1, int(round(tex.get_width() / float(CHAR_FRAME))))
+	# Кадры считаем только для листов с обычной квадратной сеткой 144×144
+	# (idle/walk/fall/fly/fly_jet/dig_pick/dig_shovel/dig_drill_*). Бур
+	# (dig_rig_*, кадр 240×168) и одиночная поза с компасом (48×89) сетке не
+	# соответствуют — для них весь файл считается ОДНИМ кадром: неверный
+	# делитель резал бы их на кривые ломти хуже, чем показ целиком.
+	var frames: int = 1
+	if int(round(tex.get_height())) == CHAR_FRAME and int(round(tex.get_width())) % CHAR_FRAME == 0:
+		frames = maxi(1, int(round(tex.get_width() / float(CHAR_FRAME))))
 	var node: TextureRect
 	if _actors.has(id):
 		node = _actors[id].node
@@ -664,8 +681,11 @@ func _place_actor(id: String) -> void:
 	var a: Dictionary = _actors[id]
 	var node: TextureRect = a.node
 	var s: float = a.scale
-	var w: float = a.frame_w * s
-	var h: float = a.tex_h * s
+	# Лист на диске в ART_SCALE раз крупнее логики (см. CHAR_FRAME выше) —
+	# делим перед тем, как накладывать "scale" сцены, иначе актёр выходит
+	# втрое крупнее замысла постановщика и не помещается на сцене портрета.
+	var w: float = a.frame_w * s / ART_SCALE
+	var h: float = a.tex_h * s / ART_SCALE
 	node.size = Vector2(w, h)
 	# Актёр стоит НА земле: низ кадра совпадает с линией земли сцены, иначе
 	# фигура висит в воздухе, и сцена перестаёт читаться как место.

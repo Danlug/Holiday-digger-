@@ -39,7 +39,16 @@ const GROUND_Y := int(46 * ART_SCALE)
 ## большого винта один диск 66 px в поперечнике, у топового джетпака пламя
 ## уносит на 43 px назад, — а ужимать под них героя нельзя: он станет мельче
 ## себя же пешком. Числа берутся из печати импортёра, менять их руками не надо.
+##
+## Ряды копки инструментом (dig_pick, dig_pick_rusty, dig_shovel) — тоже
+## шире 48 px: удар о землю рисует дугу замаха и разлетающуюся породу шире
+## клетки, а ужимать замах нельзя — герой на этом кадре худеет (см.
+## tools/import_dig.py, DIG_FRAME_W). Высота и линия земли те же, что у
+## idle — лишней высоты этим наборам не нужно.
 const SHEET_FRAME := {
+	"dig_pick": [192, 144, 138],
+	"dig_pick_rusty": [192, 144, 138],
+	"dig_shovel": [192, 144, 138],
 	"dig_rig_down": [240, 168, 150],
 	"dig_rig_side": [240, 168, 150],
 	"fly_1": [154, 162, 156],
@@ -75,6 +84,27 @@ const DIG_SHEETS := ["idle", "walk", "fall", "fly", "fly_jet",
 		"dig_shovel", "dig_pick", "dig_pick_rusty",
 		"dig_drill_down", "dig_drill_side", "dig_rig_down", "dig_rig_side"]
 
+## Фазы анимации копки: не все листы копки играются простым циклом по всем
+## кадрам. Бурмобиль нарисован тремя фазами — старт бурения, зацикленное
+## бурение, финиш, — и играть его по кругу с первого кадра до последнего
+## неверно: получится, что машина то и дело заново «выезжает» и «уезжает».
+## Ключ — общее имя набора БЕЗ суффикса направления (см. _dig_tool_base),
+## значение — три списка 0-based индексов кадров листа:
+##   start — играются один раз при начале копки;
+##   loop  — крутятся по кругу, пока копка идёт;
+##   end   — играются один раз после того, как копка закончилась.
+## Точка расширения: для листов без записи здесь (кирка, лопата, ручной бур)
+## сохраняется старое поведение — цикл по всем кадрам листа, см. _process.
+const DIG_PHASES := {
+	"dig_rig": {"start": [0, 1, 2], "loop": [3, 4, 5, 6], "end": [7, 2, 1, 0]},
+}
+
+## Копка следующей клетки, начавшаяся не позже чем через это время после
+## конца предыдущей, — продолжение той же непрерывной работы (бур уже
+## раскручен), и старт не играется повторно: сразу в цикл. Дольше — новый
+## заход, играется полный старт (см. _dig_frame).
+const DIG_PHASE_RESTART_GAP_MS := 300.0
+
 var player: Node = null
 
 # Тряска стана: 3 пикселя вправо-влево (решение владельца) на 14 Гц.
@@ -89,6 +119,14 @@ var _sheets: Dictionary = {}
 ## уровень спрашивается у самого героя, см. _flight_tier().
 var _tier_override: int = -1
 
+## Состояние машины фаз копки (см. DIG_PHASES и _dig_frame).
+var _dig_phase: String = "none"        # "none" | "start" | "loop" | "end"
+var _dig_phase_t0: float = 0.0         # player.anim в момент начала текущей фазы
+var _dig_was_active: bool = false      # player.digging != null на прошлом кадре
+var _dig_last_end_msec: float = -1e9   # когда копка в прошлый раз закончилась
+var _dig_last_base: String = ""        # набор, который доигрывает фазу "end"
+var _dig_last_sheet_name: String = ""  # лист (с суффиксом направления) для "end"
+
 
 func _ready() -> void:
 	_sprite = Sprite2D.new()
@@ -102,17 +140,23 @@ func _ready() -> void:
 			_sheets[sheet] = load(path)
 
 
+## Общее имя набора копки по текущему инструменту, БЕЗ суффикса направления
+## («вниз»/«вбок») — см. _dig_sheet_name и DIG_PHASES, где по этому имени
+## ищется таблица фаз анимации.
+func _dig_tool_base() -> String:
+	match GameState.current_tool:
+		"shovel": return "dig_shovel"
+		"rusty_pickaxe": return "dig_pick_rusty"
+		"hand_drill": return "dig_drill"
+		"drill_rig": return "dig_rig"
+		_: return "dig_pick"
+
+
 ## Имя листа копки по инструменту и направлению. Направление берём из самой
 ## копаемой клетки: она либо прямо под героем, либо сбоку. У кирки и лопаты
 ## нарисован один набор на оба направления — тогда суффикса просто нет.
 func _dig_sheet_name() -> String:
-	var base: String
-	match GameState.current_tool:
-		"shovel": base = "dig_shovel"
-		"rusty_pickaxe": base = "dig_pick_rusty"
-		"hand_drill": base = "dig_drill"
-		"drill_rig": base = "dig_rig"
-		_: base = "dig_pick"
+	var base: String = _dig_tool_base()
 	var dir: String = "_down" if int(player.digging.y) == player.cell_y() + 1 else "_side"
 	return base + dir if _sheets.has(base + dir) else base
 
@@ -161,6 +205,71 @@ func _fly_sheet_name() -> String:
 	return String(names[0])
 
 
+## Фаза и кадр анимации копки — см. DIG_PHASES. Вызывается КАЖДЫЙ кадр, даже
+## когда копки нет: так отслеживается, не доигрывает ли лист копки фазу
+## "end" (герой ещё доигрывает финиш удара, хотя сама копка уже кончилась).
+##
+## Возвращает {} — копки не видно, обычная стойка/ходьба/полёт. Иначе —
+## {"sheet_name": ..., "frame": ...}, где frame < 0 значит «для этого набора
+## фаз нет (см. DIG_PHASES) — считай кадр как раньше, циклом по всем кадрам
+## листа» (точка расширения для остальных инструментов).
+func _dig_frame(digging_active: bool) -> Dictionary:
+	var now := float(Time.get_ticks_msec())
+
+	if digging_active and not _dig_was_active:
+		# Старт копки. Если предыдущая копка закончилась только что (та же
+		# машина сразу бурит следующую клетку) — без повторного старта, сразу
+		# в цикл; иначе — полный заход со старта (см. DIG_PHASE_RESTART_GAP_MS).
+		_dig_phase = "loop" if (now - _dig_last_end_msec) <= DIG_PHASE_RESTART_GAP_MS \
+				else "start"
+		_dig_phase_t0 = player.anim
+	elif not digging_active and _dig_was_active:
+		# Конец копки: доигрываем "end", если он есть для этого набора.
+		_dig_last_end_msec = now
+		_dig_phase = "end" if DIG_PHASES.has(_dig_last_base) else "none"
+		_dig_phase_t0 = player.anim
+	_dig_was_active = digging_active
+
+	if digging_active:
+		_dig_last_base = _dig_tool_base()
+		_dig_last_sheet_name = _dig_sheet_name()
+	elif _dig_phase != "end":
+		return {}   # копки не видно — ни самой копки, ни доигрывания финиша
+
+	var base: String = _dig_last_base
+	var sheet_name: String = _dig_last_sheet_name
+	var phases: Dictionary = DIG_PHASES.get(base, {})
+	if phases.is_empty():
+		if not digging_active:
+			return {}   # доигрывать нечего — фаз для этого набора вовсе нет
+		return {"sheet_name": sheet_name, "frame": -1}
+
+	var anim_div: float = SHEET_ANIM_DIV.get(sheet_name, ANIM_DIV)
+	var frames: Array = phases.get(_dig_phase, [])
+	var idx: int = int(floor((player.anim - _dig_phase_t0) / anim_div)) if anim_div > 0.0 else 0
+
+	if _dig_phase == "start" and idx >= frames.size():
+		# Старт доигран — без паузы дальше в цикл.
+		_dig_phase = "loop"
+		_dig_phase_t0 = player.anim
+		idx = 0
+		frames = phases.get(_dig_phase, [])
+	elif _dig_phase == "end" and idx >= frames.size():
+		# Финиш доигран — дальше обычная стойка/ходьба.
+		_dig_phase = "none"
+		return {}
+
+	if frames.is_empty():
+		return {"sheet_name": sheet_name, "frame": -1}
+
+	var frame_i: int
+	if _dig_phase == "loop":
+		frame_i = int(frames[idx % frames.size()])
+	else:
+		frame_i = int(frames[clampi(idx, 0, frames.size() - 1)])
+	return {"sheet_name": sheet_name, "frame": frame_i}
+
+
 func _process(_dt: float) -> void:
 	if player == null:
 		return
@@ -174,12 +283,17 @@ func _process(_dt: float) -> void:
 	# машины на месте (ПРЕДЛОЖЕНО: см. отчёт агента).
 	var in_rig: bool = player.has_method("is_in_rig") and player.is_in_rig() and player.cell_y() >= 1
 
+	var dig: Dictionary = _dig_frame(player.digging != null)
+
 	var sheet_name: String
+	var phase_frame: int = -1
 	var force_static_frame := false
-	if player.digging != null:
+	if dig.has("sheet_name"):
 		# Для каждого инструмента нарисована своя анимация, а для бура и
-		# бурмобиля — ещё и своя на каждое направление копки.
-		sheet_name = _dig_sheet_name()
+		# бурмобиля — ещё и своя на каждое направление копки; фаза (старт /
+		# цикл / финиш) — см. _dig_frame и DIG_PHASES.
+		sheet_name = dig["sheet_name"]
+		phase_frame = dig["frame"]
 	elif in_rig:
 		sheet_name = "dig_rig_side" if _sheets.has("dig_rig_side") else "dig_pick"
 		force_static_frame = true
@@ -202,8 +316,10 @@ func _process(_dt: float) -> void:
 	if tex != null:
 		_sprite.texture = tex
 		var frames: int = maxi(1, int(round(tex.get_width() / float(fw))))
-		var frame: int = 0 if force_static_frame else \
-				(int(floor(player.anim / anim_div)) % frames if frames > 1 else 0)
+		var frame: int = phase_frame
+		if frame < 0:
+			frame = 0 if force_static_frame else \
+					(int(floor(player.anim / anim_div)) % frames if frames > 1 else 0)
 		_sprite.region_rect = Rect2(frame * fw, 0, fw, fh)
 	_sprite.flip_h = player.facing < 0
 	# Линия земли листа должна лечь туда же, куда ложится подошва у кадра

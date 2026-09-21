@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_exhaustion_penalty()
 	_test_sky_ceiling()
 	_test_sky_colors()
+	_test_no_fog_in_grandpa_era()
 	_test_sealed_garden_gives_no_xp()
 
 	# --- бурмобиль как транспорт ---
@@ -621,6 +622,32 @@ func _test_sky_colors() -> void:
 	check("строка выше верха неба тоже покрашена",
 		view._sky_color(-view.SKY_HEIGHT - 1) == at_top)
 	check("днём небо — ровно COLOR_SKY (81D3F4)", near_ground == view.COLOR_SKY)
+	view.queue_free()
+
+
+## В эпоху деда (интро-флешбэк на живой карте) туман войны не должен красить
+## неразведанную породу чёрным прямоугольником — владелец описал это как
+## "тут почему-то тоннель": маленький радиус обзора вокруг единственного
+## актёра оставлял почти весь кадр чёрным ещё до первой копки, неотличимо
+## от настоящей вырытой шахты (см. scripts/world/world_view.gd:_paint_cell).
+func _test_no_fog_in_grandpa_era() -> void:
+	var w := WorldGen.new(2026)
+	w.era = "grandpa"
+	var f := FogOfWar.new()  # ничего не revealed — весь мир BLACK по умолчанию
+	var view = load("res://scripts/world/world_view.gd").new()
+	add_child(view)
+	view.world = w
+	view.fog = f
+	var s := Sprite2D.new()
+	view.add_child(s)
+	view._paint_cell(s, 19, 3)  # неразведанная клетка, далеко от места копки
+	check("в эпоху деда порода видна без тумана (не COLOR_FOG_BLACK)",
+		s.modulate != view.COLOR_FOG_BLACK)
+
+	w.era = "now"
+	view._paint_cell(s, 19, 3)
+	check("в обычной игре тот же непройденный туман по-прежнему чёрный",
+		s.modulate == view.COLOR_FOG_BLACK)
 	view.queue_free()
 
 

@@ -186,7 +186,18 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 			_set_color(s, COLOR_GROUND)
 		return
 
-	var state := fog.get_state(wx, wy)
+	# Эпоха деда (интро-флешбэк на живой карте, см. GameState.era/world.era,
+	# scripts/story/cutscene_player.gd) — это не разведка игроком, а память:
+	# зритель СМОТРИТ сцену, а не открывает карту сам, поэтому обычный туман
+	# войны (маленький радиус обзора вокруг героя — см. FogOfWar.
+	# DEFAULT_TERRAIN_RADIUS=2) здесь неуместен и производил ровно ту самую
+	# путаницу, которую владелец описал как «тут почему-то тоннель»: узкая
+	# аура обзора оставляла почти весь кадр вокруг деда чёрным прямоугольником
+	# ещё ДО первой копки — неотличимым на глаз от настоящей вырытой шахты.
+	# В эту эпоху порода видна целиком, как в классической (не-мировой)
+	# катсцене раньше — а выкопанные дедом клетки всё равно честно пропадают
+	# (get_tile вернёт EMPTY для них), просто без наложенного тумана поверх.
+	var state := FogOfWar.State.FULL if world != null and world.era == "grandpa" 			else fog.get_state(wx, wy)
 	if state == FogOfWar.State.BLACK:
 		_set_color(s, COLOR_FOG_BLACK)
 		return

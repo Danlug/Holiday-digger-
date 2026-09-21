@@ -460,6 +460,19 @@ func _px(room: String, point: String) -> float:
 	return float(HouseRoomsConfig.points(room)[point]["x"])
 
 
+## Доля x, где герой РЕАЛЬНО появляется после входа через enter_at: не ровно
+## на самой точке (двери/лестнице), а на ширину героя вглубь комнаты —
+## решение владельца (2026-09-21), см. HouseView.go_to_room. Room_width_px()
+## тут должен уже отражать ЦЕЛЕВУЮ комнату (вызывать после перехода).
+func _enter_frac(room: String, point: String) -> float:
+	var base := _px(room, point)
+	if base >= 0.20 and base <= 0.80:
+		return base   # не у края — HouseView.go_to_room не сдвигает
+	var inset: float = (house._view.HERO_W * house._view.HERO_SCALE) / \
+			maxf(1.0, house._view.room_width_px())
+	return clampf(base + inset if base < 0.5 else base - inset, 0.0, 1.0)
+
+
 func _test_room_hotspots_appear_and_fade() -> void:
 	if GameState.house_is_indoors:
 		house.exit_to_door()
@@ -512,13 +525,16 @@ func _test_room_transitions_use_enter_points() -> void:
 	check("нажатие у двери перевело в мастерскую", house._view.room_id() == "workshop")
 	check("GameState.house_room обновился (бухгалтерию ведёт дом)",
 		GameState.house_room == "workshop")
-	check_near("вошёл у лестницы (enter_at из data/rooms.json)",
-		house._view.hero_x_fraction(), _px("workshop", "stairs"), 0.001)
+	# Не ровно на лестнице, а чуть дальше вглубь мастерской (решение
+	# владельца, 2026-09-21) — иначе герой стоит вплотную к точке входа, и
+	# кнопка "Подняться" тут же снова в радиусе.
+	check_near("вошёл у лестницы, чуть дальше вглубь (enter_at из data/rooms.json)",
+		house._view.hero_x_fraction(), _enter_frac("workshop", "stairs"), 0.001)
 
 	house._view.trigger_point_button("stairs", 0)  # index 0 — «Подняться в дом»
 	check("лестница ведёт обратно в салон", house._view.room_id() == "hall")
-	check_near("вошёл у той же двери, из которой уходил",
-		house._view.hero_x_fraction(), _px("hall", "door_workshop"), 0.001)
+	check_near("вошёл у той же двери, из которой уходил, чуть дальше вглубь",
+		house._view.hero_x_fraction(), _enter_frac("hall", "door_workshop"), 0.001)
 
 
 func _test_pickaxe_hotspot() -> void:

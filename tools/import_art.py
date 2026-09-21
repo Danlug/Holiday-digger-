@@ -534,7 +534,48 @@ def head_anchor(img, body_src_h):
     return sum((a + b) * (b - a + 1) / 2.0 for a, b in xs) / n, top
 
 
-def shrink_set(frames, body_src_h, fit_height=True):
+def head_x_anchored(img, top_y, body_src_h, pad=2):
+    """X головы, когда её Y УЖЕ известен антропометрически, а не выводится
+    из формы силуэта (см. head_anchor).
+
+    head_anchor берёт САМЫЙ ВЕРХНИЙ достаточно крупный массив силуэта — и
+    ошибается ровно тогда, когда над головой оказывается что-то ещё
+    крупное: инструмент в замахе "занёс за голову" (см. tools/import_dig.py
+    — покадровая копка, где рисованные кадры дают именно такую позу).
+    Тогда "голова" алгоритма — боёк кирки, и он гуляет по кадрам замаха
+    вместе с рукой на добрый десяток логических px — герой на экране
+    буквально прыгает. Здесь вместо поиска головы по силуэту берём Y
+    заранее — рост в спокойной позе стоя известен (голова всегда на одной
+    высоте над ступнями, торс почти не наклоняется даже во время замаха,
+    см. shrink_set) — и просто ищем плотную заливку в узкой полосе вокруг
+    этого Y. Инструмент, поднятый ВЫШЕ головы, лежит выше этой полосы и в
+    неё не попадает вообще — там его просто нет.
+    """
+    w, h = img.size
+    r = max(1, round(body_src_h * HEAD_ERODE))
+    band = max(1, round(body_src_h * HEAD_BAND))
+    y0 = max(0, int(round(top_y)) - pad)
+    y1 = min(h, int(round(top_y + band)) + pad)
+    if y1 <= y0:
+        return w / 2.0
+
+    solid = img.getchannel("A").point(lambda v: 255 if v else 0)
+    for _ in range(r):
+        solid = solid.filter(ImageFilter.MinFilter(3))
+    px = solid.load()
+    total = 0
+    wsum = 0.0
+    for y in range(y0, y1):
+        for x in range(w):
+            if px[x, y]:
+                total += 1
+                wsum += x
+    if total == 0:
+        return head_x(img, body_src_h)   # полоса пуста — откат на старый поиск
+    return wsum / total
+
+
+def shrink_set(frames, body_src_h, fit_height=True, heads=None):
     """Уменьшить набор кадров ОДНИМ масштабом, сведя их по голове.
 
     Масштаб один на набор — иначе персонаж то толстеет, то худеет по ходу
@@ -551,9 +592,17 @@ def shrink_set(frames, body_src_h, fit_height=True):
     (compose_src, anim_dig, anim_fly) кладут тело на низ холста, так что это
     общая линия земли. По низу СОДЕРЖИМОГО равнять нельзя — тогда пропадут
     приседание, подскок и шаг.
+
+    heads — готовый список X-координат головы по кадрам, если он уже
+    известен точнее, чем даёт head_x() (см. anim_dig: замах поднимает
+    инструмент ВЫШЕ головы, и "самый верхний плотный массив силуэта" —
+    уже не голова, а боёк. Раньше это качало собранного циркулярной сборкой
+    деда/бабку на 6-8 логических px между кадрами замаха — ровно то, что
+    владелец увидел как "анимации скачут"). Без heads каждый кадр
+    выравнивается по своей собственной оценке головы, как раньше.
     """
     boxes = [f.getbbox() for f in frames]
-    heads = [head_x(f, body_src_h) for f in frames]
+    heads = heads if heads is not None else [head_x(f, body_src_h) for f in frames]
 
     # полуширина: как далеко содержимое уходит от головы в самую дальнюю сторону
     half = max(1, math.ceil(max(max(hx - b[0], b[2] - hx)
@@ -844,7 +893,19 @@ def _rotate_about(img, pivot, deg, canvas):
 
 
 def anim_dig(body, tool):
+    """Возвращает (frames, heads): кадры замаха и X головы для каждого.
+
+    heads — НЕ head_x() по каждому готовому кадру: в позе "занёс над
+    головой" инструмент оказывается выше головы, и "самый верхний плотный
+    массив силуэта" (см. head_anchor) — это боёк, а не голова. Голова
+    гуляла на 6-8 логических px между кадрами замаха, и это выглядело как
+    раз тем "скачет", что заметил владелец. Торс по ходу замаха не
+    сдвигается вбок вообще (двигается только рука — см. compose_src), так
+    что голову достаточно найти ОДИН раз на голом торсе (без руки, значит
+    без инструмента над ней) и переиспользовать эту X для всех кадров.
+    """
     torso, arm, (ax, ay) = take_arm(body)
+    ref_hx, _ = head_anchor(compose_src(torso, dy_body=0), body.size[1])
     aw, ah = arm.size
     el = round(ah * ELBOW)
 
@@ -870,6 +931,7 @@ def anim_dig(body, tool):
     shoulder_pivot = (upper.size[0] // 2, 0)
 
     frames = []
+    heads = []
     for a_up, a_fore, lean in SWING:
         rot_up, c_up = _rotate_about(upper, shoulder_pivot, a_up, up_canvas)
         rot_limb, c_lb = _rotate_about(limb, elbow_pivot, a_up + a_fore, canvas)
@@ -896,7 +958,8 @@ def anim_dig(body, tool):
         out.alpha_composite(rot_up, (sx - c_up[0], sy - c_up[1]))
         out.alpha_composite(rot_limb, (ex - c_lb[0], ey - c_lb[1]))
         frames.append(out)
-    return frames
+        heads.append(px + ref_hx)
+    return frames, heads
 
 
 # ---------------------------------------------------------------------------
@@ -973,7 +1036,10 @@ def main(sheet_path):
 
         for name, frames in sets.items():
             fit_h = not name.startswith("fly")
-            written.append(save(strip(shrink_set(frames, bh, fit_h)),
+            heads = None
+            if isinstance(frames, tuple):
+                frames, heads = frames
+            written.append(save(strip(shrink_set(frames, bh, fit_h, heads=heads)),
                                 f"character/{slug}/{name}"))
 
         # сон — отдельным масштабом: лежачая поза шире стоячей

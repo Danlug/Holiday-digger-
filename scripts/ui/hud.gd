@@ -82,10 +82,11 @@ var _hold_hint: Label
 ## двух других режимах можно, и одно и то же движение требовало бы разных
 ## навыков в зависимости от режима.
 ##
-## Стрелки РИСУЮТСЯ треугольниками, а не пишутся символами: ↑ ← → ↓
-## (U+2190…U+2193) в шрифте темы по умолчанию отсутствуют и выходят пустыми
-## квадратами с шестнадцатеричным кодом внутри — та же ловушка, что с ✕ и ↺.
-## Вектор здесь — направление острия.
+## Стрелки РИСУЮТСЯ треугольниками (см. scripts/ui/arrow_icon.gd), а не
+## пишутся символами: ↑ ← → ↓ (U+2190…U+2193) в шрифте темы по умолчанию
+## отсутствуют и выходят пустыми квадратами с шестнадцатеричным кодом
+## внутри — та же ловушка, что с ✕ и ↺, и та же, что была у кнопок хода в
+## доме (house_view.gd) с ◀/▶. Вектор здесь — направление острия.
 const ARROW_CELLS: Array = [
 	{"dir": "up", "col": 1, "row": 0, "v": Vector2(0, -1)},
 	{"dir": "left", "col": 0, "row": 1, "v": Vector2(-1, 0)},
@@ -503,31 +504,14 @@ func _build_arrows(parent: Control) -> void:
 		b.button_up.connect(func(): _on_arrow_up(dir))
 		_arrows_panel.add_child(b)
 
-		var glyph := Control.new()
-		glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Треугольник, а не текстовый символ — общий хелпер, см.
+		# scripts/ui/arrow_icon.gd (шрифт темы не содержит стрелок-глифов).
+		var glyph := ArrowIcon.new()
 		glyph.set_anchors_preset(Control.PRESET_FULL_RECT)
-		var v: Vector2 = cell["v"]
-		glyph.draw.connect(func(): _draw_arrow(glyph, v))
+		glyph.dir = cell["v"]
 		b.add_child(glyph)
 
 		_arrow_buttons[dir] = b
-
-
-## Треугольник остриём в сторону v, вписанный в кнопку.
-##
-## Пропорции важны: треугольник должен быть заметно ВЫТЯНУТ вдоль v. Первый
-## заход дал почти равносторонний — у вертикальной и горизонтальных стрелок
-## он читался за счёт горизонтального основания, а у диагоналей основание
-## тоже под 45°, и куда он смотрит, было не понять вовсе.
-func _draw_arrow(canvas: Control, v: Vector2) -> void:
-	var c: Vector2 = canvas.size * 0.5
-	var r: float = minf(canvas.size.x, canvas.size.y) * 0.30
-	var tip: Vector2 = c + v * r * 1.30
-	var back: Vector2 = c - v * r * 0.45
-	var side: Vector2 = Vector2(-v.y, v.x) * r * 0.58
-	canvas.draw_colored_polygon(
-		PackedVector2Array([tip, back + side, back - side]),
-		Color8(0xE0, 0xA9, 0x3B))
 
 
 func _layout_arrows() -> void:

@@ -608,13 +608,14 @@ func _start_move(beat: Dictionary) -> void:
 # Актёры и реквизит
 # ---------------------------------------------------------------------------
 
-func _show_actor(beat: Dictionary) -> void:
-	var id := String(beat.get("actor", ""))
-	var pose := String(beat.get("pose", "idle"))
+## Загружает лист кадров позы pose в уже существующий узел актёра, не трогая
+## его позицию/dx/dy. Общая часть "show" и переключения на позу ходьбы во
+## время шага (см. _show_actor:enter, _hide_actor:exit_to, _tick_slides) —
+## актёр не должен скользить по сцене статичной фигурой, пока идёт пешком.
+func _load_pose(id: String, pose: String, flip: bool) -> bool:
 	var path := StoryData.actor_sheet_path(id, pose)
 	if path.is_empty() or not ResourceLoader.exists(path):
-		# Спрайта нет (Роберт, родители) — реплика идёт голосом за кадром.
-		return
+		return false
 	var tex: Texture2D = load(path)
 	# Кадры считаем только для листов с обычной квадратной сеткой 144×144
 	# (idle/walk/fall/fly/fly_jet/dig_pick/dig_shovel/dig_drill_*). Бур
@@ -624,6 +625,28 @@ func _show_actor(beat: Dictionary) -> void:
 	var frames: int = 1
 	if int(round(tex.get_height())) == CHAR_FRAME and int(round(tex.get_width())) % CHAR_FRAME == 0:
 		frames = maxi(1, int(round(tex.get_width() / float(CHAR_FRAME))))
+	var node: TextureRect = _actors[id].node
+	var atlas := AtlasTexture.new()
+	atlas.atlas = tex
+	var frame_w: float = tex.get_width() / float(frames)
+	atlas.region = Rect2(0, 0, frame_w, tex.get_height())
+	node.texture = atlas
+	node.flip_h = flip
+	_actors[id].frames = frames
+	_actors[id].frame_w = frame_w
+	_actors[id].tex_h = tex.get_height()
+	_actors[id].pose = pose
+	_actors[id].flip = flip
+	return true
+
+
+func _show_actor(beat: Dictionary) -> void:
+	var id := String(beat.get("actor", ""))
+	var pose := String(beat.get("pose", "idle"))
+	var path := StoryData.actor_sheet_path(id, pose)
+	if path.is_empty() or not ResourceLoader.exists(path):
+		# Спрайта нет (Роберт, родители) — реплика идёт голосом за кадром.
+		return
 	var is_new := not _actors.has(id)
 	var node: TextureRect
 	if not is_new:
@@ -635,12 +658,6 @@ func _show_actor(beat: Dictionary) -> void:
 		node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_stage.add_child(node)
 
-	var atlas := AtlasTexture.new()
-	atlas.atlas = tex
-	var frame_w: float = tex.get_width() / float(frames)
-	atlas.region = Rect2(0, 0, frame_w, tex.get_height())
-	node.texture = atlas
-	node.flip_h = bool(beat.get("flip", false))
 	# dx/dy накапливают сдвиги от "move" (падение) и от входа/выхода пешком —
 	# сохраняются при смене позы у УЖЕ стоящего актёра (иначе смена idle->dig
 	# посреди сцены обнулила бы, например, ещё не долетевший вход).
@@ -648,14 +665,14 @@ func _show_actor(beat: Dictionary) -> void:
 	var prev_dy: float = float(_actors[id].get("dy", 0.0)) if _actors.has(id) else 0.0
 	_actors[id] = {
 		"node": node,
-		"frames": frames,
-		"frame_w": frame_w,
-		"tex_h": tex.get_height(),
+		"frames": 1, "frame_w": 1.0, "tex_h": 1.0,
 		"at": String(beat.get("at", "center")),
 		"scale": float(beat.get("scale", 2.0)),
 		"dy": prev_dy,
 		"dx": prev_dx,
 	}
+	var flip := bool(beat.get("flip", false))
+	_load_pose(id, pose, flip)
 	_place_actor(id)
 
 	# Вход пешком: только для только что созданного узла — повторный "show"
@@ -668,8 +685,17 @@ func _show_actor(beat: Dictionary) -> void:
 		_actors[id].dx = start_off
 		_place_actor(id)
 		var sec: float = maxf(0.05, float(beat.get("enter_sec", 0.7)))
+		# Пока идёт вход, проигрываем позу ходьбы, если она у актёра есть —
+		# без неё вход выглядел статичной фигурой, скользящей по сцене
+		# боком, и это и было "скачет" в глазах владельца. По прибытии
+		# _tick_slides возвращает позу, заказанную кадром "show".
+		var walking := _load_pose(id, "walk", flip)
+		if not walking:
+			_load_pose(id, pose, flip)
+		_place_actor(id)
 		_slides.append({"actor": id, "left": sec, "total": sec,
-			"from_dx": start_off, "to_dx": 0.0, "then_free": false})
+			"from_dx": start_off, "to_dx": 0.0, "then_free": false,
+			"arrive_pose": pose, "arrive_flip": flip, "walking": walking})
 
 
 ## exit_to (край сцены) в beat — актёр уходит пешком, узел освобождается
@@ -687,6 +713,11 @@ func _hide_actor(beat: Dictionary) -> void:
 	var w: float = a.frame_w * a.scale / ART_SCALE
 	var to_off: float = _fit_x(_stage_x(exit_to), w) - _fit_x(_stage_x(String(a.at)), w)
 	var sec: float = maxf(0.05, float(beat.get("exit_sec", 0.6)))
+	# Пока уходит, тоже проигрываем позу ходьбы, если она есть (см. _show_actor:
+	# enter) — узел освобождается по прибытии, поэтому позу назад возвращать
+	# не нужно.
+	_load_pose(id, "walk", bool(a.get("flip", false)))
+	_place_actor(id)
 	_slides.append({"actor": id, "left": sec, "total": sec,
 		"from_dx": float(a.get("dx", 0.0)), "to_dx": to_off, "then_free": true})
 
@@ -777,9 +808,15 @@ func _tick_slides(dt: float) -> void:
 			_place_actor(id)
 		if sl.left > 0.0:
 			still.append(sl)
-		elif has_actor and bool(sl.then_free):
-			_actors[id].node.queue_free()
-			_actors.erase(id)
+		elif has_actor:
+			if bool(sl.then_free):
+				_actors[id].node.queue_free()
+				_actors.erase(id)
+			elif bool(sl.get("walking", false)):
+				# Дошёл: возвращаем позу, заказанную кадром "show" (обычно
+				# idle) — иначе актёр так и стоял бы в позе ходьбы навсегда.
+				_load_pose(id, String(sl.get("arrive_pose", "idle")), bool(sl.get("arrive_flip", false)))
+				_place_actor(id)
 	_slides = still
 
 

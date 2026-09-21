@@ -907,6 +907,11 @@
 				{
 					"do": "tool",
 					"id": "rusty_pickaxe"
+				},
+				{
+					"do": "toast",
+					"text": "workshop.toast_pickaxe",
+					"sec": 6.0
 				}
 			]
 		},

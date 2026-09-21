@@ -9,6 +9,7 @@ var world: WorldGen
 var fog: FogOfWar
 var player: Node2D
 var world_view: Node2D
+var sky_view: SkyView
 var hud: Control
 var view_root: Node2D
 
@@ -37,6 +38,15 @@ func _ready() -> void:
 	world_view.world = world
 	world_view.fog = fog
 	view_root.add_child(world_view)
+
+	# Солнце/месяц/звёзды — сразу ПОСЛЕ WorldView (значит поверх его тайлов:
+	# без этого порядка непрозрачные тайлы неба закрыли бы их собой, см.
+	# sky_view.gd) и до героя (значит под ним — задание владельца "слой неба
+	# за всем"). Тот же ViewRoot, что и у мира: движение камеры по X/Y (ниже,
+	# view_root.position) достаётся SkyView бесплатно, без второй копии кода.
+	sky_view = preload("res://scripts/world/sky_view.gd").new()
+	sky_view.name = "SkyView"
+	view_root.add_child(sky_view)
 
 	player = preload("res://scripts/player/player.gd").new()
 	player.name = "Player"
@@ -146,6 +156,10 @@ func _process(delta: float) -> void:
 	hud.set_camera(cam)
 
 	world_view.render(cam)
+	# Солнце/месяц — экранно-относительные (DayCycle.sun_t()/moon_t() отдают
+	# долю ШИРИНЫ ЭКРАНА, не всей карты, см. sky_view.gd) — без этого вызова
+	# они почти всегда стояли бы за пределами узкого 7-клеточного окна камеры.
+	sky_view.set_camera(cam, _view_w())
 
 	if not GameState.is_alive:
 		_handle_death()

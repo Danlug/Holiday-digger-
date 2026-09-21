@@ -76,6 +76,14 @@ var _daynight_idx: int = 0
 var _mood_id: String = "dark"
 var _last_vp: Vector2 = Vector2.ZERO
 
+# --- небо DayCycle (задание владельца: катсцены тоже могут жить по общим
+# игровым часам — например, интро деда гонит 6:00 -> 22:00 за время показа
+# через DayCycle.set_hour()/set_time_scale()). Выключено по умолчанию: без
+# явного use_day_cycle(true) катсцена красит небо moods-таблицей, как раньше
+# — ни одна существующая сцена не переписывается этим агентом.
+var _use_day_cycle: bool = false
+var _sky_view: SkyView = null
+
 # "Рост": пролистывание поз актёра (развёртка пацана 8-15 лет в intro_boy) —
 # та же механика, что и daynight (автоматический таймер держит кадр), но
 # вместо смены цвета неба меняет pose актёра через _show_actor.
@@ -275,6 +283,26 @@ func _build_tap_target() -> void:
 # Раскладка (портрет 224×480, но размер вьюпорта в вебе плавает)
 # ---------------------------------------------------------------------------
 
+## Включает/выключает освещение по DayCycle вместо статичных moods (см.
+## поле _use_day_cycle выше). Звёзды/солнце/месяц — тот же SkyView, что и в
+## мире (scripts/world/sky_view.gd): один код рисования, не два. Узел
+## создаётся лениво при первом включении и просто прячется при выключении
+## (сцена может переключаться туда-обратно, если сценарий это попросит).
+func use_day_cycle(enabled: bool) -> void:
+	_use_day_cycle = enabled
+	if enabled and _sky_view == null:
+		_sky_view = preload("res://scripts/world/sky_view.gd").new()
+		_sky_view.name = "SkyView"
+		_root.add_child(_sky_view)
+		# Сразу после _sky (плоский фон-подложка) и перед _ground/_stage —
+		# светила и звёзды поверх цвета неба, но под землёй и актёрами.
+		_root.move_child(_sky_view, _sky.get_index() + 1)
+		if _last_vp != Vector2.ZERO:
+			_layout()
+	if _sky_view != null:
+		_sky_view.visible = enabled
+
+
 func _relayout_if_resized() -> void:
 	if get_viewport().get_visible_rect().size != _last_vp:
 		_layout()
@@ -289,6 +317,9 @@ func _layout() -> void:
 	var ground_y: float = vp.y * GROUND_LINE
 	_ground.position = Vector2(0, ground_y)
 	_ground.size = Vector2(vp.x, vp.y - ground_y)
+	if _sky_view != null:
+		_sky_view.position = Vector2.ZERO
+		_sky_view.set_scene_rect(vp.x, ground_y, 0.0)
 
 	_stage.position = Vector2(0, vp.y * STAGE_TOP)
 	_stage.size = Vector2(vp.x, ground_y - vp.y * STAGE_TOP)
@@ -400,6 +431,9 @@ func _process(dt: float) -> void:
 	_tick_daynight(dt)
 	_tick_grow(dt)
 	_tick_slides(dt)
+	# В самом конце — иначе mood/daynight, отработавшие чуть выше, перезапишут
+	# цвет неба обратно и часы DayCycle не будет видно.
+	_apply_day_cycle_sky()
 	_next_hint.visible = _waiting_tap and not _typing and int(_anim_time * 2.0) % 2 == 0
 
 	if _typing:
@@ -931,6 +965,20 @@ func _set_mood(id: String) -> void:
 	# Смена обстановки — это новая сцена, а затемнение от предыдущей на ней
 	# уже не нужно: иначе титр после "fade out" рисовался бы под чёрным.
 	_fade.color = Color(0, 0, 0, 0)
+
+
+## Цвет неба из общих игровых часов вместо moods-таблицы (см.
+## use_day_cycle()). Дневной ориентир берём из mood "day" — так небо
+## катсцены остаётся тем же голубым небом, что и остальная игра, просто
+## умноженным на DayCycle.sky_dark(), а не отдельной палитрой на глаз.
+func _apply_day_cycle_sky() -> void:
+	if not _use_day_cycle:
+		return
+	var dc := get_node_or_null("/root/DayCycle")
+	if dc == null:
+		return
+	var day_col := Color(String(StoryData.mood("day").get("sky", "#7d93a6")))
+	_sky.color = day_col.lerp(Color.BLACK, dc.sky_dark())
 
 
 func _apply_mood_colors(id: String) -> void:

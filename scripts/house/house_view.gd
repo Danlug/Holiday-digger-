@@ -556,6 +556,7 @@ func refresh() -> void:
 	if not visible:
 		return
 	_refresh_header()
+	_apply_night_dim()
 	_update_camera_and_hero()
 	if _is_locked():
 		_clear_hotspots()
@@ -569,15 +570,43 @@ func _refresh_header() -> void:
 	_set_bar("hunger", GameState.hunger / 100.0)
 	_set_bar("stamina", GameState.stamina / 100.0)
 
-	var total: float = GameState.game_clock_hours
-	var day := int(total / 24.0) + 1
-	var hour := int(total) % 24
-	var minute := int((total - floor(total)) * 60.0)
+	# Единственный источник правды о часе — DayCycle (см. scripts/core/
+	# day_cycle.gd): он же красит небо/светила/звёзды, и часы на стене дома
+	# обязаны показывать то же самое время, а не пересчитывать его заново
+	# без стартового сдвига на 6 утра (задание владельца: "картинки фона и
+	# дома по умолчанию — 6 утра").
+	var day_cycle := get_node_or_null("/root/DayCycle")
+	var day: int = day_cycle.day if day_cycle != null else 1
+	var hour_f: float = day_cycle.hour if day_cycle != null else 6.0
+	var hour := int(hour_f)
+	var minute := int((hour_f - floor(hour_f)) * 60.0)
 	_clock.text = "День %d, %02d:%02d" % [day, hour, minute]
 
 	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
 		_notice.text = ""
 		_notice.visible = false
+
+
+## Ночь дома читается мягче, чем на улице (задание владельца: "мягче:
+## exposure 0.5" против уличных 0.2 из DayCycle.grade()) — интерьер и так
+## искусственно освещён лампой, полностью гасить его как забор с горой не
+## нужно. Трогает только фон комнаты (_bg/_bg_fallback): герой и окна-панели
+## (магазин, форс-экран обучения, кнопки) остаются как есть — задание прямо
+## просит не трогать окна.
+func _apply_night_dim() -> void:
+	var day_cycle := get_node_or_null("/root/DayCycle")
+	var exposure := 1.0
+	if day_cycle != null:
+		# sky_dark() и grade() растут из одной и той же рампы DayCycle._phase()
+		# (0 днём..1 ночью); sky_dark() всегда 0..0.9, поэтому деление на 0.9
+		# восстанавливает саму фазу без нового публичного метода в DayCycle.
+		var phase: float = day_cycle.sky_dark() / 0.9
+		exposure = lerpf(1.0, 0.5, phase)
+	var tint := Color(exposure, exposure, exposure, 1.0)
+	if _bg != null:
+		_bg.modulate = tint
+	if _bg_fallback != null:
+		_bg_fallback.modulate = tint
 
 
 func _set_bar(id: String, fraction: float) -> void:

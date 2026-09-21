@@ -1006,6 +1006,19 @@ func _clear_stage() -> void:
 	_house_sleep_left = 0.0
 	if world_mode:
 		_exit_world_mode()
+	# "house_enter" (см. house_mode выше) прячет CharacterView тем же
+	# приёмом, что и world_mode, но НЕ гасит house_mode при выходе (сцена
+	# нарочно может закончиться внутри дома, см. эффект "enter_house" у
+	# death). Живой герой вне катсцены свой CharacterView никогда не прячет
+	# (в реальной игре дом просто рисуется ПОВЕРХ него отдельным
+	# CanvasLayer, см. house_view.gd:layer=9) — поэтому спрятанный
+	# CharacterView обязан вернуться, даже когда сама сцена решила остаться
+	# "в доме": без этой строки герой навсегда пропадал бы с улицы стоило
+	# катсцене хоть раз войти в дом (баг владельца: "зашёл в дом, вышел —
+	# персонажа вообще нет").
+	var cv := get_tree().root.find_child("CharacterView", true, false)
+	if cv != null:
+		cv.visible = true
 
 
 func _place_all() -> void:

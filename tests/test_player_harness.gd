@@ -1046,10 +1046,12 @@ func _test_house_never_diggable_by_any_tool() -> void:
 # ---------------------------------------------------------------------------
 
 func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
-	# seed 90005, y=1: x=16 и x=19 — гарантированно DIRT (см. отчёт агента),
-	# ни то ни другое не задето реальной лестницей на первом уровне (она
-	# занимает там только x=15) — отказ будет ровно из-за гейта, не из-за типа
-	# клетки или лестницы.
+	# seed не важен — геометрия лестницы приходит из world_layers.json, не из
+	# сида. С разворотом лестницы (отчёт агента, баг владельца "не копается
+	# даже справа от лестницы") самый широкий её уровень — ПЕРВЫЙ, прямо на
+	# поверхности: x=15..18 на y=1 теперь сама лестница (видна игроку целиком
+	# ещё до первой попытки копать), а не гейт по типу клетки. x=19 —
+	# гарантированно DIRT и вне запертой полосы при любом гейте.
 	var w := WorldGen.new(90005)
 	player.world = w
 	w.lock_pre_autodig_garden()
@@ -1063,7 +1065,7 @@ func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
 	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
 	player.digging = null
 	_tick(90)
-	check("до автокопки: клетка левее лестницы (x=16) не копается",
+	check("до автокопки: клетка левее правого края лестницы (x=16) не копается",
 		w.get_tile(16, 1) != TileTypes.Type.EMPTY)
 	check("копка левее лестницы даже не начинается", player.digging == null)
 	check("опыт за отказанную копку не начислен", GameState.xp == xp_before)
@@ -1082,7 +1084,10 @@ func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
 		w.get_tile(19, 1) == TileTypes.Type.EMPTY)
 
 	# сценарий со скоростной копкой запустился — гейт снят (единая точка,
-	# см. AutoDigTutorial.begin) — та же клетка слева от лестницы берётся
+	# см. AutoDigTutorial.begin). (16,1) при этом остаётся запертым: после
+	# разворота это уже не "гейт держит обычную землю", а сама нерушимая
+	# лестница (структура, ГДД) — снятие гейта её не открывает, и это
+	# правильно: лестница — постоянный ориентир у дома, а не временный забор.
 	w.unlock_pre_autodig_garden()
 	player.hold_down = false
 	player.x = 16.5; player.y = 0.5
@@ -1091,8 +1096,8 @@ func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
 	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
 	player.digging = null
 	_tick(300)
-	check("после снятия гейта клетка (16,1) тоже копается",
-		w.get_tile(16, 1) == TileTypes.Type.EMPTY)
+	check("после снятия гейта (16,1) по-прежнему не копается — это лестница, не гейт",
+		w.get_tile(16, 1) != TileTypes.Type.EMPTY)
 
 	player.hold_down = false
 	player.world = world

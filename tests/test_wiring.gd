@@ -56,5 +56,18 @@ func _ready() -> void:
 		check("сюжет видит мир", director.world != null)
 		check("сюжет видит интерфейс", director.hud != null)
 
+	# Часы на поверхности (отчёт агента, баг владельца "время не течёт во
+	# дворе"): DayCycle честно тикал и раньше, но нигде не отображался на
+	# улице (единственные часы были в доме) — игрок не мог заметить ход
+	# времени. hud.gd теперь держит свою копию тех же часов, что и дом.
+	var hud := root.find_child("HUD", true, false)
+	if hud != null:
+		check("у HUD есть виджет часов", "_clock_label" in hud and hud._clock_label != null)
+		if "_clock_label" in hud and hud._clock_label != null:
+			DayCycle.set_hour(15.0)
+			await get_tree().process_frame
+			check("часы во дворе показывают то же время, что и DayCycle (\"День N, ЧЧ:ММ\")",
+				hud._clock_label.text == "День %d, 15:00" % DayCycle.day)
+
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)

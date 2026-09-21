@@ -459,7 +459,6 @@ theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_disabled_color = Color(0.243137, 0.192157, 0.145098, 1)
 theme_override_font_sizes/font_size = 9
-text = "◀"
 
 [node name="WalkRight" type="Button" parent="Root/Stage"]
 custom_minimum_size = Vector2(0, 22)
@@ -482,7 +481,6 @@ theme_override_colors/font_pressed_color = Color(0.878431, 0.662745, 0.231373, 1
 theme_override_colors/font_hover_color = Color(0.878431, 0.662745, 0.231373, 1)
 theme_override_colors/font_disabled_color = Color(0.243137, 0.192157, 0.145098, 1)
 theme_override_font_sizes/font_size = 9
-text = "▶"
 
 [node name="SleepOverlay" type="Control" parent="Root"]
 visible = false

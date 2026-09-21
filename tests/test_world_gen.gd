@@ -21,6 +21,7 @@ func _init() -> void:
 	test_staircase()
 	test_robert_tunnel()
 	test_garden_sealed_after_robert()
+	test_garden_decor()
 	test_tunnel_survives_collapse()
 	test_peat_seam_solid()
 	test_all_solid_tiles_are_pickaxe_diggable()
@@ -407,6 +408,58 @@ func test_garden_sealed_after_robert() -> void:
 	var fresh := WorldGen.new(7)
 	check("is_garden_sealed_cell: до Роберта ничего не заперто",
 		not fresh.is_garden_sealed_cell(25, 3))
+
+
+## Декор поверхности (art/env/garden/*.png, tools/import_garden.py):
+## детерминирован, не лезет на дом (0..14) и на вход тоннеля (17), а каждое
+## возвращённое имя — существующий файл, и до, и после Роберта.
+func test_garden_decor() -> void:
+	print("-- Декор огорода на поверхности --")
+	var seeds := [1, 42, 4242, 999999]
+
+	for sd in seeds:
+		var w := WorldGen.new(sd)
+		var w2 := WorldGen.new(sd)
+		var stable := true
+		var house_clear := true
+		var tunnel_clear := true
+		var assets_ok := true
+		for x in range(WorldGen.WIDTH):
+			var name := w.garden_decor_at(x)
+			if name != w2.garden_decor_at(x):
+				stable = false
+			if x <= WorldGen.HOUSE_X_MAX and not name.is_empty():
+				house_clear = false
+			if x == WorldGen.TUNNEL_X and not name.is_empty():
+				tunnel_clear = false
+			if not name.is_empty() and not ResourceLoader.exists("res://art/env/garden/%s.png" % name):
+				assets_ok = false
+		check("сид %d: декор — чистая функция (не меняется между экземплярами)" % sd, stable)
+		check("сид %d: декор не залезает на дом (0..14)" % sd, house_clear)
+		check("сид %d: декор не закрывает вход тоннеля (17)" % sd, tunnel_clear)
+		check("сид %d: каждое имя декора — существующий файл" % sd, assets_ok)
+
+	# после Роберта раскладка меняется (дикий -> ухоженный огород), но правила
+	# те же: дом и тоннель по-прежнему свободны.
+	var w3 := WorldGen.new(2024)
+	var before: Array = []
+	for x in range(WorldGen.WIDTH):
+		before.append(w3.garden_decor_at(x))
+	w3.build_robert_tunnel()
+	var differs := false
+	var tunnel_clear_after := true
+	var assets_ok_after := true
+	for x in range(WorldGen.WIDTH):
+		var name := w3.garden_decor_at(x)
+		if name != before[x]:
+			differs = true
+		if x == WorldGen.TUNNEL_X and not name.is_empty():
+			tunnel_clear_after = false
+		if not name.is_empty() and not ResourceLoader.exists("res://art/env/garden/%s.png" % name):
+			assets_ok_after = false
+	check("после Роберта раскладка декора меняется (дикий -> ухоженный)", differs)
+	check("после Роберта тоннель по-прежнему свободен", tunnel_clear_after)
+	check("после Роберта все имена декора — существующие файлы", assets_ok_after)
 
 
 ## Обвал и землетрясение тоннель не разрушают: он зафиксирован так же, как

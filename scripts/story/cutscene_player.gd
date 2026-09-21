@@ -76,6 +76,26 @@ var _daynight_idx: int = 0
 var _mood_id: String = "dark"
 var _last_vp: Vector2 = Vector2.ZERO
 
+# "Рост": пролистывание поз актёра (развёртка пацана 8-15 лет в intro_boy) —
+# та же механика, что и daynight (автоматический таймер держит кадр), но
+# вместо смены цвета неба меняет pose актёра через _show_actor.
+var _grow_left: float = 0.0
+var _grow_step: float = 0.0
+var _grow_idx: int = -1
+var _grow_actor: String = ""
+var _grow_poses: Array = []
+var _grow_at: String = "center"
+var _grow_scale: float = 2.0
+var _grow_flip: bool = false
+
+# Вход/выход актёра со сцены пешком: "show" с полем "enter" и "hide" с полем
+# "exit_to" задают КРАЙ сцены (far_left/left/center/right/far_right), откуда
+# актёр появляется или куда уходит. Сдвиг накапливается в actors[id].dx —
+# отдельно от вертикального actors[id].dy (падение в шахту) — и гасится этим
+# тикером с кубическим ease-out (человек тормозит перед остановкой, а не
+# бьётся о стену).
+var _slides: Array = []   # {"actor":id, "left":sec, "total":sec, "from_dx":float, "to_dx":float, "then_free":bool}
+
 
 func _init() -> void:
 	layer = LAYER
@@ -378,6 +398,8 @@ func _process(dt: float) -> void:
 	_tick_moves(dt)
 	_tick_shake(dt)
 	_tick_daynight(dt)
+	_tick_grow(dt)
+	_tick_slides(dt)
 	_next_hint.visible = _waiting_tap and not _typing and int(_anim_time * 2.0) % 2 == 0
 
 	if _typing:
@@ -462,7 +484,7 @@ func _run_beat(beat: Dictionary) -> bool:
 			_show_actor(beat)
 			return false
 		"hide":
-			_hide_actor(String(beat.get("actor", "")))
+			_hide_actor(beat)
 			return false
 		"prop":
 			_show_prop(beat)
@@ -496,6 +518,9 @@ func _run_beat(beat: Dictionary) -> bool:
 			_daynight_step = float(beat.get("sec", 0.7))
 			_daynight_left = _daynight_step * float(beat.get("cycles", 3)) * 2.0
 			_beat_timer = _daynight_left
+			return true
+		"grow":
+			_start_grow(beat)
 			return true
 	return false
 
@@ -599,8 +624,9 @@ func _show_actor(beat: Dictionary) -> void:
 	var frames: int = 1
 	if int(round(tex.get_height())) == CHAR_FRAME and int(round(tex.get_width())) % CHAR_FRAME == 0:
 		frames = maxi(1, int(round(tex.get_width() / float(CHAR_FRAME))))
+	var is_new := not _actors.has(id)
 	var node: TextureRect
-	if _actors.has(id):
+	if not is_new:
 		node = _actors[id].node
 	else:
 		node = TextureRect.new()
@@ -615,6 +641,11 @@ func _show_actor(beat: Dictionary) -> void:
 	atlas.region = Rect2(0, 0, frame_w, tex.get_height())
 	node.texture = atlas
 	node.flip_h = bool(beat.get("flip", false))
+	# dx/dy накапливают сдвиги от "move" (падение) и от входа/выхода пешком —
+	# сохраняются при смене позы у УЖЕ стоящего актёра (иначе смена idle->dig
+	# посреди сцены обнулила бы, например, ещё не долетевший вход).
+	var prev_dx: float = float(_actors[id].get("dx", 0.0)) if _actors.has(id) else 0.0
+	var prev_dy: float = float(_actors[id].get("dy", 0.0)) if _actors.has(id) else 0.0
 	_actors[id] = {
 		"node": node,
 		"frames": frames,
@@ -622,16 +653,42 @@ func _show_actor(beat: Dictionary) -> void:
 		"tex_h": tex.get_height(),
 		"at": String(beat.get("at", "center")),
 		"scale": float(beat.get("scale", 2.0)),
-		"dy": 0.0,
+		"dy": prev_dy,
+		"dx": prev_dx,
 	}
 	_place_actor(id)
 
+	# Вход пешком: только для только что созданного узла — повторный "show"
+	# с тем же id (смена позы) входа не переигрывает.
+	var enter_from := String(beat.get("enter", ""))
+	if is_new and not enter_from.is_empty():
+		var a: Dictionary = _actors[id]
+		var w: float = a.frame_w * a.scale / ART_SCALE
+		var start_off: float = _fit_x(_stage_x(enter_from), w) - _fit_x(_stage_x(String(a.at)), w)
+		_actors[id].dx = start_off
+		_place_actor(id)
+		var sec: float = maxf(0.05, float(beat.get("enter_sec", 0.7)))
+		_slides.append({"actor": id, "left": sec, "total": sec,
+			"from_dx": start_off, "to_dx": 0.0, "then_free": false})
 
-func _hide_actor(id: String) -> void:
+
+## exit_to (край сцены) в beat — актёр уходит пешком, узел освобождается
+## после того, как доедет; без exit_to — прежнее поведение, убрать сразу.
+func _hide_actor(beat: Dictionary) -> void:
+	var id := String(beat.get("actor", ""))
 	if not _actors.has(id):
 		return
-	_actors[id].node.queue_free()
-	_actors.erase(id)
+	var exit_to := String(beat.get("exit_to", ""))
+	if exit_to.is_empty():
+		_actors[id].node.queue_free()
+		_actors.erase(id)
+		return
+	var a: Dictionary = _actors[id]
+	var w: float = a.frame_w * a.scale / ART_SCALE
+	var to_off: float = _fit_x(_stage_x(exit_to), w) - _fit_x(_stage_x(String(a.at)), w)
+	var sec: float = maxf(0.05, float(beat.get("exit_sec", 0.6)))
+	_slides.append({"actor": id, "left": sec, "total": sec,
+		"from_dx": float(a.get("dx", 0.0)), "to_dx": to_off, "then_free": true})
 
 
 func _show_prop(beat: Dictionary) -> void:
@@ -667,6 +724,7 @@ func _clear_stage() -> void:
 		_props[id].queue_free()
 	_props.clear()
 	_moves.clear()
+	_slides.clear()
 	_tap_target.visible = false
 
 
@@ -688,8 +746,36 @@ func _place_actor(id: String) -> void:
 	var h: float = a.tex_h * s / ART_SCALE
 	node.size = Vector2(w, h)
 	# Актёр стоит НА земле: низ кадра совпадает с линией земли сцены, иначе
-	# фигура висит в воздухе, и сцена перестаёт читаться как место.
-	node.position = Vector2(_fit_x(_stage_x(a.at), w), _stage.size.y - h + float(a.dy))
+	# фигура висит в воздухе, и сцена перестаёт читаться как место. dx —
+	# горизонтальный сдвиг входа/выхода пешком (см. _tick_slides), поверх
+	# именованной позиции "at".
+	node.position = Vector2(_fit_x(_stage_x(a.at), w) + float(a.get("dx", 0.0)),
+		_stage.size.y - h + float(a.dy))
+
+
+## Тикает вход/выход актёра пешком (см. _show_actor:enter / _hide_actor:exit_to).
+## Кубический ease-out: быстрый шаг, плавное торможение у цели — то же самое,
+## что step-функции в CSS/твинах, но без зависимости от готовых Tween на
+## значениях внутри Dictionary (Tween не умеет анимировать поле словаря).
+func _tick_slides(dt: float) -> void:
+	if _slides.is_empty():
+		return
+	var still: Array = []
+	for sl in _slides:
+		var id: String = sl.actor
+		sl.left -= dt
+		var has_actor := _actors.has(id)
+		if has_actor:
+			var t: float = 1.0 - clampf(sl.left / sl.total, 0.0, 1.0)
+			var eased: float = 1.0 - pow(1.0 - t, 3.0)
+			_actors[id].dx = lerpf(sl.from_dx, sl.to_dx, eased)
+			_place_actor(id)
+		if sl.left > 0.0:
+			still.append(sl)
+		elif has_actor and bool(sl.then_free):
+			_actors[id].node.queue_free()
+			_actors.erase(id)
+	_slides = still
 
 
 func _place_prop(id: String) -> void:
@@ -752,6 +838,40 @@ func _tick_daynight(dt: float) -> void:
 		_apply_mood_colors("night" if phase == 0 else "day")
 	if _daynight_left <= 0.0:
 		_apply_mood_colors(_mood_id)
+
+
+## "Рост": пролистывает pose-список актёра, показывая каждую beat.sec секунд
+## (развёртка пацана 8-15 лет — art/character/boy/age_8.png … age_15.png).
+## Держит сцену, как card/daynight — конец считает общий _beat_timer.
+func _start_grow(beat: Dictionary) -> void:
+	var poses: Array = beat.get("poses", [])
+	if poses.is_empty():
+		return
+	_grow_actor = String(beat.get("actor", "boy"))
+	_grow_poses = poses
+	_grow_step = maxf(0.05, float(beat.get("sec", 0.45)))
+	_grow_at = String(beat.get("at", "center"))
+	_grow_scale = float(beat.get("scale", 2.0))
+	_grow_flip = bool(beat.get("flip", false))
+	_grow_idx = -1
+	_grow_left = _grow_step * poses.size()
+	_beat_timer = _grow_left
+	_tick_grow(0.0)
+
+
+func _tick_grow(dt: float) -> void:
+	if _grow_poses.is_empty() or _grow_left <= 0.0 and _grow_idx == _grow_poses.size() - 1:
+		return
+	_grow_left -= dt
+	var elapsed: float = _grow_step * float(_grow_poses.size()) - maxf(_grow_left, 0.0)
+	var idx: int = clampi(int(elapsed / _grow_step), 0, _grow_poses.size() - 1)
+	if idx == _grow_idx:
+		return
+	_grow_idx = idx
+	_show_actor({
+		"actor": _grow_actor, "pose": _grow_poses[idx],
+		"at": _grow_at, "scale": _grow_scale, "flip": _grow_flip,
+	})
 
 
 func _set_mood(id: String) -> void:

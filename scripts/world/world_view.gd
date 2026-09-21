@@ -101,12 +101,16 @@ func _set_texture(s: Sprite2D, tex: Texture2D) -> void:
 	s.modulate = Color.WHITE
 
 
+var _cam_bx: int = 0    # левый край окна камеры в клетках — overlay рисует по нему декор огорода
+
+
 ## Перерисовывает окно вокруг камеры (в КЛЕТКАХ, см. player.camera()).
 func render(cam: Vector2) -> void:
 	if world == null or fog == null or _pool.is_empty():
 		return
 	var bx := int(floor(cam.x))
 	var by := int(floor(cam.y))
+	_cam_bx = bx
 
 	for r in range(-1, view_h + 2):
 		var wy := by + r
@@ -152,7 +156,11 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 		_set_color(s, _sky_color(wy))
 		return
 	if wy == 0:
-		_set_color(s, COLOR_GROUND)
+		var grass := TileArt.grass_texture(wx)
+		if grass != null:
+			_set_texture(s, grass)
+		else:
+			_set_color(s, COLOR_GROUND)
 		return
 
 	var state := fog.get_state(wx, wy)
@@ -189,7 +197,30 @@ func set_quest_cells(cells: Array) -> void:
 		_overlay.queue_redraw()
 
 
+## Декор огорода (art/env/garden/*.png) поверх тайла травы — деревья, грядки,
+## камни. Свой draw_texture_rect, а не спрайт из пула _paint_cell: объекты
+## разной высоты (дерево — под три клетки) и должны расти ВВЕРХ от границы
+## y=0, залезая в клетки неба, а пул рисует ровно одну клетку на спрайт.
+## Чисто декоративно — без коллизии, герой проходит сквозь них насквозь.
+func _draw_garden_decor() -> void:
+	if world == null:
+		return
+	for wx in range(_cam_bx - 1, _cam_bx + view_w + 2):
+		var name := world.garden_decor_at(wx)
+		if name.is_empty():
+			continue
+		var tex := TileArt.garden_texture(name)
+		if tex == null:
+			continue
+		var w: float = tex.get_width() / ART_SCALE
+		var h: float = tex.get_height() / ART_SCALE
+		var x: float = wx * TILE + (TILE - w) / 2.0
+		var y: float = -h   # низ объекта — на линии земли (верх клетки y=0)
+		_overlay.draw_texture_rect(tex, Rect2(x, y, w, h), false)
+
+
 func _on_overlay_draw() -> void:
+	_draw_garden_decor()
 	if player == null:
 		return
 	var pcx: float = player.x * TILE

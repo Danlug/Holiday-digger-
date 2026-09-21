@@ -43,6 +43,13 @@ static var _tile_to_file: Dictionary = {
 const DIRT_FILES := ["dirt_1", "dirt_2", "dirt_3", "dirt_4",
 		"dirt_5", "dirt_6", "dirt_7", "dirt_8"]
 
+## Два варианта тайла травы (tools/import_grass.py — один измеренный период
+## бесшовного повтора, два сдвига разреза). Полоса из одного варианта на весь
+## экран читалась бы штампом, поэтому вариант, как и у земли, зависит от
+## мировой координаты.
+const GRASS_FILES := ["grass_1", "grass_2"]
+const DIR_GARDEN := "res://art/env/garden/"
+
 static var _cache: Dictionary = {}
 
 ## Вариант земли по МИРОВЫМ координатам клетки (не экранным — иначе текстура
@@ -52,6 +59,27 @@ static func dirt_variant(wx: int, wy: int) -> int:
 	var b: int = (wy * 19349663) & 0xFFFFFFFF
 	var h: int = (a ^ b) & 0xFFFFFFFF
 	return h % DIRT_FILES.size()
+
+
+## Тайл травы для клетки поверхности (y=0) по мировому x.
+static func grass_texture(wx: int) -> Texture2D:
+	var h: int = (wx * 2654435761) & 0xFFFFFFFF
+	return _load(GRASS_FILES[h % GRASS_FILES.size()])
+
+
+## Спрайт объекта огорода (art/env/garden/<name>.png) по имени из
+## WorldGen.garden_decor_at(). Свой кеш-путь — файлы лежат в другой папке,
+## чем тайлы шахты.
+static func garden_texture(name: String) -> Texture2D:
+	if name.is_empty():
+		return null
+	var key := "garden/" + name
+	if _cache.has(key):
+		return _cache[key]
+	var path := DIR_GARDEN + name + ".png"
+	var tex: Texture2D = load(path) if ResourceLoader.exists(path) else null
+	_cache[key] = tex
+	return tex
 
 
 ## Текстура клетки по типу и мировым координатам (для варианта земли).

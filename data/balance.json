@@ -494,7 +494,32 @@
    "note": "герой залезает внутрь (см. GDD п.5); ширина копки, движение вбок/вверх, перегрев — нерешённые механики (п.18), не предложены числами. Название — «бурмобиль» везде в игре.",
    "line": "tech",
    "tier": 2,
-   "icon": "res://art/items/drill_rig_icon.png"
+   "icon": "res://art/items/drill_rig_icon.png",
+   "capacity_bonus_kg": {
+    "value": 200,
+    "proposed": false,
+    "note": "решение владельца дословно: «когда он обретает бурмобиль, его носимый вес увеличивается на 200 кг, вдобавок к собственному» — прибавка к ЛИМИТУ переноски (GameState.get_max_carry_kg()), пока бурмобиль надет, а не вес самой машины в инвентаре (см. Balance.get_drill_rig_capacity_bonus_kg)."
+   },
+   "fall_speed_mult": {
+    "value": 1.3,
+    "proposed": false,
+    "note": "решение владельца дословно: «скорость падения в бурмобиле на 30% быстрее» — умножает V_TERM (предел скорости падения) в player.gd, пока бурмобиль надет."
+   },
+   "flight_speed_mult": {
+    "value": 1.3,
+    "proposed": false,
+    "note": "решение владельца дословно: «полёт на 30% быстрее» — умножает потолок скорости подъёма на тяге в player.gd, пока бурмобиль надет."
+   },
+   "fall_damage_mult": {
+    "value": 0.5,
+    "proposed": false,
+    "note": "решение владельца дословно: «урон от падения на 50% меньше» — множитель Balance.get_fall_damage_from_speed(), пока бурмобиль надет."
+   },
+   "fall_damage_height_mult": {
+    "value": 3.0,
+    "proposed": false,
+    "note": "решение владельца дословно: «высота, с которой он получает урон, в 3 раза выше» — множитель порога min_height_cells в Balance.get_fall_damage_from_speed(), пока бурмобиль надет."
+   }
   },
   "peat_distillery": {
    "name_ru": "Торфоперегонка",

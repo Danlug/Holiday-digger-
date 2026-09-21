@@ -45,12 +45,18 @@ const GROUND_Y := int(46 * ART_SCALE)
 ## клетки, а ужимать замах нельзя — герой на этом кадре худеет (см.
 ## tools/import_dig.py, DIG_FRAME_W). Высота и линия земли те же, что у
 ## idle — лишней высоты этим наборам не нужно.
+## rig_jump/rig_fly — прыжок и полёт бурмобиля (см. tools/import_rig_jump_fly.py
+## и блок "Прыжок и полёт бурмобиля" ниже). GROUND_Y=150 у обоих — та же линия
+## земли, что у dig_rig_down/side: машина не должна прыгать по вертикали при
+## переходе копка <-> прыжок <-> полёт.
 const SHEET_FRAME := {
 	"dig_pick": [192, 144, 138],
 	"dig_pick_rusty": [192, 144, 138],
 	"dig_shovel": [192, 144, 138],
 	"dig_rig_down": [240, 168, 150],
 	"dig_rig_side": [240, 168, 150],
+	"rig_jump": [240, 168, 150],
+	"rig_fly": [220, 220, 150],
 	"fly_1": [154, 162, 156],
 	"fly_2": [204, 165, 163],
 	"fly_3": [152, 141, 129],
@@ -82,7 +88,8 @@ const SHEET_ANIM_DIV := {
 const DIG_SHEETS := ["idle", "walk", "fall", "fly", "fly_jet",
 		"fly_1", "fly_2", "fly_3", "fly_4",
 		"dig_shovel", "dig_pick", "dig_pick_rusty",
-		"dig_drill_down", "dig_drill_side", "dig_rig_down", "dig_rig_side"]
+		"dig_drill_down", "dig_drill_side", "dig_rig_down", "dig_rig_side",
+		"rig_jump", "rig_fly"]
 
 ## Фазы анимации копки: не все листы копки играются простым циклом по всем
 ## кадрам. Бурмобиль нарисован тремя фазами — старт бурения, зацикленное
@@ -143,6 +150,44 @@ var _dig_was_active: bool = false      # player.digging != null на прошл�
 var _dig_last_end_msec: float = -1e9   # когда копка в прошлый раз закончилась
 var _dig_last_base: String = ""        # набор, который доигрывает фазу "end"
 var _dig_last_sheet_name: String = ""  # лист (с суффиксом направления) для "end"
+
+# ---------------------------------------------------------------------------
+# Прыжок и полёт бурмобиля (art/character/rig_jump.png + rig_fly.png, см.
+# tools/import_rig_jump_fly.py) — вертикальное перемещение машины: отдельная
+# система от DIG_PHASES (копка вбок/вниз — там же владелец задачи «Раскопки»
+# держит другой агент, эту таблицу не трогаем) и от rig_transition
+# (выход/посадка на поверхности — тоже чужая зона, см. блок выше). Приоритет
+# в _process: копка > rig_transition > это > статичный кадр — оба «чужих»
+# состояния перехватывают отрисовку РАНЬШЕ (см. ранний return для
+# rig_transition и dig.has("sheet_name") в _process), эта система работает
+# только когда игрок в машине, не копает и не садится/высаживается.
+#
+# rig_jump.png (кадры 1-8 листа, индексы 0-7): бур втягивается — играется
+# ВПЕРЁД (0..7) при толчке от земли вверх (баллистический прыжок, без тяги)
+# и НАЗАД (7..0) при приземлении — то же самое движение в обратном порядке,
+# ровно как попросил владелец.
+# rig_fly.png (кадры 9-16 листа, индексы 0-7): розжиг и полный ход турбины —
+# START (0..5) один раз при начале тяги, затем LOOP (6,7) по кругу, пока тяга
+# держится, затем STOP (5..0) один раз, когда тяга кончилась.
+const RIG_JUMP_SHEET := "rig_jump"
+const RIG_FLY_SHEET := "rig_fly"
+const RIG_JUMP_UP := [0, 1, 2, 3, 4, 5, 6, 7]
+const RIG_JUMP_DOWN := [7, 6, 5, 4, 3, 2, 1, 0]
+const RIG_FLY_START := [0, 1, 2, 3, 4, 5]
+const RIG_FLY_LOOP := [6, 7]
+const RIG_FLY_STOP := [5, 4, 3, 2, 1, 0]
+## Статичный кадр бурмобиля на поверхности вне копки/прыжка/полёта — последний
+## кадр rig_jump.png, бур полностью втянут, обтекаемый закрытый корпус.
+## Показывается вместо dig_rig_side (тот кадр 0 — бур торчит, поза "готов
+## бурить", уместна только под землёй, см. _process) — решение владельца:
+## после приземления/остановки полёта машина должна быть закрытой, пока не
+## началась копка.
+const RIG_CLOSED_FRAME := 7
+
+var _rig_move_phase: String = "none"   # "none"|"jump_up"|"jump_down"|"fly_start"|"fly_loop"|"fly_stop"
+var _rig_move_t0: float = 0.0          # player.anim в момент начала текущей фазы
+var _rig_was_on_ground: bool = true    # player.on_ground на прошлом кадре — для edge-детекции
+var _rig_was_thrust: bool = false      # (player.thrust != "") на прошлом кадре
 
 
 func _ready() -> void:
@@ -288,6 +333,103 @@ func _dig_frame(digging_active: bool) -> Dictionary:
 	return {"sheet_name": sheet_name, "frame": frame_i}
 
 
+## Фаза и кадр прыжка/полёта бурмобиля — см. блок объявлений выше. Вызывается
+## КАЖДЫЙ кадр (как и _dig_frame), даже когда игрок не в машине: так
+## _rig_was_on_ground/_rig_was_thrust остаются свежими, и edge-детекция
+## (оттолкнулся/приземлился/включил-выключил тягу) не путает старое
+## состояние с новым, когда игрок садится в машину или вылезает из неё.
+##
+## Возвращает {} — играть нечего, обычный статичный кадр (см. _process).
+## Иначе — {"sheet_name": ..., "frame": ...}, 0-based индекс внутри листа.
+func _rig_move_frame() -> Dictionary:
+	if not (player.has_method("is_in_rig") and player.is_in_rig()):
+		_rig_move_phase = "none"
+		_rig_was_on_ground = true
+		_rig_was_thrust = false
+		return {}
+
+	var on_ground: bool = player.on_ground
+	var thrusting: bool = player.thrust != ""
+	# Приземление — сильнее всего остального: даже если фаза сейчас
+	# fly_stop/jump_up, касание земли обязано показать посадку заново (см.
+	# решение владельца: "приземление... после прыжка ИЛИ полёта" — общий
+	# случай для обоих путей в воздух).
+	var landed_now: bool = (not _rig_was_on_ground) and on_ground
+	# Прыжок — именно толчок вверх (vy < 0), а не "сошёл с края платформы"
+	# (там vy стартует от нуля и только потом растёт под тяготением) — и
+	# только без тяги: тяга сразу после толчка физикой запрещена
+	# (JUMP_TO_FLY_MS/vy>=0 в player.gd), так что thrusting здесь всегда
+	# false в момент самого толчка.
+	var jumped_now: bool = _rig_was_on_ground and not on_ground and not thrusting and player.vy < 0.0
+	var thrust_started: bool = thrusting and not _rig_was_thrust
+	var thrust_stopped: bool = (not thrusting) and _rig_was_thrust and not on_ground
+
+	if landed_now:
+		_rig_move_phase = "jump_down"
+		_rig_move_t0 = player.anim
+	elif jumped_now:
+		_rig_move_phase = "jump_up"
+		_rig_move_t0 = player.anim
+	elif thrust_started:
+		_rig_move_phase = "fly_start"
+		_rig_move_t0 = player.anim
+	elif thrust_stopped:
+		_rig_move_phase = "fly_stop"
+		_rig_move_t0 = player.anim
+
+	_rig_was_on_ground = on_ground
+	_rig_was_thrust = thrusting
+
+	if _rig_move_phase == "none":
+		return {}
+
+	# "closed" — доигранные jump_up/jump_down/fly_stop оседают сюда: машина
+	# закрыта (кадр 8 rig_jump.png), пока не начнётся новый прыжок/полёт,
+	# копка (выше по приоритету, см. _process) или спуск под землю. Отдаём
+	# кадр ТОЛЬКО на поверхности (player.cell_y() < 1) — под землёй эта фаза
+	# не должна перебивать статичный dig_rig_side/копку (см. _process, у
+	# in_rig_underground приоритет ниже rig_move, поэтому здесь отступаем
+	# сами, а не полагаемся на порядок веток).
+	var closed_frame: Dictionary = {} if player.cell_y() >= 1 \
+			else {"sheet_name": RIG_JUMP_SHEET, "frame": RIG_CLOSED_FRAME}
+	if _rig_move_phase == "closed":
+		return closed_frame
+
+	var anim_div: float = SHEET_ANIM_DIV.get(RIG_JUMP_SHEET, ANIM_DIV)
+	var idx: int = int(floor((player.anim - _rig_move_t0) / anim_div)) if anim_div > 0.0 else 0
+
+	match _rig_move_phase:
+		"jump_up":
+			if idx >= RIG_JUMP_UP.size():
+				# Апекс доигран раньше, чем машина легла на пик прыжка, или
+				# сам прыжок короче анимации — держим закрытый кадр (тот же,
+				# чем кончается сама анимация втягивания) до приземления.
+				_rig_move_phase = "closed"
+				return closed_frame
+			return {"sheet_name": RIG_JUMP_SHEET, "frame": RIG_JUMP_UP[idx]}
+		"jump_down":
+			if idx >= RIG_JUMP_DOWN.size():
+				_rig_move_phase = "closed"
+				return closed_frame
+			return {"sheet_name": RIG_JUMP_SHEET, "frame": RIG_JUMP_DOWN[idx]}
+		"fly_start":
+			if idx >= RIG_FLY_START.size():
+				# Старт доигран — без паузы дальше в цикл (тот же приём, что
+				# у DIG_PHASES: "start" -> "loop" без задержки).
+				_rig_move_phase = "fly_loop"
+				_rig_move_t0 = player.anim
+				return {"sheet_name": RIG_FLY_SHEET, "frame": RIG_FLY_LOOP[0]}
+			return {"sheet_name": RIG_FLY_SHEET, "frame": RIG_FLY_START[idx]}
+		"fly_loop":
+			return {"sheet_name": RIG_FLY_SHEET, "frame": RIG_FLY_LOOP[idx % RIG_FLY_LOOP.size()]}
+		"fly_stop":
+			if idx >= RIG_FLY_STOP.size():
+				_rig_move_phase = "closed"
+				return closed_frame
+			return {"sheet_name": RIG_FLY_SHEET, "frame": RIG_FLY_STOP[idx]}
+	return {}
+
+
 func _process(_dt: float) -> void:
 	if player == null:
 		return
@@ -304,13 +446,20 @@ func _process(_dt: float) -> void:
 
 	# Бурмобиль под землёй — герой ВСЕГДА в кабине (решение владельца, задача
 	# «Бурмобиль — транспорт»): никаких листов ходьбы/полёта/падения пешком,
-	# пока едет машина. Отдельных кадров простоя/ходьбы/падения у машины нет
-	# (владелец прислал только dig_rig_down/side, нарисованные под копку) —
-	# статичный боковой кадр как временная замена, до отдельной анимации
-	# машины на месте (ПРЕДЛОЖЕНО: см. отчёт агента).
-	var in_rig: bool = player.has_method("is_in_rig") and player.is_in_rig() and player.cell_y() >= 1
+	# пока едет машина. Отдельных кадров простоя у машины под землёй нет —
+	# статичный боковой кадр (бур торчит, "готов бурить") как замена. На
+	# поверхности статику вне прыжка/полёта отдаёт сам rig_move (фаза
+	# "closed", см. _rig_move_frame) — здесь отдельной ветки для этого нет,
+	# иначе она перебивала бы обычную стойку/ходьбу ДО того, как герой хоть
+	# раз прыгнул или взлетел (см. test_dig_phases.gd: "в машине, стоит на
+	# поверхности, никогда не прыгал" — обязана остаться idle-стойкой).
+	var in_rig_underground: bool = player.has_method("is_in_rig") and player.is_in_rig() and player.cell_y() >= 1
 
 	var dig: Dictionary = _dig_frame(player.digging != null)
+	# Вызывается КАЖДЫЙ кадр (см. её собственный докстринг) — даже когда
+	# сейчас копка/переход выигрывают отрисовку: иначе edge-детекция
+	# прыжка/посадки/тяги внутри неё видела бы устаревшее on_ground/thrust.
+	var rig_move: Dictionary = _rig_move_frame()
 
 	var sheet_name: String
 	var phase_frame: int = -1
@@ -321,7 +470,14 @@ func _process(_dt: float) -> void:
 		# цикл / финиш) — см. _dig_frame и DIG_PHASES.
 		sheet_name = dig["sheet_name"]
 		phase_frame = dig["frame"]
-	elif in_rig:
+	elif rig_move.has("sheet_name"):
+		# Прыжок/приземление/начало-конец полёта бурмобиля — см. _rig_move_frame.
+		# Приоритет НИЖЕ копки (бур не прыгает во время бурения — физически
+		# невозможно, но порядок на всякий случай тот же, что просил
+		# владелец) и выше статичных кадров ниже.
+		sheet_name = rig_move["sheet_name"]
+		phase_frame = rig_move["frame"]
+	elif in_rig_underground:
 		sheet_name = "dig_rig_side" if _sheets.has("dig_rig_side") else "dig_pick"
 		force_static_frame = true
 	elif not player.on_ground:

@@ -715,12 +715,22 @@ func _move_y(dt: float) -> void:
 		# практике ощущалось бы как «×10 разгона».
 		var max_up: float = Balance.get_gear_base_speed() \
 			* GameState.get_gear_fly_multiplier() * GameState.get_speed_multiplier()
+		# Бурмобиль: "полёт на 30% быстрее" (решение владельца) — множитель
+		# поверх потолка скорости подъёма, пока машина надета (см.
+		# Balance.get_drill_rig_flight_speed_mult). Пешего/ранец/джетпак без
+		# машины не трогает — множитель 1.0, когда is_in_rig() ложь.
+		if is_in_rig():
+			max_up *= Balance.get_drill_rig_flight_speed_mult()
 		var ramp: float = JET_RAMP if jet else _prop_ramp()
 		var accel: float = THRUST_BRAKE if vy > 0.0 else max_up / ramp
 		vy = maxf(vy - accel * dt, -max_up)
 	else:
 		var g: float = COAST_DECEL if (coasting and vy < 0.0) else _gravity_now()
-		vy = minf(vy + g * dt, V_TERM)
+		# Бурмобиль: "скорость падения в бурмобиле на 30% быстрее" (решение
+		# владельца) — множитель поверх предела скорости падения, пока машина
+		# надета (см. Balance.get_drill_rig_fall_speed_mult).
+		var v_term: float = V_TERM * (Balance.get_drill_rig_fall_speed_mult() if is_in_rig() else 1.0)
+		vy = minf(vy + g * dt, v_term)
 
 	# Небо не бесконечное: на подлёте к его верху гасим подъём пропорционально
 	# остатку высоты. Падение это не трогает (только vy < 0), так что урон от
@@ -792,9 +802,20 @@ func _move_y(dt: float) -> void:
 ## Формула — в Balance.get_fall_damage_from_speed (единый источник с тестами
 ## tests/test_fall_damage_speed.gd); G передаётся аргументом, потому что это
 ## константа ощущений движения игрока, а не баланса.
+##
+## Бурмобиль: "урон от падения на 50% меньше, а высота, с которой он получает
+## урон, в 3 раза выше" (решение владельца) — множители поверх формулы, пока
+## машина надета (см. Balance.get_drill_rig_fall_damage_mult/
+## get_drill_rig_fall_damage_height_mult); пешего/ранец/джетпак не трогает —
+## оба множителя 1.0, когда is_in_rig() ложь.
 func _land() -> void:
 	var v := vy
-	var dmg := roundf(Balance.get_fall_damage_from_speed(v, G))
+	var dmg_mult := 1.0
+	var height_mult := 1.0
+	if is_in_rig():
+		dmg_mult = Balance.get_drill_rig_fall_damage_mult()
+		height_mult = Balance.get_drill_rig_fall_damage_height_mult()
+	var dmg := roundf(Balance.get_fall_damage_from_speed(v, G, dmg_mult, height_mult))
 	if dmg < 1.0:
 		return
 	GameState.take_damage(dmg, "fall")

@@ -396,8 +396,16 @@ func get_total_weight() -> float:
 	return total
 
 
+## Лимит переноски: база от ступени "сила" плюс бонус бурмобиля, пока он
+## надет (решение владельца: «когда он обретает бурмобиль, его носимый вес
+## увеличивается на 200 кг, вдобавок к собственному» — см.
+## Balance.get_drill_rig_capacity_bonus_kg). Это прибавка к ЛИМИТУ, а не вес
+## самой машины в инвентаре — машина в инвентарь не кладётся.
 func get_max_carry_kg() -> float:
-	return Balance.get_max_carry_kg(get_skill_stage("strength"))
+	var base := Balance.get_max_carry_kg(get_skill_stage("strength"))
+	if current_tool == "drill_rig":
+		base += Balance.get_drill_rig_capacity_bonus_kg()
+	return base
 
 
 ## Радиусы аур тумана войны (ГДД раздел 12): большая — рельеф, маленькая —

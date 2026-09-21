@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_resolve_dir_zones()
 	_test_six_direction_snap()
 	_test_arrow_pad_combinations()
+	_test_arrow_pad_layout()
 	_test_keyboard_intent()
 	_test_dig_earth_gives_xp_not_coins()
 	_test_drill_rig_dig_time_quarter_of_obsidian_pickaxe()
@@ -193,7 +194,7 @@ func _test_arrow_pad_combinations() -> void:
 	var hud = preload("res://scripts/ui/hud.gd").new()
 	hud.player = player
 
-	check("кнопок на крестовине ровно четыре", hud.ARROW_CELLS.size() == 4)
+	check("кнопок ровно четыре", hud.ARROW_CELLS.size() == 4)
 	var dirs: Array = []
 	for cell in hud.ARROW_CELLS:
 		dirs.append(String(cell["dir"]))
@@ -226,6 +227,56 @@ func _test_arrow_pad_combinations() -> void:
 	hud._arrows_held = {"left": true, "right": true}
 	hud._apply_arrows()
 	check("← и → вместе гасят друг друга", player.hold_dx == 0)
+
+	hud.free()
+	player.release_control()
+
+
+## Раскладка режима стрелок (решение владельца): слева — только ◀ ▶ рядом по
+## горизонтали, справа — только ▲ ▼ столбиком. Проверяем и разметку
+## ARROW_CELLS (сторона/место), и то, что после реальной раскладки
+## (_layout_arrows) кнопки физически оказываются на своих бортах и в
+## правильном взаимном порядке — иначе тест прошёл бы даже при перепутанных
+## осях внутри _layout_arrows.
+func _test_arrow_pad_layout() -> void:
+	var hud = preload("res://scripts/ui/hud.gd").new()
+	hud.player = player
+
+	var by_dir: Dictionary = {}
+	for cell in hud.ARROW_CELLS:
+		by_dir[String(cell["dir"])] = cell
+	check("← и → размечены на левом борту",
+		String(by_dir["left"]["side"]) == "left" and String(by_dir["right"]["side"]) == "left")
+	check("↑ и ↓ размечены на правом борту",
+		String(by_dir["up"]["side"]) == "right" and String(by_dir["down"]["side"]) == "right")
+	check("← и → занимают разные места в паре",
+		int(by_dir["left"]["slot"]) != int(by_dir["right"]["slot"]))
+	check("↑ и ↓ занимают разные места в паре",
+		int(by_dir["up"]["slot"]) != int(by_dir["down"]["slot"]))
+
+	# Реальная раскладка на портретном экране 224×480 (см. GDD).
+	hud._build_ui()
+	hud.size = Vector2(224, 480)
+	hud.stage_rect = Rect2(0, 0, 224, 480 - hud.STRIP_H)
+	hud._layout_arrows()
+
+	var b_left: Button = hud._arrow_buttons["left"]
+	var b_right: Button = hud._arrow_buttons["right"]
+	var b_up: Button = hud._arrow_buttons["up"]
+	var b_down: Button = hud._arrow_buttons["down"]
+
+	check("◀ и ▶ стоят на одной высоте (горизонтальная пара)",
+		is_equal_approx(b_left.position.y, b_right.position.y))
+	check("◀ левее ▶", b_left.position.x < b_right.position.x)
+	check("▲ и ▼ стоят по одной вертикали (столбик)",
+		is_equal_approx(b_up.position.x, b_down.position.x))
+	check("▲ выше ▼", b_up.position.y < b_down.position.y)
+
+	var mid_x: float = hud.size.x / 2.0
+	check("◀▶ — на левой половине экрана",
+		b_left.position.x + b_left.size.x <= mid_x and b_right.position.x + b_right.size.x <= mid_x)
+	check("▲▼ — на правой половине экрана",
+		b_up.position.x >= mid_x and b_down.position.x >= mid_x)
 
 	hud.free()
 	player.release_control()

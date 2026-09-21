@@ -303,14 +303,20 @@ static func drill_upgrade_rows() -> Array:
 		var status: String = "owned" if tier <= owned_tier \
 				else ("next" if tier == owned_tier + 1 else "locked")
 		var speed := Balance.get_drill_rig_speed_at_tier(tier)
+		var tier_id := Balance.get_drill_rig_tier_id(tier)
 		out.append({
-			"id": Balance.get_drill_rig_tier_id(tier),
+			"id": tier_id,
 			"tier": tier,
 			"name_ru": Balance.get_drill_rig_tier_name_ru(tier),
 			"price_coins": Balance.get_drill_rig_tier_cost_coins(tier),
 			"speed_multiplier": speed,
 			"desc_ru": "копка ×%s" % mult_text(speed),
 			"status": status,
+			# Перекрашенная иконка бура под ступень (tools/rig_drill_recolor.py
+			# кладёт art/items/drill_rig_icon_<id>.png рядом с базовой) — тот же
+			# приём, что у _make_buy_row: art может не быть, ResourceLoader.exists
+			# в шопе решает, показывать её или нет.
+			"icon": "res://art/items/drill_rig_icon_%s.png" % tier_id,
 		})
 	return out
 

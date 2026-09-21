@@ -738,6 +738,17 @@ func _make_drill_upgrade_row(row: Dictionary) -> Control:
 	var status := String(row["status"])
 	var box := HBoxContainer.new()
 
+	# Та же иконка-опционально, что у _make_buy_row: перекрашенный бур по
+	# ступени (см. ShopCatalog.drill_upgrade_rows), если художник её положил.
+	var icon_path := String(row.get("icon", ""))
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(16, 16)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = load(icon_path)
+		box.add_child(icon)
+
 	var label_text := "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
 	if status == "locked":
 		# Название нужной более ранней ступени — то же самое "сначала

@@ -63,6 +63,7 @@ var _stamina_fill: ColorRect
 var _coins_label: Label
 var _dollars_label: Label
 var _load_label: Label
+var _clock_label: Label
 var _depth_box: Control
 var _depth_label: Label
 var _toast_panel: Panel
@@ -342,6 +343,18 @@ func _build_purse(parent: Control) -> void:
 	box.offset_top = 8
 	box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	parent.add_child(box)
+
+	# Часы (решение владельца, отчёт агента про "время не течёт во дворе"):
+	# DayCycle.hour и раньше честно тикал на поверхности, но нигде не
+	# показывался — единственные часы в игре висели в доме (house_view.gd:
+	# _clock), и без них игрок не мог заметить, что время вообще идёт,
+	# только по медленному ходу неба. Формат и источник — ровно те же, что у
+	# домашних часов: "День N, ЧЧ:ММ" от /root/DayCycle.
+	_clock_label = Label.new()
+	_clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_clock_label.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	_clock_label.add_theme_font_size_override("font_size", 9)
+	box.add_child(_clock_label)
 
 	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B), "res://art/ui/icon_coin.png")
 	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B), "res://art/ui/icon_dollar.png")
@@ -1393,6 +1406,7 @@ func _process(_dt: float) -> void:
 		_stick.queue_redraw()
 		_knob.queue_redraw()
 		_update_depth()
+	_update_clock()
 
 
 func _connect_game_state() -> void:
@@ -1446,6 +1460,20 @@ func _sync_hero_button() -> void:
 	_hero_plus.visible = has_points
 	_hero_button.add_theme_color_override("font_color",
 		Color8(0xE0, 0xA9, 0x3B) if has_points else Color8(0x9D, 0x8B, 0x73))
+
+
+## Единственный источник правды о часе — DayCycle (см. scripts/core/
+## day_cycle.gd и house_view.gd:_refresh_header, тот же формат и тот же
+## узел — часы снаружи и в доме обязаны показывать одно и то же время).
+func _update_clock() -> void:
+	if _clock_label == null:
+		return
+	var day_cycle := get_node_or_null("/root/DayCycle")
+	var day: int = day_cycle.day if day_cycle != null else 1
+	var hour_f: float = day_cycle.hour if day_cycle != null else 6.0
+	var hour := int(hour_f)
+	var minute := int((hour_f - floor(hour_f)) * 60.0)
+	_clock_label.text = "День %d, %02d:%02d" % [day, hour, minute]
 
 
 func _sync_purse() -> void:

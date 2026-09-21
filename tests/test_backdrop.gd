@@ -26,6 +26,10 @@ func _ready() -> void:
 	_check_textures()
 	_check_era()
 	_check_parallax()
+	# Await ОБЯЗАТЕЛЕН: функция ниже сама ждёт кадр движка (см. её тело) —
+	# без await она бы отпустилась "в фоне" и _ready() допечатал бы "Итог"
+	# раньше её проверок (тот же капкан, что описан в tests/test_day_cycle.gd).
+	await _check_sky_and_clouds_geometry()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
@@ -128,3 +132,57 @@ func _live_backdrop() -> Backdrop:
 	if main == null:
 		return null
 	return main.get("backdrop") as Backdrop
+
+
+## Небо (SkyView._celestial) и облака (CloudsView) — задание владельца:
+## "ширина неба на 10% шире горы, на 10% меньше параллакс, чем гора";
+## "облака — ширина на 10% уже горы, параллакс на 10% больше, чем у горы";
+## небо ЗАКРЕПЛЕНО по высоте, как гора (полная компенсация Y), облака — нет
+## (см. шапки scripts/world/sky_view.gd и scripts/world/clouds_view.gd).
+func _check_sky_and_clouds_geometry() -> void:
+	check("ширина неба = 1.1 × ширина горы",
+		absf(SkyView.SKY_W_LOGICAL - Backdrop.MOUNTAIN_W_LOGICAL * 1.1) < 0.01)
+	check("параллакс неба = 0.9 × параллакс горы",
+		absf(SkyView.SKY_PARALLAX_X - Backdrop.MOUNTAIN_PARALLAX_X * 0.9) < 0.0001)
+	check("ширина облаков = 0.9 × ширина горы",
+		absf(CloudsView.CLOUDS_W_LOGICAL - Backdrop.MOUNTAIN_W_LOGICAL * 0.9) < 0.01)
+	check("параллакс облаков = 1.1 × параллакс горы",
+		absf(CloudsView.CLOUDS_PARALLAX_X - Backdrop.MOUNTAIN_PARALLAX_X * 1.1) < 0.0001)
+	check("небо едет медленнее горы, облака — быстрее (0 < небо < гора < облака < 1)",
+		0.0 < SkyView.SKY_PARALLAX_X and SkyView.SKY_PARALLAX_X < Backdrop.MOUNTAIN_PARALLAX_X
+		and Backdrop.MOUNTAIN_PARALLAX_X < CloudsView.CLOUDS_PARALLAX_X and CloudsView.CLOUDS_PARALLAX_X < 1.0)
+
+	var sky := preload("res://scripts/world/sky_view.gd").new()
+	add_child(sky)
+	await get_tree().process_frame
+	var celestial: Node2D = sky.get("_celestial")
+	check("у SkyView есть слой _celestial (солнце/месяц/звёзды)", celestial != null)
+	if celestial != null:
+		sky.set_camera(Vector2(0, 0), 7)
+		var y0: float = celestial.position.y
+		var x0: float = celestial.position.x
+		# Сдвиг камеры и по X, и по Y — как гора, небо гасит Y ПОЛНОСТЬЮ
+		# (слой не едет по вертикали) и X — c долей SKY_PARALLAX_X.
+		sky.set_camera(Vector2(10.0, -6.5), 7)
+		var moved_x: float = celestial.position.x - x0
+		var expected_x: float = (1.0 - SkyView.SKY_PARALLAX_X) * 10.0 * Backdrop.TILE
+		check("небо (_celestial) X компенсирует сдвиг камеры на (1-k)*Δ (движение=%.1f, ожидание=%.1f)" %
+			[moved_x, expected_x], absf(moved_x - expected_x) < 0.5)
+		check("небо (_celestial) Y гасит сдвиг камеры ПОЛНОСТЬЮ (закреплена по высоте, как гора)",
+			absf(celestial.position.y - (-6.5) * Backdrop.TILE) < 0.01 and absf(y0) < 0.01)
+	sky.queue_free()
+
+	var clouds := preload("res://scripts/world/clouds_view.gd").new()
+	add_child(clouds)
+	await get_tree().process_frame
+	clouds.update(Vector2(0, 0))
+	var cx0: float = clouds.position.x
+	var cy0: float = clouds.position.y
+	clouds.update(Vector2(10.0, -6.5))
+	var moved_cx: float = clouds.position.x - cx0
+	var expected_cx: float = (1.0 - CloudsView.CLOUDS_PARALLAX_X) * 10.0 * Backdrop.TILE
+	check("облака X компенсируют сдвиг камеры на (1-k)*Δ (движение=%.1f, ожидание=%.1f)" %
+		[moved_cx, expected_cx], absf(moved_cx - expected_cx) < 0.5)
+	check("облака НЕ закреплены по высоте (Y-позиция слоя не меняется вслед за камерой)",
+		absf(clouds.position.y - cy0) < 0.01 and absf(clouds.position.y) < 0.01)
+	clouds.queue_free()

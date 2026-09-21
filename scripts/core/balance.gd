@@ -340,16 +340,24 @@ func get_overload_speed_multiplier(load_kg: float, max_kg: float) -> float:
 ## только скорость удара — height там не отслеживается для полёта.
 ## gravity — текущее G мира (физическая константа, см. player.gd), передаётся
 ## аргументом, а не хранится здесь: G — это ощущение движения, а не баланс.
-func get_fall_damage_from_speed(speed_cells_per_sec: float, gravity: float) -> float:
+##
+## dmg_mult/height_mult — множители бурмобиля (см. get_drill_rig_fall_damage_mult/
+## get_drill_rig_fall_damage_height_mult): по умолчанию 1.0 (пеший герой/ранец/
+## джетпак — старая формула буквально, ничего не меняется). height_mult растит
+## ПОРОГ ВЫСОТЫ (min_height_cells) ДО перевода в безопасную скорость — тройной
+## порог высоты даёт безопасную скорость sqrt(3)× больше, не втрое (падение
+## по свободному падению: v = sqrt(2*g*h), h кубу не пропорциональна v).
+func get_fall_damage_from_speed(speed_cells_per_sec: float, gravity: float,
+		dmg_mult: float = 1.0, height_mult: float = 1.0) -> float:
 	var fd: Dictionary = balance.get("fall_damage", {})
 	var coeff: float = float(_v(fd.get("coefficient", 0.154)))
 	var exponent: float = float(_v(fd.get("exponent", 2.16)))
-	var min_height: float = float(_v(fd.get("min_height_cells", 5)))
+	var min_height: float = float(_v(fd.get("min_height_cells", 5))) * height_mult
 	var safe_speed: float = sqrt(2.0 * gravity * min_height)
 	if speed_cells_per_sec < safe_speed:
 		return 0.0
 	var k: float = coeff / pow(2.0 * gravity, exponent)
-	return k * pow(speed_cells_per_sec, exponent * 2.0)
+	return k * pow(speed_cells_per_sec, exponent * 2.0) * dmg_mult
 
 
 ## Урон от падения: 0.154 * height^2.16, ниже min_height урона нет.
@@ -647,6 +655,45 @@ func get_gear_icon(id: String) -> String:
 ## -> fuel_consumption.blocks_per_cell.drill_rig, proposed).
 func get_drill_rig_fuel_per_cell() -> float:
 	return float(_v(balance.get("fuel_consumption", {}).get("blocks_per_cell", {}).get("drill_rig", 0.1)))
+
+
+# ---------------------------------------------------------------------------
+# Бурмобиль: грузоподъёмность и физика прыжка/полёта (задача «Прыжок и полёт
+# бурмобиля», числа даны владельцем дословно — proposed: false).
+# ---------------------------------------------------------------------------
+
+## Бонус к МАКСИМАЛЬНОЙ переносимой массе, пока бурмобиль надет ("носимый вес
+## увеличивается на 200 кг, вдобавок к собственному" — решение владельца).
+## Это лимит грузоподъёмности (GameState.get_max_carry_kg()), а НЕ вес самой
+## машины в инвентаре — она в инвентарь не кладётся и там ничего не весит.
+func get_drill_rig_capacity_bonus_kg() -> float:
+	return float(_v(balance.get("tools", {}).get("drill_rig", {}).get("capacity_bonus_kg", 200.0)))
+
+
+## Множитель предела скорости падения (V_TERM в player.gd), пока бурмобиль
+## надет — решение владельца: "скорость падения в бурмобиле на 30% быстрее".
+func get_drill_rig_fall_speed_mult() -> float:
+	return float(_v(balance.get("tools", {}).get("drill_rig", {}).get("fall_speed_mult", 1.3)))
+
+
+## Множитель потолка скорости подъёма на тяге, пока бурмобиль надет —
+## решение владельца: "полёт на 30% быстрее".
+func get_drill_rig_flight_speed_mult() -> float:
+	return float(_v(balance.get("tools", {}).get("drill_rig", {}).get("flight_speed_mult", 1.3)))
+
+
+## Множитель урона от падения, пока бурмобиль надет — решение владельца:
+## "урон от падения на 50% меньше" (см. get_fall_damage_from_speed).
+func get_drill_rig_fall_damage_mult() -> float:
+	return float(_v(balance.get("tools", {}).get("drill_rig", {}).get("fall_damage_mult", 0.5)))
+
+
+## Множитель порога высоты (min_height_cells в fall_damage), с которой падение
+## вообще начинает наносить урон, пока бурмобиль надет — решение владельца:
+## "высота, с которой он получает урон, в 3 раза выше" (см.
+## get_fall_damage_from_speed).
+func get_drill_rig_fall_damage_height_mult() -> float:
+	return float(_v(balance.get("tools", {}).get("drill_rig", {}).get("fall_damage_height_mult", 3.0)))
 
 
 ## Время бурения клетки минерала id базовым инструментом (drill_seconds из

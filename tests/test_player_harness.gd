@@ -50,6 +50,8 @@ func _ready() -> void:
 	_test_rig_parked_survives_save_load()
 	_test_rig_fuel_consumption_accumulator()
 	_test_rig_stalls_digging_without_fuel()
+	_test_teleport_home_while_in_rig_parks_it()
+	_test_teleport_home_on_foot_does_not_touch_parked_rig()
 
 	# --- задача «Скругление углов / огород под домом» (правила A и B) ---
 	_test_corner_rounding_horizontal_step()
@@ -906,6 +908,72 @@ func _test_rig_stalls_digging_without_fuel() -> void:
 		warnings.size() == 1)
 
 	GameState.reset_progress()
+
+
+## Баг агента: телепорт домой (смерть, «часы-телепорт», отладочная кнопка
+## «Дом») мог застать героя за рулём бурмобиля под землёй. teleport_home()
+## не парковал машину (GameState.rig_parked_at оставался (-1,-1) — в отличие
+## от обычного выезда на поверхность, _start_rig_exit/_finish_rig_transition,
+## которые паркуют её у устья тоннеля). Стоило игроку после такого телепорта
+## надеть в мастерской другой инструмент (это разрешено — house_is_indoors
+## снимает блокировку «бурмобиль под землёй не бросить»), и бурмобиль терялся
+## НАВСЕГДА: сесть в него обратно можно только кнопкой «В бурмобиль» у
+## ПРИПАРКОВАННОЙ машины (HouseSystem.near_parked_rig() требует
+## GameState.is_rig_parked()), а другого пути снова получить current_tool ==
+## "drill_rig" в игре нет — купленная за 10000 монет и материалы техника
+## пропадала бесследно. Фикс: teleport_home() паркует машину и переключает
+## инструмент, ровно как обычный выезд.
+func _test_teleport_home_while_in_rig_parks_it() -> void:
+	var w := _setup_rig_world()
+	GameState.owned_tools = ["shovel", "iron_pickaxe", "drill_rig"]
+	GameState.current_tool = "drill_rig"
+	GameState.rig_parked_at = Vector2i(-1, -1)  # застигнут под землёй, не у выезда
+	player.x = float(w.tunnel_mouth().x) + 0.5
+	player.y = 42.0  # глубоко под землёй
+	player.vx = 0.0; player.vy = 0.0
+	player.digging = {"x": w.tunnel_mouth().x, "y": 42, "t": 0.0, "total": 1.0, "type": TileTypes.Type.DIRT}
+	player.thrust = "prop"
+
+	player.teleport_home()
+
+	check("бурмобиль запаркован после телепорта (не потерян)", GameState.is_rig_parked())
+	check("запаркован на поверхности, у устья тоннеля",
+		GameState.rig_parked_at == Vector2i(WorldGen.TUNNEL_X + 1, 0))
+	check("инструмент переключился на лучший в собственности (кирку, не бурмобиль)",
+		GameState.current_tool == "iron_pickaxe")
+	check("герой больше не «за рулём»", not player.is_in_rig())
+	check("герой физически дома", player.x == player.HOME_X and player.y == 0.5)
+	check("копка отменена", player.digging == null)
+	check("тяга снята", player.thrust == "")
+
+	# Раз машина снова запаркована — посадка обратно в неё должна работать
+	# (это и есть сама гарантия «не потерян навсегда», а не только флаг).
+	GameState.add_item("fuel_block", 1)
+	player.x = float(GameState.rig_parked_at.x) + 0.5
+	player.y = 0.5
+	var boarded: bool = player.start_rig_boarding()
+	check("после фикса машину можно снова оседлать", boarded)
+
+	_teardown_rig_world(w)
+
+
+## Телепорт домой ПЕШКОМ (не за рулём) не должен трогать парковку бурмобиля —
+## бурмобиль без машины под рукой телепорт не касается вовсе.
+func _test_teleport_home_on_foot_does_not_touch_parked_rig() -> void:
+	var w := _setup_rig_world()
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.current_tool = "shovel"
+	GameState.rig_parked_at = Vector2i(w.tunnel_mouth().x + 1, 0)  # уже стоит на месте
+	player.x = float(w.tunnel_mouth().x) + 0.5
+	player.y = 3.0
+
+	player.teleport_home()
+
+	check("пеший телепорт не трогает инструмент", GameState.current_tool == "shovel")
+	check("пеший телепорт не трогает парковку бурмобиля",
+		GameState.rig_parked_at == Vector2i(w.tunnel_mouth().x + 1, 0))
+
+	_teardown_rig_world(w)
 
 
 # ---------------------------------------------------------------------------

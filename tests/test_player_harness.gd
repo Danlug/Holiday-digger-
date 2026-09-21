@@ -1129,11 +1129,12 @@ func _test_house_never_diggable_by_any_tool() -> void:
 
 func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
 	# seed не важен — геометрия лестницы приходит из world_layers.json, не из
-	# сида. С разворотом лестницы (отчёт агента, баг владельца "не копается
-	# даже справа от лестницы") самый широкий её уровень — ПЕРВЫЙ, прямо на
-	# поверхности: x=15..18 на y=1 теперь сама лестница (видна игроку целиком
-	# ещё до первой попытки копать), а не гейт по типу клетки. x=19 —
-	# гарантированно DIRT и вне запертой полосы при любом гейте.
+	# сида. Широкий конец лестницы — ВНИЗУ (владелец, 2026-09-21: «ты зря
+	# развернул, я не могу вылезти» — с широким верхом сплошная порода
+	# перекрывала весь проход разом и герой не мог подняться): на y=1 сама
+	# лестница — только x=15, а x=16 на y=1 — обычная земля, запертая ГЕЙТОМ
+	# (is_pre_autodig_locked_cell), а не структурой. x=19 — гарантированно
+	# DIRT и вне запертой полосы при любом гейте.
 	var w := WorldGen.new(90005)
 	player.world = w
 	w.lock_pre_autodig_garden()
@@ -1166,10 +1167,10 @@ func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
 		w.get_tile(19, 1) == TileTypes.Type.EMPTY)
 
 	# сценарий со скоростной копкой запустился — гейт снят (единая точка,
-	# см. AutoDigTutorial.begin). (16,1) при этом остаётся запертым: после
-	# разворота это уже не "гейт держит обычную землю", а сама нерушимая
-	# лестница (структура, ГДД) — снятие гейта её не открывает, и это
-	# правильно: лестница — постоянный ориентир у дома, а не временный забор.
+	# см. AutoDigTutorial.begin). (16,1) была заперта только гейтом (обычная
+	# земля) — теперь копается. (15,1) — сама нерушимая лестница (структура,
+	# ГДД): снятие гейта её не открывает, и это правильно — лестница
+	# постоянный ориентир у дома, а не временный забор.
 	w.unlock_pre_autodig_garden()
 	player.hold_down = false
 	player.x = 16.5; player.y = 0.5
@@ -1178,8 +1179,18 @@ func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
 	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
 	player.digging = null
 	_tick(300)
-	check("после снятия гейта (16,1) по-прежнему не копается — это лестница, не гейт",
-		w.get_tile(16, 1) != TileTypes.Type.EMPTY)
+	check("после снятия гейта (16,1) копается — это была обычная земля, не лестница",
+		w.get_tile(16, 1) == TileTypes.Type.EMPTY)
+
+	player.hold_down = false
+	player.x = 15.5; player.y = 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+	_tick(300)
+	check("после снятия гейта (15,1) по-прежнему не копается — это лестница, не гейт",
+		w.get_tile(15, 1) != TileTypes.Type.EMPTY)
 
 	player.hold_down = false
 	player.world = world

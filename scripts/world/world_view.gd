@@ -43,7 +43,6 @@ const COLOR_GROUND := Color8(0x3E, 0x5A, 0x2E)
 const COLOR_FOG_BLACK := Color8(0x08, 0x06, 0x05)
 const COLOR_GRAY_SOLID := Color8(0x2C, 0x24, 0x1B)
 const COLOR_GRAY_EMPTY := Color8(0x10, 0x0D, 0x0A)
-const COLOR_STAIRCASE := Color8(0x6B, 0x5B, 0x45)
 const COLOR_FALLBACK_SOLID := Color8(0x4A, 0x3A, 0x2A)
 const COLOR_FALLBACK_EMPTY := Color8(0x0F, 0x0C, 0x09)
 
@@ -209,9 +208,6 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 		return
 
 	# FULL — ресурс виден
-	if type == TileTypes.Type.STAIRCASE:
-		_set_color(s, COLOR_STAIRCASE)
-		return
 	var tex := TileArt.texture_for(type, wx, wy)
 	if tex != null:
 		_set_texture(s, tex)

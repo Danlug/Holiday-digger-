@@ -16,6 +16,10 @@ static var _tile_to_file: Dictionary = {
 	# тем же тайлом: отдельная графика не нужна, а общий вид как раз читается
 	# правильно — «продолжение фундамента вверх».
 	TileTypes.Type.REINFORCED: "foundation",
+	# Нерушимая лестница у дома — тот же приём (владелец, 2026-09-21: «она
+	# должна быть сделана из текстуры фундамента»): своей графики нет, и не
+	# нужно — читается как та же несокрушимая порода.
+	TileTypes.Type.STAIRCASE: "foundation",
 	TileTypes.Type.SCRAP_METAL: "ore_scrap",
 	TileTypes.Type.IRON_ORE: "ore_iron",
 	TileTypes.Type.LEAD_ORE: "ore_lead",

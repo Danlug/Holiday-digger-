@@ -129,6 +129,11 @@ var _drop_slider: HSlider
 var _drop_field: LineEdit
 var _drop_id: String = ""
 var _drop_max: int = 0
+## Тестовая панель отладки (scripts/ui/debug_panel.gd) — НЕ для релиза
+## игрокам, см. её собственный файл. Живёт отдельным классом, а не куском
+## кода здесь, — не завязана на раскладку остального HUD, добавляется в
+## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего.
+var _debug_panel: DebugPanel
 
 
 func _ready() -> void:
@@ -193,6 +198,7 @@ func _build_ui() -> void:
 	_build_arrows(stage)
 	_build_inventory_sheet(stage)
 	_build_strip()
+	_build_debug_panel()
 
 
 ## Левый верхний угол сверху вниз: уровень и опыт, три полоски выживания,
@@ -949,6 +955,18 @@ func _build_strip() -> void:
 			(item as Button).pressed.connect(close_more_menu)
 
 	_set_mode("stick")
+
+
+## Тестовая панель отладки (scripts/ui/debug_panel.gd) — добавляется в HUD
+## САМОЙ ПОСЛЕДНЕЙ (после основной нижней полосы), поэтому её триггер рисуется
+## и кликается поверх всего остального. Не в общей нижней полосе (задание
+## владельца: там уже инструмент/«•••»/топливо, и рядом другой агент двигает
+## стрелки по бокам) — свой маленький триггер «Тест» стоит НАД полосой слева,
+## зеркально «•••» справа, и раскрывается вверх, не занимая места, пока закрыт.
+func _build_debug_panel() -> void:
+	_debug_panel = DebugPanel.new()
+	_debug_panel.name = "DebugPanel"
+	add_child(_debug_panel)
 
 
 ## Меню «⋯»: то, что нужно на поверхности, а не в шахте.

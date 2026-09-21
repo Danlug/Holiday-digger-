@@ -184,6 +184,12 @@ func set_hunger(value: float) -> void:
 func take_damage(amount: float, _source: String = "") -> void:
 	if not is_alive or amount <= 0.0:
 		return
+	# Отладочный тумблер «Бессмертие» (debug_panel.gd): урон игнорируется
+	# целиком, HP не восстанавливается принудительно — единственная точка,
+	# где HP вообще снижается (падение, голод и всё будущее туда же), так что
+	# гейт здесь перекрывает все источники разом.
+	if debug_invincible:
+		return
 	hp = clamp(hp - amount, 0.0, get_max_hp())
 	hp_changed.emit(hp, get_max_hp())
 	if hp <= 0.0:
@@ -363,6 +369,12 @@ func add_coins(amount: int) -> void:
 
 
 func spend_coins(amount: int) -> bool:
+	# Отладочный тумблер «Бесплатно» (debug_panel.gd): единственная точка
+	# списания монет во всей игре (крафт, кирки/ранцы, лавка, еда — см.
+	# scripts/shop/shop_service.gd и scripts/house/house_food.gd), поэтому
+	# гейт здесь разом обнуляет цену в обоих магазинах.
+	if debug_free_shop:
+		return true
 	if amount <= 0 or coins < amount:
 		return false
 	coins -= amount
@@ -378,6 +390,10 @@ func add_dollars(amount: int) -> void:
 
 
 func spend_dollars(amount: int) -> bool:
+	# См. комментарий в spend_coins() — тот же тумблер, та же единственная
+	# точка списания, только для премиум-лавки за доллары.
+	if debug_free_shop:
+		return true
 	if amount <= 0 or dollars < amount:
 		return false
 	dollars -= amount
@@ -915,6 +931,27 @@ func reset_economy() -> void:
 var story_flags: Dictionary = {}   # id флага -> true
 var story_seen: Array = []         # id уже показанных катсцен
 var story_queue: Array = []        # id сцен, которые ждут показа
+
+# ---------------------------------------------------------------------------
+# --- отладочная тестовая панель (scripts/ui/debug_panel.gd) ---
+# Четыре тумблера тестировщика — НЕ для релиза игрокам. Нарочно НЕ сохраняются
+# в user://save.json (см. save_system.gd — этот блок там не упомянут) и
+# нарочно НЕ трогаются в reset_progress(): это не игровой прогресс, а
+# переключатели отладки, и они обязаны сбрасываться в false при каждом
+# перезапуске процесса, а не при нажатии кнопки «Сброс» в игре. Обычная игра
+# не отличается от текущей, пока эти поля не тронуты руками (default false).
+# ---------------------------------------------------------------------------
+
+## Время копки любой клетки — 0 (см. player.gd:_start_dig).
+var debug_instant_dig: bool = false
+## Урон (GameState.take_damage) не применяется; HP не подскакивает сам.
+var debug_invincible: bool = false
+## Подъём/падение всегда ровно 300 клеток/с (см. player.gd:_move_y) — пешком,
+## с ранцем/джетпаком и в бурмобиле одинаково.
+var debug_fly_300: bool = false
+## Покупки в обоих магазинах (за монеты и за доллары) ничего не списывают
+## (см. spend_coins/spend_dollars ниже).
+var debug_free_shop: bool = false
 
 ## Эпоха живого мира: "now" (внук, обычная игра) или "grandpa" (интро деда
 ## играет НА ЖИВОЙ КАРТЕ, см. scripts/story/cutscene_player.gd, режим

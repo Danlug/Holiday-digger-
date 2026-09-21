@@ -12,7 +12,8 @@ const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	"mood", "wait", "fade", "item", "tap", "move", "shake", "daynight", "grow",
 	# Режим "мир" (см. scripts/story/cutscene_player.gd:world_mode) — сцена
 	# играет на живой карте, эти кадры двигают/копают WorldActor'а по-настоящему.
-	"world_actor", "world_walk", "world_dig", "world_dig_row", "world_fall", "clock"]
+	"world_actor", "world_walk", "world_dig", "world_dig_row", "world_fall", "clock",
+	"world_prop", "world_enter"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
 	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
@@ -141,6 +142,9 @@ func _test_art_present() -> void:
 					var wa_path := StoryData.actor_sheet_path(wa_id, wa_pose)
 					if not wa_path.is_empty():
 						check("%s: есть лист %s" % [id, wa_path], ResourceLoader.exists(wa_path))
+				"world_prop":
+					var wp_tex := String(beat.get("tex", ""))
+					check("%s: есть картинка %s" % [id, wp_tex], ResourceLoader.exists(wp_tex))
 
 
 ## Флаги, по которым другие системы (дом, магазин, игрок) узнают о сюжете,

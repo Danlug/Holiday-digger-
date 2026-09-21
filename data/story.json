@@ -425,11 +425,8 @@
 					"sec": 1.2
 				},
 				{
-					"t": "clear"
-				},
-				{
-					"t": "mood",
-					"id": "dark"
+					"t": "hide",
+					"actor": "grandpa"
 				},
 				{
 					"t": "card",
@@ -437,24 +434,30 @@
 					"sec": 4.0
 				},
 				{
-					"t": "mood",
-					"id": "dusk"
+					"t": "clock",
+					"hour": 19.5
+				},
+				{
+					"t": "world_prop",
+					"id": "grave",
+					"tex": "res://art/env/grave.png",
+					"x": 4.0,
+					"y": 0.5,
+					"scale": 2.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 5.6,
+					"y": 0.5,
+					"pose": "idle",
+					"flip": true,
+					"camera": true
 				},
 				{
 					"t": "fade",
 					"dir": "in",
 					"sec": 0.8
-				},
-				{
-					"t": "prop",
-					"id": "grave",
-					"at": "center"
-				},
-				{
-					"t": "show",
-					"actor": "grandma_poor",
-					"at": "left",
-					"pose": "idle"
 				},
 				{
 					"t": "say",
@@ -469,6 +472,9 @@
 					"t": "fade",
 					"dir": "out",
 					"sec": 0.9
+				},
+				{
+					"t": "clear"
 				}
 			],
 			"effects": [
@@ -566,40 +572,28 @@
 					"sec": 2.2
 				},
 				{
-					"t": "mood",
-					"id": "day"
+					"t": "world_enter",
+					"era": "now"
 				},
 				{
-					"t": "prop",
-					"id": "house_rich",
-					"at": "center"
-				},
-				{
-					"t": "prop",
-					"id": "fence",
-					"at": "far_left"
+					"t": "world_actor",
+					"actor": "boy",
+					"x": 10.5,
+					"y": 0.5,
+					"pose": "walk",
+					"camera": true
 				},
 				{
 					"t": "fade",
 					"dir": "in",
-					"sec": 0.8
+					"sec": 0.7
 				},
 				{
-					"t": "show",
+					"t": "world_walk",
 					"actor": "boy",
-					"at": "left",
-					"pose": "walk",
-					"enter": "far_left"
-				},
-				{
-					"t": "wait",
-					"sec": 0.6
-				},
-				{
-					"t": "show",
-					"actor": "boy",
-					"at": "left",
-					"pose": "idle"
+					"x": 13.5,
+					"sec": 1.4,
+					"arrive_pose": "idle"
 				},
 				{
 					"t": "narr",
@@ -611,23 +605,19 @@
 					"text": "intro_boy.s3"
 				},
 				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "grandma_rich",
-					"at": "right",
+					"x": 17.5,
+					"y": 0.5,
 					"pose": "walk",
-					"flip": true,
-					"enter": "far_right"
-				},
-				{
-					"t": "wait",
-					"sec": 0.6
-				},
-				{
-					"t": "show",
-					"actor": "grandma_rich",
-					"at": "right",
-					"pose": "idle",
 					"flip": true
+				},
+				{
+					"t": "world_walk",
+					"actor": "grandma_rich",
+					"x": 14.5,
+					"sec": 1.4,
+					"arrive_pose": "idle"
 				},
 				{
 					"t": "say",
@@ -655,21 +645,18 @@
 					"text": "intro_boy.g3"
 				},
 				{
-					"t": "mood",
-					"id": "night"
+					"t": "world_walk",
+					"actor": "grandma_rich",
+					"x": 17.5,
+					"sec": 1.2
 				},
 				{
 					"t": "hide",
-					"actor": "grandma_rich",
-					"exit_to": "far_right"
+					"actor": "grandma_rich"
 				},
 				{
 					"t": "narr",
 					"text": "intro_boy.n4"
-				},
-				{
-					"t": "mood",
-					"id": "day"
 				},
 				{
 					"t": "card",
@@ -677,11 +664,19 @@
 					"sec": 2.6
 				},
 				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "grandma_rich",
-					"at": "right",
+					"x": 17.5,
+					"y": 0.5,
 					"pose": "walk",
 					"flip": true
+				},
+				{
+					"t": "world_walk",
+					"actor": "grandma_rich",
+					"x": 14.5,
+					"sec": 1.2,
+					"arrive_pose": "idle"
 				},
 				{
 					"t": "say",
@@ -987,41 +982,40 @@
 					"sec": 2.0
 				},
 				{
-					"t": "mood",
-					"id": "underground"
+					"t": "world_enter",
+					"era": "now"
 				},
 				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "boy",
-					"at": "center",
-					"pose": "dig_pick_rusty"
+					"pose": "dig_pick_rusty",
+					"camera": true
 				},
 				{
 					"t": "narr",
 					"text": "death.n1"
 				},
 				{
-					"t": "move",
+					"t": "world_dig",
 					"actor": "boy",
-					"dy": 18,
-					"sec": 0.8
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
 				},
 				{
-					"t": "move",
+					"t": "world_dig",
 					"actor": "boy",
-					"dy": 18,
-					"sec": 0.8
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
 				},
 				{
-					"t": "move",
+					"t": "world_dig",
 					"actor": "boy",
-					"dy": 18,
-					"sec": 0.8
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
 				},
 				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "boy",
-					"at": "center",
 					"pose": "idle"
 				},
 				{
@@ -1030,9 +1024,8 @@
 					"text": "death.s1"
 				},
 				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "boy",
-					"at": "center",
 					"pose": "fall"
 				},
 				{
@@ -1053,9 +1046,8 @@
 					"sec": 0.65
 				},
 				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "boy",
-					"at": "center",
 					"pose": "sleep"
 				},
 				{

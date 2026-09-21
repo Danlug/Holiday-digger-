@@ -34,6 +34,7 @@ const BOX_H := 108.0           # высота реплики: шесть стр�
 ## оставался неподвижным огрызком тела вместо дыхания/шага/замаха, и ровно
 ## это владелец увидел как "анимации сценариев отсутствуют".
 const ART_SCALE := 3.0
+const TILE := 32.0     # клетка мира в логических px — см. player.gd/world_actor.gd
 const CHAR_FRAME := int(48 * ART_SCALE)
 const TYPE_CHARS_PER_SEC := 42.0
 const ANIM_FPS := 7.0
@@ -122,6 +123,11 @@ var _slides: Array = []   # {"actor":id, "left":sec, "total":sec, "from_dx":floa
 # Режим "мир" (world_mode) — актёры и копка на живой карте, см. заголовок.
 # ---------------------------------------------------------------------------
 var _world_actors: Dictionary = {}   # actor_id -> WorldActor
+## Статичные предметы на живой карте (могила и подобное) — тот же приём, что
+## world_actor, но проще: один спрайт без поз/кадров/разворота (владелец,
+## 2026-09-21: "она хоронит его на реальной карте слева от лачуги" — могиле
+## не нужна анимация, только положение в клетках).
+var _world_props: Dictionary = {}    # prop_id -> Sprite2D
 var _world_dug_cells: Array = []     # [Vector2i, ...] — что реально выкопали за сцену
 var _camera_actor_id: String = ""    # чей x/y зеркалится в player.x/y (камера/туман идут за героем)
 var _world_walk: Dictionary = {}     # {"actor","from","to","left","total","arrive_pose"} или {}
@@ -456,7 +462,7 @@ func play(id: String, opts: Dictionary = {}) -> void:
 
 	_layout()
 	if bool(opts.get("world", false)):
-		_enter_world_mode()
+		_enter_world_mode(String(scene_data.get("era", "now")))
 	_advance()
 
 
@@ -668,8 +674,22 @@ func _run_beat(beat: Dictionary) -> bool:
 		"grow":
 			_start_grow(beat)
 			return true
+		"world_enter":
+			# Вход в режим "мир" ПОСЕРЕДИНЕ сцены, а не только в её самом начале
+			# (см. play(): там это делает opts.world до первого кадра) — сцены,
+			# у которых часть моментов иллюстрированная (спальня, символический
+			# реквизит), а часть — на настоящей карте (владелец, 2026-09-21:
+			# "пусть все сюжетные моменты будут делаться на реальном фоне").
+			# Симметричный выход — обычный "clear" (см. _clear_stage): он и так
+			# гасит world_mode, если тот включён, независимо от того, как
+			# именно сцена в него вошла.
+			_enter_world_mode(String(beat.get("era", "now")))
+			return false
 		"world_actor":
 			_world_place_actor(beat)
+			return false
+		"world_prop":
+			_world_place_prop(beat)
 			return false
 		"world_walk":
 			return _world_start_walk(beat)
@@ -1153,16 +1173,26 @@ const WORLD_DIG_SEC := 1.4
 const WORLD_DIG_ROW_SEC := 2.4
 
 
-func _enter_world_mode() -> void:
+## era — по умолчанию "now": большинство сцен режима "мир" (владелец,
+## 2026-09-21: "пусть все сюжетные моменты будут делаться на реальном
+## фоне") играют во времени ВНУКА, на карте как она есть прямо сейчас —
+## с уже построенным Робертом тоннелем, современным домом и т.д. "grandpa"
+## передаёт только флешбэк деда (intro_grandpa, данные scene.era в
+## data/story.json) — там своя эпоха с лачугой вместо дома и без тоннеля
+## (см. world_gen.gd:era). Раньше era была захардкожена в "grandpa" —
+## единственная на тот момент сцена режима "мир" её и требовала; с
+## появлением вторых сцен режима "мир" ("intro_boy", "death") хардкод стал
+## неверен для них.
+func _enter_world_mode(era: String = "now") -> void:
 	world_mode = true
 	# Небо/земля катсцены прячутся — живая карта показывается КАК ЕСТЬ, её
 	# рисует main.gd/world_view.gd под этим CanvasLayer, а не мы.
 	_sky.visible = false
 	_ground.visible = false
 	if world != null:
-		world.era = "grandpa"
-	GameState.era = "grandpa"
-	_set_backdrop_era("grandpa")
+		world.era = era
+	GameState.era = era
+	_set_backdrop_era(era)
 	# Герой игрока молчит и стоит замороженным во время ЛЮБОЙ катсцены (см.
 	# story_director._take_control), но его СПРАЙТ обычно скрыт под
 	# непрозрачными небом/землёй классической сцены. В режиме "мир" декорации
@@ -1193,6 +1223,9 @@ func _exit_world_mode() -> void:
 	for id in _world_actors.keys():
 		_world_actors[id].queue_free()
 	_world_actors.clear()
+	for id in _world_props.keys():
+		_world_props[id].queue_free()
+	_world_props.clear()
 	_world_dug_cells.clear()
 	_world_walk = {}
 	_world_dig = {}
@@ -1240,6 +1273,13 @@ func _world_place_actor(beat: Dictionary) -> void:
 	if a == null:
 		a = WorldActor.new()
 		a.setup(id)
+		# Без явных x/y в кадре — новый актёр встаёт там, где ПО-НАСТОЯЩЕМУ
+		# стоит игрок (тот же x/y, что вело обучение до заморозки — см.
+		# story_director._take_control): нужно для сцен вроде "death", где
+		# заранее неизвестно, в какой клетке огорода игрок пробьёт фундамент.
+		if not beat.has("x") and not beat.has("y") and player != null:
+			a.x = player.x
+			a.y = player.y
 		# Актёр обязан ехать вместе с камерой мира (тем же смещением
 		# view_root, что и WorldView/Player), а не поверх интерфейса —
 		# добавляем его в ViewRoot, а не в себя (CanvasLayer катсцены).
@@ -1256,6 +1296,41 @@ func _world_place_actor(beat: Dictionary) -> void:
 	a.set_pose(String(beat.get("pose", "idle")), bool(beat.get("flip", a.flip)))
 	if bool(beat.get("camera", false)):
 		_camera_actor_id = id
+
+
+## "world_prop" — поставить статичный предмет (могила и т.п.) в клетку живой
+## карты. beat: id, tex (res://...), x, y (низ картинки садится на клетку,
+## как у декора огорода), scale (множитель поверх ART_SCALE, по умолчанию 1).
+## Без поз/кадров/разворота — see _world_place_actor для актёров с анимацией.
+func _world_place_prop(beat: Dictionary) -> void:
+	var id := String(beat.get("id", ""))
+	if id.is_empty():
+		return
+	var spr: Sprite2D = _world_props.get(id)
+	if spr == null:
+		spr = Sprite2D.new()
+		spr.centered = false
+		var view_root := get_tree().root.find_child("ViewRoot", true, false)
+		if view_root != null:
+			view_root.add_child(spr)
+		else:
+			add_child(spr)
+		_world_props[id] = spr
+	var tex_path := String(beat.get("tex", ""))
+	if not tex_path.is_empty() and ResourceLoader.exists(tex_path):
+		spr.texture = load(tex_path)
+	var scale_mult: float = float(beat.get("scale", 1.0))
+	spr.scale = Vector2(scale_mult / ART_SCALE, scale_mult / ART_SCALE)
+	var x: float = float(beat.get("x", 0.0))
+	var y: float = float(beat.get("y", 0.0))
+	var w: float = spr.texture.get_width() if spr.texture != null else 0.0
+	var h: float = spr.texture.get_height() if spr.texture != null else 0.0
+	# Низ картинки — на клетку (x, y), по центру ширины: та же привязка, что
+	# у декора огорода (world_view.gd:_draw_garden_decor) и у припаркованного
+	# бурмобиля, — предмет "стоит" на клетке, а не растёт из её середины.
+	spr.position = Vector2(
+		x * TILE - w * scale_mult / ART_SCALE / 2.0,
+		y * TILE - h * scale_mult / ART_SCALE)
 
 
 ## "world_walk" — дойти до x за sec секунд (по умолчанию — по WORLD_WALK_SPEED
@@ -1284,7 +1359,13 @@ func _world_start_dig(beat: Dictionary) -> bool:
 	var a: WorldActor = _world_actors.get(id)
 	if a == null or world == null:
 		return false
-	var cell := Vector2i(int(beat.get("x", 0)), int(beat.get("y", 1)))
+	# Без явных x/y — копает клетку ПРЯМО ПОД собой (та же клетка-под-ногами,
+	# что "world_dig" всегда оставляет актёра стоять на дне: a.y=cell.y+0.5),
+	# чтобы можно было копать вниз серией кадров без знания стартовых
+	# координат заранее — см. "death" в data/story.json.
+	var default_x := int(round(a.x - 0.5))
+	var default_y := int(round(a.y - 0.5)) + 1
+	var cell := Vector2i(int(beat.get("x", default_x)), int(beat.get("y", default_y)))
 	var sec: float = maxf(0.1, float(beat.get("sec", WORLD_DIG_SEC)))
 	a.x = float(cell.x) + 0.5
 	a.y = float(cell.y) - 0.5

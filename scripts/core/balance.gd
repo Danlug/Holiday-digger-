@@ -513,9 +513,47 @@ func get_tool_speed_multiplier(id: String) -> float:
 		var factor := float(_v(get_tool("hand_drill").get("speed_vs_best_pickaxe", 2.0)))
 		return get_best_pickaxe_speed_multiplier() * factor
 	if id == "drill_rig":
-		var factor := float(_v(get_tool("drill_rig").get("speed_vs_hand_drill", 2.0)))
-		return get_tool_speed_multiplier("hand_drill") * factor
+		# Апгрейд бура (титан/платина/алмаз/обсидиан) — ДОПОЛНИТЕЛЬНЫЙ
+		# множитель СВЕРХУ базовой скорости бурмобиля, компаундится по
+		# ступеням (см. get_drill_rig_tier_multiplier и
+		# get_drill_rig_speed_at_tier — та же формула для гипотетического
+		# тира, нужна магазину, чтобы показать цену следующей ступени, не
+		# трогая текущий тир игрока).
+		return get_drill_rig_speed_at_tier(_current_drill_rig_tier())
 	return float(_v(get_tool(id).get("speed_multiplier", 1.0)))
+
+
+## Текущая ступень апгрейда бура игрока — GameState.drill_rig_tier, но БЕЗ
+## жёсткой ссылки на автозагрузку по имени: tests/test_balance.gd создаёт
+## Balance напрямую (load(...).new()), в обход обычного запуска сцены, а
+## headless-запуск через --script не гарантированно поднимает автозагрузки
+## до выполнения скрипта (см. докстринг того теста) — простое "GameState." в
+## этом файле тогда не компилируется вовсе (ошибка ловится на reload, а не
+## только при вызове) и рушит вообще все функции Balance, не только эту.
+## Поэтому GameState ищется по пути в дереве, а не по имени автозагрузки:
+## нет дерева/узла — тир не апгрейжен (0), ровно как у игрока с чистым сейвом.
+func _current_drill_rig_tier() -> int:
+	var loop := Engine.get_main_loop()
+	if loop is SceneTree:
+		var root: Node = (loop as SceneTree).root
+		if root != null and root.has_node("GameState"):
+			return int(root.get_node("GameState").get("drill_rig_tier"))
+	return 0
+
+
+## Базовая скорость бурмобиля БЕЗ апгрейда (тир 0) — "бурмобиль копает в 2
+## раза лучше бура" (решение владельца), она же общий множитель для
+## get_drill_rig_speed_at_tier ниже.
+func get_drill_rig_base_speed_multiplier() -> float:
+	var factor := float(_v(get_tool("drill_rig").get("speed_vs_hand_drill", 2.0)))
+	return get_tool_speed_multiplier("hand_drill") * factor
+
+
+## Скорость бурмобиля НА ПРОИЗВОЛЬНОМ тире апгрейда (0..N), не обязательно
+## текущем у игрока — нужна магазину для строки "что купишь дальше", чтобы
+## не подставлять GameState.drill_rig_tier и не откатывать его обратно.
+func get_drill_rig_speed_at_tier(tier: int) -> float:
+	return get_drill_rig_base_speed_multiplier() * get_drill_rig_tier_multiplier(tier)
 
 
 ## Максимальная глубина инструмента (null/отсутствует = без ограничения).
@@ -694,6 +732,79 @@ func get_drill_rig_fall_damage_mult() -> float:
 ## get_fall_damage_from_speed).
 func get_drill_rig_fall_damage_height_mult() -> float:
 	return float(_v(balance.get("tools", {}).get("drill_rig", {}).get("fall_damage_height_mult", 3.0)))
+
+
+# ---------------------------------------------------------------------------
+# Апгрейд бура бурмобиля (задача «Апгрейд бура», решение владельца дословно:
+# «в магазине после появления бурмобиля появляется опция улучшить бурмобиль:
+# титановый/платиновый/алмазный/обсидиановый бур, каждый на 20% быстрее
+# предыдущего»). Тиры лежат в balance.json -> tools.drill_rig.upgrade_tiers —
+# единственный источник и процента (speed_bonus), и порядка, и цены; здесь
+# только читаем, не хардкодим 1.2 второй раз (см. get_tool_speed_multiplier).
+# GameState.drill_rig_tier: 0 — апгрейда ещё нет (обычный серый бур), 1..N —
+# индекс купленной ступени (1 = первая строка массива, титан).
+# ---------------------------------------------------------------------------
+
+func _drill_rig_upgrade_tiers_raw() -> Array:
+	var t = _v(get_tool("drill_rig").get("upgrade_tiers", []))
+	return t if typeof(t) == TYPE_ARRAY else []
+
+
+## Сколько всего ступеней апгрейда бура описано в balance.json (сейчас 4:
+## титан/платина/алмаз/обсидиан) — живое число, а не хардкод «4», чтобы
+## магазин и GameState.drill_rig_tier не разъехались с JSON, если ступеней
+## станет больше или меньше.
+func get_drill_rig_tier_count() -> int:
+	return _drill_rig_upgrade_tiers_raw().size()
+
+
+## Строка тира по индексу 1..N (0 — "апгрейда нет", сюда не ходят). Пустой
+## словарь — индекс вне диапазона (тира с таким номером не существует).
+func get_drill_rig_tier_row(tier: int) -> Dictionary:
+	var tiers := _drill_rig_upgrade_tiers_raw()
+	if tier < 1 or tier > tiers.size():
+		return {}
+	var row = tiers[tier - 1]
+	return row if typeof(row) == TYPE_DICTIONARY else {}
+
+
+func get_drill_rig_tier_id(tier: int) -> String:
+	return String(get_drill_rig_tier_row(tier).get("id", ""))
+
+
+func get_drill_rig_tier_name_ru(tier: int) -> String:
+	return String(get_drill_rig_tier_row(tier).get("name_ru", ""))
+
+
+## Цена ЭТОЙ ступени (не накопленная — сколько стоит купить именно её,
+## следующую после уже надетой) в монетах.
+func get_drill_rig_tier_cost_coins(tier: int) -> int:
+	var cost = _v(get_drill_rig_tier_row(tier).get("cost", {}))
+	if typeof(cost) != TYPE_DICTIONARY:
+		return 0
+	return int(_v(cost.get("coins", 0)))
+
+
+## Собственный множитель СКОРОСТИ этой одной ступени (у владельца — «каждый
+## на 20% быстрее предыдущего», то есть 1.2 в каждой строке JSON). Читаем
+## число, а не подставляем константу: строки могут когда-нибудь задать разный
+## процент на разных ступенях, и здесь единственное место, которое об этом
+## узнает.
+func get_drill_rig_tier_speed_bonus(tier: int) -> float:
+	return float(_v(get_drill_rig_tier_row(tier).get("speed_bonus", 1.0)))
+
+
+## Накопленный множитель скорости бура НА ЭТОЙ ступени — произведение
+## speed_bonus всех ступеней с 1 по tier включительно (компаундится: титан
+## ×1.2, платина ×1.2×1.2, алмаз ×1.2³, обсидиан ×1.2⁴ — ровно как просил
+## владелец: «каждый на 20% быстрее ПРЕДЫДУЩЕГО», не от базы каждый раз).
+## tier<=0 -> 1.0 (апгрейда нет, множитель не действует).
+func get_drill_rig_tier_multiplier(tier: int) -> float:
+	var mult := 1.0
+	var top: int = clampi(tier, 0, get_drill_rig_tier_count())
+	for t in range(1, top + 1):
+		mult *= get_drill_rig_tier_speed_bonus(t)
+	return mult
 
 
 ## Время бурения клетки минерала id базовым инструментом (drill_seconds из

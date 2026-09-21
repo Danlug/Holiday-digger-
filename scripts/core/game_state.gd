@@ -783,6 +783,33 @@ var owned_tools: Array = ["shovel"]
 ## (решение владельца), и глубина про неё больше ничего не знает.
 var owned_gear: Array = []
 
+## Ступень апгрейда бура бурмобиля (задача «Апгрейд бура»): 0 — апгрейда ещё
+## нет (обычный серый бур), 1..N — купленная ступень (1=титан, 2=платина,
+## 3=алмаз, 4=обсидиан — порядок и число ступеней читаются из balance.json ->
+## tools.drill_rig.upgrade_tiers, см. Balance.get_drill_rig_tier_row).
+## Отдельное поле, а не "тир записан внутри owned_tools": апгрейд — не
+## отдельный инструмент, который берут в руки вместо бурмобиля, а ступень
+## УЖЕ ВЗЯТОГО бурмобиля, как ступень ранца у owned_gear/current_gear выше.
+## Покупки строго последовательны (см. ShopService.buy_drill_upgrade): нельзя
+## купить платину, не купив титан, — простое +1 к этому числу за раз.
+var drill_rig_tier: int = 0
+
+## Ступень апгрейда бура сменилась (покупка в магазине) — HUD слушает, чтобы
+## перерисовать иконку инструмента внизу экрана (см. hud.gd:_sync_tool):
+## смена тира не меняет current_tool (герой как сидел в бурмобиле, так и
+## сидит), поэтому GameState.tool_changed на неё не сработает сам.
+signal drill_rig_tier_changed(tier: int)
+
+
+## Выдать ступень апгрейда бура (см. ShopService.buy_drill_upgrade) — тем же
+## приёмом, что grant_tool/grant_gear выше: пишет поле и оповещает, а не
+## присваивается напрямую по всему коду.
+func grant_drill_rig_tier(tier: int) -> void:
+	if tier <= drill_rig_tier:
+		return
+	drill_rig_tier = tier
+	drill_rig_tier_changed.emit(tier)
+
 ## Клетка глубины героя ПРЯМО СЕЙЧАС (0 — поверхность, растёт вниз). Пишется
 ## каждый кадр из player.gd (как is_digging чуть выше по файлу) — GameState
 ## сам позицию не считает, но она нужна ровно одной проверке ниже
@@ -917,6 +944,7 @@ func reset_economy() -> void:
 	owned_tools = ["shovel"]
 	owned_gear = []
 	current_gear = ""
+	drill_rig_tier = 0
 	rare_find_toasts_shown = 0
 	well_level = 0
 	well_last_collect_unix = 0

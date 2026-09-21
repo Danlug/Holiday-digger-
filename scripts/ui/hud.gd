@@ -425,13 +425,27 @@ func _build_depth(parent: Control) -> void:
 	_depth_box.visible = false
 
 
+## Высота панели раньше была двумя фиксированными числами (top=-160,
+## bottom=-132 → ровно 28px всегда), а текст внутри переносился по словам
+## без ограничения по высоте — двух-трёхстрочный тост обрезался снизу или
+## вылезал за рамку (задание владельца: «фон контекстного окна не
+## соответствует по высоте реальному размеру текста»). Низ панели остаётся
+## фиксированным (offset_bottom), а верх toast() пересчитывает под
+## фактическую обёрнутую высоту текста при каждом вызове — см. ниже.
+const TOAST_BOTTOM_OFFSET := -132.0
+const TOAST_PAD_V := 12.0       # запас сверху+снизу вокруг текста
+const TOAST_MIN_H := 28.0       # короткая строка не сжимается в полоску
+const TOAST_MAX_H := 200.0      # запас на случай очень длинного текста
+
+
 func _build_toast(parent: Control) -> void:
 	_toast_panel = Panel.new()
 	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast_panel.anchor_left = 0.0; _toast_panel.anchor_right = 1.0
 	_toast_panel.anchor_top = 1.0; _toast_panel.anchor_bottom = 1.0
 	_toast_panel.offset_left = 8; _toast_panel.offset_right = -8
-	_toast_panel.offset_top = -160; _toast_panel.offset_bottom = -132
+	_toast_panel.offset_bottom = TOAST_BOTTOM_OFFSET
+	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - TOAST_MIN_H
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.071, 0.055, 0.043, 0.93)
 	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
@@ -443,6 +457,7 @@ func _build_toast(parent: Control) -> void:
 	_toast_label = Label.new()
 	_toast_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_toast_label.offset_left = 10; _toast_label.offset_top = 6
+	_toast_label.offset_right = -8
 	_toast_label.add_theme_font_size_override("font_size", 12)
 	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_toast_panel.add_child(_toast_label)
@@ -1591,8 +1606,30 @@ func _update_depth() -> void:
 
 func toast(text: String, seconds: float = 2.6) -> void:
 	_toast_label.text = text
+	_resize_toast_panel()
 	_toast_panel.visible = true
 	_toast_timer.start(seconds)
+
+
+## Меряет фактическую (обёрнутую по словам) высоту текста тем же шрифтом,
+## что рисует сам Label, и растягивает панель под неё снизу вверх — низ
+## (offset_bottom) не трогаем, чтобы тост не прыгал по вертикали при смене
+## текста. Считаем ширину от вьюпорта, а не от _toast_panel.size: та не
+## гарантированно свежая при первом же вызове toast() (см. hud.gd:
+## _update_layout — панель, как и весь HUD, отзывается на резайз вьюпорта
+## реактивно, а не мгновенно в конструкторе).
+func _resize_toast_panel() -> void:
+	var font := _toast_label.get_theme_font("font")
+	var font_size := _toast_label.get_theme_font_size("font_size")
+	if font == null:
+		return
+	var margins: float = _toast_panel.offset_left - _toast_panel.offset_right \
+		+ _toast_label.offset_left - _toast_label.offset_right
+	var wrap_width: float = maxf(40.0, get_viewport_rect().size.x - margins)
+	var text_h: float = font.get_multiline_string_size(
+		_toast_label.text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size).y
+	var panel_h: float = clampf(text_h + TOAST_PAD_V, TOAST_MIN_H, TOAST_MAX_H)
+	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - panel_h
 
 
 func _on_fell(damage: float, speed: float) -> void:

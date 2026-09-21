@@ -455,6 +455,12 @@ const TOAST_MAX_H := 200.0      # запас на случай очень дли
 func _build_toast(parent: Control) -> void:
 	_toast_panel = Panel.new()
 	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Подстраховка сверх TOAST_MAX_H: если когда-нибудь текст тоста всё равно
+	# не влезет (перевод длиннее оригинала, склеенный текст и т.п.), лишние
+	# строки обрежутся по границе панели, а не повиснут поверх игрового мира
+	# без фона — так и было до этой правки на очень длинной строке (см. отчёт
+	# QA-прохода).
+	_toast_panel.clip_contents = true
 	_toast_panel.anchor_left = 0.0; _toast_panel.anchor_right = 1.0
 	_toast_panel.anchor_top = 1.0; _toast_panel.anchor_bottom = 1.0
 	_toast_panel.offset_left = 8; _toast_panel.offset_right = -8

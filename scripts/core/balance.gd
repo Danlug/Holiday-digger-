@@ -94,7 +94,14 @@ func get_mineral(id: String) -> Dictionary:
 
 func get_mineral_price(id: String) -> int:
 	var m := get_mineral(id)
-	return int(_v(m.get("price_coins", 0)))
+	# price_coins бывает null (не продаётся вовсе — geocrystal, obsidian,
+	# fuel_block и т.п., см. minerals.json): int(null) падает с ошибкой
+	# скрипта, а не просто отдаёт 0, — раньше её ловил любой открытый
+	# инвентарь с такой находкой внутри.
+	var raw = _v(m.get("price_coins", 0))
+	if raw == null:
+		return 0
+	return int(raw)
 
 
 func get_mineral_weight(id: String) -> float:

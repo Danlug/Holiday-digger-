@@ -23,7 +23,15 @@ signal finished(scene_id: String)
 const LAYER := 100
 const STAGE_TOP := 0.06        # доля высоты, где начинается "небо" сцены
 const GROUND_LINE := 0.56      # доля высоты, на которой проходит линия земли
-const BOX_H := 108.0           # высота реплики: шесть строк, длинные фразы не режутся
+const BOX_H := 108.0           # высота реплики по умолчанию/минимум — см. _box_height_for_text()
+## Реплика длиннее шести строк при переносе по словам (напр. intro_boy.n3,
+## 146 символов) не помещалась в фиксированные BOX_H=108 — последняя строка
+## обрезалась по нижнему краю рамки, местами у самого края экрана (см. отчёт
+## QA-прохода). Растягиваем рамку под фактическую высоту текста тем же
+## приёмом, что и тост (hud.gd:_resize_toast_panel) — верх растёт, низ стоит
+## на месте.
+const BOX_MAX_H := 190.0
+const BOX_TEXT_CHROME := 34.0  # запас под подпись говорящего сверху и "дальше" снизу
 ## Лист персонажа режется в ART_SCALE раз крупнее логических координат (см.
 ## tools/import_art.py:ART_SCALE и scripts/player/character_view.gd:CHAR_W) —
 ## реальный кадр 48×48 ЛОГИЧЕСКИХ пикселей занимает на диске 144×144.
@@ -360,6 +368,23 @@ func _relayout_if_resized() -> void:
 		_layout()
 
 
+## Мерит фактическую (обёрнутую по словам) высоту текущей реплики тем же
+## шрифтом, что рисует сам Label _line, — приём один в один с
+## hud.gd:_resize_toast_panel. До того, как _line получит текст (первый вызов
+## _layout из _build()), возвращает минимум.
+func _box_height_for_text(vp_x: float) -> float:
+	if _line == null:
+		return BOX_H
+	var font := _line.get_theme_font("font")
+	var font_size := _line.get_theme_font_size("font_size")
+	if font == null or _line.text.is_empty():
+		return BOX_H
+	var wrap_width: float = maxf(40.0, (vp_x - 12.0) - 18.0)
+	var text_h: float = font.get_multiline_string_size(
+		_line.text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size).y
+	return clampf(text_h + BOX_TEXT_CHROME, BOX_H, BOX_MAX_H)
+
+
 func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_last_vp = vp
@@ -384,7 +409,7 @@ func _layout() -> void:
 		_backdrop_fence.position = Vector2(0, ground_y - band_h)
 		_backdrop_fence.size = Vector2(vp.x, band_h)
 
-	var box_h: float = BOX_H
+	var box_h: float = _box_height_for_text(vp.x)
 	_box.position = Vector2(6, vp.y - box_h - 6)
 	_box.size = Vector2(vp.x - 12, box_h)
 	_line.position = Vector2(9, 21)
@@ -743,6 +768,9 @@ func _show_line(speaker: String, text: String) -> void:
 	_line.visible_ratio = 0.0
 	_typing = true
 	_waiting_tap = true
+	# Рамка меряется по НОВОМУ тексту и может вырасти выше шести строк — см.
+	# _box_height_for_text().
+	_layout()
 
 
 func _hide_text() -> void:

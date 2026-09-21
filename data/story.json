@@ -17,7 +17,12 @@
 		"tap": "обязательный тап по подсвеченной цели — обучение действием, а не текстом",
 		"move": "сдвинуть актёра на dy пикселей за sec (герой проваливается в яму)",
 		"shake": "тряска сцены",
-		"daynight": "ускоренная смена суток: cycles раз по sec секунд"
+		"daynight": "ускоренная смена суток: cycles раз по sec секунд",
+		"world_actor": "поставить/переставить актёра НА ЖИВУЮ КАРТУ: actor, x, y (логические координаты, как player.x/y), pose, flip, camera=true — сделать его целью камеры/тумана (см. world_walk/world_dig ниже); работает только в сценах world:true",
+		"world_walk": "актёр идёт по живой карте до x (клеток/сек по умолчанию, либо sec); camera=true — камера идёт за ним",
+		"world_dig": "актёр НАСТОЯЩЕЙ лопатой/киркой выкапывает клетку (x,y) живой карты (world.dig_cell) — sec секунд играет pose (по умолчанию dig_shovel), потом клетка исчезает и актёр шагает в неё",
+		"world_fall": "визуальный сдвиг актёра на dy КЛЕТОК (не пикселей) за sec — попытка выбраться из ямы, копки не делает",
+		"clock": "контракт DayCycle: hour — выставить час суток, scale — множитель скорости часов; не блокирует сцену"
 	},
 	"_effects": {
 		"flag": "поставить сюжетный флаг id",
@@ -185,126 +190,55 @@
 		{
 			"id": "intro_grandpa",
 			"title": "intro_grandpa.title",
+			"world": true,
 			"beats": [
 				{
-					"t": "mood",
-					"id": "dark"
+					"t": "clock",
+					"hour": 6.0,
+					"scale": 30.0
 				},
 				{
 					"t": "card",
 					"text": "intro_grandpa.card_when",
-					"sec": 3.2
+					"sec": 3.0
 				},
 				{
-					"t": "mood",
-					"id": "day"
-				},
-				{
-					"t": "prop",
-					"id": "shack",
-					"at": "right"
-				},
-				{
-					"t": "prop",
-					"id": "fence",
-					"at": "far_right"
-				},
-				{
-					"t": "prop",
-					"id": "garden_bush",
-					"at": "center"
-				},
-				{
-					"t": "prop",
-					"id": "garden_stone",
-					"at": "far_left"
-				},
-				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "grandpa",
-					"at": "left",
-					"pose": "walk",
-					"enter": "far_left"
-				},
-				{
-					"t": "wait",
-					"sec": 0.7
-				},
-				{
-					"t": "show",
-					"actor": "grandpa",
-					"at": "left",
-					"pose": "dig_shovel"
+					"x": 13.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
 				},
 				{
 					"t": "narr",
 					"text": "intro_grandpa.n1"
 				},
 				{
-					"t": "show",
+					"t": "world_walk",
 					"actor": "grandpa",
-					"at": "left",
-					"pose": "idle"
+					"x": 19.5,
+					"sec": 1.6
 				},
 				{
-					"t": "say",
-					"who": "grandpa",
-					"text": "intro_grandpa.s1"
-				},
-				{
-					"t": "narr",
-					"text": "intro_grandpa.n2"
-				},
-				{
-					"t": "shake",
-					"sec": 0.35
-				},
-				{
-					"t": "say",
-					"who": "grandpa",
-					"text": "intro_grandpa.s2"
-				},
-				{
-					"t": "show",
+					"t": "world_dig",
 					"actor": "grandpa",
-					"at": "left",
+					"x": 19,
+					"y": 1,
+					"sec": 1.4,
 					"pose": "dig_shovel"
 				},
 				{
-					"t": "narr",
-					"text": "intro_grandpa.n3"
+					"t": "clock",
+					"hour": 11.0
 				},
 				{
-					"t": "hide",
-					"actor": "grandpa"
-				},
-				{
-					"t": "show",
-					"actor": "grandpa_gear",
-					"at": "left",
-					"pose": "pose_compass",
-					"scale": 2.0
-				},
-				{
-					"t": "narr",
-					"text": "intro_grandpa.n3b"
-				},
-				{
-					"t": "hide",
-					"actor": "grandpa_gear"
-				},
-				{
-					"t": "show",
-					"actor": "grandpa",
-					"at": "left",
-					"pose": "dig_shovel"
-				},
-				{
-					"t": "show",
+					"t": "world_actor",
 					"actor": "grandma_poor",
-					"at": "right",
+					"x": 12.5,
+					"y": 0.5,
 					"pose": "idle",
-					"flip": true
+					"camera": true
 				},
 				{
 					"t": "say",
@@ -312,31 +246,38 @@
 					"text": "intro_grandpa.g1"
 				},
 				{
-					"t": "narr",
-					"text": "intro_grandpa.n4"
-				},
-				{
 					"t": "say",
 					"who": "grandpa",
 					"text": "intro_grandpa.s3"
 				},
 				{
-					"t": "mood",
-					"id": "dusk"
+					"t": "hide",
+					"actor": "grandma_poor"
 				},
 				{
-					"t": "narr",
-					"text": "intro_grandpa.n5"
-				},
-				{
-					"t": "mood",
-					"id": "night"
-				},
-				{
-					"t": "move",
+					"t": "world_actor",
 					"actor": "grandpa",
-					"dy": 26,
-					"sec": 1.0
+					"camera": true
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 19,
+					"y": 2,
+					"sec": 1.4,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "clock",
+					"hour": 17.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 12.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
 				},
 				{
 					"t": "say",
@@ -350,23 +291,77 @@
 				},
 				{
 					"t": "hide",
-					"actor": "grandma_poor",
-					"exit_to": "far_right"
+					"actor": "grandma_poor"
 				},
 				{
-					"t": "move",
+					"t": "world_actor",
 					"actor": "grandpa",
-					"dy": 20,
-					"sec": 1.2
+					"camera": true
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 19,
+					"y": 3,
+					"sec": 1.4,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "clock",
+					"hour": 22.0
+				},
+				{
+					"t": "item",
+					"icon": "res://art/tiles/ore_gold.png",
+					"name": "intro_grandpa.item_name",
+					"text": "intro_grandpa.item_text"
 				},
 				{
 					"t": "narr",
-					"text": "intro_grandpa.n6"
+					"text": "intro_grandpa.n_deeper"
 				},
 				{
-					"t": "daynight",
-					"cycles": 3,
-					"sec": 0.7
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 19,
+					"y": 4,
+					"sec": 1.2,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 19,
+					"y": 5,
+					"sec": 1.2,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "shake",
+					"sec": 0.3
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s_trapped"
+				},
+				{
+					"t": "world_fall",
+					"actor": "grandpa",
+					"dy": -0.5,
+					"sec": 0.35,
+					"pose": "walk"
+				},
+				{
+					"t": "world_fall",
+					"actor": "grandpa",
+					"dy": 0.5,
+					"sec": 0.35,
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n_trapped"
 				},
 				{
 					"t": "fade",
@@ -443,7 +438,14 @@
 				{
 					"t": "grow",
 					"actor": "boy",
-					"poses": ["age_8", "age_9", "age_10", "age_11", "age_12", "age_15"],
+					"poses": [
+						"age_8",
+						"age_9",
+						"age_10",
+						"age_11",
+						"age_12",
+						"age_15"
+					],
 					"sec": 0.5,
 					"at": "center",
 					"scale": 2.2

@@ -30,6 +30,13 @@ const TILE := 32
 ## катсцен, где показывают время деда.
 const HOUSE_SPRITE := "res://art/env/house_rich.png"
 const HOUSE_META := "res://art/env/house_rich.json"
+## Лачуга деда (тот же спрайт, что показывает и катсцена интро — data/story.json
+## props.shack, art/_source/shack.jpg): пока GameState.era == "grandpa" (сцена
+## intro_grandpa играет НА ЖИВОЙ КАРТЕ, см. scripts/story/cutscene_player.gd:
+## _enter_world_mode), дом на поверхности рисуется ею вместо house_rich —
+## внук ещё не родился, дом ещё бедный. Входа у лачуги нет (владелец: "вход
+## не нужен") — кнопка "Зайти" гасится тем же условием, см. _update_outdoor_hotspot.
+const SHACK_SPRITE := "res://art/env/shack.png"
 const VIEW_SCENE := "res://scenes/house.tscn"
 const PROMPT_SCENE := "res://scenes/house_prompt.tscn"
 const STORAGE_SCENE := "res://scenes/house_storage.tscn"
@@ -59,6 +66,7 @@ var _view: CanvasLayer = null
 var _prompt: CanvasLayer = null
 var _storage_view: CanvasLayer = null
 var _exterior: Sprite2D = null
+var _exterior_era: String = ""   # какая текстура сейчас стоит в _exterior ("" — ещё не строили)
 var _button: Button = null
 var _button_action: String = ""
 var _storage_button: Button = null
@@ -146,24 +154,39 @@ func _resolve_refs() -> void:
 # ---------------------------------------------------------------------------
 
 func _build_world_props() -> void:
-	var door := HouseConfig.door_cell()
-	if ResourceLoader.exists(HOUSE_SPRITE):
-		_exterior = Sprite2D.new()
-		_exterior.name = "HouseExterior"
-		_exterior.centered = false
-		_exterior.texture = load(HOUSE_SPRITE)
-		var size := _exterior.texture.get_size()
-		# Дом прижимается ПРАВЫМ краем к границе огорода, а не центрируется по
-		# двери: он шире своей половины карты не бывает, но и залезать на
-		# грядки не должен — там копают. Дверь на рисунке одна и не в центре
-		# (левее — навес с машиной), поэтому клетка двери в balance.json
-		# подобрана под рисунок, а не наоборот.
-		#
-		# Низ ставится на ВЕРХ первой земляной клетки (y = 1), а не на y = 0:
-		# земля начинается с первого слоя, и герой стоит ступнями именно там —
-		# по y = 0 дом висел бы на клетку выше уровня земли.
-		_exterior.position = Vector2(WorldGen.GARDEN_X_MIN * TILE - size.x, TILE - size.y)
-		add_child(_exterior)
+	_exterior = Sprite2D.new()
+	_exterior.name = "HouseExterior"
+	_exterior.centered = false
+	add_child(_exterior)
+	_update_exterior_sprite()
+
+
+## Домик на поверхности переключается лачуга ⇄ богатый дом по GameState.era
+## (см. заголовок SHACK_SPRITE) — вызывается каждый кадр из _process, но
+## перестраивает спрайт только когда эпоха и правда сменилась (_exterior_era).
+func _update_exterior_sprite() -> void:
+	if _exterior == null:
+		return
+	var era := String(GameState.era)
+	if era == _exterior_era:
+		return
+	_exterior_era = era
+	var path := SHACK_SPRITE if era == "grandpa" else HOUSE_SPRITE
+	if not ResourceLoader.exists(path):
+		_exterior.texture = null
+		return
+	_exterior.texture = load(path)
+	var size := _exterior.texture.get_size()
+	# Дом (и лачуга — тот же анкер, просто другой размер картинки) прижимается
+	# ПРАВЫМ краем к границе огорода, а не центрируется по двери: он шире
+	# своей половины карты не бывает, но и залезать на грядки не должен — там
+	# копают. Дверь на рисунке одна и не в центре (левее — навес с машиной),
+	# поэтому клетка двери в balance.json подобрана под рисунок, а не наоборот.
+	#
+	# Низ ставится на ВЕРХ первой земляной клетки (y = 1), а не на y = 0:
+	# земля начинается с первого слоя, и герой стоит ступнями именно там —
+	# по y = 0 дом висел бы на клетку выше уровня земли.
+	_exterior.position = Vector2(WorldGen.GARDEN_X_MIN * TILE - size.x, TILE - size.y)
 
 
 func _build_scenes() -> void:
@@ -254,6 +277,7 @@ func _style_outdoor_button(b: Button) -> void:
 
 func _process(_dt: float) -> void:
 	_resolve_refs()
+	_update_exterior_sprite()
 	_tick_tutorial()
 	_update_hud_button()
 	_update_outdoor_hotspot()
@@ -287,7 +311,11 @@ func _outdoor_camera() -> Vector2:
 func _update_outdoor_hotspot() -> void:
 	if _outdoor_button == null:
 		return
-	if GameState.house_is_indoors or not GameState.is_alive or player == null or not near_door():
+	# Лачуга деда (GameState.era == "grandpa") входа не имеет вовсе (владелец:
+	# "вход не нужен") — гасим кнопку явно, не полагаясь на то, что герой
+	# заморожен/спрятан на время сцены и без того далеко от двери.
+	if GameState.era == "grandpa" or GameState.house_is_indoors or not GameState.is_alive \
+			or player == null or not near_door():
 		_outdoor_button.visible = false
 		return
 	_outdoor_button.visible = true
@@ -307,8 +335,8 @@ func _update_rig_hotspot() -> void:
 		return
 	var busy: bool = player != null and player.has_method("is_in_rig") \
 		and (player.is_in_rig() or String(player.get("rig_transition")) != "")
-	if GameState.house_is_indoors or not GameState.is_alive or player == null \
-			or busy or not near_parked_rig():
+	if GameState.era == "grandpa" or GameState.house_is_indoors or not GameState.is_alive \
+			or player == null or busy or not near_parked_rig():
 		_rig_button.visible = false
 		return
 	_rig_button.visible = true

@@ -54,6 +54,7 @@ func _run() -> void:
 	await _frame()
 
 	await _test_intro_plays_and_finishes()
+	_test_intro_grandpa_world()
 	await _test_not_shown_twice()
 	await _test_survives_quit_midscene()
 	await _test_autodig_terminates()
@@ -109,6 +110,89 @@ func _test_intro_plays_and_finishes() -> void:
 	check("эффект сцены применился и при пропуске", StoryState.has_flag("intro_seen"))
 	check("очередь опустела", GameState.story_queue.is_empty())
 	check("управление вернулось игроку", not player.frozen)
+
+
+## Интро деда играет НА ЖИВОЙ КАРТЕ (scripts/story/cutscene_player.gd,
+## режим play(id, {"world": true})) — проверяем это отдельно, белым ящиком,
+## на своих мире/герое/катсцене (не трогая общие director/world/player
+## теста): реплики здесь пропускаем не кнопкой "Пропустить" (она молча
+## доигрывает сцену целиком, не оставляя проверить промежуточное состояние),
+## а руками — зовём _run_beat напрямую по списку кадров, как сама сцена
+## зовёт его из _advance(), и докручиваем таймеры world_walk/world_dig/
+## world_fall через _tick_world(dt), как это делает _process в игре.
+func _test_intro_grandpa_world() -> void:
+	var w := WorldGen.new(778899)
+	var p := preload("res://scripts/player/player.gd").new()
+	p.world = w
+	add_child(p)
+	var cs := CutscenePlayer.new()
+	cs.world = w
+	cs.player = p
+	add_child(cs)
+
+	check("до сцены — обычная эпоха", w.era == "now" and GameState.era == "now")
+	check("до сцены лестница на месте", w.get_tile(WorldGen.GARDEN_X_MIN, 1) == TileTypes.Type.STAIRCASE)
+
+	cs.play("intro_grandpa", {"world": true})
+	check("сцена началась в режиме «мир»", cs.is_playing and cs.world_mode)
+	check("era переключилась на «дед»", w.era == "grandpa" and GameState.era == "grandpa")
+	check("в эпоху деда лестницы в огороде нет",
+		w.get_tile(WorldGen.GARDEN_X_MIN, 1) != TileTypes.Type.STAIRCASE)
+
+	var seen_decor := false
+	for gx in range(WorldGen.GARDEN_X_MIN, WorldGen.WIDTH):
+		var dname := w.garden_decor_at(gx)
+		if dname.is_empty():
+			continue
+		seen_decor = true
+		check("декор огорода деда из подходящего набора (%s)" % dname,
+			WorldGen.GARDEN_DECOR_GRANDPA.has(dname))
+	check("в огороде деда есть декор (горшки/тыква/деревья/тачка)", seen_decor)
+
+	# Докручиваем кадры руками до самого дна ямы (пятый слой), считая по
+	# ходу реплики бабки/деда — три слоя, два звонка бабки между ними, потом
+	# самородок и ещё два тайла вниз (см. data/story.json:intro_grandpa).
+	var grandma_calls := 0
+	var refusals := 0
+	var found_nugget := false
+	var guard := 0
+	while cs._index < cs._beats.size() and guard < 200:
+		var beat: Dictionary = cs._beats[cs._index]
+		cs._index += 1
+		cs._run_beat(beat)
+		var steps := 0
+		while (not cs._world_walk.is_empty() or not cs._world_dig.is_empty() or not cs._world_fall.is_empty()) \
+				and steps < 400:
+			cs._tick_world(0.05)
+			steps += 1
+		guard += 1
+		if String(beat.get("t", "")) == "say" and String(beat.get("who", "")) == "grandma_poor":
+			grandma_calls += 1
+		if String(beat.get("t", "")) == "say" and String(beat.get("who", "")) == "grandpa":
+			refusals += 1
+		if String(beat.get("t", "")) == "item":
+			found_nugget = true
+		if String(beat.get("t", "")) == "world_dig" and int(beat.get("y", -1)) == 5:
+			break
+
+	check("докрутили сцену не зациклившись", guard < 200, "кругов: %d" % guard)
+	check("бабка звала дважды", grandma_calls == 2, "звонков: %d" % grandma_calls)
+	check("дед отказывался дважды", refusals == 2, "отказов: %d" % refusals)
+	check("самородок найден на третьем слое", found_nugget)
+	check("яма реально выкопана — все пять клеток", w.is_dug(19, 1) and w.is_dug(19, 2)
+		and w.is_dug(19, 3) and w.is_dug(19, 4) and w.is_dug(19, 5))
+	check("время к третьему слою дошло до ~22:00", is_equal_approx(cs.current_clock_hour, 22.0),
+		"час: %s" % cs.current_clock_hour)
+
+	cs.skip()
+	await _frame()
+	check("после сцены era снова «внук»", w.era == "now" and GameState.era == "now")
+	check("яма после сцены засыпана (клетки забыты)", not w.is_dug(19, 1) and not w.is_dug(19, 2)
+		and not w.is_dug(19, 3) and not w.is_dug(19, 4) and not w.is_dug(19, 5))
+	check("после сцены лестница снова на месте", w.get_tile(WorldGen.GARDEN_X_MIN, 1) == TileTypes.Type.STAIRCASE)
+
+	p.queue_free()
+	cs.queue_free()
 
 
 func _test_not_shown_twice() -> void:

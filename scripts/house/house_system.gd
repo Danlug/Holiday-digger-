@@ -427,7 +427,11 @@ func near_hatch() -> bool:
 	return near_tunnel_mouth()
 
 
-func enter_house(room: String = "hall") -> void:
+## enter_x — доля 0..1, где встанет герой (см. house_view.open); -1 (по
+## умолчанию) — spawn_x комнаты. Параметр нужен сюжету (scripts/story/
+## cutscene_player.gd:"house_enter") — сцена ставит героя прямо у кровати
+## или верстака, а не куда попало.
+func enter_house(room: String = "hall", enter_x: float = -1.0) -> void:
 	GameState.house_is_indoors = true
 	GameState.house_room = room
 	_freeze_player(true)
@@ -437,7 +441,22 @@ func enter_house(room: String = "hall") -> void:
 		# выживания продублированы в шапке дома.
 		hud.visible = false
 	if _view != null:
-		_view.open(room)
+		_view.open(room, enter_x)
+
+
+## Обёртки над house_view.gd для сюжета (см. cutscene_player.gd:"house_sleep")
+## — тот же ролик, что у кнопки "Спать" (_start_sleep_sequence), без самого
+## эффекта сна: сцена считает часы/голод/бодрость сама через effects.
+func play_sleep_animation(seconds: float) -> void:
+	if _view != null:
+		_view.set_locked(true)
+		_view.play_sleep_animation(seconds)
+
+
+func stop_sleep_animation() -> void:
+	if _view != null:
+		_view.stop_sleep_animation()
+		_view.set_locked(false)
 
 
 ## Выход через входную дверь на поверхность (ГДД п.3: дом занимает клетки

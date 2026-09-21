@@ -1077,19 +1077,18 @@
 					"sec": 3.0
 				},
 				{
-					"t": "mood",
-					"id": "room"
-				},
-				{
-					"t": "show",
-					"actor": "boy",
-					"at": "center",
-					"pose": "sleep"
+					"t": "house_enter",
+					"room": "bedroom",
+					"x": 0.42
 				},
 				{
 					"t": "fade",
 					"dir": "in",
-					"sec": 1.0
+					"sec": 0.8
+				},
+				{
+					"t": "house_sleep",
+					"sec": 1.8
 				},
 				{
 					"t": "narr",
@@ -1100,10 +1099,9 @@
 					"text": "death.n6"
 				},
 				{
-					"t": "show",
-					"actor": "boy",
-					"at": "center",
-					"pose": "idle"
+					"t": "house_enter",
+					"room": "workshop",
+					"x": 0.45
 				},
 				{
 					"t": "say",

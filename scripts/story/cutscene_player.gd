@@ -55,6 +55,16 @@ var world_mode: bool = false
 var world: WorldGen = null
 var player: Node = null
 
+## "house_enter"/"house_sleep" (см. _run_beat) — сцена показывает НАСТОЯЩИЙ
+## интерьер дома (scripts/house/house_view.gd) вместо иллюстрации "mood
+## room": та же комната, что видит игрок, физически зайдя внутрь. В отличие
+## от world_mode, симметричного выхода на "clear" нет — сцена, вошедшая в
+## дом, обычно в нём и заканчивается (см. эффект "enter_house" у сцены
+## death в data/story.json), поэтому house_mode нарочно не гасится
+## автоматически.
+var house_mode: bool = false
+var _house_sleep_left: float = 0.0
+
 var _beats: Array = []
 var _index: int = 0
 var _beat_timer: float = 0.0     # сколько ещё держать кадр с автопереходом
@@ -549,6 +559,7 @@ func _process(dt: float) -> void:
 	_tick_grow(dt)
 	_tick_slides(dt)
 	_tick_world(dt)
+	_tick_house_sleep(dt)
 	# В самом конце — иначе mood/daynight, отработавшие чуть выше, перезапишут
 	# цвет неба обратно и часы DayCycle не будет видно.
 	_apply_day_cycle_sky()
@@ -702,6 +713,11 @@ func _run_beat(beat: Dictionary) -> bool:
 		"clock":
 			_do_clock(beat)
 			return false
+		"house_enter":
+			_house_enter(beat)
+			return false
+		"house_sleep":
+			return _house_start_sleep(beat)
 	return false
 
 
@@ -959,6 +975,7 @@ func _clear_stage() -> void:
 	_moves.clear()
 	_slides.clear()
 	_tap_target.visible = false
+	_house_sleep_left = 0.0
 	if world_mode:
 		_exit_world_mode()
 
@@ -1259,6 +1276,60 @@ func _set_backdrop_era(era: String) -> void:
 	var bd := get_tree().root.find_child("Backdrop", true, false)
 	if bd != null and bd.has_method("set_era"):
 		bd.call("set_era", era)
+
+
+## HouseSystem регистрирует себя в группе "house_system" (см.
+## scripts/house/house_system.gd:_ready) — тем же приёмом, что WorldGen/
+## player передаются извне (см. поля world/player выше), только без ручного
+## провода: дом всегда один на игру, и находить его через группу проще, чем
+## тянуть ещё одну ссылку через story_director.gd для двух кадров.
+func _find_house_system() -> Node:
+	return get_tree().get_first_node_in_group("house_system")
+
+
+## "house_enter" — сцена показывает НАСТОЯЩИЙ интерьер (см. house_mode выше).
+## beat: room ("hall"/"bedroom"/"workshop"), x — доля 0..1 ширины комнаты,
+## где встанет герой (см. data/rooms.json:points), по умолчанию spawn_x
+## комнаты. Своё небо/землю/героя катсцена прячет тем же приёмом, что и
+## world_mode (_enter_world_mode) — дом рисуется НИЖНИМ CanvasLayer
+## (layer=9), а катсцена — верхним (layer=100), и без этого закрывала бы
+## его собой.
+func _house_enter(beat: Dictionary) -> void:
+	var hs := _find_house_system()
+	if hs == null or not hs.has_method("enter_house"):
+		return
+	_sky.visible = false
+	_ground.visible = false
+	var cv := get_tree().root.find_child("CharacterView", true, false)
+	if cv != null:
+		cv.visible = false
+	hs.call("enter_house", String(beat.get("room", "hall")), float(beat.get("x", -1.0)))
+	house_mode = true
+
+
+## "house_sleep" — короткая анимация сна у настоящей кровати, тот же ролик,
+## что игрок видит по кнопке "Спать" (house_system._start_sleep_sequence),
+## но без самого эффекта сна — часы/голод/бодрость сцена "death" считает
+## сама через effects (data/story.json), не через реальный HouseSleep.
+func _house_start_sleep(beat: Dictionary) -> bool:
+	var hs := _find_house_system()
+	var sec: float = maxf(0.1, float(beat.get("sec", 1.8)))
+	if hs != null and hs.has_method("play_sleep_animation"):
+		hs.call("play_sleep_animation", sec)
+	_house_sleep_left = sec
+	_beat_timer = sec
+	return true
+
+
+func _tick_house_sleep(dt: float) -> void:
+	if _house_sleep_left <= 0.0:
+		return
+	_house_sleep_left -= dt
+	if _house_sleep_left <= 0.0:
+		_house_sleep_left = 0.0
+		var hs := _find_house_system()
+		if hs != null and hs.has_method("stop_sleep_animation"):
+			hs.call("stop_sleep_animation")
 
 
 ## "world_actor" — поставить (или переставить/переодеть) актёра в клетку

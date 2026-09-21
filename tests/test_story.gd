@@ -13,7 +13,10 @@ const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	# Режим "мир" (см. scripts/story/cutscene_player.gd:world_mode) — сцена
 	# играет на живой карте, эти кадры двигают/копают WorldActor'а по-настоящему.
 	"world_actor", "world_walk", "world_dig", "world_dig_row", "world_fall", "clock",
-	"world_prop", "world_enter"]
+	"world_prop", "world_enter",
+	# Режим "дом" (см. cutscene_player.gd:house_mode) — сцена играет в НАСТОЯЩЕМ
+	# интерьере (scripts/house/house_view.gd), не в иллюстрации "mood room".
+	"house_enter", "house_sleep"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
 	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.

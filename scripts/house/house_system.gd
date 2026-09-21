@@ -37,6 +37,7 @@ const HOUSE_META := "res://art/env/house_rich.json"
 ## внук ещё не родился, дом ещё бедный. Входа у лачуги нет (владелец: "вход
 ## не нужен") — кнопка "Зайти" гасится тем же условием, см. _update_outdoor_hotspot.
 const SHACK_SPRITE := "res://art/env/shack.png"
+const SHACK_SCALE := 0.5   # решение владельца: лачуга вдвое меньше дома
 const VIEW_SCENE := "res://scenes/house.tscn"
 const PROMPT_SCENE := "res://scenes/house_prompt.tscn"
 const STORAGE_SCENE := "res://scenes/house_storage.tscn"
@@ -183,7 +184,11 @@ func _update_exterior_sprite() -> void:
 		_exterior.texture = null
 		return
 	_exterior.texture = load(path)
-	var size := _exterior.texture.get_size()
+	# Лачуга нарезана в том же масштабе, что дом, но по слову владельца
+	# должна быть вдвое меньше — дед с бабкой не великаны, а домик у них
+	# действительно крошечный. Дом внука — 1:1.
+	_exterior.scale = Vector2(SHACK_SCALE, SHACK_SCALE) if era == "grandpa" else Vector2.ONE
+	var size := _exterior.texture.get_size() * _exterior.scale
 	# Дом (и лачуга — тот же анкер, просто другой размер картинки) прижимается
 	# ПРАВЫМ краем к границе огорода, а не центрируется по двери: он шире
 	# своей половины карты не бывает, но и залезать на грядки не должен — там

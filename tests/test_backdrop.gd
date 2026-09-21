@@ -64,7 +64,14 @@ func _check_era() -> void:
 	if backdrop == null:
 		return
 
-	check("era по умолчанию 'now'", backdrop.era == "now")
+	# В новой игре сразу играет интро деда на живой карте (режим world,
+	# см. cutscene_player.gd) и переводит задник в эпоху «grandpa»; вне
+	# сцены задник должен быть «now». Проверяем связку, а не «по умолчанию».
+	var cs := get_tree().root.find_child("CutscenePlayer", true, false)
+	var intro_on: bool = cs != null and cs.is_playing and String(cs.scene_id) == "intro_grandpa"
+	check("era задника согласована с интро деда (%s)" % ("идёт" if intro_on else "нет"),
+		backdrop.era == ("grandpa" if intro_on else "now"))
+	backdrop.set_era("now")
 	var tex_now := backdrop._fence_texture()
 
 	backdrop.set_era("grandpa")

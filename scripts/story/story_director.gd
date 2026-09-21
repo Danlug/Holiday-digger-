@@ -343,7 +343,18 @@ func play(id: String) -> void:
 		return
 	_playing = true
 	_take_control()
-	cutscene.play(id)
+	# Сцены режима "мир" (data/story.json: scenes[].world == true, сейчас
+	# только intro_grandpa) работают на живой карте — катсцене нужны ссылки
+	# на настоящие мир и героя (камера/туман идут за player.x/y, см.
+	# cutscene_player.gd:_tick_world). Выставляем перед каждым play(), а не
+	# один раз в boot(): world/player у режиссёра могут прийти позже него
+	# самого (см. _find_game_nodes).
+	cutscene.world = world
+	cutscene.player = player
+	var opts := {}
+	if StoryData.is_world_scene(id):
+		opts["world"] = true
+	cutscene.play(id, opts)
 
 
 func _on_cutscene_finished(id: String) -> void:

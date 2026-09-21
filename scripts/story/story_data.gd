@@ -49,6 +49,13 @@ static func beats(scene_id: String) -> Array:
 	return scene(scene_id).get("beats", [])
 
 
+## Сцена режима "мир" (scenes[].world == true в data/story.json) — играет
+## поверх живой карты через CutscenePlayer.play(id, {"world": true}), а не в
+## собственной декорации. См. cutscene_player.gd:world_mode.
+static func is_world_scene(scene_id: String) -> bool:
+	return bool(scene(scene_id).get("world", false))
+
+
 static func effects(scene_id: String) -> Array:
 	return scene(scene_id).get("effects", [])
 

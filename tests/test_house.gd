@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_sleep_button_uses_animation_sequence()
 	_test_outdoor_enter_hotspot()
 	_test_house_button_context_gone()
+	_test_era_shack_exterior()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -705,3 +706,32 @@ func _test_house_button_context_gone() -> void:
 
 	btn.queue_free()
 	house._button = null
+
+
+## Лачуга деда (GameState.era == "grandpa", интро на живой карте — см.
+## scripts/story/cutscene_player.gd:_enter_world_mode) вместо богатого дома
+## на поверхности, и обратно после сцены (GDD: "вход не нужен" — кнопка
+## «Зайти» тоже гаснет).
+func _test_era_shack_exterior() -> void:
+	GameState.era = "now"
+	house._process(0.016)
+	check("обычная эпоха — дом house_rich", house._exterior.texture != null
+		and house._exterior.texture.resource_path == HouseSystem.HOUSE_SPRITE)
+
+	GameState.era = "grandpa"
+	house._process(0.016)
+	check("эпоха деда — экстерьер лачуга (shack.png)", house._exterior.texture != null
+		and house._exterior.texture.resource_path == HouseSystem.SHACK_SPRITE)
+
+	# Кнопка "Зайти" — у лачуги входа нет вовсе (владелец), даже если герой
+	# стоит ровно у клетки двери.
+	var door := HouseConfig.door_cell()
+	player.x = float(door.x) + 0.5
+	player.y = 0.5
+	house._update_outdoor_hotspot()
+	check("у лачуги кнопка «Зайти» не показывается", not house._outdoor_button.visible)
+
+	GameState.era = "now"
+	house._process(0.016)
+	check("после сцены дом снова house_rich", house._exterior.texture != null
+		and house._exterior.texture.resource_path == HouseSystem.HOUSE_SPRITE)

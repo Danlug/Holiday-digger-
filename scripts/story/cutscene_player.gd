@@ -41,6 +41,19 @@ const ANIM_FPS := 7.0
 var scene_id: String = ""
 var is_playing: bool = false
 
+## Режим "мир" (см. play(id, opts)): сцена НЕ рисует свои небо/землю/актёров
+## (_sky/_ground спрятаны, _stage не используется) — вместо этого поверх
+## ЖИВОЙ игровой карты работают world_actor/world_walk/world_dig/world_fall
+## (актёры — scripts/story/world_actor.gd) и настоящая копка через
+## world.dig_cell. Единственные 11 сцен обучения на классическом режиме не
+## трогает: у них opts.world нет, is_world_scene(id) для них false.
+var world_mode: bool = false
+## Ссылки, которые режиссёр выставляет перед play() (см. story_director.gd:
+## cutscene.world = world; cutscene.player = player) — без них world_*
+## кадры молча ничего не делают (see _run_beat), сцена не падает.
+var world: WorldGen = null
+var player: Node = null
+
 var _beats: Array = []
 var _index: int = 0
 var _beat_timer: float = 0.0     # сколько ещё держать кадр с автопереходом
@@ -104,6 +117,20 @@ var _grow_flip: bool = false
 # тикером с кубическим ease-out (человек тормозит перед остановкой, а не
 # бьётся о стену).
 var _slides: Array = []   # {"actor":id, "left":sec, "total":sec, "from_dx":float, "to_dx":float, "then_free":bool}
+
+# ---------------------------------------------------------------------------
+# Режим "мир" (world_mode) — актёры и копка на живой карте, см. заголовок.
+# ---------------------------------------------------------------------------
+var _world_actors: Dictionary = {}   # actor_id -> WorldActor
+var _world_dug_cells: Array = []     # [Vector2i, ...] — что реально выкопали за сцену
+var _camera_actor_id: String = ""    # чей x/y зеркалится в player.x/y (камера/туман идут за героем)
+var _world_walk: Dictionary = {}     # {"actor","from","to","left","total","arrive_pose"} или {}
+var _world_dig: Dictionary = {}      # {"actor","cell":Vector2i,"left","total"} или {}
+var _world_fall: Dictionary = {}     # {"actor","from","to","left","total"} или {}
+## Последний час, выставленный кадром "clock" — публично, чтобы тесты могли
+## проверить ход времени сцены даже там, где автозагрузки /root/DayCycle ещё
+## нет (см. GDD-контракт DayCycle в задании, узел параллельного агента).
+var current_clock_hour: float = -1.0
 
 
 func _init() -> void:
@@ -382,7 +409,11 @@ func _stage_x(at: String) -> float:
 # Публичное API
 # ---------------------------------------------------------------------------
 
-func play(id: String) -> void:
+## opts.world == true — режим "мир" (см. заголовок файла и заголовок блока
+## world_mode выше): сцена играет поверх живой карты, а не в своей
+## декорации. Классические сцены вызывают play(id) без второго аргумента —
+## поведение для них не меняется ни на бит.
+func play(id: String, opts: Dictionary = {}) -> void:
 	scene_id = id
 	_beats = StoryData.beats(id)
 	_index = 0
@@ -392,6 +423,7 @@ func play(id: String) -> void:
 	_shake_left = 0.0
 	_daynight_left = 0.0
 	_moves.clear()
+	current_clock_hour = -1.0
 	_clear_stage()
 	_fade.color = Color(0, 0, 0, 0)
 	_skip_btn.text = StoryText.get_text("ui.skip")
@@ -410,6 +442,8 @@ func play(id: String) -> void:
 		set_backdrop_era("")
 
 	_layout()
+	if bool(opts.get("world", false)):
+		_enter_world_mode()
 	_advance()
 
 
@@ -495,6 +529,7 @@ func _process(dt: float) -> void:
 	_tick_daynight(dt)
 	_tick_grow(dt)
 	_tick_slides(dt)
+	_tick_world(dt)
 	# В самом конце — иначе mood/daynight, отработавшие чуть выше, перезапишут
 	# цвет неба обратно и часы DayCycle не будет видно.
 	_apply_day_cycle_sky()
@@ -620,6 +655,18 @@ func _run_beat(beat: Dictionary) -> bool:
 		"grow":
 			_start_grow(beat)
 			return true
+		"world_actor":
+			_world_place_actor(beat)
+			return false
+		"world_walk":
+			return _world_start_walk(beat)
+		"world_dig":
+			return _world_start_dig(beat)
+		"world_fall":
+			return _world_start_fall(beat)
+		"clock":
+			_do_clock(beat)
+			return false
 	return false
 
 
@@ -800,6 +847,16 @@ func _show_actor(beat: Dictionary) -> void:
 ## после того, как доедет; без exit_to — прежнее поведение, убрать сразу.
 func _hide_actor(beat: Dictionary) -> void:
 	var id := String(beat.get("actor", ""))
+	# Актёр режима "мир" (world_actor) живёт в отдельной таблице — см. блок
+	# world_mode выше. "hide" одинаково убирает и классического актёра со
+	# сцены, и мирового с живой карты: имена кадров не путаются, две таблицы
+	# просто никогда не пересекаются по одному и тому же вызову.
+	if _world_actors.has(id):
+		_world_actors[id].queue_free()
+		_world_actors.erase(id)
+		if _camera_actor_id == id:
+			_camera_actor_id = ""
+		return
 	if not _actors.has(id):
 		return
 	var exit_to := String(beat.get("exit_to", ""))
@@ -850,6 +907,13 @@ func _show_prop(beat: Dictionary) -> void:
 	_place_prop(id)
 
 
+## "clear" — общий кадр "убрать со сцены всё" (было и раньше), а для сцены в
+## режиме мира — ЕЩЁ И выход из него (_exit_world_mode): мир возвращается к
+## внуку СРАЗУ, как только сюжету больше не нужна живая карта (дальше в
+## intro_grandpa идёт эпилог у могилы — своя декорация, ей era/копка деда не
+## нужны). Тот же вызов срабатывает и на honest-finish, и на skip()/abort()
+## (оба зовут _clear_stage напрямую или через _finish/abort) — одна точка
+## гарантирует откат независимо от того, досмотрели сцену или пропустили.
 func _clear_stage() -> void:
 	for id in _actors.keys():
 		_actors[id].node.queue_free()
@@ -860,6 +924,8 @@ func _clear_stage() -> void:
 	_moves.clear()
 	_slides.clear()
 	_tap_target.visible = false
+	if world_mode:
+		_exit_world_mode()
 
 
 func _place_all() -> void:
@@ -1053,3 +1119,257 @@ func _apply_mood_colors(id: String) -> void:
 	# выглядеть ночным, подвальным и дневным.
 	_ground.modulate = ground * 2.0
 	_ground.modulate.a = 1.0
+
+
+# ---------------------------------------------------------------------------
+# Режим "мир": сцена на живой карте (см. заголовок файла, play(id, opts) и
+# заголовок блока полей world_mode выше).
+# ---------------------------------------------------------------------------
+
+## Скорость ходьбы актёра по умолчанию (клеток/сек) — как у героя игрока
+## (см. player.gd), если кадр не задал свой "sec".
+const WORLD_WALK_SPEED := 3.0
+const WORLD_DIG_SEC := 1.4
+
+
+func _enter_world_mode() -> void:
+	world_mode = true
+	# Небо/земля катсцены прячутся — живая карта показывается КАК ЕСТЬ, её
+	# рисует main.gd/world_view.gd под этим CanvasLayer, а не мы.
+	_sky.visible = false
+	_ground.visible = false
+	if world != null:
+		world.era = "grandpa"
+	GameState.era = "grandpa"
+	_set_backdrop_era("grandpa")
+	# Герой игрока молчит и стоит замороженным во время ЛЮБОЙ катсцены (см.
+	# story_director._take_control), но его СПРАЙТ обычно скрыт под
+	# непрозрачными небом/землёй классической сцены. В режиме "мир" декорации
+	# нет — прячем сам узел отрисовки героя, иначе на поверхности рядом с
+	# дедом молча стоял бы ещё и мальчик из будущего.
+	var cv := get_tree().root.find_child("CharacterView", true, false)
+	if cv != null:
+		cv.visible = false
+
+
+## Симметрично _enter_world_mode — зовётся из _clear_stage() (кадр "clear"
+## ИЛИ конец сцены через _finish()/abort(), которые тоже проходят через
+## _clear_stage). Идемпотентна (world_mode-гейт внутри), так что повторный
+## вызов (у _finish() после уже отработавшего "clear") безопасен.
+func _exit_world_mode() -> void:
+	world_mode = false
+	if world != null:
+		# Откатываем РОВНО то, что выкопала сама сцена, — включая клетки,
+		# которые были зафиксированы (фундамент), restore_garden() их не
+		# трогает нарочно (см. world_gen.gd:forget_dug_cells).
+		world.forget_dug_cells(_world_dug_cells)
+		world.era = "now"
+	GameState.era = "now"
+	_set_backdrop_era("now")
+	var dc := get_node_or_null("/root/DayCycle")
+	if dc != null and dc.has_method("set_time_scale"):
+		dc.set_time_scale(1.0)
+	for id in _world_actors.keys():
+		_world_actors[id].queue_free()
+	_world_actors.clear()
+	_world_dug_cells.clear()
+	_world_walk = {}
+	_world_dig = {}
+	_world_fall = {}
+	_camera_actor_id = ""
+	var cv := get_tree().root.find_child("CharacterView", true, false)
+	if cv != null:
+		cv.visible = true
+	_sky.visible = true
+	_ground.visible = true
+	# Пока сцена шла, камера/туман следовали за дедом через player.x/y (см.
+	# _tick_world) — герой игрока настоящий x/y НИКОГДА не получал (он всё
+	# время заморожен и спрятан), но само поле осталось там, где кончил дед
+	# (например, на дне пятиклеточной ямы). Следующая сцена (intro_boy) или
+	# обычная игра унаследовали бы эту точку как стартовую — второй раз то
+	# же самое падение, только уже для внука, и без единой клетки под ним
+	# (яму мы только что забыли). Возвращаем на ту же точку, что и
+	# main.gd:_position_from_save_or_start() — единственную позицию, с
+	# которой начинается игра.
+	if player != null:
+		player.x = 20.5
+		player.y = 0.5
+		player.vx = 0.0
+		player.vy = 0.0
+
+
+## Задник (забор/гора) — параллельная задача, контракт: узел с именем
+## "Backdrop" и методом set_era(era). Пока узла нет — no-op, сцена не падает.
+func _set_backdrop_era(era: String) -> void:
+	var bd := get_tree().root.find_child("Backdrop", true, false)
+	if bd != null and bd.has_method("set_era"):
+		bd.call("set_era", era)
+
+
+## "world_actor" — поставить (или переставить/переодеть) актёра в клетку
+## живой карты. beat: actor, x, y (логические координаты, как player.x/y —
+## например y=0.5 значит "стоит на поверхности"), pose, flip, camera=true
+## (сделать этого актёра целью камеры/тумана — см. _tick_world).
+func _world_place_actor(beat: Dictionary) -> void:
+	var id := String(beat.get("actor", ""))
+	if id.is_empty():
+		return
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		a = WorldActor.new()
+		a.setup(id)
+		# Актёр обязан ехать вместе с камерой мира (тем же смещением
+		# view_root, что и WorldView/Player), а не поверх интерфейса —
+		# добавляем его в ViewRoot, а не в себя (CanvasLayer катсцены).
+		var view_root := get_tree().root.find_child("ViewRoot", true, false)
+		if view_root != null:
+			view_root.add_child(a)
+		else:
+			add_child(a)   # тест без main.gd (см. test_story_flow.gd) — держим хоть так
+		_world_actors[id] = a
+	if beat.has("x"):
+		a.x = float(beat.get("x"))
+	if beat.has("y"):
+		a.y = float(beat.get("y"))
+	a.set_pose(String(beat.get("pose", "idle")), bool(beat.get("flip", a.flip)))
+	if bool(beat.get("camera", false)):
+		_camera_actor_id = id
+
+
+## "world_walk" — дойти до x за sec секунд (по умолчанию — по WORLD_WALK_SPEED
+## клеток/сек). Держит сцену (как "move"/"fade"), пока актёр не дойдёт.
+func _world_start_walk(beat: Dictionary) -> bool:
+	var id := String(beat.get("actor", ""))
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		return false
+	var target_x: float = float(beat.get("x", a.x))
+	var sec: float = float(beat.get("sec", maxf(0.2, absf(target_x - a.x) / WORLD_WALK_SPEED)))
+	a.set_pose("walk", target_x < a.x)
+	if bool(beat.get("camera", false)):
+		_camera_actor_id = id
+	_world_walk = {"actor": id, "from": a.x, "to": target_x, "left": sec, "total": sec,
+		"arrive_pose": String(beat.get("arrive_pose", "idle"))}
+	_beat_timer = sec
+	return true
+
+
+## "world_dig" — выкопать клетку (x, y) НАСТОЯЩЕЙ картой (world.dig_cell):
+## актёр встаёт над клеткой, sec секунд играет pose (по умолчанию
+## "dig_shovel"), затем клетка выкапывается и актёр шагает в неё (y+0.5).
+func _world_start_dig(beat: Dictionary) -> bool:
+	var id := String(beat.get("actor", ""))
+	var a: WorldActor = _world_actors.get(id)
+	if a == null or world == null:
+		return false
+	var cell := Vector2i(int(beat.get("x", 0)), int(beat.get("y", 1)))
+	var sec: float = maxf(0.1, float(beat.get("sec", WORLD_DIG_SEC)))
+	a.x = float(cell.x) + 0.5
+	a.y = float(cell.y) - 0.5
+	a.set_pose(String(beat.get("pose", "dig_shovel")), a.flip)
+	if bool(beat.get("camera", false)):
+		_camera_actor_id = id
+	_world_dig = {"actor": id, "cell": cell, "left": sec, "total": sec}
+	_beat_timer = sec
+	return true
+
+
+## "world_fall" — визуальный сдвиг актёра вниз/вверх на dy КЛЕТОК (не
+## пикселей, в отличие от классического "move") за sec секунд. Копки не
+## делает — нужен для "пробовал выбраться, не смог": актёр дёргается в яме,
+## сама яма (world_dig) уже выкопана раньше.
+func _world_start_fall(beat: Dictionary) -> bool:
+	var id := String(beat.get("actor", ""))
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		return false
+	var sec: float = maxf(0.05, float(beat.get("sec", 0.5)))
+	_world_fall = {"actor": id, "from": a.y, "to": a.y + float(beat.get("dy", 0.0)),
+		"left": sec, "total": sec}
+	a.set_pose(String(beat.get("pose", "fall")), a.flip)
+	_beat_timer = sec
+	return true
+
+
+## "clock" — контракт DayCycle (автозагрузка параллельного агента,
+## /root/DayCycle): hour — сразу выставить час, scale — множитель скорости
+## часов. Не блокирует сцену (как "mood"). Пока узла нет — только
+## current_clock_hour обновляется (тесты проверяют ход времени сцены и без
+## DayCycle, см. tests/test_story.gd).
+func _do_clock(beat: Dictionary) -> void:
+	var dc := get_node_or_null("/root/DayCycle")
+	if beat.has("hour"):
+		current_clock_hour = float(beat.get("hour"))
+		if dc != null and dc.has_method("set_hour"):
+			dc.set_hour(current_clock_hour)
+	if beat.has("scale") and dc != null and dc.has_method("set_time_scale"):
+		dc.set_time_scale(float(beat.get("scale")))
+
+
+func _tick_world(dt: float) -> void:
+	if _world_actors.is_empty():
+		return
+	for id in _world_actors.keys():
+		_world_actors[id].anim += 60.0 * dt
+	_tick_world_walk(dt)
+	_tick_world_dig(dt)
+	_tick_world_fall(dt)
+	# Камера и туман войны идут за героем (main.gd:_camera/_reveal_around_player
+	# читают ровно player.x/player.y) — во время сцены герой заморожен и
+	# спрятан (см. _enter_world_mode), а его координаты ведёт актёр, за
+	# которым сейчас следит камера (см. поле "camera" у world_actor/
+	# world_walk/world_dig).
+	if not _camera_actor_id.is_empty() and player != null and _world_actors.has(_camera_actor_id):
+		var cam_a: WorldActor = _world_actors[_camera_actor_id]
+		player.x = cam_a.x
+		player.y = cam_a.y
+
+
+func _tick_world_walk(dt: float) -> void:
+	if _world_walk.is_empty():
+		return
+	var id: String = _world_walk.actor
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		_world_walk = {}
+		return
+	_world_walk.left -= dt
+	var t: float = 1.0 - clampf(_world_walk.left / _world_walk.total, 0.0, 1.0)
+	a.x = lerpf(_world_walk.from, _world_walk.to, t)
+	if _world_walk.left <= 0.0:
+		a.set_pose(String(_world_walk.arrive_pose), a.flip)
+		_world_walk = {}
+
+
+func _tick_world_dig(dt: float) -> void:
+	if _world_dig.is_empty():
+		return
+	var id: String = _world_dig.actor
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		_world_dig = {}
+		return
+	_world_dig.left -= dt
+	if _world_dig.left <= 0.0:
+		var cell: Vector2i = _world_dig.cell
+		if world != null and world.dig_cell(cell.x, cell.y):
+			_world_dug_cells.append(cell)
+		# Шагнул вниз, в свежую яму — так же, как игрок проваливается в
+		# только что выкопанную под собой клетку.
+		a.y = float(cell.y) + 0.5
+		_world_dig = {}
+
+
+func _tick_world_fall(dt: float) -> void:
+	if _world_fall.is_empty():
+		return
+	var id: String = _world_fall.actor
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		_world_fall = {}
+		return
+	_world_fall.left -= dt
+	var t: float = 1.0 - clampf(_world_fall.left / _world_fall.total, 0.0, 1.0)
+	a.y = lerpf(_world_fall.from, _world_fall.to, t)
+	if _world_fall.left <= 0.0:
+		_world_fall = {}

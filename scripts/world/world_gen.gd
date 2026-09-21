@@ -97,6 +97,21 @@ var _garden_locked: bool = false
 # был всегда. Снимает — AutoDigTutorial.begin(), см. комментарий там: это и
 # есть тот самый "запустился сценарий со скоростным копанием".
 var _pre_autodig_locked: bool = false
+## Эпоха, в которую сейчас читается мир: "now" (внук, обычная игра) или
+## "grandpa" (интро деда, играет на этой же живой карте — см. GDD и
+## scripts/story/cutscene_player.gd, режим play(id, {"world": true})).
+## Живёт в мире тем же приёмом, что и _garden_locked (см. комментарий выше):
+## WorldGen — чистый RefCounted без автозагрузок, поэтому эпоху ему
+## выставляет снаружи тот, кто ведёт сцену (CutscenePlayer), а не он сам
+## читает GameState.era. GameState.era — тот же факт для систем с доступом
+## к автозагрузкам (HouseSystem: лачуга вместо богатого дома).
+##
+## Единственное отличие эпохи деда от обычного "до Роберта" состояния:
+## лестницы в огороде ещё нет — три года назад дед копал прямо в грядки,
+## лестницу поставят(?) позже (см. _permanent_feature_type). Тоннеля тоже
+## нет ни там, ни там — он появляется только после Роберта, это уже
+## учтено полем _garden_locked отдельно от era.
+var era: String = "now"
 
 
 func _init(p_world_seed: int) -> void:
@@ -423,6 +438,16 @@ const GARDEN_DECOR_TENDED := [
 	"daisies", "cornflowers", "hosta", "lavender",
 	"flowers_butterflies", "stone_1", "stone_2",
 ]
+## Огород в эпоху деда (интро, era=="grandpa"): владелец — "с травой, с
+## горшками, тыквой, деревьями, тачкой" — смесь ухоженной грядки (горшки,
+## тыква, тачка) и дикорастущих деревьев (в GARDEN_DECOR_TENDED деревьев нет
+## вовсе, в GARDEN_DECOR_WILD нет горшков/тыквы/тачки — ни один из двух
+## готовых наборов сам по себе не покрывает список владельца).
+const GARDEN_DECOR_GRANDPA := [
+	"pumpkin", "pots", "wheelbarrow", "cabbage", "tomato",
+	"tree_pine", "tree_spruce", "bush_fir",
+	"sunflower", "hosta", "stone_1",
+]
 # Доля клеток огорода, занятых декором — не каждая: сплошной ряд предметов
 # впритык друг к другу выглядит частоколом, а не грядкой.
 const GARDEN_DECOR_DENSITY := 0.55
@@ -436,13 +461,32 @@ func garden_decor_at(x: int) -> String:
 		return ""
 	if _roll(x, 0, "garden_decor_has", 0) > GARDEN_DECOR_DENSITY:
 		return ""
-	var list: Array = GARDEN_DECOR_TENDED if _garden_locked else GARDEN_DECOR_WILD
+	var list: Array = GARDEN_DECOR_GRANDPA if era == "grandpa" \
+		else (GARDEN_DECOR_TENDED if _garden_locked else GARDEN_DECOR_WILD)
 	var idx: int = clampi(int(_roll(x, 0, "garden_decor_which", 0) * list.size()), 0, list.size() - 1)
 	return list[idx]
 
 
 func is_dug(x: int, y: int) -> bool:
 	return diffs.has(_key(x, y))
+
+
+## Стирает диффы клеток, будто их никогда не копали, — В ОТЛИЧИЕ от
+## restore_garden()/_clear_diffs_in_rect, которые нарочно НЕ трогают
+## зафиксированные структуры (фундамент, лестница, сценарный алмаз/золото),
+## эта функция стирает диффы БЕЗ ЛЮБЫХ исключений.
+##
+## Нужна интро деда (scripts/story/cutscene_player.gd, world_dig): яма деда
+## по сюжету доходит до фундамента включительно (ГДД — "копает ещё два тайла
+## вниз и там уже не может выбраться"), а после сцены мир обязан вернуться к
+## внуку таким же нетронутым, каким был, — фундамент цел, лестница на месте.
+## restore_garden() эту клетку не отдаст (фундамент зафиксирован), поэтому
+## сцена сама помнит список клеток, которые выкопала (CutscenePlayer._world_dug_cells),
+## и откатывает их этим методом, а не общей засыпкой.
+func forget_dug_cells(cells: Array) -> void:
+	for c in cells:
+		var v: Vector2i = c
+		diffs.erase(_key(v.x, v.y))
 
 
 ## Клетка не участвует в событиях сброса, пока не выкопана (фундамент,
@@ -533,7 +577,10 @@ func _permanent_feature_type(x: int, y: int) -> int:
 				# трогает — на месте вынутого самородка осталась бы ямка.
 				return -1
 	elif y >= 1 and y <= _staircase_y_max:
-		if x >= _staircase_x_start and x < _staircase_x_start + y:
+		# В эпоху деда (три года до начала игры, см. era выше) лестницы в
+		# огороде ещё нет вообще — дед копает прямо в ровную грядку, без
+		# всякой нерушимой структуры под ногами.
+		if era != "grandpa" and x >= _staircase_x_start and x < _staircase_x_start + y:
 			return TileTypes.Type.STAIRCASE
 	if y >= _peat_seam_y_min and y <= _peat_seam_y_max:
 		return TileTypes.Type.PEAT

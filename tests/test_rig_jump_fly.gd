@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_landing_interrupts_flight()
 	_test_capacity_bonus_200kg()
 	_test_fall_and_flight_speed_multipliers()
+	_test_drill_upgrade_tier_art()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -277,3 +278,92 @@ func _test_fall_and_flight_speed_multipliers() -> void:
 	p.queue_free()
 	GameState.current_tool = "shovel"
 	GameState.reset_progress()
+
+
+## Апгрейд бура (задача «Апгрейд бура»): перекрашенные листы (см.
+## tools/rig_drill_recolor.py) подставляются по GameState.drill_rig_tier для
+## каждого набора, где бур виден, — dig_rig_side/dig_rig_down (копка) и
+## rig_jump (прыжок/посадка), — одной точкой (CharacterView._tex_for_sheet).
+## rig_fly СЮДА НЕ ВХОДИТ: бур на нём не виден ни в одном кадре (см.
+## докстринг rig_drill_recolor.py), перекрашенных вариантов для него нет и
+## подставлять нечего — RIG_FLY_SHEET всегда берёт базовый лист (уже
+## проверено выше в _test_fly_start_loop_stop, там же).
+func _test_drill_upgrade_tier_art() -> void:
+	print("--- Апгрейд бура: перекрашенные листы ---")
+	GameState.current_tool = "drill_rig"
+	var suffixes := ["", "_titanium", "_platinum", "_diamond", "_obsidian"]
+
+	for tier in range(0, 5):
+		_reset_state()
+		GameState.current_tool = "drill_rig"
+		GameState.drill_rig_tier = tier
+		# rig_jump: кадр прыжка (idx0), бур виден — тот же толчок вверх, что
+		# в _test_jump_up_then_landing.
+		player.on_ground = false
+		player.vy = -8.1
+		var f: Dictionary = _shown_frame()
+		check("rig_jump тир %d -> лист rig_jump%s" % [tier, suffixes[tier]],
+			f.sheet == "rig_jump" + suffixes[tier])
+
+	for tier in range(0, 5):
+		_reset_state()
+		GameState.current_tool = "drill_rig"
+		GameState.drill_rig_tier = tier
+		# dig_rig_side: копка вбок (клетка справа от героя, не под ним).
+		player.digging = {"x": player.cell_x() + 1, "y": player.cell_y(),
+				"t": 0.0, "total": 999.0, "type": TileTypes.Type.DIRT}
+		var f: Dictionary = _shown_frame()
+		check("dig_rig_side тир %d -> лист dig_rig_side%s" % [tier, suffixes[tier]],
+			f.sheet == "dig_rig_side" + suffixes[tier])
+
+	for tier in range(0, 5):
+		_reset_state()
+		GameState.current_tool = "drill_rig"
+		GameState.drill_rig_tier = tier
+		# dig_rig_down: копка клетки прямо под героем.
+		player.digging = {"x": player.cell_x(), "y": player.cell_y() + 1,
+				"t": 0.0, "total": 999.0, "type": TileTypes.Type.DIRT}
+		var f: Dictionary = _shown_frame()
+		check("dig_rig_down тир %d -> лист dig_rig_down%s" % [tier, suffixes[tier]],
+			f.sheet == "dig_rig_down" + suffixes[tier])
+
+	_reset_state()
+	GameState.drill_rig_tier = 0
+	GameState.current_tool = "shovel"
+
+	# Средний цвет ОБЛАСТИ БУРА смещается к целевому металлу — читаем файлы
+	# напрямую (в обход движка), тем же кропом, каким подбиралась маска бура
+	# в tools/rig_drill_recolor.py (_side_drill_mask: x140..225, y55..150 на
+	# кадре 240×168 dig_rig_side.png).
+	var crop := Rect2i(140, 55, 85, 95)
+	var base_img: Image = load("res://art/character/dig_rig_side.png").get_image()
+	var base_avg := _avg_rgb(base_img, crop)
+	for suffix: String in ["_titanium", "_platinum", "_diamond", "_obsidian"]:
+		var path: String = "res://art/character/dig_rig_side" + suffix + ".png"
+		check(path + ": файл перекрашенного тира существует", ResourceLoader.exists(path))
+		if not ResourceLoader.exists(path):
+			continue
+		var img: Image = load(path).get_image()
+		var avg := _avg_rgb(img, crop)
+		var delta: float = avg.distance_to(base_avg)
+		# Цвета Image.get_pixel нормированы в 0..1 (не 0..255) — порог тоже в
+		# этой шкале; ~0.02 — это заметный на глаз сдвиг в несколько единиц
+		# canale из 255 (см. отчёт агента: реальные сдвиги тира от 0.04 до
+		# 0.2 на кропе бура dig_rig_side).
+		check("%s: средний цвет бура сместился от базового серого (Δ=%.3f)" % [suffix, delta],
+			delta > 0.02)
+
+
+## Средний RGB (0..1 на канал) непрозрачных пикселей прямоугольника — для
+## сравнения "тот же ли это в среднем цвет" между базовым листом и тиром.
+func _avg_rgb(img: Image, crop: Rect2i) -> Vector3:
+	var sum := Vector3.ZERO
+	var n := 0
+	for y in range(crop.position.y, crop.position.y + crop.size.y):
+		for x in range(crop.position.x, crop.position.x + crop.size.x):
+			var c := img.get_pixel(x, y)
+			if c.a < 0.05:
+				continue
+			sum += Vector3(c.r, c.g, c.b)
+			n += 1
+	return sum / float(n) if n > 0 else Vector3.ZERO

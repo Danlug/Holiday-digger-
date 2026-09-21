@@ -189,6 +189,21 @@ var _rig_move_t0: float = 0.0          # player.anim в момент начал�
 var _rig_was_on_ground: bool = true    # player.on_ground на прошлом кадре — для edge-детекции
 var _rig_was_thrust: bool = false      # (player.thrust != "") на прошлом кадре
 
+# ---------------------------------------------------------------------------
+# Апгрейд бура (задача «Апгрейд бура»): титан/платина/алмаз/обсидиан — тот же
+# бур, перекрашенный tools/rig_drill_recolor.py в цвет соответствующей кирки
+# (см. его докстринг). Индекс — GameState.drill_rig_tier (0 = обычный серый
+# бур, апгрейда нет). Листы РАЗНЫЕ ФАЙЛЫ (dig_rig_down_titanium.png и т.п.),
+# не перекраска на лету: так дешевле по кадру и не плывёт при повторной
+# перекраске на разных платформах.
+#
+# rig_fly.png СЮДА НЕ ВХОДИТ: бур не виден ни в одном её кадре (см. докстринг
+# rig_drill_recolor.py) — перекрашенных вариантов для него нет и подставлять
+# нечего, RIG_FLY_SHEET всегда берёт базовый лист.
+# ---------------------------------------------------------------------------
+const RIG_TIER_SUFFIX := ["", "_titanium", "_platinum", "_diamond", "_obsidian"]
+const RIG_RECOLOR_SHEETS := ["dig_rig_down", "dig_rig_side", "rig_jump"]
+
 
 func _ready() -> void:
 	_sprite = Sprite2D.new()
@@ -200,7 +215,37 @@ func _ready() -> void:
 		var path: String = "res://art/character/" + sheet + ".png"
 		if ResourceLoader.exists(path):
 			_sheets[sheet] = load(path)
+		if RIG_RECOLOR_SHEETS.has(sheet):
+			for suffix: String in RIG_TIER_SUFFIX:
+				if suffix.is_empty():
+					continue
+				var tiered_path: String = "res://art/character/" + sheet + suffix + ".png"
+				if ResourceLoader.exists(tiered_path):
+					_sheets[sheet + suffix] = load(tiered_path)
 	_load_rig_exit_sheet()
+
+
+## Суффикс перекрашенного варианта бура по текущей ступени апгрейда — одна
+## точка, которую читают все места ниже, где имя листа начинается с
+## "dig_rig_"/"rig_jump" (см. _tex_for_sheet). "" — обычный серый бур.
+func _rig_tier_suffix() -> String:
+	var tier: int = clampi(int(GameState.drill_rig_tier), 0, RIG_TIER_SUFFIX.size() - 1)
+	return RIG_TIER_SUFFIX[tier]
+
+
+## Текстура листа по имени, с подстановкой перекрашенного варианта бура, если
+## это один из RIG_RECOLOR_SHEETS и нужный тир вообще нарезан (см. _ready).
+## Единственная точка, где имя листа превращается в реальную Texture2D —
+## поэтому геометрия (SHEET_FRAME) и фазы (DIG_PHASES) по-прежнему считаются
+## по БАЗОВОМУ имени листа (dig_rig_side, а не dig_rig_side_titanium): у
+## перекрашенных вариантов та же ширина/высота кадра и те же фазы, отдельной
+## записи под суффиксом им заводить незачем.
+func _tex_for_sheet(name: String) -> Texture2D:
+	if RIG_RECOLOR_SHEETS.has(name):
+		var suffix := _rig_tier_suffix()
+		if not suffix.is_empty() and _sheets.has(name + suffix):
+			return _sheets[name + suffix]
+	return _sheets.get(name)
 
 
 ## Общее имя набора копки по текущему инструменту, БЕЗ суффикса направления
@@ -495,7 +540,7 @@ func _process(_dt: float) -> void:
 	var anim_div: float = SHEET_ANIM_DIV.get(sheet_name, ANIM_DIV)
 	var fw: int = geom[0]
 	var fh: int = geom[1]
-	var tex: Texture2D = _sheets.get(sheet_name)
+	var tex: Texture2D = _tex_for_sheet(sheet_name)
 	if tex != null:
 		_sprite.texture = tex
 		var frames: int = maxi(1, int(round(tex.get_width() / float(fw))))

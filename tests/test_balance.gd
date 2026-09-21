@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_tool_line(bal)
 	_test_gear_line(bal)
 	_test_drill_speed_computed(bal)
+	_test_drill_rig_upgrade_tiers(bal)
 	_test_no_old_rig_name()
 
 	_print_summary()
@@ -278,6 +279,53 @@ func _test_drill_speed_computed(bal) -> void:
 		not bal.get_tool("hand_drill").has("speed_multiplier"))
 	_check_true("drill_rig.speed_multiplier убран из JSON (считается кодом)",
 		not bal.get_tool("drill_rig").has("speed_multiplier"))
+
+
+## Задача «Апгрейд бура»: «титановый/платиновый/алмазный/обсидиановый бур,
+## каждый на 20% быстрее предыдущего» — проверяется на уровне ДАННЫХ
+## (get_drill_rig_speed_at_tier принимает тир параметром, в обход
+## GameState.drill_rig_tier — этот bare-скрипт его не видит, см. докстринг
+## файла и Balance._current_drill_rig_tier): растёт РОВНО ×1.2 от тира к
+## тиру (сравнение соседних тиров, не абсолютные числа — они завтра
+## пересчитаются вслед за линейкой кирок), последовательность id строго
+## титан -> платина -> алмаз -> обсидиан, и у каждой ступени цена больше
+## предыдущей (порядок покупки в магазине).
+func _test_drill_rig_upgrade_tiers(bal) -> void:
+	print("--- Апгрейд бура: тиры ×1.2 за ступень ---")
+	_check_int("четыре ступени апгрейда бура", bal.get_drill_rig_tier_count(), 4)
+	var want_ids := ["titanium", "platinum", "diamond", "obsidian"]
+	for i in range(want_ids.size()):
+		var tier := i + 1
+		_check_true("тир %d — %s" % [tier, want_ids[i]],
+			bal.get_drill_rig_tier_id(tier) == want_ids[i])
+		_check("тир %d: собственный бонус ×1.2" % tier,
+			bal.get_drill_rig_tier_speed_bonus(tier), 1.2, 0.0001)
+
+	# Компаунд, не сумма: тир N = тир (N-1) × 1.2, начиная от тира 0 (без
+	# апгрейда) — «каждый на 20% быстрее ПРЕДЫДУЩЕГО», не от базы каждый раз.
+	var prev: float = bal.get_drill_rig_speed_at_tier(0)
+	for tier in range(1, 5):
+		var cur: float = bal.get_drill_rig_speed_at_tier(tier)
+		_check("тир %d ровно ×1.2 от тира %d" % [tier, tier - 1], cur, prev * 1.2, 0.0001)
+		prev = cur
+	_check("тир 4 (обсидиан) = база × 1.2⁴",
+		bal.get_drill_rig_speed_at_tier(4),
+		bal.get_drill_rig_speed_at_tier(0) * pow(1.2, 4.0), 0.0001)
+
+	# Последовательные цены — растут от ступени к ступени (порядок покупки),
+	# без проверки конкретных сумм: они помечены proposed в balance.json и
+	# может поменять владелец, не тест.
+	var prev_price := 0
+	for tier in range(1, 5):
+		var price: int = bal.get_drill_rig_tier_cost_coins(tier)
+		_check_true("тир %d: цена задана и больше предыдущей ступени" % tier,
+			price > prev_price)
+		prev_price = price
+
+	# Тир 0 (апгрейда нет) не должен молчаливо тянуть бонус — множитель на
+	# нём ровно 1.0, вся разница входит только со ступени 1.
+	_check("тир 0: множитель апгрейда = 1.0 (апгрейда ещё нет)",
+		bal.get_drill_rig_tier_multiplier(0), 1.0, 0.0001)
 
 
 ## Владелец: «бурмобиль называется в игре везде „бурмобиль“». Старое название

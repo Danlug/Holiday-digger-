@@ -1423,6 +1423,9 @@ func _connect_game_state() -> void:
 			_render_inventory()
 	)
 	GameState.tool_changed.connect(func(_t): _sync_tool())
+	# Апгрейд бура (задача «Апгрейд бура»): смена тира не трогает
+	# current_tool, поэтому GameState.tool_changed не сработает — своя точка.
+	GameState.drill_rig_tier_changed.connect(func(_tier): _sync_tool())
 	GameState.rig_dismount_blocked.connect(func(_id):
 		toast("Бурмобиль под землёй не бросить — сначала наверх или домой."))
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
@@ -1554,7 +1557,20 @@ func _tool_icon_path(tool_id: String) -> String:
 		if tool_id == "drill_rig":
 			return "res://art/items/hand_drill.png"
 		return ""
-	return path if path.begins_with("res://") else "res://" + path
+	path = path if path.begins_with("res://") else "res://" + path
+	# Апгрейд бура (задача «Апгрейд бура»): та же подмена по суффиксу, что у
+	# анимаций бурмобиля в character_view.gd (_rig_tier_suffix) — тот же тир,
+	# то же имя файла + суффикс. Состояние героя (тир), а не данные
+	# инструмента, поэтому решается здесь же, рядом с трещиной ржавой кирки
+	# выше — обе подмены одной формы: "обычная иконка -> иконка под текущее
+	# состояние, если файл для него есть".
+	if tool_id == "drill_rig" and GameState.drill_rig_tier > 0:
+		var suffixes: Array = ["", "_titanium", "_platinum", "_diamond", "_obsidian"]
+		var suffix: String = suffixes[clampi(GameState.drill_rig_tier, 0, 4)]
+		var tiered: String = path.get_basename() + suffix + "." + path.get_extension()
+		if ResourceLoader.exists(tiered):
+			return tiered
+	return path
 
 
 func _update_depth() -> void:

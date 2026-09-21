@@ -719,6 +719,65 @@ func _render_tech() -> void:
 	for r in ShopCatalog.recipes():
 		_list.add_child(_make_craft_row(r))
 
+	# Апгрейд бура (задача «Апгрейд бура») — виден только когда сам бурмобиль
+	# уже есть (открыт с глубины 1000, см. data/shop.json ->
+	# craft.unlock_depth.drill_rig): апгрейд ступени того, чего ещё нет,
+	# читался бы как отдельная покупка бурмобиля во второй раз.
+	if GameState.owns_tool("drill_rig"):
+		_add_section("Апгрейд бура")
+		for row in ShopCatalog.drill_upgrade_rows():
+			_list.add_child(_make_drill_upgrade_row(row))
+
+
+## Строка ступени апгрейда бура: {id, tier, name_ru, price_coins,
+## speed_multiplier, desc_ru, status}. За монеты (не материалы), поэтому
+## строка ближе к _make_buy_row (кирки/ранцы), чем к _make_craft_row
+## (рецепты из руды) — но с третьим состоянием "locked", которого у кирок и
+## ранцев нет: апгрейды бура строго последовательны.
+func _make_drill_upgrade_row(row: Dictionary) -> Control:
+	var status := String(row["status"])
+	var box := HBoxContainer.new()
+
+	var label_text := "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
+	if status == "locked":
+		# Название нужной более ранней ступени — то же самое "сначала
+		# титановый", каким в игре объясняются другие последовательные
+		# апгрейды, а не голое "недоступно". В подписи строки, а не на самой
+		# кнопке: "сначала обсидиановый бур" на кнопке в 52 точки не влезает.
+		label_text += " (сначала %s)" % Balance.get_drill_rig_tier_name_ru(int(row["tier"]) - 1).to_lower()
+
+	var text := Label.new()
+	text.text = label_text
+	text.add_theme_font_size_override("font_size", 9)
+	text.add_theme_color_override("font_color", GREEN if status == "owned" else \
+			(Color(1, 1, 1) if status == "next" else DIM))
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	box.add_child(text)
+
+	var btn := _make_button("")
+	btn.custom_minimum_size = Vector2(52, 18)
+	match status:
+		"owned":
+			btn.text = "Есть"
+			btn.disabled = true
+		"locked":
+			btn.text = "Заперто"
+			btn.disabled = true
+		_:
+			var price := int(row["price_coins"])
+			btn.text = str(price)
+			btn.disabled = GameState.coins < price and not GameState.debug_free_shop
+			btn.pressed.connect(func(): _do_buy_drill_upgrade())
+	box.add_child(btn)
+	return box
+
+
+func _do_buy_drill_upgrade() -> void:
+	var result := ShopService.buy_drill_upgrade()
+	notice(String(result["message"]), 3.0)
+	_render()
+
 
 func _make_craft_row(r: Dictionary) -> Control:
 	var recipe_id := String(r["id"])

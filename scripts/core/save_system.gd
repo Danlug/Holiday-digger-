@@ -119,6 +119,7 @@ static func _serialize() -> Dictionary:
 			"owned_tools": gs.owned_tools,
 			"owned_gear": gs.owned_gear,
 			"current_gear": gs.current_gear,
+			"drill_rig_tier": gs.drill_rig_tier,
 			"rare_find_toasts_shown": gs.rare_find_toasts_shown,
 			"well_level": gs.well_level,
 			"well_last_collect_unix": gs.well_last_collect_unix,
@@ -228,6 +229,9 @@ static func _apply(data: Dictionary) -> void:
 	gs.current_gear = String(economy.get("current_gear", ""))
 	if not gs.current_gear.is_empty() and not gs.owned_gear.has(gs.current_gear):
 		gs.current_gear = ""
+	# Ступень апгрейда бура (см. GameState.drill_rig_tier) — сейвы до этой
+	# задачи её не знают, 0 ("апгрейда нет") — верное значение по умолчанию.
+	gs.drill_rig_tier = int(economy.get("drill_rig_tier", 0))
 	gs.workshop_visited = bool(economy.get("workshop_visited", gs.workshop_visited))
 	gs.next_sale_doubled = bool(economy.get("next_sale_doubled", false))
 	gs.lifetime_coins_from_sales = int(economy.get("lifetime_coins_from_sales", 0))

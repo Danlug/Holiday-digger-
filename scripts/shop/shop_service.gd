@@ -350,6 +350,44 @@ static func buy_gear(gear_id: String) -> Dictionary:
 	return {"ok": true, "message": "%s куплен." % Balance.get_gear_name_ru(gear_id)}
 
 
+# ---------------------------------------------------------------------------
+# Апгрейд бура бурмобиля (задача «Апгрейд бура») — четыре ступени строго по
+# порядку (титан -> платина -> алмаз -> обсидиан), видны только когда бур сам
+# уже куплен (GameState.owns_tool("drill_rig")). Списание — тот же
+# GameState.spend_coins, что и у кирок/ранцев/крафта: тумблер debug_free_shop
+# учтён им самим, отдельно его здесь не проверяем (см. комментарий у
+# spend_coins — «единственная точка списания монет во всей игре»).
+# ---------------------------------------------------------------------------
+
+## Следующая ещё не купленная ступень апгрейда бура (1..N) — то, что магазин
+## продаёт прямо сейчас; GameState.drill_rig_tier + 1. Больше
+## get_drill_rig_tier_count() -> апгрейд уже выбран весь (обсидиан куплен).
+static func next_drill_upgrade_tier() -> int:
+	return GameState.drill_rig_tier + 1
+
+
+## Покупка ОДНОЙ следующей ступени апгрейда бура за монеты. Строго
+## последовательно: нельзя купить платину, не купив титан, — проверяется
+## тем же способом, каким считается "следующая ступень" (GameState.drill_rig_tier
+## растёт на 1 за покупку, тир нельзя перескочить).
+static func buy_drill_upgrade() -> Dictionary:
+	if not GameState.owns_tool("drill_rig"):
+		return {"ok": false, "message": "Сначала нужен сам бурмобиль"}
+	if not can_shop_here():
+		return {"ok": false, "message": "Магазин у входной двери"}
+	var tier := next_drill_upgrade_tier()
+	if tier > Balance.get_drill_rig_tier_count():
+		return {"ok": false, "message": "Все ступени бура уже куплены"}
+	var price := Balance.get_drill_rig_tier_cost_coins(tier)
+	if price <= 0:
+		return {"ok": false, "message": "Эта ступень ещё не готова к продаже"}
+	if not GameState.spend_coins(price):
+		return {"ok": false, "message": "Не хватает монет"}
+	GameState.grant_drill_rig_tier(tier)
+	SaveSystem.save_game()
+	return {"ok": true, "message": "%s установлен — бур стал быстрее." % Balance.get_drill_rig_tier_name_ru(tier)}
+
+
 ## Списать материал на крафт: сначала со склада, потом из рюкзака. Порядок
 ## именно такой — на складе лежит то, что уже донесено и никуда не денется, а
 ## рюкзак игрок, скорее всего, хочет сохранить под обратную дорогу.

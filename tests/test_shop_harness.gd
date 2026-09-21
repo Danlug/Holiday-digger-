@@ -45,6 +45,14 @@ func _ready() -> void:
 	_test_save_migration_v1()
 	_test_rig_state_persists_save_load()
 
+	# --- апгрейд бура (задача «Апгрейд бура») ---
+	_test_drill_upgrade_hidden_without_rig()
+	_test_drill_upgrade_sequential_gate()
+	_test_drill_upgrade_speed_multiplies_live()
+	_test_drill_upgrade_spends_exact_coins()
+	_test_drill_upgrade_debug_free_shop()
+	_test_drill_upgrade_persists_save_load()
+
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
 
@@ -70,6 +78,8 @@ func _fresh() -> void:
 	GameState.owned_gear = []
 	GameState.current_gear = ""
 	GameState.max_depth_reached = 0
+	GameState.drill_rig_tier = 0
+	GameState.debug_free_shop = false
 	# Скупка и верстак работают только дома (ГДД раздел 5: мастерская в
 	# подвале). Большинство проверок — про саму арифметику, поэтому ставим
 	# героя домой; отдельная проверка ниже следит за тем, что из шахты
@@ -722,6 +732,125 @@ func _test_rig_state_persists_save_load() -> void:
 	check("бурмобиль остался экипирован после перезапуска (одно состояние истины — current_tool)",
 		GameState.current_tool == "drill_rig")
 	check("брикеты пережили перезапуск", GameState.get_item_count("fuel_block") == 4)
+
+
+## Апгрейд бура (задача «Апгрейд бура», решение владельца дословно: «в
+## магазине после появления бурмобиля появляется опция улучшить бурмобиль»).
+## Строки видны только когда бурмобиль уже есть — до покупки самой машины
+## апгрейд ступени того, чего нет, смысла не имеет.
+# ---------------------------------------------------------------------------
+
+func _test_drill_upgrade_hidden_without_rig() -> void:
+	_fresh()
+	check("без бурмобиля строк апгрейда нет вовсе (владением проверяет UI)",
+		not GameState.owns_tool("drill_rig"))
+	GameState.owned_tools.append("drill_rig")
+	check("с бурмобилем строки апгрейда есть — четыре тира из balance.json",
+		ShopCatalog.drill_upgrade_rows().size() == Balance.get_drill_rig_tier_count())
+
+
+## Строго последовательно: платину нельзя купить, не купив титан, — тем же
+## гейтом, каким в игре устроены другие последовательные апгрейды.
+func _test_drill_upgrade_sequential_gate() -> void:
+	_fresh()
+	GameState.owned_tools.append("drill_rig")
+	GameState.coins = 100000000
+
+	var rows := ShopCatalog.drill_upgrade_rows()
+	check("тир 1 (титан) — следующий, доступный к покупке", String(rows[0]["status"]) == "next")
+	check("тир 2 (платина) заперт, пока не куплен титан", String(rows[1]["status"]) == "locked")
+	check("тир 3 (алмаз) заперт", String(rows[2]["status"]) == "locked")
+	check("тир 4 (обсидиан) заперт", String(rows[3]["status"]) == "locked")
+
+	# Прыгнуть через ступень нельзя: buy_drill_upgrade всегда продаёт РОВНО
+	# следующую по порядку, а не ту, что попросили бы явно (интерфейс её и
+	# не предлагает — кнопка заблокирована, см. shop_ui.gd:_make_drill_upgrade_row).
+	check("тир 1 продан первым", bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("тир игрока стал 1 (титан)", GameState.drill_rig_tier == 1)
+
+	rows = ShopCatalog.drill_upgrade_rows()
+	check("титан теперь 'куплено'", String(rows[0]["status"]) == "owned")
+	check("платина теперь следующая", String(rows[1]["status"]) == "next")
+	check("алмаз по-прежнему заперт (нельзя перескочить платину)",
+		String(rows[2]["status"]) == "locked")
+
+	check("тир 2 продан вторым", bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("тир игрока стал 2 (платина)", GameState.drill_rig_tier == 2)
+	check("тир 3 продан третьим", bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("тир игрока стал 3 (алмаз)", GameState.drill_rig_tier == 3)
+	check("тир 4 продан четвёртым", bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("тир игрока стал 4 (обсидиан) — последняя ступень", GameState.drill_rig_tier == 4)
+
+	var result := ShopService.buy_drill_upgrade()
+	check("пятой ступени не существует — покупка отказывает", not bool(result["ok"]))
+	check("тир не пополз выше 4", GameState.drill_rig_tier == 4)
+
+	# Без самого бурмобиля апгрейд не продаётся, даже если тир почему-то не 0.
+	_fresh()
+	GameState.coins = 100000000
+	check("без бурмобиля апгрейд не продаётся", not bool(ShopService.buy_drill_upgrade()["ok"]))
+
+
+## Balance.get_tool_speed_multiplier("drill_rig") реально растёт ×1.2 за
+## купленный тир — не только на уровне данных (test_balance.gd это уже
+## проверяет без GameState), а живьём, через GameState.drill_rig_tier,
+## который меняет именно покупка в магазине.
+func _test_drill_upgrade_speed_multiplies_live() -> void:
+	_fresh()
+	GameState.owned_tools.append("drill_rig")
+	GameState.coins = 100000000
+
+	var prev: float = Balance.get_tool_speed_multiplier("drill_rig")
+	for tier in range(1, 5):
+		check("тир %d куплен" % tier, bool(ShopService.buy_drill_upgrade()["ok"]))
+		var cur: float = Balance.get_tool_speed_multiplier("drill_rig")
+		check("тир %d: скорость бурмобиля выросла ровно ×1.2 (сравнение соседних тиров)" % tier,
+			is_equal_approx(cur, prev * 1.2))
+		prev = cur
+
+
+func _test_drill_upgrade_spends_exact_coins() -> void:
+	_fresh()
+	GameState.owned_tools.append("drill_rig")
+	var price := Balance.get_drill_rig_tier_cost_coins(1)
+	GameState.coins = price - 1
+	check("без монет титановый бур не покупается", not bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("неудачная покупка монет не тронула", GameState.coins == price - 1)
+	check("тир не сдвинулся", GameState.drill_rig_tier == 0)
+
+	GameState.coins = price + 42
+	check("покупка прошла", bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("списано ровно %d монет" % price, GameState.coins == 42)
+	check("тир стал 1", GameState.drill_rig_tier == 1)
+
+
+## Тот же тумблер, что и у кирок/ранцев/крафта — единственная точка списания
+## монет во всей игре (GameState.spend_coins), апгрейд бура ничего не
+## изобретает заново (см. ShopService.buy_drill_upgrade).
+func _test_drill_upgrade_debug_free_shop() -> void:
+	_fresh()
+	GameState.owned_tools.append("drill_rig")
+	GameState.coins = 0
+	GameState.debug_free_shop = true
+	check("«Бесплатно»: апгрейд бура проходит без монет", bool(ShopService.buy_drill_upgrade()["ok"]))
+	check("«Бесплатно»: монеты не списались", GameState.coins == 0)
+	check("тир всё равно вырос", GameState.drill_rig_tier == 1)
+	GameState.debug_free_shop = false
+
+
+## Тир апгрейда — часть экономики (scripts/shop/), переживает реальный цикл
+## save_game()/load_game(), как и владение бурмобилем (см.
+## _test_rig_state_persists_save_load выше).
+func _test_drill_upgrade_persists_save_load() -> void:
+	_fresh()
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.drill_rig_tier = 3
+
+	check("сейв записался", SaveSystem.save_game())
+	GameState.drill_rig_tier = 0
+	check("сейв загрузился", SaveSystem.load_game())
+	check("тир апгрейда бура пережил перезапуск", GameState.drill_rig_tier == 3)
+	GameState.drill_rig_tier = 0
 
 
 ## Дымовая проверка шторки: каждый из четырёх разделов магазина и экран

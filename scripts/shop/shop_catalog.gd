@@ -289,6 +289,32 @@ static func gear_line() -> Array:
 	return out
 
 
+## Четыре ступени апгрейда бура бурмобиля (титан/платина/алмаз/обсидиан),
+## строго по порядку покупки (см. ShopService.buy_drill_upgrade). Строка:
+## {id, tier, name_ru, price_coins, speed_multiplier (какой станет скорость
+## бурмобиля ПОСЛЕ покупки этой ступени), desc_ru, status: "owned" | "next" |
+## "locked"}. "next" — единственная ступень, которую можно купить прямо
+## сейчас; "locked" — нужно сначала купить более раннюю (тот же принцип, что
+## у остальных последовательных апгрейдов игры).
+static func drill_upgrade_rows() -> Array:
+	var out: Array = []
+	var owned_tier: int = GameState.drill_rig_tier
+	for tier in range(1, Balance.get_drill_rig_tier_count() + 1):
+		var status: String = "owned" if tier <= owned_tier \
+				else ("next" if tier == owned_tier + 1 else "locked")
+		var speed := Balance.get_drill_rig_speed_at_tier(tier)
+		out.append({
+			"id": Balance.get_drill_rig_tier_id(tier),
+			"tier": tier,
+			"name_ru": Balance.get_drill_rig_tier_name_ru(tier),
+			"price_coins": Balance.get_drill_rig_tier_cost_coins(tier),
+			"speed_multiplier": speed,
+			"desc_ru": "копка ×%s" % mult_text(speed),
+			"status": status,
+		})
+	return out
+
+
 ## Множитель строкой без хвоста из нулей: ×5, а не ×5.0, но ×1.3 — как есть.
 ## На экране в 224 точки лишний знак стоит дороже, чем кажется.
 static func mult_text(value: float) -> String:

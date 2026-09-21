@@ -311,6 +311,49 @@ func tunnel_mouth() -> Vector2i:
 	return Vector2i(TUNNEL_X, 1)
 
 
+# ============================== ДЕКОР ОГОРОДА ==============================
+#
+# Владелец: "для огорода, как до начала игры так и после, используй объекты
+# из ассорти". До Роберта (is_garden_locked()==false) — дикий огород:
+# сорняки, камни, редкий куст; после — ухоженный, грядками (капуста, томаты,
+# подсолнух, тыквы, тачка, горшки, цветы). Раскладка — чистая функция от
+# (world_seed, x) и текущего состояния замка, как и вся остальная генерация
+# (см. заголовок файла): сейв не хранит ни одной клетки декора, только флаг
+# garden_locked, который уже хранится диффом WorldGen.
+#
+# Это ВИЗУАЛЬНЫЙ слой поверхности (y=0), а не клетки шахты — рисует его
+# world_view.gd поверх тайла травы, коллизии у объектов нет (декор, не
+# препятствие — герой проходит сквозь них так же, как сквозь траву).
+const GARDEN_DECOR_WILD := [
+	"stone_1", "stone_2", "stone_3",
+	"grass_weeds_1", "grass_weeds_2", "grass_weeds_1", "grass_weeds_2",
+	"bush_fir", "tree_pine", "tree_spruce",
+	"flowers_dragonfly",
+]
+const GARDEN_DECOR_TENDED := [
+	"cabbage", "tomato", "sunflower", "pumpkin",
+	"wheelbarrow", "pots", "hose_reel", "fork_rake",
+	"daisies", "cornflowers", "hosta", "lavender",
+	"flowers_butterflies", "stone_1", "stone_2",
+]
+# Доля клеток огорода, занятых декором — не каждая: сплошной ряд предметов
+# впритык друг к другу выглядит частоколом, а не грядкой.
+const GARDEN_DECOR_DENSITY := 0.55
+
+
+## Имя спрайта art/env/garden/<name>.png для клетки поверхности (x, y=0)
+## огорода, или "" — клетка пустая (голая трава). Вне огорода, в столбце
+## тоннеля и в столбцах дома всегда "" — вход и дом декором не закрываются.
+func garden_decor_at(x: int) -> String:
+	if x < GARDEN_X_MIN or x == TUNNEL_X:
+		return ""
+	if _roll(x, 0, "garden_decor_has", 0) > GARDEN_DECOR_DENSITY:
+		return ""
+	var list: Array = GARDEN_DECOR_TENDED if _garden_locked else GARDEN_DECOR_WILD
+	var idx: int = clampi(int(_roll(x, 0, "garden_decor_which", 0) * list.size()), 0, list.size() - 1)
+	return list[idx]
+
+
 func is_dug(x: int, y: int) -> bool:
 	return diffs.has(_key(x, y))
 

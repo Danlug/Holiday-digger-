@@ -9,7 +9,7 @@ extends SceneTree
 ## гарантирует): StoryData и StoryText читают файлы напрямую.
 
 const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
-	"mood", "wait", "fade", "item", "tap", "move", "shake", "daynight"]
+	"mood", "wait", "fade", "item", "tap", "move", "shake", "daynight", "grow"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
 	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
@@ -106,6 +106,13 @@ func _test_art_present() -> void:
 					if path.is_empty():
 						continue  # актёр без спрайта — голос за кадром, так задумано
 					check("%s: есть лист %s" % [id, path], ResourceLoader.exists(path))
+				"grow":
+					var g_actor := String(beat.get("actor", ""))
+					var poses: Array = beat.get("poses", [])
+					check("%s: у 'grow' есть список поз" % id, not poses.is_empty())
+					for p in poses:
+						var gpath := StoryData.actor_sheet_path(g_actor, String(p))
+						check("%s: есть лист роста %s" % [id, gpath], ResourceLoader.exists(gpath))
 				"prop":
 					var prop := StoryData.prop(String(beat.get("id", "")))
 					check("%s: реквизит '%s' описан" % [id, beat.get("id", "")], not prop.is_empty())

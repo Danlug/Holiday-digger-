@@ -5,8 +5,9 @@
 		"card": "полноэкранная карточка-титр; sec — через сколько сама уйдёт (тап ускоряет)",
 		"narr": "закадровый текст, ждёт тапа",
 		"say": "реплика; who — id актёра (подпись берётся из speaker.<who>)",
-		"show": "поставить актёра: at=left|center|right, pose=имя листа в art/character/<actor>/, flip, scale",
-		"hide": "убрать актёра",
+		"show": "поставить актёра: at=left|center|right, pose=имя листа в art/character/<actor>/, flip, scale; enter=far_left|left|center|right|far_right — актёр появляется не на месте, а входит туда пешком (enter_sec, по умолчанию 0.7); работает только при первом show нового актёра на сцене",
+		"hide": "убрать актёра; exit_to=far_left|left|center|right|far_right — актёр уходит туда пешком, а не исчезает мгновенно (exit_sec, по умолчанию 0.6), сцена дальше не ждёт",
+		"grow": "пролистать возрастные позы актёра (actor, poses=[age_8..age_15], sec на кадр, at/scale/flip) — рост героя в перемотке времени",
 		"prop": "поставить реквизит из таблицы props",
 		"clear": "убрать со сцены всё",
 		"mood": "сменить свет/фон сцены (таблица moods)",
@@ -64,8 +65,43 @@
 	},
 	"props": {
 		"house": {
+			"_comment": "Плейсхолдер-заглушка (gen_art.py), больше нигде не используется: сцены деда показывают shack (авторский рисунок лачуги), сцены внука и Роберта — house_rich (тот же дом, что и на игровой поверхности). Оставлен, чтобы не терять запись в таблице.",
 			"tex": "res://art/env/house_exterior.png",
 			"scale": 0.95,
+			"y": 0.0
+		},
+		"shack": {
+			"_comment": "Лачуга деда (art/_source/shack.jpg, tools/import_shack.py) — времена ДО Роберта/богатого дома.",
+			"tex": "res://art/env/shack.png",
+			"scale": 0.48,
+			"y": 0.0
+		},
+		"house_rich": {
+			"_comment": "Тот же спрайт, что и на игровой поверхности (scripts/house/house_system.gd:HOUSE_SPRITE) — дом бабки после смерти деда.",
+			"tex": "res://art/env/house_rich.png",
+			"scale": 0.5,
+			"y": 0.0
+		},
+		"garden_bush": {
+			"_comment": "Ассорти огорода (tools/import_garden.py) — дикое состояние, сцена деда.",
+			"tex": "res://art/env/garden/bush_fir.png",
+			"scale": 0.55,
+			"y": 0.0
+		},
+		"garden_stone": {
+			"tex": "res://art/env/garden/stone_1.png",
+			"scale": 0.6,
+			"y": 0.0
+		},
+		"garden_cabbage": {
+			"_comment": "Ассорти огорода — ухоженное состояние (после Роберта).",
+			"tex": "res://art/env/garden/cabbage.png",
+			"scale": 0.9,
+			"y": 0.0
+		},
+		"garden_wheelbarrow": {
+			"tex": "res://art/env/garden/wheelbarrow.png",
+			"scale": 0.7,
 			"y": 0.0
 		},
 		"fence": {
@@ -164,13 +200,34 @@
 				},
 				{
 					"t": "prop",
-					"id": "house",
+					"id": "shack",
 					"at": "right"
 				},
 				{
 					"t": "prop",
 					"id": "fence",
 					"at": "far_right"
+				},
+				{
+					"t": "prop",
+					"id": "garden_bush",
+					"at": "center"
+				},
+				{
+					"t": "prop",
+					"id": "garden_stone",
+					"at": "far_left"
+				},
+				{
+					"t": "show",
+					"actor": "grandpa",
+					"at": "left",
+					"pose": "walk",
+					"enter": "far_left"
+				},
+				{
+					"t": "wait",
+					"sec": 0.7
 				},
 				{
 					"t": "show",
@@ -292,7 +349,8 @@
 				},
 				{
 					"t": "hide",
-					"actor": "grandma_poor"
+					"actor": "grandma_poor",
+					"exit_to": "far_right"
 				},
 				{
 					"t": "move",
@@ -382,6 +440,18 @@
 					"sec": 2.6
 				},
 				{
+					"t": "grow",
+					"actor": "boy",
+					"poses": ["age_8", "age_9", "age_10", "age_11", "age_12", "age_15"],
+					"sec": 0.5,
+					"at": "center",
+					"scale": 2.2
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
 					"t": "mood",
 					"id": "room"
 				},
@@ -442,7 +512,7 @@
 				},
 				{
 					"t": "prop",
-					"id": "house",
+					"id": "house_rich",
 					"at": "center"
 				},
 				{
@@ -459,6 +529,17 @@
 					"t": "show",
 					"actor": "boy",
 					"at": "left",
+					"pose": "walk",
+					"enter": "far_left"
+				},
+				{
+					"t": "wait",
+					"sec": 0.6
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
 					"pose": "idle"
 				},
 				{
@@ -469,6 +550,18 @@
 					"t": "say",
 					"who": "boy",
 					"text": "intro_boy.s3"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_rich",
+					"at": "right",
+					"pose": "walk",
+					"flip": true,
+					"enter": "far_right"
+				},
+				{
+					"t": "wait",
+					"sec": 0.6
 				},
 				{
 					"t": "show",
@@ -508,7 +601,8 @@
 				},
 				{
 					"t": "hide",
-					"actor": "grandma_rich"
+					"actor": "grandma_rich",
+					"exit_to": "far_right"
 				},
 				{
 					"t": "narr",
@@ -1134,8 +1228,18 @@
 				},
 				{
 					"t": "prop",
-					"id": "house",
+					"id": "house_rich",
 					"at": "right"
+				},
+				{
+					"t": "prop",
+					"id": "garden_wheelbarrow",
+					"at": "left"
+				},
+				{
+					"t": "prop",
+					"id": "garden_cabbage",
+					"at": "center"
 				},
 				{
 					"t": "narr",

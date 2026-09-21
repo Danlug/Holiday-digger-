@@ -56,6 +56,9 @@ func _ready() -> void:
 	_test_corner_rounding_diagonal_input_along_staircase()
 	_test_house_never_diggable_by_any_tool()
 
+	# --- задача «Огород до автокопки: копать только правее лестницы» ---
+	_test_pre_autodig_gate_blocks_left_of_stairs()
+
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
 
@@ -1026,6 +1029,66 @@ func _test_house_never_diggable_by_any_tool() -> void:
 			w.get_tile(hx, hy) != TileTypes.Type.EMPTY)
 		check("под домом «%s»: копка даже не начинается" % tool_id, player.digging == null)
 		check("под домом «%s»: опыт не начислен" % tool_id, GameState.xp == xp_before)
+
+	player.hold_down = false
+	player.world = world
+
+
+# ---------------------------------------------------------------------------
+# Огород до автокопки: копать можно только правее лестницы (ГДД п.9, решение
+# владельца — см. world_gen.gd:is_pre_autodig_locked_cell). Гейт по
+# умолчанию снят (голый WorldGen как и раньше свободен), поэтому тест взводит
+# его сам, как это в игре делает StoryDirector.boot() для новой игры.
+# ---------------------------------------------------------------------------
+
+func _test_pre_autodig_gate_blocks_left_of_stairs() -> void:
+	# seed 90005, y=1: x=16 и x=19 — гарантированно DIRT (см. отчёт агента),
+	# ни то ни другое не задето реальной лестницей на первом уровне (она
+	# занимает там только x=15) — отказ будет ровно из-за гейта, не из-за типа
+	# клетки или лестницы.
+	var w := WorldGen.new(90005)
+	player.world = w
+	w.lock_pre_autodig_garden()
+	GameState.current_tool = "shovel"
+	GameState.owned_tools = ["shovel"]
+
+	var xp_before := GameState.xp
+	player.x = 16.5; player.y = 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+	_tick(90)
+	check("до автокопки: клетка левее лестницы (x=16) не копается",
+		w.get_tile(16, 1) != TileTypes.Type.EMPTY)
+	check("копка левее лестницы даже не начинается", player.digging == null)
+	check("опыт за отказанную копку не начислен", GameState.xp == xp_before)
+
+	# правее правого края лестницы (x=19) — копать можно как обычно
+	player.hold_down = false
+	player.x = 19.5; player.y = 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+	# Копка не мгновенна (база 3с/клетка, ГДД раздел 6) — тиков нужно больше,
+	# чем для проверки отказа, где digging не стартует вовсе.
+	_tick(300)
+	check("до автокопки: клетка правее лестницы (x=19) копается",
+		w.get_tile(19, 1) == TileTypes.Type.EMPTY)
+
+	# сценарий со скоростной копкой запустился — гейт снят (единая точка,
+	# см. AutoDigTutorial.begin) — та же клетка слева от лестницы берётся
+	w.unlock_pre_autodig_garden()
+	player.hold_down = false
+	player.x = 16.5; player.y = 0.5
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+	_tick(300)
+	check("после снятия гейта клетка (16,1) тоже копается",
+		w.get_tile(16, 1) == TileTypes.Type.EMPTY)
 
 	player.hold_down = false
 	player.world = world

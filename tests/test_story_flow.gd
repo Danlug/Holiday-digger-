@@ -98,6 +98,14 @@ func _test_intro_plays_and_finishes() -> void:
 	check("катсцена запустилась сама", director.cutscene.is_playing)
 	check("на время катсцены герой заморожен", player.frozen)
 
+	# ГДД п.9 (решение владельца): "в начале игры ему можно копать только
+	# справа от дома и лестницы" — на новой игре StoryDirector.boot() обязан
+	# взвести этот гейт сам, ещё до всякого интро.
+	check("новая игра: огород левее лестницы заперт с самого старта",
+		world.is_pre_autodig_locked_cell(16, 2))
+	check("новая игра: огород правее лестницы копается с самого старта",
+		not world.is_pre_autodig_locked_cell(20, 2))
+
 	director.cutscene.skip()
 	await _frame()
 	check("сцена деда помечена просмотренной", StoryState.is_seen("intro_grandpa"))
@@ -185,6 +193,11 @@ func _test_autodig_terminates() -> void:
 		"получено: %d" % (GameState.coins - coins_before))
 	check("клад дал 5 премиум-валюты", GameState.dollars >= 5)
 	check("итог автокопки показан", StoryState.is_seen("autodig_done"))
+
+	# Автокопка (сценарий со скоростной копкой) сняла гейт "только правее
+	# лестницы" — огород слева от неё теперь копается как обычно.
+	check("после автокопки огород левее лестницы больше не заперт",
+		not world.is_pre_autodig_locked_cell(16, 2))
 
 
 func _test_tutorial_does_not_loop() -> void:

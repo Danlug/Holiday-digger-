@@ -79,8 +79,29 @@ func boot() -> void:
 
 	_connect_signals()
 	_find_gauges()
+	_sync_pre_autodig_lock()
 	_queue_intro_if_new_game()
 	_play_next_if_idle()
+
+
+## Взводит/снимает гейт WorldGen "до автокопки — только правее лестницы"
+## (см. world_gen.gd:is_pre_autodig_locked_cell) по сохранённому прогрессу.
+## Нужно на каждой загрузке: WorldGen — чистый RefCounted без автозагрузок и
+## своего состояния между сессиями не помнит (сам гейт живёт в оперативной
+## памяти, не в сейве, — см. комментарий у поля _pre_autodig_locked), а
+## StoryState.is_seen("autodig_start") как раз и есть признак "сценарий со
+## скоростной копкой уже запускался" — тот же самый момент, которым
+## AutoDigTutorial.begin() снимает гейт вживую. Без этой синхронизации сейв,
+## загруженный посреди самого первого обучения (до трёх ручных копок),
+## получил бы огород без ограничения, а сейв после автокопки — наоборот,
+## запертый левый край без единого способа его снять.
+func _sync_pre_autodig_lock() -> void:
+	if world == null:
+		return
+	if StoryState.is_seen("autodig_start"):
+		world.unlock_pre_autodig_garden()
+	else:
+		world.lock_pre_autodig_garden()
 
 
 ## Локаль берём системную, но файла перевода может ещё не быть — StoryText
@@ -483,6 +504,8 @@ func _on_dig_refused(reason: String) -> void:
 			hud.toast(StoryText.get_text("quest.gold_needs_pickaxe"), 3.0)
 		"foundation_needs_pickaxe":
 			hud.toast(StoryText.get_text("quest.foundation_needs_pickaxe"), 3.4)
+		"garden_left_of_stairs":
+			hud.toast(StoryText.get_text("quest.garden_left_of_stairs"), 3.0)
 
 
 func _on_dig_finished(_x: int, _y: int, type: int, _mineral_id: String, _was_loot: bool, _coins: int) -> void:
@@ -529,6 +552,11 @@ func _on_max_depth_changed(depth: int) -> void:
 		cutscene.abort()
 	if auto_dig != null:
 		auto_dig.abort()
+	# Сброс возвращает и гейт "только правее лестницы" — сюжет начинается
+	# заново, значит и обучение начинается с той же самой точки (мир при этом
+	# уже засыпан заново самим hud.gd, см. его _on_reset_pressed).
+	if world != null:
+		world.lock_pre_autodig_garden()
 	StoryState.clear_all()
 	_manual_digs = 0
 	_objective = ""

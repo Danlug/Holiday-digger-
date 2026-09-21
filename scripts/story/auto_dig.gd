@@ -50,6 +50,14 @@ var _skip_btn: Button
 func begin(player: Node, world: WorldGen) -> void:
 	_player = player
 	_world = world
+	# "Пока не запустится сценарий со скоростным копанием" (ГДД п.9, решение
+	# владельца) — вот он и запустился: гейт "копать можно только справа от
+	# дома и лестницы" снимается здесь же, единой точкой, а не в сюжете —
+	# begin() зовут и StoryDirector, и тесты напрямую, и оба раза это ровно
+	# тот момент, когда ограничение теряет смысл (см. world_gen.gd:
+	# is_pre_autodig_locked_cell).
+	if _world != null:
+		_world.unlock_pre_autodig_garden()
 	_cells = _build_cell_list()
 	_index = 0
 	_cell_time = 0.0

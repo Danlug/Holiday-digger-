@@ -236,8 +236,44 @@ func _draw_garden_decor() -> void:
 		_overlay.draw_texture_rect(tex, Rect2(x, y, w, h), false)
 
 
+## Припаркованный у устья бурмобиль (GameState.rig_parked_at, см.
+## player.gd "Бурмобиль как транспорт" и tools/import_rig_exit.py) — объект
+## мира, а не героя: он стоит там и когда герой давно ушёл в дом пешком.
+## Свой, отдельный от _draw_garden_decor (та функция и её данные — GARDEN_*
+## в world_gen.gd — чужая задача декора огорода, не трогаем).
+const RIG_PARKED_TEX_PATH := "res://art/env/drill_mobile_parked.png"
+var _rig_parked_tex: Texture2D = null
+var _rig_parked_tex_checked: bool = false
+
+
+func _draw_parked_rig() -> void:
+	if not GameState.is_rig_parked():
+		return
+	# Во время самой анимации выхода/посадки машина уже нарисована как часть
+	# кадра rig_exit.png (see character_view._draw_rig_transition) — второй,
+	# мировой спрайт поверх неё дал бы удвоенную машину на экране.
+	if player != null and String(player.get("rig_transition")) != "":
+		return
+	if not _rig_parked_tex_checked:
+		_rig_parked_tex_checked = true
+		if ResourceLoader.exists(RIG_PARKED_TEX_PATH):
+			_rig_parked_tex = load(RIG_PARKED_TEX_PATH)
+	if _rig_parked_tex == null:
+		return
+	var cell: Vector2i = GameState.rig_parked_at
+	var w: float = _rig_parked_tex.get_width() / ART_SCALE
+	var h: float = _rig_parked_tex.get_height() / ART_SCALE
+	# Низ машины — на линии земли (верх клетки y=0), центр — по клетке
+	# парковки; та же привязка, что у декора огорода до правки середины
+	# тайла (машина не "растение", ей стоять на кромке, а не расти из неё).
+	var x: float = cell.x * TILE + (TILE - w) / 2.0
+	var y: float = cell.y * TILE - h
+	_overlay.draw_texture_rect(_rig_parked_tex, Rect2(x, y, w, h), false)
+
+
 func _on_overlay_draw() -> void:
 	_draw_garden_decor()
+	_draw_parked_rig()
 	if player == null:
 		return
 	var pcx: float = player.x * TILE

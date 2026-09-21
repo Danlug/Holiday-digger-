@@ -139,6 +139,15 @@ var _was_underground: bool = false
 ## тратится не на каждой клетке). Не сохраняется между сессиями: точность в
 ## доли блока никто не заметит, а хранить её ради этого не стоит.
 var _rig_fuel_progress: float = 0.0
+## Тост «нет брикетов» у невидимой стены устья и тост «кончилось топливо»
+## при попытке копать без брикетов уже показаны для текущего непрерывного
+## упора в стену/удержания копки — оба места вызываются каждый кадр физики
+## (_move_y — пока держится вниз, _start_dig — пока держится направление
+## копки), и без этих флагов тост эмитился бы 60 раз в секунду вместо одного
+## раза за попытку. Сбрасываются на "отпустил ввод"/"перестал упираться" —
+## новая попытка снова получает своё сообщение.
+var _rig_wall_warned: bool = false
+var _rig_dig_stall_warned: bool = false
 
 var frozen: bool = false       # true во время сцены смерти/катсцен — герой не управляется
 
@@ -516,8 +525,14 @@ func _move_y(dt: float) -> void:
 		y = 1.0 - HH - 0.002
 		vy = minf(vy, 0.0)
 		on_ground = true
-		rig_fuel_warning.emit("Нет брикетов — сделай на верстаке из угля")
+		# Пока герой упирается в стену, этот if бьёт каждый физический кадр —
+		# без флага тост сыпался бы 60 раз в секунду вместо одного раза за
+		# попытку (см. _rig_wall_warned выше).
+		if not _rig_wall_warned:
+			_rig_wall_warned = true
+			rig_fuel_warning.emit("Нет брикетов — сделай на верстаке из угля")
 		return
+	_rig_wall_warned = false
 
 	var left := x - HW + 0.02
 	var right := x + HW - 0.02
@@ -635,10 +650,18 @@ func _apply_intent(dt: float) -> void:
 		var edge: float = (float(cx + 1) - (x + HW)) if hold_dx > 0 else ((x - HW) - float(cx))
 		if ahead != TileTypes.Type.EMPTY and edge < 0.06:
 			_start_dig(cx + hold_dx, cy)
+		else:
+			_rig_dig_stall_warned = false
 	elif hold_down:
 		var below: int = world.get_tile(cx, cy + 1) if world != null else TileTypes.Type.EMPTY
 		if below != TileTypes.Type.EMPTY:
 			_start_dig(cx, cy + 1)
+		else:
+			_rig_dig_stall_warned = false
+	else:
+		# Не держит ни направление, ни "вниз" — новая попытка копать без
+		# топлива (после этого простоя) снова получит своё сообщение.
+		_rig_dig_stall_warned = false
 
 
 ## Отменяет копку, если игрок увёл управление с копаемой клетки (см.
@@ -697,7 +720,12 @@ func _start_dig(tx: int, ty: int) -> void:
 	# начале копки, а не в физике движения.
 	if is_in_rig() and not _has_rig_fuel():
 		digging = null
-		rig_fuel_warning.emit("Кончилось топливо")
+		# _start_dig зовётся каждый кадр, пока герой держит направление копки
+		# (см. _apply_intent) — без флага тост сыпался бы каждый кадр вместо
+		# одного раза за попытку (сбрасывается там же, когда ввод отпущен).
+		if not _rig_dig_stall_warned:
+			_rig_dig_stall_warned = true
+			rig_fuel_warning.emit("Кончилось топливо")
 		return
 
 	# Запечатанный Робертом огород (уровни 1..4 вне ствола тоннеля) не

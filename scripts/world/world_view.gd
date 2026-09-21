@@ -206,6 +206,13 @@ func _draw_garden_decor() -> void:
 	if world == null:
 		return
 	for wx in range(_cam_bx - 1, _cam_bx + view_w + 2):
+		# Клетка y=0 (трава) сама никогда не копается (world.get_tile трактует
+		# y<1 как EMPTY всегда), но игрок мог выкопать землю ПОД декором
+		# (y=1, самый верхний диггаемый слой) — тогда дерево/куст стоял бы
+		# прямо над чёрной ямой, повиснув в воздухе. Декор рисуется только
+		# над нетронутой землёй.
+		if world.is_dug(wx, 1):
+			continue
 		var name := world.garden_decor_at(wx)
 		if name.is_empty():
 			continue

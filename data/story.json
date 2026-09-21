@@ -71,9 +71,10 @@
 			"y": 0.0
 		},
 		"shack": {
-			"_comment": "Лачуга деда (art/_source/shack.jpg, tools/import_shack.py) — времена ДО Роберта/богатого дома.",
+			"_comment": "Лачуга деда (art/_source/shack.jpg, tools/import_shack.py) — времена ДО Роберта/богатого дома. scale поднят с 0.48: при нём лачуга (210px * 0.48 = 101px) была почти одного роста с актёром (grandpa, default show.scale=2.0 -> 96px) и на сцене читалась не домом, а сарайчиком чуть выше деда. 0.95 -> 199.5px, вдвое больше актёра — дом обязан читаться домом. Шире сцены (224px) — overflow уводит лишнее за края вместо сжатия (см. cutscene_player.gd:_place_prop).",
 			"tex": "res://art/env/shack.png",
-			"scale": 0.48,
+			"scale": 0.95,
+			"overflow": true,
 			"y": 0.0
 		},
 		"house_rich": {

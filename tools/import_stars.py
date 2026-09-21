@@ -26,6 +26,16 @@
 {"regions": [{"x":.., "y":.., "w":.., "h":..}, ...]} — так SkyView не должен
 грузить десятки отдельных файлов текстур.
 
+Второй источник (владелец, доп. задание "звёзды/облака/солнце/месяц"):
+art/_source/sky_clouds_sun_moon_sheet.jpg — в правом нижнем углу, рядом с
+солнцем и месяцем, есть маленький квадрат-образец со звёздами (~8 штук,
+россыпь крестиков/огоньков разного размера на однотонном светло-голубом
+фоне, тот же приём хромакея, что и выше, только фон другой и почти без
+JPEG-шума на кромке — порог уже, а не эталонный T_LOW/T_HIGH зелёного
+листа). Эти звёзды ДОБАВЛЯЮТСЯ в тот же атлас, тем же способом (вырезка →
+уменьшение до 3-7 логич. px → упаковка в общую полосу) — SkyView не должен
+знать, что часть звёзд родом с другого листа.
+
 Запуск:  python3 tools/import_stars.py
 """
 
@@ -35,6 +45,7 @@ import random
 import sys
 from collections import deque
 
+import numpy as np
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -42,8 +53,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import ART_SCALE, shrink  # noqa: E402
 
 SRC = os.path.join(ROOT, "art", "_source", "stars_sheet.jpg")
+SRC2 = os.path.join(ROOT, "art", "_source", "sky_clouds_sun_moon_sheet.jpg")
 OUT_PNG = os.path.join(ROOT, "art", "env", "stars.png")
 OUT_JSON = os.path.join(ROOT, "art", "env", "stars.json")
+
+# Квадрат-образец со звёздами на втором листе (см. докстринг файла и
+# tools/import_clouds.py — там же солнце/месяц с того же листа). Квадрат
+# обведён скруглённой светлой рамкой (~166,222,248, как у соседней панели
+# солнца) поверх тёмной "ночной" заливки (124,178,209, тот же тон, что у
+# фона месяца) — на глаз эти два похожих синих на маленькой картинке не
+# различить, нашлось только сравнением медианы по областям (см. отчёт
+# агента). bbox взят С ЗАПАСОМ ВНУТРЬ от рамки (не только от края листа) —
+# иначе скруглённые углы рамки режутся на "крюки", неотличимые связными
+# компонентами от настоящих звёзд.
+SRC2_BOX = (900, 315, 999, 412)
+SRC2_BG = (124, 178, 209)
+SRC2_T_LOW = 20.0
+SRC2_T_HIGH = 40.0
+SRC2_STAR_MAX_PX = 30   # аномально крупный компонент — не звезда, см. main()
 
 BG = (76, 152, 55)
 # Гистограмма расстояний до фона на этом листе распадается на два чётких
@@ -145,19 +172,78 @@ def _cut(rgba, labels, w, comp_id, box):
     return out
 
 
+def _alpha_and_color_generic(im, bg, t_low, t_high):
+    """Как _alpha_and_color(), но без зелёного spill suppression (тот
+    годится только для хромакея по зелёному) и с настраиваемым фоном/
+    порогом — для второго листа (SRC2). bg — один цвет или список цветов
+    (несколько фоновых тонов в одном кадре, см. SRC2_BG); расстояние до
+    фона берётся как МИНИМУМ по всем эталонам."""
+    bgs = [bg] if isinstance(bg[0], (int, float)) else list(bg)
+    w, h = im.size
+    src = im.load()
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    dst = out.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b = src[x, y]
+            d = min(_dist((r, g, b), one_bg) for one_bg in bgs)
+            if d <= t_low:
+                continue
+            a = 255 if d >= t_high else round(255 * (d - t_low) / (t_high - t_low))
+            dst[x, y] = (r, g, b, a)
+    return out
+
+
+def _extract_components(rgba, area_min):
+    w, h = rgba.size
+    labels, comps = _label(rgba)
+    comps = [c for c in comps if c["area"] >= area_min]
+    return [_cut(rgba, labels, w, c["id"], c["box"]) for c in comps]
+
+
 def main():
     sheet = Image.open(SRC).convert("RGB")
     w, h = sheet.size
     print("лист:", sheet.size)
 
     rgba = _alpha_and_color(sheet)
-    labels, comps = _label(rgba)
-    print(f"звёзд найдено (area>={AREA_MIN}): {len(comps)}")
+    cuts = _extract_components(rgba, AREA_MIN)
+    print(f"звёзд найдено на {os.path.relpath(SRC, ROOT)} (area>={AREA_MIN}): {len(cuts)}")
+
+    # Второй лист: квадрат-образец со звёздами рядом с солнцем/месяцем (см.
+    # докстринг файла и tools/import_clouds.py — задание владельца просило
+    # добавить ОДИН ЕЩЁ вариант звезды из этого квадрата, не разобрать его
+    # целиком). area_min=15 — заметно выше, чем AREA_MIN зелёного листа:
+    # у JPEG-края звёзд на этом фоне анти-алиасинг местами рвёт контур на
+    # 4-5-пиксельные "островки" (не собственные лучи звезды, а осколки
+    # кромки антиалиасинга) — с area_min=3 их набиралось до 9 штук на
+    # компонент, и после уменьшения shrink() они превращались в кривые
+    # бесформенные пятна (см. отчёт агента). area_min=15 оставляет только
+    # по-настоящему цельные компоненты — самую крупную "главную" звезду
+    # плюс несколько компактных крестиков поменьше.
+    sheet2 = Image.open(SRC2).convert("RGB")
+    crop2 = sheet2.crop(SRC2_BOX)
+    rgba2 = _alpha_and_color_generic(crop2, SRC2_BG, SRC2_T_LOW, SRC2_T_HIGH)
+    cuts2 = _extract_components(rgba2, area_min=15)
+    # Дополнительная защита от обрывков скруглённого угла рамки (тонкая
+    # дуга в большом bbox, см. SRC2_BG): и по форме bbox, и по плотности
+    # непрозрачных px внутри него — у компактной звезды/креста она заметно
+    # выше, чем у дуги.
+    def _looks_like_star(cut) -> bool:
+        if max(cut.size) > SRC2_STAR_MAX_PX or min(cut.size) < 2:
+            return False
+        if max(cut.size) / min(cut.size) > 5:
+            return False
+        alpha = np.asarray(cut)[:, :, 3]
+        density = float((alpha > 128).sum()) / (cut.width * cut.height)
+        return density >= 0.3
+
+    cuts2 = [c for c in cuts2 if _looks_like_star(c)]
+    print(f"звёзд найдено на {os.path.relpath(SRC2, ROOT)} (квадрат-образец): {len(cuts2)}")
 
     rng = random.Random(SEED)
     small = []
-    for c in comps:
-        cut = _cut(rgba, labels, w, c["id"], c["box"])
+    for cut in cuts + cuts2:
         target_logical = rng.uniform(MIN_LOGICAL_PX, MAX_LOGICAL_PX)
         target_px = max(2, round(target_logical * ART_SCALE))
         # большая сторона -> target_px, вторая сохраняет пропорцию исходника
@@ -188,7 +274,8 @@ def main():
     atlas.save(OUT_PNG)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({
-            "source": "art/_source/stars_sheet.jpg",
+            "source": ["art/_source/stars_sheet.jpg",
+                       "art/_source/sky_clouds_sun_moon_sheet.jpg (квадрат-образец)"],
             "art_scale": ART_SCALE,
             "count": len(regions),
             "regions": regions,

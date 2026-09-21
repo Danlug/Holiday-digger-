@@ -1,7 +1,10 @@
 {
-  "source": "art/_source/stars_sheet.jpg",
+  "source": [
+    "art/_source/stars_sheet.jpg",
+    "art/_source/sky_clouds_sun_moon_sheet.jpg (квадрат-образец)"
+  ],
   "art_scale": 3,
-  "count": 40,
+  "count": 44,
   "regions": [
     {
       "x": 0,
@@ -242,6 +245,30 @@
       "y": 0,
       "w": 14,
       "h": 13
+    },
+    {
+      "x": 625,
+      "y": 0,
+      "w": 10,
+      "h": 11
+    },
+    {
+      "x": 636,
+      "y": 0,
+      "w": 19,
+      "h": 16
+    },
+    {
+      "x": 656,
+      "y": 0,
+      "w": 14,
+      "h": 18
+    },
+    {
+      "x": 671,
+      "y": 0,
+      "w": 14,
+      "h": 14
     }
   ]
 }

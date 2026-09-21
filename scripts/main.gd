@@ -11,6 +11,7 @@ var player: Node2D
 var world_view: Node2D
 var sky_view: SkyView
 var backdrop: Backdrop
+var clouds_view: CloudsView
 var hud: Control
 var view_root: Node2D
 
@@ -35,10 +36,12 @@ func _ready() -> void:
 	add_child(view_root)
 
 	# Порядок слоёв ViewRoot (рисуется от первого к последнему):
-	#   SkyView  — градиент неба, солнце, месяц, звёзды (за всем);
-	#   Backdrop — гора вдали (параллакс) и забор со средним планом;
-	#   WorldView — тайлы, трава, декор, дом (небо тайлами не красит).
-	# Все три — дети одного ViewRoot: движение камеры (view_root.position)
+	#   SkyView    — градиент неба, солнце, месяц, звёзды (за всем);
+	#   Backdrop   — гора вдали (параллакс) и забор со средним планом;
+	#   CloudsView — облака (параллакс БЛИЖЕ горы — рисуются поверх неё, но
+	#                не закреплены по высоте, см. clouds_view.gd);
+	#   WorldView  — тайлы, трава, декор, дом (небо тайлами не красит).
+	# Все четыре — дети одного ViewRoot: движение камеры (view_root.position)
 	# достаётся им без второй копии кода.
 	sky_view = preload("res://scripts/world/sky_view.gd").new()
 	sky_view.name = "SkyView"
@@ -47,6 +50,10 @@ func _ready() -> void:
 	backdrop = preload("res://scripts/world/backdrop.gd").new()
 	backdrop.name = "Backdrop"
 	view_root.add_child(backdrop)
+
+	clouds_view = preload("res://scripts/world/clouds_view.gd").new()
+	clouds_view.name = "CloudsView"
+	view_root.add_child(clouds_view)
 
 	world_view = preload("res://scripts/world/world_view.gd").new()
 	world_view.name = "WorldView"
@@ -161,6 +168,7 @@ func _process(delta: float) -> void:
 	var cam: Vector2 = _camera()
 	view_root.position = Vector2(-cam.x * TILE, -cam.y * TILE)
 	backdrop.update(cam)
+	clouds_view.update(cam)
 	hud.set_camera(cam)
 
 	world_view.render(cam)

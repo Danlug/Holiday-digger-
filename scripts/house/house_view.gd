@@ -45,19 +45,20 @@ const HEADER_HEIGHT := 40.0
 const STAGE_HEIGHT := 440.0
 const VIEW_W := 224.0  # project.godot: window/size/viewport_width
 
-## Скорость ходьбы по комнате — тот же порядок величины, что WALK*TILE в
-## шахте (player.gd: 4.2 * 32 = 134.4 px/c), чтобы «те же органы управления»
-## ощущались так же и внутри дома.
-const WALK_SPEED_PX_S := 130.0
+## Скорость ходьбы по комнате — решение владельца (2026-09-21): «ходить он
+## должен в 2 раза быстрее». Было 130 (тот же порядок, что WALK*TILE в шахте:
+## player.gd 4.2 * 32 = 134.4 px/c) — то есть быстрее не только шахтной
+## скорости, а этого же дома до правки.
+const WALK_SPEED_PX_S := 260.0
 const HERO_W := 48.0
 const HERO_H := 48.0
 
-## Герой в доме крупнее, чем в шахте (решение владельца: «в доме он должен
-## быть в 5 раз больше»). Комнаты нарисованы в другом масштабе — дверь в
-## салоне высотой почти в половину экрана, — и кадр 48×48 рядом с ней читался
-## как игрушечный. Пиксель героя при этом становится крупнее пикселя фона:
-## это цена того, чтобы он был одного роста с мебелью.
-const HERO_SCALE := 5.0
+## Герой в доме крупнее, чем в шахте, но решением владельца (2026-09-21)
+## уменьшен на 25% от прежних 5.0 («в доме можно... сделать на 25 процентов
+## меньше»): 5.0 * 0.75 = 3.75. Раньше герой ростом уходил в 1.6 раза выше
+## дверного проёма — теперь примерно в 1.2, читается как "крупный, но
+## человеческий", а не как великан в кукольном домике.
+const HERO_SCALE := 3.75
 
 ## Кадр героя на диске в ART_SCALE раз крупнее логических 48×48 (см.
 ## tools/import_art.py). В доме он к тому же увеличен впятеро, поэтому
@@ -67,7 +68,13 @@ const ART_SCALE := 3.0
 ## character_view.gd (48 - 46 = 2): кадр героя шире тела, и без этого запаса
 ## подошва повисала бы над полом.
 const FOOT_PAD := 2.0
-const WALK_FPS := 8.0
+## Темп смены кадров ходьбы — держим тем же отношением к WALK_SPEED_PX_S, что
+## было раньше (8 / 130), иначе при удвоенной скорости ноги переступают
+## вдвое реже, чем нужно для пройденного расстояния, и герой едет "на
+## коньках", а не идёт (см. отчёт агента про анимации катсцен — тот же
+## эффект, что ловит cutscene_player.ANIM_FPS, только здесь считанный от
+## скорости явно).
+const WALK_FPS := 8.0 * (WALK_SPEED_PX_S / 130.0)
 
 const IDLE_SHEET := "res://art/character/idle.png"
 const WALK_SHEET := "res://art/character/walk.png"
@@ -295,7 +302,6 @@ func _build_stage() -> void:
 
 func _build_walk_buttons() -> void:
 	_walk_left_btn = _need(_stage, "WalkLeft", Button) as Button
-	_walk_left_btn.text = "◀"
 	_style_button(_walk_left_btn)
 	_walk_left_btn.anchor_top = 1.0
 	_walk_left_btn.anchor_bottom = 1.0
@@ -303,9 +309,9 @@ func _build_walk_buttons() -> void:
 	_walk_left_btn.offset_right = 44
 	_walk_left_btn.offset_top = -40
 	_walk_left_btn.offset_bottom = -6
+	_arrow_icon(_walk_left_btn, Vector2.LEFT)
 
 	_walk_right_btn = _need(_stage, "WalkRight", Button) as Button
-	_walk_right_btn.text = "▶"
 	_style_button(_walk_right_btn)
 	_walk_right_btn.anchor_left = 1.0
 	_walk_right_btn.anchor_right = 1.0
@@ -315,6 +321,18 @@ func _build_walk_buttons() -> void:
 	_walk_right_btn.offset_right = -6
 	_walk_right_btn.offset_top = -40
 	_walk_right_btn.offset_bottom = -6
+	_arrow_icon(_walk_right_btn, Vector2.RIGHT)
+
+
+## Кнопки хода были подписаны текстом "◀"/"▶" — в шрифте темы этих символов
+## нет, и кнопка показывала пустоту вместо стрелки (та же ловушка, что и у
+## стрелок режима "стрелки" в hud.gd, см. её же комментарий). Треугольник
+## общим хелпером ArrowIcon вместо текста — исправление, а не смена
+## поведения: кнопка по-прежнему просто "шаг влево/вправо".
+func _arrow_icon(btn: Button, dir: Vector2) -> void:
+	var icon := _need(btn, "Arrow", ArrowIcon) as ArrowIcon
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.set_dir(dir)
 
 
 func _build_sleep_overlay() -> void:
@@ -442,6 +460,21 @@ func go_to_room(id: String, enter_x: float = -1.0) -> void:
 	if changed:
 		_load_background()
 	var frac: float = enter_x if enter_x >= 0.0 else float(_room_def.get("spawn_x", 0.5))
+	# "Разместить чуть дальше" (решение владельца, 2026-09-21): точки входа —
+	# дверь, лестница, веранда — стоят у самого края комнаты (enter_at из
+	# data/rooms.json, или спальный дефолт spawn_x, как у веранды в hall:
+	# 0.93, почти вплотную к её же хотспоту "Выйти на улицу" на 0.95). Герой
+	# появлялся вплотную к точке — сразу в радиусе СВОЕГО ЖЕ хотспота, и
+	# кнопка "Зайти"/"Подняться"/"Выйти" срабатывала обратно почти
+	# мгновенно. Если точка появления и так у края (а не намеренно
+	# центральный spawn_x вроде кровати в спальне — её не трогаем), сдвигаем
+	# на ширину героя вглубь комнаты, к центру — не жёстко вправо/влево,
+	# двери бывают и слева (hall), и справа (bedroom, workshop).
+	const EDGE_FRAC := 0.20
+	if frac < EDGE_FRAC or frac > 1.0 - EDGE_FRAC:
+		var inset_frac: float = (HERO_W * HERO_SCALE) / maxf(1.0, _room_width_px)
+		frac += inset_frac if frac < 0.5 else -inset_frac
+		frac = clampf(frac, 0.0, 1.0)
 	_hero_x_px = clampf(frac, 0.0, 1.0) * _room_width_px
 	_hold_left = false
 	_hold_right = false

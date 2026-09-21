@@ -10,6 +10,7 @@ var fog: FogOfWar
 var player: Node2D
 var world_view: Node2D
 var sky_view: SkyView
+var backdrop: Backdrop
 var hud: Control
 var view_root: Node2D
 
@@ -33,20 +34,26 @@ func _ready() -> void:
 	view_root.name = "ViewRoot"
 	add_child(view_root)
 
+	# Порядок слоёв ViewRoot (рисуется от первого к последнему):
+	#   SkyView  — градиент неба, солнце, месяц, звёзды (за всем);
+	#   Backdrop — гора вдали (параллакс) и забор со средним планом;
+	#   WorldView — тайлы, трава, декор, дом (небо тайлами не красит).
+	# Все три — дети одного ViewRoot: движение камеры (view_root.position)
+	# достаётся им без второй копии кода.
+	sky_view = preload("res://scripts/world/sky_view.gd").new()
+	sky_view.name = "SkyView"
+	view_root.add_child(sky_view)
+
+	backdrop = preload("res://scripts/world/backdrop.gd").new()
+	backdrop.name = "Backdrop"
+	view_root.add_child(backdrop)
+
 	world_view = preload("res://scripts/world/world_view.gd").new()
 	world_view.name = "WorldView"
 	world_view.world = world
 	world_view.fog = fog
 	view_root.add_child(world_view)
-
-	# Солнце/месяц/звёзды — сразу ПОСЛЕ WorldView (значит поверх его тайлов:
-	# без этого порядка непрозрачные тайлы неба закрыли бы их собой, см.
-	# sky_view.gd) и до героя (значит под ним — задание владельца "слой неба
-	# за всем"). Тот же ViewRoot, что и у мира: движение камеры по X/Y (ниже,
-	# view_root.position) достаётся SkyView бесплатно, без второй копии кода.
-	sky_view = preload("res://scripts/world/sky_view.gd").new()
-	sky_view.name = "SkyView"
-	view_root.add_child(sky_view)
+	sky_view.sky_color_source = world_view
 
 	player = preload("res://scripts/player/player.gd").new()
 	player.name = "Player"
@@ -153,6 +160,7 @@ func _process(delta: float) -> void:
 
 	var cam: Vector2 = _camera()
 	view_root.position = Vector2(-cam.x * TILE, -cam.y * TILE)
+	backdrop.update(cam)
 	hud.set_camera(cam)
 
 	world_view.render(cam)

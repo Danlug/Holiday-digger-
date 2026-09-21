@@ -231,12 +231,32 @@ func debug_star_timer(i: int) -> float:
 	return float(_stars[i].timer) if i >= 0 and i < _stars.size() else 0.0
 
 
+## Источник цветов неба — WorldView (_sky_color(wy) с затемнением DayCycle);
+## задаёт main.gd. В катсцене (set_scene_rect) источника нет — там небо
+## красит сама сцена, а этот узел рисует только светила и звёзды.
+var sky_color_source: Node = null
+
+
 func _draw() -> void:
+	_draw_sky_gradient()
 	if _day_cycle == null:
 		return
 	_draw_sun()
 	_draw_moon()
 	_draw_stars()
+
+
+## Небо построчно, в мировых координатах, на ширину окна с запасом по клетке
+## с каждой стороны: тайлы неба WorldView больше не красит (см. там
+## _paint_cell), иначе заливка закрывала бы гору и забор Backdrop.
+func _draw_sky_gradient() -> void:
+	if sky_color_source == null or not sky_color_source.has_method("_sky_color"):
+		return
+	var x0: float = _cam_x_px - float(TILE)
+	var w: float = _screen_w_px + 2.0 * float(TILE)
+	for wy in range(-SKY_HEIGHT, 0):
+		var c: Color = sky_color_source._sky_color(wy)
+		draw_rect(Rect2(x0, float(wy) * float(TILE), w, float(TILE) + 0.5), c, true)
 
 
 func _sun_moon_y() -> float:

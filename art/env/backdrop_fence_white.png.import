@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://pnx0wkofygqb"
-path="res://.godot/imported/backdrop_fence_white.jpg-e601c54238070132a98bb8c8e043ccac.ctex"
+uid="uid://clxlv001j7ikm"
+path="res://.godot/imported/backdrop_fence_white.png-132e71e6899ca96019ba491ef785e070.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/_source/backdrop_fence_white.jpg"
-dest_files=["res://.godot/imported/backdrop_fence_white.jpg-e601c54238070132a98bb8c8e043ccac.ctex"]
+source_file="res://art/env/backdrop_fence_white.png"
+dest_files=["res://.godot/imported/backdrop_fence_white.png-132e71e6899ca96019ba491ef785e070.ctex"]
 
 [params]
 

@@ -167,9 +167,14 @@ func _sky_color(wy: int) -> Color:
 
 
 func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
+	# Небо (wy < 0) тайлами больше не красится: сплошная заливка закрывала бы
+	# гору и забор (Backdrop), которые лежат между небом и тайлами. Градиент
+	# неба рисует SkyView (первый слой ViewRoot) — тем же _sky_color(wy),
+	# чтобы цвета и затемнение DayCycle остались в одном месте.
 	if wy < 0:
-		_set_color(s, _sky_color(wy))
+		s.visible = false
 		return
+	s.visible = true
 	if wy == 0:
 		var grass := TileArt.grass_texture(wx)
 		if grass != null:

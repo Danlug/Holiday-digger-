@@ -98,9 +98,16 @@ func _ready() -> void:
 
 	# Экстерьер рисуется ПОСЛЕ тайлов, но ДО героя: иначе дом закрывает
 	# героя, стоящего у двери, а если уйти под тайлы — дом закрывает небо.
+	# Встаём сразу за WorldView, а не на жёсткий индекс 1: перед тайлами в
+	# ViewRoot теперь лежат небо (SkyView) и задник (Backdrop), и индекс 1
+	# ставил бы дом за гору и забор.
 	var parent := get_parent()
-	if parent != null and parent.get_child_count() > 1:
-		parent.move_child(self, 1)
+	if parent != null:
+		var wv := parent.get_node_or_null("WorldView")
+		if wv != null:
+			parent.move_child(self, wv.get_index() + 1)
+		elif parent.get_child_count() > 1:
+			parent.move_child(self, 1)
 
 	_build_world_props()
 	_build_scenes()

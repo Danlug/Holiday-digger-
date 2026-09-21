@@ -52,6 +52,7 @@ var _anim_time: float = 0.0
 var _root: Control
 var _sky: ColorRect
 var _ground: TextureRect
+var _backdrop_fence: TextureRect = null  # см. set_backdrop_era() — создаётся лениво
 var _stage: Control
 var _card: Label
 var _box: Panel
@@ -324,6 +325,14 @@ func _layout() -> void:
 	_stage.position = Vector2(0, vp.y * STAGE_TOP)
 	_stage.size = Vector2(vp.x, ground_y - vp.y * STAGE_TOP)
 
+	if _backdrop_fence != null:
+		# Полоса у самой линии земли — забор стоит на горизонте позади актёров,
+		# а не занимает всю сцену (небо над ним остаётся плоской заливкой _sky,
+		# катсцена не пытается нарисовать весь мир целиком).
+		var band_h: float = (ground_y - vp.y * STAGE_TOP) * 0.5
+		_backdrop_fence.position = Vector2(0, ground_y - band_h)
+		_backdrop_fence.size = Vector2(vp.x, band_h)
+
 	var box_h: float = BOX_H
 	_box.position = Vector2(6, vp.y - box_h - 6)
 	_box.size = Vector2(vp.x - 12, box_h)
@@ -388,8 +397,63 @@ func play(id: String) -> void:
 	_skip_btn.text = StoryText.get_text("ui.skip")
 	is_playing = true
 	_root.visible = true
+
+	# Опциональное поле сцены "era" (data/story.json) — те же подложки забора,
+	# что и в живом мире (scripts/world/backdrop.gd), позади актёров вместо
+	# сплошной заливки _sky. Явно НЕ трогаем сцены без этого поля — 11 из 12
+	# сцен его не задают и продолжают выглядеть ровно как раньше (задание:
+	# "не переписывай сцены"). Сейчас поле стоит только у intro_grandpa.
+	var scene_data := StoryData.scene(id)
+	if scene_data.has("era"):
+		set_backdrop_era(String(scene_data.get("era")))
+	else:
+		set_backdrop_era("")
+
 	_layout()
 	_advance()
+
+
+## Показывает фон scripts/world/backdrop.gd (текстуры art/env/backdrop_fence_*)
+## позади актёров вместо сплошной заливки _sky. era: "now" — белый забор
+## (сейчас), "grandpa" — старый деревянный (интро деда), "" — снова прячет
+## подложку и возвращает обычную сплошную заливку. Публичный метод — вызывать
+## можно и из самой сцены (например, если катсцена меняет эпоху кадром), не
+## только из play().
+func set_backdrop_era(era: String) -> void:
+	if era.is_empty():
+		if _backdrop_fence != null:
+			_backdrop_fence.visible = false
+		return
+	_ensure_backdrop_fence()
+	var path := "res://art/env/backdrop_fence_old.png" if era == "grandpa" \
+			else "res://art/env/backdrop_fence_white.png"
+	if not ResourceLoader.exists(path):
+		_backdrop_fence.visible = false
+		return
+	_backdrop_fence.texture = load(path)
+	_backdrop_fence.visible = true
+
+
+## Создаётся один раз при первом обращении — 11 из 12 сцен ни разу не вызовут
+## set_backdrop_era(), и для них в дереве сцены вообще не появится лишнего
+## узла. Вставляется сразу за _sky (перед _stage/_ground), так что стоит
+## позади актёров и не мешает "земля рисуется поверх актёров" ниже.
+func _ensure_backdrop_fence() -> void:
+	if _backdrop_fence != null:
+		return
+	_backdrop_fence = TextureRect.new()
+	_backdrop_fence.name = "BackdropFence"
+	_backdrop_fence.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	# Без EXPAND_IGNORE_SIZE TextureRect подгоняет свой Control.size под
+	# натуральный размер текстуры (960×192 текстурных px, ART_SCALE=3) в тот
+	# момент, когда set_backdrop_era() назначает texture, — и затирает размер
+	# полосы, выставленный в _layout() ниже.
+	_backdrop_fence.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_backdrop_fence.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_backdrop_fence.visible = false
+	_root.add_child(_backdrop_fence)
+	_root.move_child(_backdrop_fence, _sky.get_index() + 1)
+	_layout()
 
 
 ## Мгновенно доигрывает сцену: все оставшиеся кадры пропускаются, сигнал

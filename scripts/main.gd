@@ -21,6 +21,14 @@ var _collapse_timer: Timer
 func _ready() -> void:
 	randomize()
 
+	# Настройки (звук/музыка/управление/радиус обзора/язык) — до всего
+	# остального: звуковые шины должны существовать раньше первого чтения
+	# регулятора панели настроек, а режим управления (Settings.control_mode)
+	# читает hud.gd при сборке своей нижней полосы чуть ниже.
+	Settings.load_from_disk()
+	Settings.ensure_buses()
+	Settings.apply_audio()
+
 	var seed_value := GameState.ensure_world_seed()
 	world = WorldGen.new(seed_value)
 	fog = FogOfWar.new()

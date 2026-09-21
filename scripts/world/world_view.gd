@@ -319,11 +319,14 @@ func _on_overlay_draw() -> void:
 	# Ауры тумана войны (ГДД п.12): большая — рельеф, меньшая — ресурсы.
 	# Радиус берём у самого тумана, а не считаем здесь: нарисованный круг и
 	# круг раскрытия обязаны быть одним и тем же кругом, иначе аура переезжает
-	# через клетку раньше, чем та открывается.
-	var relief_r: float = FogOfWar.vision_radius(GameState.get_vision_terrain_radius()) * TILE
-	var res_r: float = FogOfWar.vision_radius(GameState.get_vision_resource_radius()) * TILE
-	_overlay.draw_arc(Vector2(pcx, pcy), relief_r, 0, TAU, 48, Color(0.918, 0.867, 0.776, 0.16), 1.0)
-	_overlay.draw_arc(Vector2(pcx, pcy), res_r, 0, TAU, 48, Color(0.878, 0.663, 0.231, 0.3), 1.0)
+	# через клетку раньше, чем та открывается. Видимость — настройка игрока
+	# (Settings.show_vision_radius, панель «Настройки → Отображение»): сам
+	# радиус раскрытия тумана она не трогает, только рисование кольца.
+	if Settings.show_vision_radius:
+		var relief_r: float = FogOfWar.vision_radius(GameState.get_vision_terrain_radius()) * TILE
+		var res_r: float = FogOfWar.vision_radius(GameState.get_vision_resource_radius()) * TILE
+		_overlay.draw_arc(Vector2(pcx, pcy), relief_r, 0, TAU, 48, Color(0.918, 0.867, 0.776, 0.16), 1.0)
+		_overlay.draw_arc(Vector2(pcx, pcy), res_r, 0, TAU, 48, Color(0.878, 0.663, 0.231, 0.3), 1.0)
 
 	# Клетки обучающего задания (пять самородков золота): пульсирующая рамка,
 	# чтобы их было видно среди породы. Задание висит строкой в интерфейсе, но

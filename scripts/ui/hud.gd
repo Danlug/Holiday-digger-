@@ -139,6 +139,19 @@ var _drop_max: int = 0
 ## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего.
 var _debug_panel: DebugPanel
 
+## Панель настроек (Settings — scripts/core/settings.gd): звук/музыка,
+## управление, радиус обзора, язык. Тот же приём full-screen шторки, что у
+## инвентаря (_inv_sheet), — регуляторам (ползунки громкости) нужна ширина
+## экрана, узкая popup-панель «⋯» для них тесна.
+var _settings_sheet: Control
+var _sound_slider: HSlider
+var _sound_mute_btn: Button
+var _music_slider: HSlider
+var _music_mute_btn: Button
+var _vision_toggle_btn: Button
+var _control_mode_buttons: Dictionary = {}   # mode:String -> Button
+var _language_buttons: Dictionary = {}       # code:String -> Button
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -201,6 +214,7 @@ func _build_ui() -> void:
 	_build_hold_hint(stage)
 	_build_arrows(stage)
 	_build_inventory_sheet(stage)
+	_build_settings_sheet(stage)
 	_build_strip()
 	_build_debug_panel()
 
@@ -690,6 +704,244 @@ func _build_inventory_sheet(parent: Control) -> void:
 	_build_drop_panel(_inv_sheet)
 
 
+# ---------------------------------------------------------------------------
+# Настройки (Settings — scripts/core/settings.gd): звук/музыка, управление,
+# радиус обзора, язык.
+# ---------------------------------------------------------------------------
+
+func _build_settings_sheet(parent: Control) -> void:
+	_settings_sheet = Control.new()
+	_settings_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_sheet.visible = false
+	var bg := ColorRect.new()
+	bg.color = Color(0.071, 0.055, 0.043, 0.95)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_sheet.add_child(bg)
+	parent.add_child(_settings_sheet)
+
+	var head := HBoxContainer.new()
+	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	head.offset_left = 10; head.offset_right = -10
+	head.offset_top = 8; head.offset_bottom = 30
+	_settings_sheet.add_child(head)
+
+	var title := Label.new()
+	title.text = "Настройки"
+	title.add_theme_font_size_override("font_size", 12)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+
+	var close_btn := Button.new()
+	# × (U+00D7), не ✕ (U+2715) — та же ловушка шрифта темы, что у остальных
+	# закрывающих крестиков в этом файле (см. _build_inventory_sheet).
+	close_btn.text = "×"
+	close_btn.add_theme_font_size_override("font_size", 10)
+	close_btn.custom_minimum_size = Vector2(20, 20)
+	close_btn.pressed.connect(close_settings)
+	head.add_child(close_btn)
+
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 10; scroll.offset_right = -10
+	scroll.offset_top = 36; scroll.offset_bottom = -6
+	# Без этого ScrollContainer по умолчанию разрешает содержимому расти и
+	# ВПРАВО (SCROLL_MODE_AUTO), а не только вниз — строка из трёх кнопок
+	# «Джойстик/Нажатия/Стрелки» вместо равного деления ширины считала себя
+	# свободной шириться, и третья кнопка уезжала за край экрана.
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_settings_sheet.add_child(scroll)
+	DragScroll.attach(scroll)
+
+	var body := VBoxContainer.new()
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 14)
+	scroll.add_child(body)
+
+	_build_settings_sound_row(body)
+	_build_settings_music_row(body)
+	_build_settings_control_row(body)
+	_build_settings_vision_row(body)
+	_build_settings_language_row(body)
+
+
+func _settings_section_label(parent: Control, text: String) -> void:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 10)
+	lbl.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	parent.add_child(lbl)
+
+
+func _build_settings_sound_row(parent: Control) -> void:
+	_settings_section_label(parent, "ЗВУК")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+
+	var icon := Label.new()
+	icon.text = "🔊"
+	icon.add_theme_font_size_override("font_size", 16)
+	icon.custom_minimum_size = Vector2(24, 0)
+	row.add_child(icon)
+
+	_sound_slider = HSlider.new()
+	_sound_slider.min_value = 0.0
+	_sound_slider.max_value = 100.0
+	_sound_slider.step = 1.0
+	_sound_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sound_slider.value_changed.connect(func(v: float): Settings.set_sound_volume(v / 100.0))
+	row.add_child(_sound_slider)
+
+	_sound_mute_btn = Button.new()
+	_sound_mute_btn.custom_minimum_size = Vector2(28, 24)
+	_sound_mute_btn.add_theme_font_size_override("font_size", 14)
+	_sound_mute_btn.focus_mode = Control.FOCUS_NONE
+	_sound_mute_btn.pressed.connect(func(): Settings.set_sound_muted(not Settings.sound_muted); _refresh_settings_panel())
+	row.add_child(_sound_mute_btn)
+
+
+func _build_settings_music_row(parent: Control) -> void:
+	_settings_section_label(parent, "МУЗЫКА")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+
+	var icon := Label.new()
+	icon.text = "🎵"
+	icon.add_theme_font_size_override("font_size", 16)
+	icon.custom_minimum_size = Vector2(24, 0)
+	row.add_child(icon)
+
+	_music_slider = HSlider.new()
+	_music_slider.min_value = 0.0
+	_music_slider.max_value = 100.0
+	_music_slider.step = 1.0
+	_music_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_music_slider.value_changed.connect(func(v: float): Settings.set_music_volume(v / 100.0))
+	row.add_child(_music_slider)
+
+	_music_mute_btn = Button.new()
+	_music_mute_btn.custom_minimum_size = Vector2(28, 24)
+	_music_mute_btn.add_theme_font_size_override("font_size", 14)
+	_music_mute_btn.focus_mode = Control.FOCUS_NONE
+	_music_mute_btn.pressed.connect(func(): Settings.set_music_muted(not Settings.music_muted); _refresh_settings_panel())
+	row.add_child(_music_mute_btn)
+
+
+## Джойстик / стрелки / удержание — те же три режима, что кнопка «⋯ →
+## Управление» (_set_mode), тремя явными кнопками вместо цикла по кругу:
+## в настройках понятнее видеть все варианты сразу, чем гадать, что будет
+## следующим нажатием.
+const _CONTROL_MODE_LABELS := {
+	"stick": "Джойстик",
+	"arrows": "Стрелки",
+	"hold": "Нажатия",
+}
+
+
+func _build_settings_control_row(parent: Control) -> void:
+	_settings_section_label(parent, "УПРАВЛЕНИЕ")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	parent.add_child(row)
+	for m in MODES:
+		var btn := Button.new()
+		btn.text = String(_CONTROL_MODE_LABELS.get(m, m))
+		btn.add_theme_font_size_override("font_size", 10)
+		btn.custom_minimum_size = Vector2(0, 26)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.pressed.connect(_set_mode.bind(m))
+		row.add_child(btn)
+		_control_mode_buttons[m] = btn
+
+
+func _build_settings_vision_row(parent: Control) -> void:
+	_settings_section_label(parent, "ОТОБРАЖЕНИЕ")
+	_vision_toggle_btn = Button.new()
+	_vision_toggle_btn.add_theme_font_size_override("font_size", 10)
+	_vision_toggle_btn.custom_minimum_size = Vector2(0, 26)
+	_vision_toggle_btn.focus_mode = Control.FOCUS_NONE
+	_vision_toggle_btn.pressed.connect(func():
+		Settings.set_show_vision_radius(not Settings.show_vision_radius)
+		_refresh_settings_panel())
+	parent.add_child(_vision_toggle_btn)
+
+
+func _build_settings_language_row(parent: Control) -> void:
+	_settings_section_label(parent, "ЯЗЫК")
+	# HFlowContainer, не HBoxContainer: шесть языковых чипов в один ряд не
+	# помещаются на портретных 224px — этот контейнер сам переносит лишние
+	# на следующую строку, а не сжимает всех до нечитаемой ширины и не
+	# уезжает вбок (тем более что горизонтальная прокрутка шторки настроек
+	# выключена — см. scroll.horizontal_scroll_mode выше).
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 6)
+	row.add_theme_constant_override("v_separation", 6)
+	parent.add_child(row)
+	for entry in Settings.LANGUAGES:
+		var code := String(entry.get("code", ""))
+		var available := bool(entry.get("available", false))
+		var btn := Button.new()
+		btn.text = String(entry.get("name", code))
+		btn.add_theme_font_size_override("font_size", 10)
+		btn.custom_minimum_size = Vector2(0, 24)
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.disabled = not available
+		if not available:
+			# Языки ждут перевода (задание владельца: "дальше, после моего
+			# разрешения, будет...") — видны сразу, но серые и некликабельные,
+			# а не появляются позже с нуля собранной панелью.
+			btn.tooltip_text = "Скоро"
+			btn.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
+		else:
+			btn.pressed.connect(func(): Settings.set_language(code); _refresh_settings_panel())
+		row.add_child(btn)
+		_language_buttons[code] = btn
+
+
+## Перечитывает Settings и красит все контролы панели — вызывается при
+## открытии и после любого изменения (мьют/режим/язык/радиус), чтобы кнопки
+## сразу отражали новое состояние, а не только реальный эффект в игре.
+func _refresh_settings_panel() -> void:
+	if _sound_slider == null:
+		return
+	_sound_slider.value = Settings.sound_volume * 100.0
+	_sound_mute_btn.text = "🔇" if Settings.sound_muted else "🔊"
+	_music_slider.value = Settings.music_volume * 100.0
+	_music_mute_btn.text = "🔇" if Settings.music_muted else "🎵"
+	_vision_toggle_btn.text = "Радиус обзора: показан" if Settings.show_vision_radius \
+		else "Радиус обзора: скрыт"
+
+	for m in _control_mode_buttons.keys():
+		var btn: Button = _control_mode_buttons[m]
+		var on: bool = m == mode
+		btn.add_theme_color_override("font_color",
+			Color8(0xE0, 0xA9, 0x3B) if on else Color8(0x9D, 0x8B, 0x73))
+		btn.disabled = on
+
+	for code in _language_buttons.keys():
+		var lbtn: Button = _language_buttons[code]
+		if not lbtn.disabled:
+			var lon: bool = code == Settings.language
+			lbtn.add_theme_color_override("font_color",
+				Color8(0xE0, 0xA9, 0x3B) if lon else Color8(0x9D, 0x8B, 0x73))
+
+
+func open_settings() -> void:
+	close_more_menu()
+	_refresh_settings_panel()
+	_settings_sheet.visible = true
+
+
+func close_settings() -> void:
+	_settings_sheet.visible = false
+
+
+func is_settings_open() -> bool:
+	return _settings_sheet != null and _settings_sheet.visible
+
+
 ## Окно «выбросить N штук»: ползунок и то же число полем ввода — на телефоне
 ## ползунком трудно попасть в «ровно 7 из 240», а руками неудобно набирать
 ## «120». Поле открывает цифровую клавиатуру, буквы в нём не принимаются.
@@ -968,6 +1220,13 @@ func _build_strip() -> void:
 	_mode_button.pressed.connect(_on_mode_button_pressed)
 	more_menu.add_child(_mode_button)
 
+	# --- настройки (задание владельца, 2026-09-21: «в 3 точки снизу справа
+	# добавь кнопку "Настройки"») ---
+	var settings_btn := _make_chip("Настройки")
+	settings_btn.pressed.connect(open_settings)
+	more_menu.add_child(settings_btn)
+	# --- конец блока настроек ---
+
 	# Стрелка ↺ (U+21BA) отсутствует в шрифте темы по умолчанию и рисуется
 	# пустым квадратом — подписываем словом.
 	var reset_btn := _make_chip("Сброс")
@@ -1000,7 +1259,10 @@ func _build_strip() -> void:
 		if item is Button:
 			(item as Button).pressed.connect(close_more_menu)
 
-	_set_mode("stick")
+	# Схема управления — сохранённая настройка игрока (Settings.control_mode),
+	# а не всегда "stick" по умолчанию (задание владельца: «Управление —
+	# джойстик, стрелки, нажатия» в панели настроек).
+	_set_mode(Settings.control_mode if Settings.control_mode in MODES else "stick")
 
 
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — добавляется в HUD
@@ -1820,6 +2082,7 @@ func _on_mode_button_pressed() -> void:
 
 func _set_mode(m: String) -> void:
 	mode = m
+	Settings.set_control_mode(m)
 	_release_stick()
 	_has_touch = false
 	_arrows_held.clear()
@@ -1834,6 +2097,7 @@ func _set_mode(m: String) -> void:
 	if _arrows_panel != null:
 		_arrows_panel.visible = mode == "arrows"
 		_layout_arrows()
+	_refresh_settings_panel()
 
 
 ## «Сброс» раньше чистил только diffs/fog/GameState-числа поверх ЖИВОГО
@@ -1872,7 +2136,7 @@ func _input(event: InputEvent) -> void:
 	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
 	if _dismiss_on_outside_press(event):
 		return
-	if player == null or _inv_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
 		return
 
 	# Тестовая панель (debug_panel.gd) плавает НАД нижней полосой, то есть

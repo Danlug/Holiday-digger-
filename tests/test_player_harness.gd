@@ -547,6 +547,8 @@ func _test_rig_blocks_tunnel_without_fuel() -> void:
 	check("инструмент не переключился без топлива", GameState.current_tool == "shovel")
 	check("тост «нет брикетов» пришёл",
 		warnings.has("Нет брикетов — сделай на верстаке из угля"))
+	check("тост у стены не спамит каждый кадр (пришёл один раз, а не %d)" % warnings.size(),
+		warnings.size() == 1)
 
 	_teardown_rig_world(w)
 
@@ -620,12 +622,22 @@ func _test_rig_stalls_digging_without_fuel() -> void:
 	var warnings: Array = []
 	var cb := func(m): warnings.append(m)
 	player.rig_fuel_warning.connect(cb)
-	_tick(30)
+	# y/on_ground прибиваются на каждом тике: сцена теста делит один общий
+	# world с предыдущими тестами файла, и колонки вокруг найденной клетки
+	# могли быть выкопаны раньше — без этого герой просто падает мимо
+	# нужного ряда, и тест проверяет не то, что заявлено в его имени.
+	for i in range(30):
+		player.y = float(cell.y) + 0.5
+		player.vy = 0.0
+		player.on_ground = true
+		_tick(1)
 	player.rig_fuel_warning.disconnect(cb)
 	player.hold_dx = 0
 
 	check("без топлива бурмобиль клетку не берёт", world.get_tile(cell.x, cell.y) != TileTypes.Type.EMPTY)
 	check("копка даже не начинается", player.digging == null)
 	check("тост «кончилось топливо» пришёл", warnings.has("Кончилось топливо"))
+	check("тост про копку без топлива не спамит каждый кадр (пришёл один раз, а не %d)" % warnings.size(),
+		warnings.size() == 1)
 
 	GameState.reset_progress()

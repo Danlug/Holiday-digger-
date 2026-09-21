@@ -712,6 +712,11 @@ func _show_prop(beat: Dictionary) -> void:
 	node.texture = tex
 	node.set_meta("at", String(beat.get("at", "center")))
 	node.set_meta("scale", float(beat.get("scale", def.get("scale", 1.0))))
+	# overflow: реквизит шире сцены не сжимается до неё (see _fit_x), а
+	# уходит за край экрана — дом обязан читаться домом (крупнее актёра),
+	# а не сплющиваться в рамку портрета 224 px (решение по конкретному
+	# кейсу: лачуга деда шире стойки, см. props.shack в data/story.json).
+	node.set_meta("overflow", bool(beat.get("overflow", def.get("overflow", false))))
 	_props[id] = node
 	_place_prop(id)
 
@@ -787,7 +792,13 @@ func _place_prop(id: String) -> void:
 	var w: float = tex.get_width() * s
 	var h: float = tex.get_height() * s
 	node.size = Vector2(w, h)
-	node.position = Vector2(_fit_x(_stage_x(String(node.get_meta("at", "center"))), w), _stage.size.y - h)
+	var center_x := _stage_x(String(node.get_meta("at", "center")))
+	# overflow пропускает клампинг _fit_x в границы сцены: реквизит крупнее
+	# стойки (например, лачуга — она обязана читаться крупнее актёра, ГДД)
+	# уходит за край экрана вместо того, чтобы центроваться или сжиматься.
+	var x: float = center_x - w / 2.0 if bool(node.get_meta("overflow", false)) \
+		else _fit_x(center_x, w)
+	node.position = Vector2(x, _stage.size.y - h)
 
 
 func _tick_actor_frames() -> void:

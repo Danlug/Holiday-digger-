@@ -737,6 +737,10 @@ func _test_rig_exit_plays_all_phases_in_order() -> void:
 		GameState.current_tool == "iron_pickaxe")
 	check("машина запаркована у устья", GameState.is_rig_parked())
 	check("машина запаркована на поверхности (y=0)", GameState.rig_parked_at.y == 0)
+	check("машина ждёт справа от тоннеля (x = TUNNEL_X + 1)",
+		GameState.rig_parked_at.x == WorldGen.TUNNEL_X + 1)
+	check("стартовая клетка героя — сразу справа от дома, слева от тоннеля",
+		player.HOME_X == float(WorldGen.HOUSE_X_MAX + 1) + 0.5 and player.HOME_X < float(WorldGen.TUNNEL_X))
 
 	_teardown_rig_world(w)
 

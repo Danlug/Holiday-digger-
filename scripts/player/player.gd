@@ -114,7 +114,12 @@ const STICK_DEAD := 0.26
 # --- состояние ---
 var world: WorldGen = null
 
-var x: float = 20.5
+## Стартовая клетка героя: сразу справа от дома и слева от тоннеля Роберта
+## (решение владельца 2026-09-21). Припаркованный бурмобиль ждёт по другую
+## сторону устья — справа от тоннеля (см. _start_rig_exit).
+const HOME_X := float(WorldGen.HOUSE_X_MAX + 1) + 0.5   # 15.5
+
+var x: float = HOME_X
 var y: float = 0.5
 var vx: float = 0.0
 var vy: float = 0.0
@@ -457,7 +462,9 @@ func _rig_setup_transition(entering: bool) -> void:
 func _start_rig_exit() -> void:
 	rig_transition = "exit"
 	_rig_setup_transition(false)
-	var park_x := cell_x()
+	# Машина паркуется справа от устья (решение владельца: герой стартует
+	# слева от тоннеля, бурмобиль ждёт справа), а не в самой колонке устья.
+	var park_x := WorldGen.TUNNEL_X + 1
 	GameState.rig_parked_at = Vector2i(park_x, 0)
 	x = float(park_x) + 0.5
 	y = 0.5
@@ -520,9 +527,11 @@ func _finish_rig_transition() -> void:
 		# транспорт" выше).
 		GameState.rig_parked_at = Vector2i(-1, -1)
 		GameState.set_current_tool("drill_rig")
-		# Герой стоял точно у машины (start_rig_boarding уже поставил его
-		# туда) — вход в тоннель отсюда решает обычная физика/ввод игрока,
-		# как и раньше.
+		# Сел — и машина уже стоит над устьем: парковка справа от тоннеля,
+		# а спуск — только через колонку TUNNEL_X, поэтому подкатываем сюда
+		# сами; дальше вниз ведёт обычная физика/ввод игрока.
+		x = float(WorldGen.TUNNEL_X) + 0.5
+		y = 0.5
 		_was_underground = cell_y() >= 1
 		entered_rig.emit()
 	else:
@@ -1085,7 +1094,7 @@ func _finish_dig() -> void:
 # ---------------------------------------------------------------------------
 
 func teleport_home() -> void:
-	x = 20.5
+	x = HOME_X
 	y = 0.5
 	vx = 0.0
 	vy = 0.0

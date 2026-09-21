@@ -847,6 +847,9 @@ func _start_grow(beat: Dictionary) -> void:
 	var poses: Array = beat.get("poses", [])
 	if poses.is_empty():
 		return
+	# Титр предыдущего кадра ("card") сам не гаснет — молча провисел бы поверх
+	# растущей фигуры (ноги съезжали под строку текста).
+	_hide_text()
 	_grow_actor = String(beat.get("actor", "boy"))
 	_grow_poses = poses
 	_grow_step = maxf(0.05, float(beat.get("sec", 0.45)))

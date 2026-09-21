@@ -1799,18 +1799,30 @@ func _set_mode(m: String) -> void:
 		_layout_arrows()
 
 
+## «Сброс» раньше чистил только diffs/fog/GameState-числа поверх ЖИВОГО
+## мира — оставляя нетронутыми StoryState (флаги «сцена уже видена») и
+## приватные поля WorldGen (_garden_locked и весь тоннель Роберта,
+## era, ворота автокопки, разложенное сценарное золото...). Результат:
+## тоннель после «сброса» никуда не девался — Роберт «уже построил» его
+## навсегда, хотя прогресс игрока обнулился (задание владельца: «кнопка
+## сброс пусть реально сбрасывает весь кэш игры, и тоннель пусть
+## пропадает снова, пока Роберт не построит его»).
+##
+## Вместо ручного перечисления всех этих полей — стираем сейв и файл
+## сюжета с диска и перезагружаем ВСЮ сцену: main.gd создаёт мир/туман/
+## игрока/режиссёра сюжета заново, начисто, тем же путём, что при первом
+## запуске без сейва. GameState — автозагрузка, реалоад сцены её не
+## трогает, поэтому её ещё и reset_progress() явно (иначе цифры в памяти
+## пережили бы стёртый файл). Рекорды (records.json) НЕ трогаем —
+## RecordsStore задуман как трофеи поперёк забегов, а не часть прогресса.
 func _on_reset_pressed() -> void:
+	close_more_menu()
 	close_inventory()
 	GameState.reset_progress()
-	if GameState.world_ref != null:
-		GameState.world_ref.diffs.clear()
-		GameState.world_ref.events.clear()
-	if GameState.fog_ref != null:
-		GameState.fog_ref.reset_all()
-	if player != null:
-		player.teleport_home()
-		player.rusty_pickaxe_cracked = false
-	toast("Бабка улетела в Таиланд. Огород твой.")
+	StoryState.clear_all()
+	StoryState.delete_from_disk()
+	SaveSystem.delete_save()
+	get_tree().reload_current_scene()
 
 
 # ---------------------------------------------------------------------------

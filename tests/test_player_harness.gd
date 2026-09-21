@@ -444,9 +444,11 @@ func _test_tutorial_gold_does_not_stun() -> void:
 	for y in range(1, cell.y):
 		world.dig_cell(cell.x, y)
 	# Ровно та поза, в которой игрок оказывается после автокопки: стоит НА
-	# самородке и жмёт «вниз».
+	# самородке и жмёт «вниз». Ступни вплотную к границе клетки через HH, а не
+	# жёстким "-0.5" — иначе положение годится только для конкретного старого
+	# размера хитбокса и рассыпается при следующей правке HH.
 	player.x = float(cell.x) + 0.5
-	player.y = float(cell.y) - 0.5
+	player.y = float(cell.y) - player.HH - 0.01
 	player.vx = 0.0; player.vy = 0.0
 	player.on_ground = true
 	player.hold_dx = 0; player.hold_up = false; player.hold_down = true

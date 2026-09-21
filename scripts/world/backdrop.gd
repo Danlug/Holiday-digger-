@@ -83,9 +83,9 @@ const MOUNTAIN_REF_CAM_Y_PX := -6.5 * TILE
 ## картинки забора (небо над её лесом прозрачно, см. import_backdrops.py),
 ## а над кронами оставаться только склоны и вершины. −11 мировых px: луг
 ## целиком за лесом и штакетником, пик — на 5 клеток выше земли.
-const MOUNTAIN_BOTTOM_WORLD_Y := -11.0
-const MOUNTAIN_BOTTOM_SCREEN_Y := MOUNTAIN_BOTTOM_WORLD_Y - MOUNTAIN_REF_CAM_Y_PX  # 197
-const MOUNTAIN_TOP_SCREEN_Y := MOUNTAIN_BOTTOM_SCREEN_Y - MOUNTAIN_H_LOGICAL  # -11
+const MOUNTAIN_BOTTOM_WORLD_Y := 21.0   # было -11: владелец попросил опустить на клетку
+const MOUNTAIN_BOTTOM_SCREEN_Y := MOUNTAIN_BOTTOM_WORLD_Y - MOUNTAIN_REF_CAM_Y_PX  # 229
+const MOUNTAIN_TOP_SCREEN_Y := MOUNTAIN_BOTTOM_SCREEN_Y - MOUNTAIN_H_LOGICAL  # 69
 
 ## Доля смещения камеры по X, которую всё-таки получает гора (0.3–0.4 из
 ## задания). 0.35 — середина диапазона: за пробег через весь тридцатидвух-

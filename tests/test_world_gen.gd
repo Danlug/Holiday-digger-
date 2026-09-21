@@ -30,6 +30,11 @@ func _init() -> void:
 	test_collapse_fog_only_in_zone()
 	test_collapse_below_player_only()
 	test_full_reset_waits_for_player()
+	# --- задача «Огород под домом / тоннель Роберта» (правила владельца B) ---
+	test_house_never_diggable()
+	test_collapse_never_touches_house()
+	test_tunnel_absent_before_robert()
+	test_tunnel_mouth_save_load_roundtrip()
 	print("=== Итог: %d проверок, %d провалов ===" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -775,6 +780,133 @@ func test_full_reset_waits_for_player() -> void:
 	check("в доме отложенное землетрясение применяется",
 		CollapseEvents.try_trigger_earthquake(w2, fog2, 900, true, rng))
 	check("мир перетряхнуло и из дома", not w2.is_dug(25, 2))
+
+
+# ============================== ДОМ НЕ КОПАЕТСЯ (решение владельца B.1) ==============================
+
+## «Огород под домом вообще никогда нельзя копать» — дом занимает x 0..14
+## (ГДД раздел 3), и dig_cell — единственная точка входа для любой копки
+## (лопата/кирка/бур/бурмобиль/автокопка идут через неё же), поэтому
+## запрет здесь закрывает все инструменты разом.
+func test_house_never_diggable() -> void:
+	print("-- Под домом (x 0..14) не копают никогда --")
+	var w := WorldGen.new(2026)
+
+	# и до, и после Роберта: замок огорода тут ни при чём, запрет безусловный
+	var ok_before := true
+	for x in range(0, WorldGen.HOUSE_X_MAX + 1):
+		for y in [1, 2, 3, 4, 5, 100]:
+			if w.dig_cell(x, y):
+				ok_before = false
+			if w.is_dug(x, y):
+				ok_before = false
+	check("до Роберта под домом ничего не выкопать (x=0..14, разные y)", ok_before)
+
+	w.build_robert_tunnel()
+	var ok_after := true
+	for x in range(0, WorldGen.HOUSE_X_MAX + 1):
+		for y in [1, 2, 3, 4, 5, 100]:
+			if w.dig_cell(x, y):
+				ok_after = false
+	check("после Роберта под домом по-прежнему ничего не выкопать", ok_after)
+
+	# Огород (x >= 15) копается как обычно — граница ровно по HOUSE_X_MAX, не
+	# сдвинута ни в одну из сторон. (25, 2) — мелкий слой без камня (см. другие
+	# тесты этого файла), гарантированно DIRT при любом сиде: вне лестницы,
+	# вне сценарного золота (то на y=4, не y=2).
+	var w2 := WorldGen.new(2026)
+	check("соседняя клетка огорода копается (x=25, y=2)", w2.dig_cell(25, 2))
+	check("HOUSE_X_MAX и GARDEN_X_MIN примыкают без зазора",
+		WorldGen.HOUSE_X_MAX + 1 == WorldGen.GARDEN_X_MIN)
+
+
+## Обвал (раздел 8 ГДД) не должен дырявить дом заодно с огородом — ни один
+## прямоугольник обвала не имеет права задеть x <= HOUSE_X_MAX, при любом
+## сиде генератора случайных чисел.
+func test_collapse_never_touches_house() -> void:
+	print("-- Обвал никогда не задевает дом (x 0..14) --")
+	var w := WorldGen.new(31415)
+	var fog := FogOfWar.new()
+	var touched_house := false
+	var got_full_width_shape := false
+	for i in range(300):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = i
+		var rect: Dictionary = CollapseEvents.trigger_chunk_collapse(w, fog, rng)
+		if rect.is_empty():
+			continue
+		var x0 := int(rect.x0)
+		var x1 := x0 + int(rect.w)
+		if x0 < WorldGen.GARDEN_X_MIN:
+			touched_house = true
+		if x1 - x0 >= WorldGen.WIDTH - WorldGen.GARDEN_X_MIN:
+			got_full_width_shape = true
+	check("за 300 обвалов ни один не начинается левее огорода", not touched_house)
+	check("широкие формы обвала (5×32 / 10×32) встретились хотя бы раз — форма проверена не вхолостую",
+		got_full_width_shape)
+
+
+# ============================== ТОННЕЛЬ ДО РОБЕРТА (решение владельца B.3) ==============================
+
+## «Тоннеля нет, пока не произошёл сюжет с Робертом»: на свежем сиде без
+## флага колонки 16..18 на уровнях 1..4 — обычная земля, а не железобетон/
+## пустота, и tunnel_mouth() честно говорит "нет", а не подсовывает координаты
+## ещё не построенного колодца.
+func test_tunnel_absent_before_robert() -> void:
+	print("-- Тоннеля нет до сцены Роберта --")
+	var ok_ordinary := true
+	for seed_try in [1, 55, 999999]:
+		var w := WorldGen.new(seed_try)
+		for y in range(1, WorldGen.TUNNEL_DEPTH + 1):
+			for x in [WorldGen.TUNNEL_WALL_LEFT, WorldGen.TUNNEL_X, WorldGen.TUNNEL_WALL_RIGHT]:
+				var t := w.get_tile(x, y)
+				if t == TileTypes.Type.REINFORCED:
+					ok_ordinary = false
+				# x=17/18 на уровне 4 — часть треугольной лестницы (x_start=15,
+				# растёт по клетке в уровень) — это и есть "обычная земля" ДО
+				# Роберта: сама лестница, а не тоннель. Пустота там означала бы,
+				# что тоннель уже прорезан без сцены.
+				if t == TileTypes.Type.EMPTY:
+					ok_ordinary = false
+	check("свежий мир без флага: x=16..18, y=1..4 — обычная земля/лестница, не тоннель",
+		ok_ordinary)
+
+	var w := WorldGen.new(2026)
+	check("до Роберта is_garden_locked() == false", not w.is_garden_locked())
+	check("до Роберта tunnel_mouth() говорит «нет» (-1, -1)",
+		w.tunnel_mouth() == Vector2i(-1, -1))
+
+	w.build_robert_tunnel()
+	check("после Роберта tunnel_mouth() возвращает устье", w.tunnel_mouth() == Vector2i(WorldGen.TUNNEL_X, 1))
+
+
+## Сохранение: старый сейв с построенным тоннелем грузится с тоннелем, новый
+## (до Роберта) — без. get_save_data()/load_save_data() хранят только флаг
+## garden_locked — geometрия тоннеля вычисляется из него же при каждом
+## обращении, так что круглый путь save->load обязан воспроизводить и
+## отсутствие тоннеля, а не только его наличие (последнее уже покрыто
+## test_robert_tunnel).
+func test_tunnel_mouth_save_load_roundtrip() -> void:
+	print("-- tunnel_mouth() переживает сохранение/загрузку в обе стороны --")
+	var fresh := WorldGen.new(7)
+	var fresh_save := fresh.get_save_data()
+	var loaded_fresh := WorldGen.new(7)
+	loaded_fresh.load_save_data(fresh_save)
+	check("новый сейв (без Роберта) после загрузки — без тоннеля",
+		not loaded_fresh.is_garden_locked() and loaded_fresh.tunnel_mouth() == Vector2i(-1, -1))
+	check("новый сейв после загрузки: устье ещё обычная лестница/земля",
+		loaded_fresh.get_tile(WorldGen.TUNNEL_X, 1) != TileTypes.Type.REINFORCED)
+
+	var built := WorldGen.new(7)
+	built.build_robert_tunnel()
+	var built_save := built.get_save_data()
+	var loaded_built := WorldGen.new(7)
+	loaded_built.load_save_data(built_save)
+	check("старый сейв (с Робертом) после загрузки — с тоннелем",
+		loaded_built.is_garden_locked() and loaded_built.tunnel_mouth() == Vector2i(WorldGen.TUNNEL_X, 1))
+	check("старый сейв после загрузки: устье пусто, стены — железобетон",
+		loaded_built.get_tile(WorldGen.TUNNEL_X, 1) == TileTypes.Type.EMPTY
+		and loaded_built.get_tile(WorldGen.TUNNEL_WALL_LEFT, 1) == TileTypes.Type.REINFORCED)
 
 
 ## Туман открывает клетку, когда круг обзора накрыл её не меньше чем на

@@ -12,7 +12,7 @@ const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	"mood", "wait", "fade", "item", "tap", "move", "shake", "daynight", "grow",
 	# Режим "мир" (см. scripts/story/cutscene_player.gd:world_mode) — сцена
 	# играет на живой карте, эти кадры двигают/копают WorldActor'а по-настоящему.
-	"world_actor", "world_walk", "world_dig", "world_fall", "clock"]
+	"world_actor", "world_walk", "world_dig", "world_dig_row", "world_fall", "clock"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
 	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
@@ -127,14 +127,17 @@ func _test_art_present() -> void:
 				"mood":
 					check("%s: настроение '%s' описано" % [id, beat.get("id", "")],
 						not StoryData.mood(String(beat.get("id", ""))).is_empty())
-				"world_actor", "world_dig":
-					# world_dig без явного "pose" по умолчанию копает dig_shovel
-					# (см. cutscene_player.gd:_world_start_dig) — тот же лист,
-					# что и "show" молча пропускает, если актёра без спрайта нет
-					# (Роберт, родители): по факту в мире сейчас есть только
-					# дед/бабка, спрайт у них есть, и тихо потерять его нельзя.
+				"world_actor", "world_dig", "world_dig_row":
+					# world_dig/world_dig_row без явного "pose" по умолчанию
+					# копают dig_shovel (см. cutscene_player.gd:_world_start_dig,
+					# _world_start_dig_row) — тот же лист, что и "show" молча
+					# пропускает, если актёра без спрайта нет (Роберт, родители):
+					# по факту в мире сейчас есть только дед/бабка, спрайт у них
+					# есть, и тихо потерять его нельзя.
 					var wa_id := String(beat.get("actor", ""))
-					var wa_pose := String(beat.get("pose", "dig_shovel" if String(beat.get("t", "")) == "world_dig" else "idle"))
+					var wa_t := String(beat.get("t", ""))
+					var wa_pose := String(beat.get("pose",
+						"dig_shovel" if (wa_t == "world_dig" or wa_t == "world_dig_row") else "idle"))
 					var wa_path := StoryData.actor_sheet_path(wa_id, wa_pose)
 					if not wa_path.is_empty():
 						check("%s: есть лист %s" % [id, wa_path], ResourceLoader.exists(wa_path))

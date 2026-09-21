@@ -157,20 +157,23 @@ func _test_intro_grandpa_world() -> void:
 			WorldGen.GARDEN_DECOR_GRANDPA.has(dname))
 	check("в огороде деда есть декор (горшки/тыква/деревья/тачка)", seen_decor)
 
-	# Докручиваем кадры руками до самого дна ямы (пятый слой), считая по
-	# ходу реплики бабки/деда — три слоя, два звонка бабки между ними, потом
-	# самородок и ещё два тайла вниз (см. data/story.json:intro_grandpa).
+	# Докручиваем кадры руками до дна ямы (решение владельца 2026-09-21):
+	# ряды y=1..3 копаются целиком от x=15 "до конца" ("world_dig_row"), три
+	# звонка бабки — по одному после каждого ряда, затем ряды y=4..6 копаются
+	# уже одной клеткой при x=15 (три самородка подряд), потом ловушка (см.
+	# data/story.json:intro_grandpa).
 	var grandma_calls := 0
 	var refusals := 0
-	var found_nugget := false
+	var nuggets := 0
 	var guard := 0
-	while cs._index < cs._beats.size() and guard < 200:
+	while cs._index < cs._beats.size() and guard < 400:
 		var beat: Dictionary = cs._beats[cs._index]
 		cs._index += 1
 		cs._run_beat(beat)
 		var steps := 0
-		while (not cs._world_walk.is_empty() or not cs._world_dig.is_empty() or not cs._world_fall.is_empty()) \
-				and steps < 400:
+		while (not cs._world_walk.is_empty() or not cs._world_dig.is_empty()
+				or not cs._world_dig_row.is_empty() or not cs._world_fall.is_empty()) \
+				and steps < 800:
 			cs._tick_world(0.05)
 			steps += 1
 		guard += 1
@@ -179,24 +182,45 @@ func _test_intro_grandpa_world() -> void:
 		if String(beat.get("t", "")) == "say" and String(beat.get("who", "")) == "grandpa":
 			refusals += 1
 		if String(beat.get("t", "")) == "item":
-			found_nugget = true
-		if String(beat.get("t", "")) == "world_dig" and int(beat.get("y", -1)) == 5:
-			break
+			nuggets += 1
+			if nuggets >= 3:
+				break
 
-	check("докрутили сцену не зациклившись", guard < 200, "кругов: %d" % guard)
-	check("бабка звала дважды", grandma_calls == 2, "звонков: %d" % grandma_calls)
-	check("дед отказывался дважды", refusals == 2, "отказов: %d" % refusals)
-	check("самородок найден на третьем слое", found_nugget)
-	check("яма реально выкопана — все пять клеток", w.is_dug(19, 1) and w.is_dug(19, 2)
-		and w.is_dug(19, 3) and w.is_dug(19, 4) and w.is_dug(19, 5))
-	check("время к третьему слою дошло до ~22:00", is_equal_approx(cs.current_clock_hour, 22.0),
-		"час: %s" % cs.current_clock_hour)
+	check("докрутили сцену не зациклившись", guard < 400, "кругов: %d" % guard)
+	check("бабка звала трижды", grandma_calls == 3, "звонков: %d" % grandma_calls)
+	check("дед отказывался трижды", refusals == 3, "отказов: %d" % refusals)
+	check("самородков найдено три", nuggets == 3, "самородков: %d" % nuggets)
+
+	# Ряды 1-3 выкопаны целиком от x=15 "до конца" — точечная проверка по
+	# ширине (край/середина/другой край), не все 17 клеток на ряд. Клетка
+	# считается открытой и тогда, когда там и так была естественная пустота
+	# (каверна) — is_dug() смотрит только на СОБСТВЕННЫЙ diff, а сцена не
+	# обязана "по-настоящему копать" то, что уже пусто: игроку с экрана видна
+	# та же открытая клетка в обоих случаях.
+	var opened := func(x: int, y: int) -> bool:
+		return w.is_dug(x, y) or w.get_tile(x, y) == TileTypes.Type.EMPTY
+	for y in range(1, 4):
+		for x in [WorldGen.GARDEN_X_MIN, 23, WorldGen.WIDTH - 1]:
+			check("ряд y=%d открыт на x=%d" % [y, x], opened.call(x, y))
+	# Ряды 4-6 — одна клетка при x=15 (решение владельца).
+	for y in range(4, 7):
+		check("клетка (15, %d) открыта" % y, opened.call(15, y))
+
+	check("время дошло до ~22:00 к находкам самородков",
+		is_equal_approx(cs.current_clock_hour, 22.0), "час: %s" % cs.current_clock_hour)
 
 	cs.skip()
 	await _frame()
 	check("после сцены era снова «внук»", w.era == "now" and GameState.era == "now")
-	check("яма после сцены засыпана (клетки забыты)", not w.is_dug(19, 1) and not w.is_dug(19, 2)
-		and not w.is_dug(19, 3) and not w.is_dug(19, 4) and not w.is_dug(19, 5))
+	var still_dug := false
+	for y in range(1, 4):
+		for x in [WorldGen.GARDEN_X_MIN, 23, WorldGen.WIDTH - 1]:
+			if w.is_dug(x, y):
+				still_dug = true
+	for y in range(4, 7):
+		if w.is_dug(15, y):
+			still_dug = true
+	check("яма после сцены засыпана (все клетки забыты)", not still_dug)
 	check("после сцены лестница снова на месте", w.get_tile(WorldGen.GARDEN_X_MIN, 1) == TileTypes.Type.STAIRCASE)
 
 	p.queue_free()

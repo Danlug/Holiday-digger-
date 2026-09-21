@@ -218,20 +218,20 @@
 				{
 					"t": "world_walk",
 					"actor": "grandpa",
-					"x": 19.5,
-					"sec": 1.6
+					"x": 15.5
 				},
 				{
-					"t": "world_dig",
+					"t": "world_dig_row",
 					"actor": "grandpa",
-					"x": 19,
 					"y": 1,
-					"sec": 1.4,
+					"from_x": 15,
+					"to_x": 31,
+					"sec": 2.4,
 					"pose": "dig_shovel"
 				},
 				{
 					"t": "clock",
-					"hour": 11.0
+					"hour": 10.0
 				},
 				{
 					"t": "world_actor",
@@ -261,16 +261,17 @@
 					"camera": true
 				},
 				{
-					"t": "world_dig",
+					"t": "world_dig_row",
 					"actor": "grandpa",
-					"x": 19,
 					"y": 2,
-					"sec": 1.4,
+					"from_x": 15,
+					"to_x": 31,
+					"sec": 2.4,
 					"pose": "dig_shovel"
 				},
 				{
 					"t": "clock",
-					"hour": 17.0
+					"hour": 15.0
 				},
 				{
 					"t": "world_actor",
@@ -300,16 +301,62 @@
 					"camera": true
 				},
 				{
-					"t": "world_dig",
+					"t": "world_dig_row",
 					"actor": "grandpa",
-					"x": 19,
 					"y": 3,
-					"sec": 1.4,
+					"from_x": 15,
+					"to_x": 31,
+					"sec": 2.4,
 					"pose": "dig_shovel"
 				},
 				{
 					"t": "clock",
+					"hour": 19.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 12.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g_call3"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s_call3"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_poor"
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"camera": true
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"x": 15.5,
+					"camera": true
+				},
+				{
+					"t": "clock",
 					"hour": 22.0
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 15,
+					"y": 4,
+					"sec": 1.2,
+					"pose": "dig_shovel"
 				},
 				{
 					"t": "item",
@@ -318,24 +365,32 @@
 					"text": "intro_grandpa.item_text"
 				},
 				{
-					"t": "narr",
-					"text": "intro_grandpa.n_deeper"
-				},
-				{
 					"t": "world_dig",
 					"actor": "grandpa",
-					"x": 19,
-					"y": 4,
-					"sec": 1.2,
-					"pose": "dig_shovel"
-				},
-				{
-					"t": "world_dig",
-					"actor": "grandpa",
-					"x": 19,
+					"x": 15,
 					"y": 5,
 					"sec": 1.2,
 					"pose": "dig_shovel"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/tiles/ore_gold.png",
+					"name": "intro_grandpa.item_name",
+					"text": "intro_grandpa.item_text2"
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 15,
+					"y": 6,
+					"sec": 1.2,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/tiles/ore_gold.png",
+					"name": "intro_grandpa.item_name",
+					"text": "intro_grandpa.item_text3"
 				},
 				{
 					"t": "shake",

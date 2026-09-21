@@ -243,10 +243,16 @@ func dig_cell(x: int, y: int) -> bool:
 	# неё же), поэтому запрет здесь закрывает все пути разом.
 	if is_house_locked_cell(x, y):
 		return false
-	if is_garden_sealed_cell(x, y):
-		return false
-	if is_pre_autodig_locked_cell(x, y):
-		return false
+	# Эпоха деда (интро-флешбэк, era=="grandpa") — три года до начала игры
+	# внука: обучающие гейты "не запущена ещё скоростная копка"/"Роберт ещё
+	# не запечатал огород" относятся к ПРОГРЕССУ ВНУКА и не существуют для
+	# деда вовсе — иначе решение владельца "копает y1 от x15 и до конца"
+	# упиралось бы в _pre_autodig_min_x=19 уже на четвёртой клетке.
+	if era != "grandpa":
+		if is_garden_sealed_cell(x, y):
+			return false
+		if is_pre_autodig_locked_cell(x, y):
+			return false
 	var current := get_tile(x, y)
 	if current == TileTypes.Type.EMPTY:
 		return false

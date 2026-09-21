@@ -126,6 +126,14 @@ var _world_dug_cells: Array = []     # [Vector2i, ...] — что реально
 var _camera_actor_id: String = ""    # чей x/y зеркалится в player.x/y (камера/туман идут за героем)
 var _world_walk: Dictionary = {}     # {"actor","from","to","left","total","arrive_pose"} или {}
 var _world_dig: Dictionary = {}      # {"actor","cell":Vector2i,"left","total"} или {}
+## "world_dig_row" — быстрая промотка целого ряда (решение владельца
+## 2026-09-21: "копает y1 от x15 и до конца... все тайлы, что он копает,
+## должны пропадать"), не одна клетка за раз, а сплошной проезд по ряду с
+## копкой каждой клетки на ходу — {"actor","y","from_x","to_x","left",
+## "total","dug_up_to"} или {}. dug_up_to — крайний уже выкопанный x
+## (эксклюзивно по направлению), чтобы не копать одну клетку дважды, если
+## физтик перепрыгнул сразу через несколько клеток экрана.
+var _world_dig_row: Dictionary = {}
 var _world_fall: Dictionary = {}     # {"actor","from","to","left","total"} или {}
 ## Последний час, выставленный кадром "clock" — публично, чтобы тесты могли
 ## проверить ход времени сцены даже там, где автозагрузки /root/DayCycle ещё
@@ -667,6 +675,8 @@ func _run_beat(beat: Dictionary) -> bool:
 			return _world_start_walk(beat)
 		"world_dig":
 			return _world_start_dig(beat)
+		"world_dig_row":
+			return _world_start_dig_row(beat)
 		"world_fall":
 			return _world_start_fall(beat)
 		"clock":
@@ -1138,6 +1148,9 @@ func _apply_mood_colors(id: String) -> void:
 ## (см. player.gd), если кадр не задал свой "sec".
 const WORLD_WALK_SPEED := 3.0
 const WORLD_DIG_SEC := 1.4
+## Целый ряд ("быстрая промотка" — решение владельца) заметно быстрее
+## одной клетки: секунды на весь проезд по ряду, а не на клетку.
+const WORLD_DIG_ROW_SEC := 2.4
 
 
 func _enter_world_mode() -> void:
@@ -1183,6 +1196,7 @@ func _exit_world_mode() -> void:
 	_world_dug_cells.clear()
 	_world_walk = {}
 	_world_dig = {}
+	_world_dig_row = {}
 	_world_fall = {}
 	_camera_actor_id = ""
 	var cv := get_tree().root.find_child("CharacterView", true, false)
@@ -1282,6 +1296,35 @@ func _world_start_dig(beat: Dictionary) -> bool:
 	return true
 
 
+## "world_dig_row" — весь ряд y от from_x до to_x за sec секунд одним
+## проездом: актёр плавно едет по X (как world_walk), а клетки, которые он
+## проезжает, копаются НАСТОЯЩЕЙ картой на лету — тем же приёмом, что и
+## "быстрая промотка" у обучения внука (см. scripts/story/auto_dig.gd), но
+## управляемая сюжетом, а не игроком. from_x по умолчанию — GARDEN_X_MIN
+## (сразу у дома), to_x — WorldGen.WIDTH-1 ("до конца", т.е. до самого края
+## карты). y_stand (по умолчанию y-0.5) — на какой высоте стоит актёр, пока
+## копает ряд под собой: слой НАД тем, что копается, как и в одиночной
+## "world_dig".
+func _world_start_dig_row(beat: Dictionary) -> bool:
+	var id := String(beat.get("actor", ""))
+	var a: WorldActor = _world_actors.get(id)
+	if a == null or world == null:
+		return false
+	var y: int = int(beat.get("y", 1))
+	var from_x: int = int(beat.get("from_x", WorldGen.GARDEN_X_MIN))
+	var to_x: int = int(beat.get("to_x", WorldGen.WIDTH - 1))
+	var sec: float = maxf(0.2, float(beat.get("sec", WORLD_DIG_ROW_SEC)))
+	a.y = float(beat.get("y_stand", float(y) - 0.5))
+	a.x = float(from_x) + 0.5
+	a.set_pose(String(beat.get("pose", "dig_shovel")), to_x < from_x)
+	if bool(beat.get("camera", false)):
+		_camera_actor_id = id
+	_world_dig_row = {"actor": id, "y": y, "from_x": from_x, "to_x": to_x,
+		"left": sec, "total": sec, "dug_up_to": from_x - 1 if to_x >= from_x else from_x + 1}
+	_beat_timer = sec
+	return true
+
+
 ## "world_fall" — визуальный сдвиг актёра вниз/вверх на dy КЛЕТОК (не
 ## пикселей, в отличие от классического "move") за sec секунд. Копки не
 ## делает — нужен для "пробовал выбраться, не смог": актёр дёргается в яме,
@@ -1321,6 +1364,7 @@ func _tick_world(dt: float) -> void:
 		_world_actors[id].anim += 60.0 * dt
 	_tick_world_walk(dt)
 	_tick_world_dig(dt)
+	_tick_world_dig_row(dt)
 	_tick_world_fall(dt)
 	# Камера и туман войны идут за героем (main.gd:_camera/_reveal_around_player
 	# читают ровно player.x/player.y) — во время сцены герой заморожен и
@@ -1366,6 +1410,47 @@ func _tick_world_dig(dt: float) -> void:
 		# только что выкопанную под собой клетку.
 		a.y = float(cell.y) + 0.5
 		_world_dig = {}
+
+
+
+## Копает каждую клетку ряда РОВНО РАЗ, в тот момент, когда проезжающий
+## актёр пересекает её центр — а не всю пачку разом в конце (иначе "все
+## тайлы должны пропадать" не читалось бы как промотка, а выглядело бы
+## одним щелчком в конце проезда).
+func _tick_world_dig_row(dt: float) -> void:
+	if _world_dig_row.is_empty():
+		return
+	var id: String = _world_dig_row.actor
+	var a: WorldActor = _world_actors.get(id)
+	if a == null:
+		_world_dig_row = {}
+		return
+	_world_dig_row.left -= dt
+	var t: float = 1.0 - clampf(_world_dig_row.left / _world_dig_row.total, 0.0, 1.0)
+	var from_x: int = _world_dig_row.from_x
+	var to_x: int = _world_dig_row.to_x
+	a.x = lerpf(float(from_x) + 0.5, float(to_x) + 0.5, t)
+	var forward: bool = to_x >= from_x
+	var reached: int = int(round(a.x - 0.5))
+	if forward:
+		while _world_dig_row.dug_up_to < reached and _world_dig_row.dug_up_to < to_x:
+			_world_dig_row.dug_up_to += 1
+			world.dig_cell(_world_dig_row.dug_up_to, _world_dig_row.y)
+			_world_dug_cells.append(Vector2i(_world_dig_row.dug_up_to, _world_dig_row.y))
+	else:
+		while _world_dig_row.dug_up_to > reached and _world_dig_row.dug_up_to > to_x:
+			_world_dig_row.dug_up_to -= 1
+			world.dig_cell(_world_dig_row.dug_up_to, _world_dig_row.y)
+			_world_dug_cells.append(Vector2i(_world_dig_row.dug_up_to, _world_dig_row.y))
+	if _world_dig_row.left <= 0.0:
+		# Последняя клетка (to_x) обязана быть выкопана даже если округление
+		# a.x чуть не дотянуло до неё за отведённое время.
+		if _world_dig_row.dug_up_to != to_x:
+			_world_dig_row.dug_up_to = to_x
+			world.dig_cell(to_x, _world_dig_row.y)
+			_world_dug_cells.append(Vector2i(to_x, _world_dig_row.y))
+		a.x = float(to_x) + 0.5
+		_world_dig_row = {}
 
 
 func _tick_world_fall(dt: float) -> void:

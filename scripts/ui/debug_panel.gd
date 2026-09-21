@@ -48,6 +48,17 @@ const TOGGLES := [
 	{"field": "debug_free_shop", "label": "Бесплатно"},
 ]
 
+## Кнопки-действия (не тумблеры — состояния не хранят, срабатывают один раз
+## за клик): «Дом» телепортирует героя ко входу, «Динамит» мгновенно копает
+## 3×3 клетки вокруг него. DebugPanel по-прежнему не знает про player/world —
+## как и тумблеры, кнопка шлёт запрос через GameState (см.
+## GameState.trigger_debug_action), а исполняет main.gd, у которого есть
+## доступ и к герою, и к миру.
+const ACTIONS := [
+	{"field": "home", "label": "Дом"},
+	{"field": "dynamite", "label": "Динамит"},
+]
+
 var _trigger: Button
 var _panel: PanelContainer
 var _buttons: Dictionary = {}   # field:String -> Button
@@ -102,9 +113,17 @@ func _build() -> void:
 	_panel.offset_bottom = -STRIP_H - GAP - TRIGGER_SIZE.y - GAP
 	add_child(_panel)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	_panel.add_child(row)
+	# Две строки, не одна: шесть кнопок по 48px в ряд (4 тумблера + 2 действия
+	# «Дом»/«Динамит») шире портретного экрана 224px и вылезали бы за правый
+	# край — там же, где их и так не достанет палец. Строка тумблеров сверху,
+	# действия отдельной строкой ниже.
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 4)
+	_panel.add_child(rows)
+
+	var toggle_row := HBoxContainer.new()
+	toggle_row.add_theme_constant_override("separation", 4)
+	rows.add_child(toggle_row)
 
 	for t in TOGGLES:
 		var field := String(t["field"])
@@ -115,8 +134,22 @@ func _build() -> void:
 		b.add_theme_font_size_override("font_size", 9)
 		b.custom_minimum_size = Vector2(48.0, 28.0)
 		b.pressed.connect(_on_toggle_pressed.bind(field))
-		row.add_child(b)
+		toggle_row.add_child(b)
 		_buttons[field] = b
+
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 4)
+	rows.add_child(action_row)
+
+	for a in ACTIONS:
+		var field := String(a["field"])
+		var b := Button.new()
+		b.text = String(a["label"])
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_size_override("font_size", 9)
+		b.custom_minimum_size = Vector2(48.0, 28.0)
+		b.pressed.connect(_on_action_pressed.bind(field))
+		action_row.add_child(b)
 
 	_refresh()
 
@@ -147,6 +180,26 @@ func toggle(field: String) -> void:
 
 func _on_toggle_pressed(field: String) -> void:
 	toggle(field)
+
+
+## Кнопка-действие: разово шлёт запрос в GameState, не трогая свой набор
+## тумблеров (используется и кнопками, и тестами).
+func _on_action_pressed(field: String) -> void:
+	GameState.trigger_debug_action(field)
+
+
+## Занята ли точка экрана триггером «Тест» или (пока раскрыта) самой панелью
+## тумблеров — в глобальных координатах HUD. hud.gd вызывает это ПЕРЕД тем,
+## как отдать тап джойстику/пальцу-миру: панель стоит внутри игровой зоны
+## (над нижней полосой, а не в ней — см. комментарий класса выше), и без
+## этой проверки тот же тап сперва ловил мировой ввод (см. _input в hud.gd),
+## помечал событие обработанным и кнопка ни разу не успевала получить клик.
+func hit_test(global_pos: Vector2) -> bool:
+	if _trigger != null and Rect2(_trigger.global_position, _trigger.size).has_point(global_pos):
+		return true
+	if is_open() and _panel != null and Rect2(_panel.global_position, _panel.size).has_point(global_pos):
+		return true
+	return false
 
 
 ## Перечитать состояние GameState и перекрасить все четыре кнопки — зелёная

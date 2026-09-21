@@ -757,60 +757,85 @@ func _move_y(dt: float) -> void:
 	if vy < 0.0 and y - ceiling < SKY_BRAKE:
 		vy *= clampf((y - ceiling) / SKY_BRAKE, 0.0, 1.0)
 
-	y += vy * dt
-	# Страховка на случай большого dt: за нарисованную кромку не выпускаем.
-	if y < ceiling:
-		y = ceiling
-		vy = maxf(vy, 0.0)
+	on_ground = false
+
+	# Шаг по Y дробим на куски не больше MOVE_STEP_MAX клетки: коллизия ниже
+	# проверяет только итоговую позицию после шага, а не путь до неё, и при
+	# большой скорости (тумблер отладки «Полёт 300» — 300 клеток/с) герой
+	# перепрыгивал однотайловый пол/потолок целиком за один физтик, ни разу
+	# не попав в него собственной проверкой. Обычная скорость (V_TERM, тяга
+	# ранца/джетпака) всегда меньше клетки за тик, так что цикл почти всегда
+	# проходит ровно одну итерацию — лишней работы это не добавляет.
+	const MOVE_STEP_MAX := 0.9
+	var remaining: float = vy * dt
+	var stopped := false
+	while absf(remaining) > 0.0001 and not stopped:
+		var step: float = clampf(remaining, -MOVE_STEP_MAX, MOVE_STEP_MAX)
+		y += step
+		remaining -= step
+
+		# Страховка на случай большого шага: за нарисованную кромку неба не
+		# выпускаем.
+		if y < ceiling:
+			y = ceiling
+			vy = maxf(vy, 0.0)
+			stopped = true
+			break
+
+		var left := x - HW + 0.02
+		var right := x + HW - 0.02
+
+		if vy > 0.0:
+			var b := y + HH
+			var hit_lb := _solid_at(left, b)
+			var hit_rb := _solid_at(right, b)
+			var slipped_b := false
+			# Тот же угловой допуск, что и при взлёте ниже (раздельная коллизия
+			# по осям иначе сажала героя на карниз шахты шириной в клетку,
+			# стоило ему при падении/копке вниз оказаться смещённым от центра
+			# на пиксели — решение владельца, см. отчёт агента): падение в
+			# шахту соскальзывает к центру, а не садится на угол, который
+			# герой всё равно бы прошёл.
+			if hit_lb and not hit_rb:
+				var over_b: float = (floor(left) + 1.0) - left
+				if over_b <= CORNER:
+					x += over_b + 0.002
+					slipped_b = true
+			elif hit_rb and not hit_lb:
+				var over2_b: float = right - floor(right)
+				if over2_b <= CORNER:
+					x -= over2_b + 0.002
+					slipped_b = true
+			if (hit_lb or hit_rb) and not slipped_b:
+				y = floor(b) - HH - 0.001
+				_land()
+				vy = 0.0
+				on_ground = true
+				stopped = true
+		elif vy < 0.0:
+			var tp := y - HH
+			var hit_l := _solid_at(left, tp)
+			var hit_r := _solid_at(right, tp)
+			var slipped := false
+			if hit_l and not hit_r:
+				var over: float = (floor(left) + 1.0) - left
+				if over <= CORNER:
+					x += over + 0.002
+					slipped = true
+			elif hit_r and not hit_l:
+				var over2: float = right - floor(right)
+				if over2 <= CORNER:
+					x -= over2 + 0.002
+					slipped = true
+			if not slipped and (hit_l or hit_r):
+				y = floor(tp) + 1.0 + HH + 0.001
+				vy = 0.0
+				stopped = true
+		else:
+			stopped = true
 
 	var left := x - HW + 0.02
 	var right := x + HW - 0.02
-	on_ground = false
-
-	if vy > 0.0:
-		var b := y + HH
-		var hit_lb := _solid_at(left, b)
-		var hit_rb := _solid_at(right, b)
-		var slipped_b := false
-		# Тот же угловой допуск, что и при взлёте ниже (раздельная коллизия по
-		# осям иначе сажала героя на карниз шахты шириной в клетку, стоило ему
-		# при падении/копке вниз оказаться смещённым от центра на пиксели —
-		# решение владельца, см. отчёт агента): падение в шахту соскальзывает
-		# к центру, а не садится на угол, который герой всё равно бы прошёл.
-		if hit_lb and not hit_rb:
-			var over_b: float = (floor(left) + 1.0) - left
-			if over_b <= CORNER:
-				x += over_b + 0.002
-				slipped_b = true
-		elif hit_rb and not hit_lb:
-			var over2_b: float = right - floor(right)
-			if over2_b <= CORNER:
-				x -= over2_b + 0.002
-				slipped_b = true
-		if (hit_lb or hit_rb) and not slipped_b:
-			y = floor(b) - HH - 0.001
-			_land()
-			vy = 0.0
-			on_ground = true
-	elif vy < 0.0:
-		var tp := y - HH
-		var hit_l := _solid_at(left, tp)
-		var hit_r := _solid_at(right, tp)
-		var slipped := false
-		if hit_l and not hit_r:
-			var over: float = (floor(left) + 1.0) - left
-			if over <= CORNER:
-				x += over + 0.002
-				slipped = true
-		elif hit_r and not hit_l:
-			var over2: float = right - floor(right)
-			if over2 <= CORNER:
-				x -= over2 + 0.002
-				slipped = true
-		if not slipped and (hit_l or hit_r):
-			y = floor(tp) + 1.0 + HH + 0.001
-			vy = 0.0
-
 	if not on_ground:
 		var b2 := y + HH + 0.02
 		on_ground = vy == 0.0 and (_solid_at(left, b2) or _solid_at(right, b2))

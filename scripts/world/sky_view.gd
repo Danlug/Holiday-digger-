@@ -69,6 +69,11 @@ const MOON_GAP_BOTTOM_ROW := 5.7
 ## полёте на пределе ранца), а с небольшим запасом за типичное окно камеры
 ## стоящего на земле героя.
 const STAR_TOP_ROW := 12
+## Раскладка звёзд — «дрожащая сетка» (см. _spawn_stars): поле от края
+## каждой ячейки, за которое не заходит случайная точка внутри неё, — не 0
+## и не 0.5 (иначе звёзды либо садятся на границы соседних ячеек почти
+## впритык, либо стягиваются точно в центр и снова читаются как сетка).
+const CELL_MARGIN := 0.12
 ## Раз в 3-8 секунд звезда на 0.5-1 с плавно проваливается в 0-15% —
 ## интервал ПОДОБРАН так, что доля "спокойного" времени (видна на 70%)
 ## естественно ложится в заданные 80-90%: idle/(idle+dip) при dip=0.5-1с и
@@ -208,15 +213,46 @@ func _spawn_stars() -> void:
 	var row_to_y := func(row: float) -> float:
 		var t: float = -row / float(SKY_HEIGHT)  # row=0 -> t=0 (горизонт), row=-SKY_HEIGHT -> t=1 (верх)
 		return _rect_horizon_y + t * (_rect_top_y - _rect_horizon_y)
+
+	# Раскладка «дрожащей сеткой» (задание владельца от 2026-09-21: "более
+	# рандомно и на 70% более равномерно") — чистый randf_range по X и Y (как
+	# было раньше) статистически честен, но на глаз даёт заметные сгустки и
+	# пустоты просто по случайности. Тут делим полосу на cols×rows ячеек,
+	# перемешиваем их порядок (детерминированно, тем же rng) и внутри каждой
+	# занятой ячейки берём случайную точку с полями 6% от края — сетка
+	# гарантирует равномерное покрытие, а перемешивание ячеек + случайный
+	# сдвиг внутри каждой не дают глазу увидеть ряды/столбцы.
+	# Соотношение cols/rows берём из реального размера полосы разброса (ширина
+	# против пиксельной высоты полосы STAR_TOP_ROW строк), а не константой:
+	# у катсцены (set_scene_rect) своя ширина/высота, сильно отличная от
+	# мирового режима.
+	var span_top_px: float = row_to_y.call(-float(STAR_TOP_ROW))
+	var span_bottom_px: float = row_to_y.call(-1.0)
+	var aspect: float = _rect_w_px / maxf(1.0, absf(span_top_px - span_bottom_px))
+	var cols: int = maxi(1, int(ceil(sqrt(float(count) * aspect))))
+	var rows: int = maxi(1, int(ceil(float(count) / float(cols))))
+	var total_cells := cols * rows
+	var cell_order: Array = range(total_cells)
+	for i in range(cell_order.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var tmp = cell_order[i]
+		cell_order[i] = cell_order[j]
+		cell_order[j] = tmp
+
 	for i in range(count):
+		var cell: int = cell_order[i % cell_order.size()]
+		var cell_x: int = cell % cols
+		var cell_y: int = cell / cols
 		var region: Dictionary = _star_regions[rng.randi() % _star_regions.size()]
-		# Честный равномерный разброс по X и по Y (без сетки/рядов, задание
-		# владельца "звёзды тоже расположи более случайно") — row берётся
-		# из СПЛОШНОГО диапазона (1..STAR_TOP_ROW), единственная поправка —
-		# сдвиг прочь из полосы месяца (не отдельная случайная величина, а
-		# послечистка уже взятого row, иначе randf_range не умеет "дырявый"
-		# интервал без перекоса плотности).
-		var row := rng.randf_range(1.0, float(STAR_TOP_ROW))
+		var jitter_x: float = rng.randf_range(CELL_MARGIN, 1.0 - CELL_MARGIN)
+		var jitter_row: float = rng.randf_range(CELL_MARGIN, 1.0 - CELL_MARGIN)
+		var x_norm: float = (float(cell_x) + jitter_x) / float(cols)
+		var row_norm: float = (float(cell_y) + jitter_row) / float(rows)
+		# row берётся из СПЛОШНОГО диапазона (1..STAR_TOP_ROW), единственная
+		# поправка — сдвиг прочь из полосы месяца (послечистка уже взятого
+		# row, а не отдельная случайная величина, иначе интервал с "дыркой"
+		# перекашивает плотность).
+		var row: float = 1.0 + row_norm * (float(STAR_TOP_ROW) - 1.0)
 		if row > MOON_GAP_TOP_ROW and row < MOON_GAP_BOTTOM_ROW:
 			var to_top := row - MOON_GAP_TOP_ROW
 			var to_bottom := MOON_GAP_BOTTOM_ROW - row
@@ -224,7 +260,7 @@ func _spawn_stars() -> void:
 		var y: float = _world_y_to_local(row_to_y.call(-row))
 		var star := {
 			"region": region,
-			"x": rng.randf_range(0.0, _rect_w_px),
+			"x": x_norm * _rect_w_px,
 			"y": y,
 			"timer": rng.randf_range(0.0, DIP_INTERVAL_MAX),
 			"in_dip": false,

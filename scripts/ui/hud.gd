@@ -1826,6 +1826,17 @@ func _input(event: InputEvent) -> void:
 	if player == null or _inv_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
 		return
 
+	# Тестовая панель (debug_panel.gd) плавает НАД нижней полосой, то есть
+	# физически внутри stage_rect — без этой проверки тап по её кнопкам
+	# сперва ловил «режим пальца» (_handle_hold_input: любая точка внутри
+	# stage_rect) или джойстик, событие помечалось обработанным, и кнопка
+	# так и не получала свой клик (задание владельца: «тестовые кнопки не
+	# получается нажать, так как они проживают фоновые кнопки»).
+	if _debug_panel != null:
+		var dbg_e := _normalize_pointer_event(event)
+		if dbg_e.kind == "press" and _debug_panel.hit_test(dbg_e.pos):
+			return
+
 	match mode:
 		"stick": _handle_stick_input(event)
 		"hold": _handle_hold_input(event)

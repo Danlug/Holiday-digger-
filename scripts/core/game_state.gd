@@ -989,6 +989,16 @@ var debug_fly_300: bool = false
 ## (см. spend_coins/spend_dollars ниже).
 var debug_free_shop: bool = false
 
+## Кнопки-действия панели (не тумблеры — «Дом», «Динамит»): DebugPanel не
+## держит ссылку на игрока/мир (см. debug_panel.gd), поэтому просто шлёт
+## имя действия сюда, а слушает и исполняет main.gd, у которого оба узла
+## есть под рукой.
+signal debug_action_triggered(name: String)
+
+
+func trigger_debug_action(name: String) -> void:
+	debug_action_triggered.emit(name)
+
 ## Эпоха живого мира: "now" (внук, обычная игра) или "grandpa" (интро деда
 ## играет НА ЖИВОЙ КАРТЕ, см. scripts/story/cutscene_player.gd, режим
 ## play(id, {"world": true})). Выставляет и снимает сама катсцена

@@ -36,6 +36,8 @@ func _ready() -> void:
 	_test_free_shop_coins_toggle()
 	_test_free_shop_dollars_toggle()
 	_test_panel_ui_toggles_flags_and_paints()
+	_test_action_buttons_send_debug_action()
+	await _test_hit_test_covers_trigger_and_panel()
 
 	# Флаги — тестовые, не часть прогресса: возвращаем игру в обычное
 	# состояние, чтобы этот тест не портил порядок запуска остальных (если
@@ -246,5 +248,69 @@ func _test_panel_ui_toggles_flags_and_paints() -> void:
 
 	panel.set_open(false)
 	check("панель закрывается", not panel.is_open())
+
+	panel.queue_free()
+
+
+## Кнопки-действия «Дом»/«Динамит» не хранят состояние — каждый клик должен
+## разово прислать своё имя через GameState.trigger_debug_action (main.gd
+## слушает этот сигнал и исполняет; здесь проверяем только отправку).
+func _test_action_buttons_send_debug_action() -> void:
+	var panel := DebugPanel.new()
+	add_child(panel)
+	panel.set_open(true)
+
+	var received: Array = []
+	var cb := func(name: String): received.append(name)
+	GameState.debug_action_triggered.connect(cb)
+
+	var home_btn: Button = null
+	var dynamite_btn: Button = null
+	var stack: Array = [panel._panel]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		for child in node.get_children():
+			stack.append(child)
+			if child is Button and (child as Button).text == "Дом":
+				home_btn = child
+			elif child is Button and (child as Button).text == "Динамит":
+				dynamite_btn = child
+	check("кнопка «Дом» найдена в панели", home_btn != null)
+	check("кнопка «Динамит» найдена в панели", dynamite_btn != null)
+
+	if home_btn != null:
+		home_btn.pressed.emit()
+		check("клик по «Дом» шлёт GameState.debug_action_triggered('home')",
+			received.size() == 1 and received[0] == "home")
+	if dynamite_btn != null:
+		dynamite_btn.pressed.emit()
+		check("клик по «Динамит» шлёт GameState.debug_action_triggered('dynamite')",
+			received.size() == 2 and received[1] == "dynamite")
+
+	GameState.debug_action_triggered.disconnect(cb)
+	panel.queue_free()
+
+
+## hit_test() — то, чем hud.gd отличает тап по тестовой панели от тапа по
+## игровому миру (см. задание владельца: «тестовые кнопки не получается
+## нажать, так как они проживают фоновые кнопки»): точка внутри триггера/
+## раскрытой панели должна считаться "занятой", вне их — свободной.
+func _test_hit_test_covers_trigger_and_panel() -> void:
+	var panel := DebugPanel.new()
+	add_child(panel)
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.size = Vector2(224, 480)
+	await get_tree().process_frame
+
+	panel.set_open(false)
+	var trigger_center: Vector2 = panel._trigger.global_position + panel._trigger.size * 0.5
+	check("закрыта: точка на триггере «Тест» занята", panel.hit_test(trigger_center))
+	check("закрыта: точка в игровом мире свободна", not panel.hit_test(Vector2(112, 200)))
+
+	panel.set_open(true)
+	await get_tree().process_frame
+	var panel_center: Vector2 = panel._panel.global_position + panel._panel.size * 0.5
+	check("открыта: точка на раскрытой панели тумблеров занята", panel.hit_test(panel_center))
+	check("открыта: точка в игровом мире всё ещё свободна", not panel.hit_test(Vector2(112, 200)))
 
 	panel.queue_free()

@@ -124,6 +124,8 @@ func _ready() -> void:
 
 	_apply_saved_earthquake_on_start()
 
+	GameState.debug_action_triggered.connect(_on_debug_action)
+
 
 func _view_w() -> int:
 	return hud.get_view_cells().x
@@ -277,3 +279,27 @@ func _apply_saved_earthquake_on_start() -> void:
 			house.hud = hud
 		house.enter_house("bedroom")
 	hud.toast("Пока тебя не было, копальню тряхнуло целиком. Ты отсиделся дома.", 4.4)
+
+
+## Кнопки-действия тестовой панели (scripts/ui/debug_panel.gd) — панель сама
+## не трогает ни player, ни world (решение: не тянуть к ней зависимость от
+## игровых узлов), поэтому просто шлёт имя действия через
+## GameState.trigger_debug_action, а исполняет его здесь, где оба узла есть.
+func _on_debug_action(name: String) -> void:
+	match name:
+		"home":
+			player.teleport_home()
+		"dynamite":
+			_debug_dynamite()
+
+
+## «Динамит»: мгновенно копает 3×3 клетки вокруг героя (задание владельца) —
+## та же единственная точка входа world.dig_cell, что у обычной лопаты, так
+## что дом/запечатанный Робертом огород остаются защищены теми же правилами.
+func _debug_dynamite() -> void:
+	var cx: int = player.cell_x()
+	var cy: int = player.cell_y()
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			world.dig_cell(cx + dx, cy + dy)
+	_reveal_around_player()

@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_arrow_pad_combinations()
 	_test_keyboard_intent()
 	_test_dig_earth_gives_xp_not_coins()
+	_test_drill_rig_dig_time_quarter_of_obsidian_pickaxe()
 	_test_shovel_cannot_dig_stone()
 	_test_tutorial_gold_does_not_stun()
 	_test_gear_unlock_by_depth()
@@ -250,6 +251,42 @@ func _test_dig_earth_gives_xp_not_coins() -> void:
 	check("земля НЕ попала в инвентарь (см. ГДД раздел 4)", not GameState.inventory.has("earth"))
 
 
+## Владелец: «ручной бур копает в 2 раза быстрее, чем лучшая кирка. Бурмобиль
+## копает в 2 раза лучше, чем ручной бур» -> бурмобиль в 4 раза быстрее
+## обсидиановой кирки, а время копки клетки обратно пропорционально скорости:
+## бурмобиль должен закрывать ту же клетку земли за 1/4 времени обсидиановой
+## кирки. Меряем через player._start_dig() напрямую (без тиков физики) —
+## _start_dig только считает digging.total и не трогает тайл, поэтому одну и
+## ту же клетку можно "начать копать" дважды разными инструментами подряд.
+func _test_drill_rig_dig_time_quarter_of_obsidian_pickaxe() -> void:
+	var cell := _find_tile(TileTypes.Type.DIRT)
+	check("нашлась клетка земли для теста времени копки", cell.x >= 0)
+	if cell.x < 0:
+		return
+
+	GameState.owned_tools = ["shovel", "rusty_pickaxe", "obsidian_pickaxe", "drill_rig"]
+	GameState.add_item("fuel_block", 10)  # бурмобилю нужно топливо, чтобы вообще начать копать
+
+	GameState.current_tool = "obsidian_pickaxe"
+	player.digging = null
+	player._start_dig(cell.x, cell.y)
+	check("копка обсидиановой киркой началась", player.digging != null)
+	var obsidian_total: float = float(player.digging.get("total", 0.0)) if player.digging != null else 0.0
+
+	GameState.current_tool = "drill_rig"
+	player.digging = null
+	player._start_dig(cell.x, cell.y)
+	check("копка бурмобилем началась", player.digging != null)
+	var rig_total: float = float(player.digging.get("total", 0.0)) if player.digging != null else 0.0
+
+	check("время копки посчиталось (не ноль)", obsidian_total > 0.0 and rig_total > 0.0)
+	check("бурмобиль копает клетку земли за 1/4 времени обсидиановой кирки",
+			absf(rig_total - obsidian_total * 0.25) < 0.001)
+
+	player.digging = null
+	GameState.reset_progress()
+
+
 ## Запечатанный Робертом огород не должен кормить опытом. Мир клетку не
 ## отдаёт, но раньше результат dig_cell игнорировался, и опыт капал за сам
 ## удар — на грядке получалась бесконечная ферма.
@@ -368,23 +405,31 @@ func _test_gear_unlock_by_depth() -> void:
 	GameState.owned_gear.clear()
 	GameState.current_gear = ""
 	check("на глубине 100 открывается ручной бур", player.has_hand_drill())
-	check("буровой машины на глубине 100 ещё нет", not player.has_drill_rig())
+	check("бурмобиля на глубине 100 ещё нет", not player.has_drill_rig())
 	GameState.max_depth_reached = player.RIG_DEPTH - 1
-	check("на клетку выше порога буровой машины ещё нет", not player.has_drill_rig())
+	check("на клетку выше порога бурмобиля ещё нет", not player.has_drill_rig())
 	GameState.max_depth_reached = player.RIG_DEPTH
-	check("на глубине 1000 открывается буровая машина", player.has_drill_rig())
+	check("на глубине 1000 открывается бурмобиль", player.has_drill_rig())
 
-	# Ступень должна не только открыться, но и включиться: сама машина в руках
-	# героя — это другой инструмент с другой скоростью копки. Владение выдаём
-	# руками: смена инструмента проходит через GameState.set_current_tool, а
-	# он требует, чтобы машина была куплена или скрафчена (ГДД п.5).
+	# Ступень должна не только открыться, но и включиться: сам бурмобиль в
+	# руках героя — это другой инструмент с другой скоростью копки. Владение
+	# выдаём руками: смена инструмента проходит через GameState.set_current_tool,
+	# а он требует, чтобы бурмобиль был куплен или скрафчен (ГДД п.5).
 	GameState.grant_tool("drill_rig")
 	player._announced_rig = false
 	player._check_gear_unlocks()
-	check("буровая машина становится текущим инструментом",
+	check("бурмобиль становится текущим инструментом",
 			GameState.current_tool == "drill_rig")
-	check("буровая машина копает втрое быстрее кирки",
-			is_equal_approx(Balance.get_tool_speed_multiplier("drill_rig"), 3.0))
+	# Владелец: «ручной бур копает в 2 раза быстрее, чем лучшая кирка» (сейчас
+	# обсидиановая, ×5 -> бур ×10), «бурмобиль — в 2 раза лучше бура» -> ×20.
+	# Считается от лучшей кирки, а не хардкожено — см. Balance.get_tool_speed_multiplier.
+	var best_pickaxe: float = Balance.get_best_pickaxe_speed_multiplier()
+	check("лучшая кирка сейчас — обсидиановая (×5)", is_equal_approx(best_pickaxe, 5.0))
+	check("ручной бур копает вдвое быстрее лучшей кирки",
+			is_equal_approx(Balance.get_tool_speed_multiplier("hand_drill"), best_pickaxe * 2.0))
+	check("бурмобиль копает вдвое быстрее ручного бура",
+			is_equal_approx(Balance.get_tool_speed_multiplier("drill_rig"),
+					Balance.get_tool_speed_multiplier("hand_drill") * 2.0))
 
 
 # ---------------------------------------------------------------------------

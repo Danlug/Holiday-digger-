@@ -29,6 +29,8 @@ func _init() -> void:
 	_test_luck(bal)
 	_test_tool_line(bal)
 	_test_gear_line(bal)
+	_test_drill_speed_computed(bal)
+	_test_no_old_rig_name()
 
 	_print_summary()
 	quit(0 if failures == 0 else 1)
@@ -254,6 +256,60 @@ func _test_gear_line(bal) -> void:
 	# (player.gd:V_TERM = 32): падать по-прежнему опаснее, чем лететь.
 	_check_true("потолок топового джетпака ниже предела падения",
 		bal.get_gear_max_speed("jetpack_top") < 32.0)
+
+
+## Владелец: «ручной бур копает в 2 раза быстрее, чем лучшая кирка. Бурмобиль
+## копает в 2 раза лучше, чем ручной бур» — и это должно быть ВЫЧИСЛЕНО от
+## текущей лучшей кирки (Balance.get_best_pickaxe_speed_multiplier), а не
+## храниться отдельным числом в balance.json: иначе линейки разъедутся при
+## следующей правке кирок.
+func _test_drill_speed_computed(bal) -> void:
+	print("--- Бур и бурмобиль: скорость от лучшей кирки ---")
+	var best: float = bal.get_best_pickaxe_speed_multiplier()
+	_check("лучшая кирка сейчас — обсидиановая (×5)", best, 5.0, 0.0001)
+	var drill: float = bal.get_tool_speed_multiplier("hand_drill")
+	var rig: float = bal.get_tool_speed_multiplier("drill_rig")
+	_check("бур = 2 × лучшая кирка", drill, 2.0 * best, 0.0001)
+	_check("бурмобиль = 2 × бур", rig, 2.0 * drill, 0.0001)
+	_check("бурмобиль = 4 × лучшая кирка", rig, 4.0 * best, 0.0001)
+	# У бура и бурмобиля в JSON больше НЕТ поля speed_multiplier — есть
+	# только коэффициент относительно другого инструмента (см. balance.json).
+	_check_true("hand_drill.speed_multiplier убран из JSON (считается кодом)",
+		not bal.get_tool("hand_drill").has("speed_multiplier"))
+	_check_true("drill_rig.speed_multiplier убран из JSON (считается кодом)",
+		not bal.get_tool("drill_rig").has("speed_multiplier"))
+
+
+## Владелец: «бурмобиль называется в игре везде „бурмобиль“». Старое название
+## «буровая машина» не должно встречаться ни в одной пользовательской строке
+## (и ни в одном комментарии/note данных) в игровых JSON-файлах.
+func _test_no_old_rig_name() -> void:
+	print("--- Название «бурмобиль» везде ---")
+	# Известные падежные формы старого названия — без \w-регэкспа: Godot/PCRE
+	# \w по умолчанию не берёт кириллицу, а точный список форм проще и надёжнее.
+	var old_forms := [
+		"буровая машина", "буровой машины", "буровую машину",
+		"буровой машине", "буровой машиной", "буровые машины",
+	]
+	for path in [
+		"res://data/story_ru.json",
+		"res://data/balance.json",
+		"res://data/shop.json",
+		"res://data/upgrades.json",
+	]:
+		var f := FileAccess.open(path, FileAccess.READ)
+		var ok := f != null
+		_check_true("%s читается" % path, ok)
+		if not ok:
+			continue
+		var text: String = f.get_as_text().to_lower()
+		f.close()
+		var found := false
+		for form in old_forms:
+			if text.contains(form):
+				found = true
+				break
+		_check_true("%s: нет старого названия «буровая машина»" % path, not found)
 
 
 func _print_summary() -> void:

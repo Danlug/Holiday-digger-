@@ -93,6 +93,7 @@ static func recipes() -> Array:
 	var out: Array = []
 	out.append(_recipe_bronze())
 	out.append(_recipe_fuel_block())
+	out.append(_recipe_fuel_block_coal())
 	for tool_id in ["hand_drill", "drill_rig"]:
 		var r := _recipe_tool(tool_id)
 		if not r.is_empty():
@@ -139,6 +140,26 @@ static func _recipe_fuel_block() -> Dictionary:
 		"inputs": {"peat": maxi(per, 1)},
 		"coins": 0,
 		"unlock_depth": 0,
+	}
+
+
+## Топливный блок из угля (решение владельца, задача «Бурмобиль — транспорт»:
+## «если он экипирован бурмобилем, он должен иметь на себе топливо (брикеты
+## каменного угля)» — уголь назван прямо, поэтому это основной рецепт блока
+## начиная с глубины угля). Рецепт на торфе (см. _recipe_fuel_block) не
+## отменён: он и раньше был в ГДД (торфоперегонка), просто теперь не
+## единственный.
+static func _recipe_fuel_block_coal() -> Dictionary:
+	var per: int = int(Balance.unwrap(Balance.balance.get("fuel_consumption", {}).get("coal_per_fuel_block", 2)))
+	return {
+		"id": "fuel_block_coal",
+		"name_ru": "Топливный блок (уголь)",
+		"desc_ru": "Брикетирование угля",
+		"kind": "item",
+		"output": {"id": "fuel_block", "count": 1},
+		"inputs": {"coal": maxi(per, 1)},
+		"coins": 0,
+		"unlock_depth": unlock_depth("fuel_block_coal"),
 	}
 
 

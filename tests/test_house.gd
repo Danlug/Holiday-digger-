@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_energy_bar_effect()
 	_test_enter_and_exit_keeps_state()
 	_test_tunnel_transition()
+	_test_tunnel_requires_fuel_for_rig()
 	_test_storage_access_rules()
 	_test_storage_survives_death_and_save()
 
@@ -421,6 +422,29 @@ func _test_tunnel_transition() -> void:
 	check("устье снова пусто",
 		world.get_tile(mouth.x, mouth.y) == TileTypes.Type.EMPTY)
 	check("огород после землетрясения всё так же закрыт", world.is_garden_locked())
+
+
+## Бурмобиль в собственности требует топлива ещё до выхода из дома (решение
+## владельца, задача «Бурмобиль — транспорт»): спуск из подвала телепортирует
+## героя прямо в устье, минуя физическую границу, где топливо проверяет
+## player.gd — эта проверка обязана стоять и здесь. Тоннель уже построен
+## предыдущим тестом (_test_tunnel_transition), поэтому house_hatch_built
+## трогать не нужно.
+func _test_tunnel_requires_fuel_for_rig() -> void:
+	GameState.owned_tools.append("drill_rig")
+	GameState.inventory.erase("fuel_block")
+	house.enter_house("workshop")
+
+	check("без брикетов спуск с бурмобилем отказывает",
+		not house.exit_through_tunnel())
+	check("герой остался дома", GameState.house_is_indoors)
+
+	GameState.add_item("fuel_block", 2)
+	check("с брикетами спуск снова работает", house.exit_through_tunnel())
+	check("герой вышел из дома", not GameState.house_is_indoors)
+
+	GameState.owned_tools.erase("drill_rig")
+	GameState.inventory.erase("fuel_block")
 
 
 # ---------------------------------------------------------------------------

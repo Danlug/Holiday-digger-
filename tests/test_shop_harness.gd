@@ -21,6 +21,7 @@ func _ready() -> void:
 	_test_not_bought()
 	_test_craft_bronze()
 	_test_craft_fuel_block()
+	_test_craft_fuel_block_coal()
 	_test_idle_well_payout()
 	_test_craft_without_materials()
 	_test_hand_drill_from_storage()
@@ -35,12 +36,14 @@ func _ready() -> void:
 	_test_pickaxe_prices_and_multipliers()
 	_test_gear_prices_and_multipliers()
 	_test_buy_pickaxe_spends_exact_coins()
+	_test_buy_tool_cannot_dismount_rig_underground()
 	_test_buy_gear_spends_exact_coins()
 	_test_pickaxes_and_gear_are_not_crafted()
 	_test_tech_is_still_crafted()
 	_test_equipment_switches_dig_and_fly()
 	_test_shop_ui_builds_every_screen()
 	_test_save_migration_v1()
+	_test_rig_state_persists_save_load()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -152,6 +155,27 @@ func _test_craft_fuel_block() -> void:
 	GameState.inventory["peat"] = 4
 	check("с четырьмя торфами блок делается", bool(ShopService.craft("fuel_block")["ok"]))
 	check("торф списан весь", GameState.get_item_count("peat") == 0)
+	check("блок лежит в рюкзаке", GameState.get_item_count("fuel_block") == 1)
+
+
+## Бурмобиль требует брикеты угля (задача «Бурмобиль — транспорт», решение
+## владельца: «если он экипирован бурмобилем, он должен иметь на себе
+## топливо (брикеты каменного угля)»). Уголь — второй путь к тому же
+## предмету fuel_block, рядом с торфом, а не замена ему.
+func _test_craft_fuel_block_coal() -> void:
+	_fresh()
+	var recipe := ShopCatalog.recipe("fuel_block_coal")
+	check("рецепт угольного блока существует", not recipe.is_empty())
+	var need := int(recipe["inputs"]["coal"])
+	check("выход тот же предмет, что и у торфяного рецепта", String(recipe["output"]["id"]) == "fuel_block")
+
+	GameState.max_depth_reached = 1000  # рецепт открывается той же глубиной, что и уголь
+	GameState.inventory["coal"] = need - 1
+	check("без достаточного угля блок не делается", not bool(ShopService.craft("fuel_block_coal")["ok"]))
+
+	GameState.inventory["coal"] = need
+	check("с углём по рецепту блок делается", bool(ShopService.craft("fuel_block_coal")["ok"]))
+	check("уголь списан весь", GameState.get_item_count("coal") == 0)
 	check("блок лежит в рюкзаке", GameState.get_item_count("fuel_block") == 1)
 
 
@@ -476,6 +500,40 @@ func _test_buy_pickaxe_spends_exact_coins() -> void:
 		not bool(ShopService.buy_tool("rusty_pickaxe")["ok"]))
 
 
+## Бурмобиль — транспорт (решение владельца): его нельзя бросить под землёй,
+## купив по дороге другую кирку. Магазин у входной двери работает откуда
+## угодно (can_shop_here() == true всегда), и это единственный путь, которым
+## смена инструмента могла бы проскочить мимо GameState.set_current_tool.
+func _test_buy_tool_cannot_dismount_rig_underground() -> void:
+	_fresh()
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.current_tool = "drill_rig"
+	GameState.house_is_indoors = false
+	GameState.player_depth = 50  # под землёй
+	GameState.coins = 100000
+
+	var result := ShopService.buy_tool("titanium_pickaxe")
+	check("под землёй в бурмобиле новую кирку не купить", not bool(result["ok"]))
+	check("монеты не списаны", GameState.coins == 100000)
+	check("бурмобиль остался в руках", GameState.current_tool == "drill_rig")
+	check("кирка не куплена", not GameState.owned_tools.has("titanium_pickaxe"))
+
+	# На поверхности — можно.
+	GameState.player_depth = 0
+	check("на поверхности новую кирку купить можно", bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+	check("бурмобиль снят, кирка в руках", GameState.current_tool == "titanium_pickaxe")
+
+	# Дома под тем же кодом глубины — тоже можно (house_is_indoors снимает запрет).
+	_fresh()
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.current_tool = "drill_rig"
+	GameState.house_is_indoors = true
+	GameState.player_depth = 50
+	GameState.coins = 100000
+	check("дома под землёй бурмобиль тоже можно сменить",
+		bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+
+
 func _test_buy_gear_spends_exact_coins() -> void:
 	_fresh()
 	var price := Balance.get_gear_cost_coins("backpack")
@@ -637,6 +695,33 @@ func _test_save_migration_v1() -> void:
 	var eco4: Dictionary = SaveSystem._migrate(fresh_save)["economy"]
 	check("сейв версии 2 миграция не переписывает",
 		Array(eco4["owned_gear"]).size() == 1 and String(eco4["current_gear"]) == "backpack")
+
+
+## Бурмобиль — транспорт (задача «Бурмобиль — транспорт», решение владельца):
+## состояние "в машине" — это current_tool == "drill_rig" (единственная
+## истина, без отдельного in_rig), и оно уже сохраняется как обычный
+## инструмент; брикеты — обычный предмет инвентаря. Оба переживают реальный
+## цикл save_game()/load_game() через user://save.json — не только миграцию.
+func _test_rig_state_persists_save_load() -> void:
+	_fresh()
+	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.current_tool = "drill_rig"
+	GameState.inventory["fuel_block"] = 4
+	GameState.max_depth_reached = 1000
+
+	check("сейв записался", SaveSystem.save_game())
+
+	# Имитация нового запуска: состояние сбрасывается перед загрузкой.
+	GameState.current_tool = "shovel"
+	GameState.owned_tools = ["shovel"]
+	GameState.inventory.clear()
+	GameState.max_depth_reached = 0
+
+	check("сейв загрузился", SaveSystem.load_game())
+	check("бурмобиль остался в собственности", GameState.owned_tools.has("drill_rig"))
+	check("бурмобиль остался экипирован после перезапуска (одно состояние истины — current_tool)",
+		GameState.current_tool == "drill_rig")
+	check("брикеты пережили перезапуск", GameState.get_item_count("fuel_block") == 4)
 
 
 ## Дымовая проверка шторки: каждый из четырёх разделов магазина и экран

@@ -1112,8 +1112,11 @@ func _apply_day_cycle_sky() -> void:
 	var dc := get_node_or_null("/root/DayCycle")
 	if dc == null:
 		return
-	var day_col := Color(String(StoryData.mood("day").get("sky", "#7d93a6")))
-	_sky.color = day_col.lerp(Color.BLACK, dc.sky_dark())
+	# Та же палитра, что у живого неба (world_view.gd): день 81D3F4, самая
+	# тёмная ночь 11053B; sky_dark() 0..0.9 нормируем к 0..1.
+	var wv := preload("res://scripts/world/world_view.gd")
+	var k: float = clampf(dc.sky_dark() / 0.9, 0.0, 1.0)
+	_sky.color = wv.COLOR_SKY.lerp(wv.COLOR_SKY_NIGHT, k)
 
 
 func _apply_mood_colors(id: String) -> void:

@@ -32,13 +32,13 @@ var _white_tex: ImageTexture
 const SKY_HEIGHT := 24
 
 # Цвета вне палитры тайлов (небо, земля-поверхность, неразведанное, ГДД п.12)
-const COLOR_SKY := Color8(0x1D, 0x2A, 0x33)          # у самой земли
-# Верх неба — глубокая ночная синь, а НЕ void_far (0A0C12), которым закрашена
-# неразведанная порода: с ним подъём на 24 клетки выглядел не полётом в небо,
-# а полётом в шахту вверх — на верхних клетках экран становился таким же
-# чёрным, как под землёй, и герой в нём терялся.
-const COLOR_SKY_TOP := Color8(0x12, 0x19, 0x2B)      # верхняя кромка неба
-const COLOR_HORIZON := Color8(0x2E, 0x35, 0x48)      # void_rim — полоса горизонта
+# Дневное небо — ровный голубой 81D3F4, самая тёмная ночь — 11053B (решение
+# владельца 2026-09-21). Градиента по высоте больше нет: верх и низ одного
+# цвета, а суточный цикл ведёт весь купол от дневного к ночному разом.
+const COLOR_SKY := Color8(0x81, 0xD3, 0xF4)          # день, у самой земли
+const COLOR_SKY_TOP := Color8(0x81, 0xD3, 0xF4)      # день, верхняя кромка неба
+const COLOR_SKY_NIGHT := Color8(0x11, 0x05, 0x3B)    # самая тёмная ночь
+const COLOR_HORIZON := Color8(0x81, 0xD3, 0xF4)      # полоса горизонта — тот же день
 const COLOR_GROUND := Color8(0x3E, 0x5A, 0x2E)
 const COLOR_FOG_BLACK := Color8(0x08, 0x06, 0x05)
 const COLOR_GRAY_SOLID := Color8(0x2C, 0x24, 0x1B)
@@ -160,9 +160,12 @@ func _sky_color(wy: int) -> Color:
 		base = COLOR_SKY
 	else:
 		base = _sky_colors[clampi(-wy - 1, 0, _sky_colors.size() - 1)]
+	# sky_dark() идёт 0..0.9 (окна 18–20 и 4–6, см. day_cycle.gd); в самой
+	# тёмной точке небо — ровно COLOR_SKY_NIGHT, а не «чёрное на 90 %».
 	var day_cycle := get_node_or_null("/root/DayCycle")
 	if day_cycle != null:
-		base = base.lerp(Color.BLACK, day_cycle.sky_dark())
+		var k: float = clampf(day_cycle.sky_dark() / 0.9, 0.0, 1.0)
+		base = base.lerp(COLOR_SKY_NIGHT, k)
 	return base
 
 

@@ -1,5 +1,5 @@
 {
-	"build": "20260921-1646",
-	"commit": "df1875a",
+	"build": "20260921-1656",
+	"commit": "2f70b73",
 	"_note": "Пишется tools/make_build_info.py перед экспортом. Показывается в меню «•••» (scripts/ui/hud.gd) и служит меткой сброса кэша в веб-странице (tools/stamp_web_build.py)."
 }

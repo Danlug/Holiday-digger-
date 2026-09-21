@@ -1,0 +1,148 @@
+{
+ "version": 1,
+ "_source": "Задание владельца, 2026-09-21: «монетизация, честная к игрокам и прибыльная для меня» — перед публикацией в App Store/Google Play. Дизайн-рационале и чек-лист для владельца — в docs/MONETIZATION.md. Числа здесь НЕ дублируют data/balance.json/data/shop.json там, где те уже что-то решили (курс доллара, дневные лимиты рекламы) — только ссылаются на них по id.",
+ "_legend": "поле {value, proposed:true, note} = число не согласовано с владельцем, стартовая оценка агента (см. docs/MONETIZATION.md, раздел «Оговорка»), ждёт утверждения. В этом файле ТАК ПОМЕЧЕНО ВСЁ: ни один продукт, ни одна цена ниже ещё не были решением владельца — в отличие от data/balance.json, где часть чисел уже утверждена.",
+ "_no_real_payments_note": "КРИТИЧНО: в этой сборке нет интеграции с App Store Connect / Google Play Billing / рекламной сетью (AdMob и т.п.) — учётных данных не существует. scripts/core/iap_manager.gd и scripts/core/ad_manager.gd — только каркас API, который платформенный SDK будет дергать в будущем; их методы-заглушки логируют вызов и ничего не покупают, не показывают и не выдают. Ничего в этом файле не превращается в реальные деньги само по себе.",
+
+ "premium_currency": {
+  "name_ru": "доллары",
+  "note": "Курс и правила обмена — не здесь, а в data/balance.json -> economy (coins_per_premium_currency_unit) и docs/GDD.md раздел 15. Здесь только то, что НОВОЕ для этой темы: пачки долларов за реальные деньги и куда доллары тратятся."
+ },
+
+ "_fairness_note": "Ни один товар в dollar_packs/iap_products/cosmetic_catalog не даёт скорость копки, силу, HP, шанс удачи, вместимость рюкзака или доступ к глубине/минералам — эти рычаги (кирки, ранцы, бур, апгрейды) в игре остаются исключительно за монеты, зарабатываемые копкой (см. data/balance.json -> tools/gear/drill_upgrade, ShopCatalog). Донат покупает время, удобство и внешний вид — не силу.",
+
+ "dollar_packs": {
+  "_note": "НОВОЕ по сравнению с текущей сборкой: сейчас доллары купить нельзя вообще (см. scripts/shop/shop_ui.gd:_render_premium_screen — 'Доллары в этой сборке нельзя купить: платежей нет'). Это предложение продуктов на будущее, когда появится платёжный SDK. Ставка тем выгоднее, чем крупнее пачка — стандартная практика F2P, но не 'плати больше — копай быстрее': доллары по-прежнему не покупают силу, только то, что перечислено ниже в cosmetic_catalog/convenience_catalog и в iap_products (антиреклама, слот ящика, подписки).",
+  "items": [
+   {
+    "product_id": "dollars_pack_s",
+    "name_ru": "Пачка долларов S",
+    "price_usd": {"value": 0.99, "proposed": true, "note": "стартовая цена входного импульсного пакета — стандарт жанра, не расчёт по ARPDAU (его ещё нет)"},
+    "grants_dollars": {"value": 100, "proposed": true}
+   },
+   {
+    "product_id": "dollars_pack_m",
+    "name_ru": "Пачка долларов M",
+    "price_usd": {"value": 4.99, "proposed": true, "note": "≈ +9% долларов за доллар по сравнению с пачкой S — поощряет пачку побольше, не создавая ощущения, что мелкая пачка это 'обман'"},
+    "grants_dollars": {"value": 550, "proposed": true}
+   },
+   {
+    "product_id": "dollars_pack_l",
+    "name_ru": "Пачка долларов L",
+    "price_usd": {"value": 9.99, "proposed": true, "note": "≈ +19% к базовой ставке"},
+    "grants_dollars": {"value": 1200, "proposed": true}
+   },
+   {
+    "product_id": "dollars_pack_xl",
+    "name_ru": "Пачка долларов XL",
+    "price_usd": {"value": 19.99, "proposed": true, "note": "≈ +29% к базовой ставке"},
+    "grants_dollars": {"value": 2600, "proposed": true}
+   },
+   {
+    "product_id": "dollars_pack_mega",
+    "name_ru": "Пачка долларов MEGA",
+    "price_usd": {"value": 49.99, "proposed": true, "note": "верхний ('whale') уровень, ≈ +39% к базовой ставке. Даже на этом уровне пачка покупает только доллары — а доллары не покупают силу (см. _fairness_note)"},
+    "grants_dollars": {"value": 7000, "proposed": true}
+   }
+  ]
+ },
+
+ "iap_products": {
+  "_note": "Расширяет и заменяет черновик data/balance.json -> monetization.iap_products (та секция помечена устаревшей и указывает сюда). Отличие от прежнего черновика: у premium_monthly убран 'strength' — грант силы в копке несовместим с заданием владельца 'честно к игрокам'; вместо него — вращающийся набор косметики и storage-конвенience через существующее поле GameState.black_box_tier (см. ниже).",
+  "items": [
+   {
+    "id": "remove_ads",
+    "name_ru": "Антиреклама",
+    "price_usd": 2.99,
+    "grants": ["no_ads"],
+    "note": "убирает баннеры/интерстишлы, если такие появятся; НЕ убирает добровольные rewarded-ролики за награду (см. ad_placements) — тот же принцип, что в GDD раздел 15"
+   },
+   {
+    "id": "black_box_plus_1",
+    "name_ru": "Чёрный ящик +1",
+    "price_usd": 2.9,
+    "grants": ["black_box_slot+1"],
+    "note": "ещё одна ячейка в GameState.black_box — сортировка/склад, не грузоподъёмность и не сила (см. data/balance.json -> black_box._note)"
+   },
+   {
+    "id": "premium_monthly",
+    "name_ru": "Премиум / мес",
+    "price_usd": 9.9,
+    "grants": [
+     "no_ads",
+     {"black_box_tier": "premium", "note": "вместо абстрактного 'inventory_boost' — конкретно: GameState.black_box_tier='premium' (2 ячейки вместо 1, см. data/balance.json -> black_box.tiers) на время подписки"},
+     {"cosmetic_bundle_monthly": true, "note": "ЗАМЕНА 'strength' из прежнего черновика balance.json — вместо прибавки к силе/копке (pay-to-win) подписчик получает доступ к одному предмету из cosmetic_catalog в месяц по выбору, бесплатно. Требует утверждения владельца — это предложение агента, не решение"},
+     {"premium_currency_onetime": {"value": 50, "proposed": true, "note": "разовая выдача при оформлении — количество не задано в GDD"}}
+    ]
+   },
+   {
+    "id": "premium_plus_monthly",
+    "name_ru": "Премиум+ / мес",
+    "price_usd": 14.9,
+    "grants": [
+     "premium_monthly_benefits",
+     {"black_box_tier": "premium_plus", "note": "GameState.black_box_tier='premium_plus' (3 ячейки) вместо 'premium' — перекрывает, не складывается"},
+     {"premium_currency_daily": {"value": 5, "proposed": true, "note": "ежедневная выдача — количество не задано в GDD"}},
+     {"cosmetic_bundle_monthly_plus": true, "note": "тот же принцип, что у premium_monthly, но выбор из двух предметов вместо одного — разница уровней в ассортименте косметики, а не в силе"}
+    ]
+   }
+  ]
+ },
+
+ "cosmetic_catalog": {
+  "_note": "Косметика продаётся за доллары (премиум-валюту), не напрямую за реальные деньги — тот же принцип, что уже применён к гаджетам в data/balance.json -> monetization.gadgets_premium_currency. Ни один предмет не меняет никакую формулу Balance: это чисто визуальная замена спрайта/сцены поверх существующего инструмента/ранца/комнаты, тот же приём, что и tools/gear (id инструмента остаётся прежним, скин — отдельное поле поверх него, ещё не реализованное в character_view.gd/tile_art.gd — раздел ниже описывает ЦЕЛЬ, не готовую систему рендера скинов).",
+  "items": [
+   {"id": "skin_hero_winter", "name_ru": "Зимний свитер", "slot": "character_skin", "price_dollars": {"value": 15, "proposed": true}},
+   {"id": "skin_hero_beach", "name_ru": "Пляжный костюм", "slot": "character_skin", "price_dollars": {"value": 15, "proposed": true}},
+   {"id": "skin_tool_golden", "name_ru": "Золотая обшивка инструмента", "slot": "tool_skin", "price_dollars": {"value": 10, "proposed": true}, "note": "перекрашивает ТЕКУЩИЙ инструмент игрока — не даёт новый инструмент и не меняет его характеристики (see Balance.get_tool)"},
+   {"id": "skin_tool_painted", "name_ru": "Разрисованный инструмент", "slot": "tool_skin", "price_dollars": {"value": 10, "proposed": true}},
+   {"id": "decor_house_poster_set", "name_ru": "Набор постеров в прихожую", "slot": "house_decor_hall", "price_dollars": {"value": 8, "proposed": true}},
+   {"id": "decor_house_plant", "name_ru": "Комнатное растение", "slot": "house_decor_bedroom", "price_dollars": {"value": 8, "proposed": true}},
+   {"id": "decor_workshop_display_case", "name_ru": "Витрина для находок в мастерской", "slot": "house_decor_workshop", "price_dollars": {"value": 12, "proposed": true}, "note": "чисто декоративная витрина рядом с верстаком; не путать с MuseumPanel — коллекция находок остаётся отдельной системой прогресса, не платной"},
+   {"id": "fx_jetpack_trail", "name_ru": "Блёстки за джетпаком", "slot": "gear_fx", "price_dollars": {"value": 20, "proposed": true}, "note": "частицы поверх полёта — jetpack/jetpack_top остаются тем же множителем скорости, что и без эффекта"}
+  ]
+ },
+
+ "convenience_catalog": {
+  "_note": "Удобства продаются за доллары. Всё, что уже бесплатно ограниченное число раз в день через рекламу (см. ad_placements/data/balance.json -> ads.daily_limits), здесь ТОЛЬКО как способ докупить использования СВЕРХ дневного лимита — не как замену рекламе: игрок, готовый ждать и смотреть ролики, ничего не платит.",
+  "items": [
+   {
+    "id": "extra_sleep_skip",
+    "name_ru": "Мгновенный сон (сверх дневного лимита роликов)",
+    "price_dollars": {"value": 3, "proposed": true},
+    "note": "сверх 5 бесплатных в день за ролик (balance.json -> ads.daily_limits.skip_sleep_at_home)"
+   },
+   {
+    "id": "extra_mine_restore",
+    "name_ru": "Восстановить бодрость/голод в шахте (сверх лимита)",
+    "price_dollars": {"value": 3, "proposed": true},
+    "note": "сверх 3 бесплатных в день за ролик (ads.daily_limits.restore_stamina_hunger_in_mine)"
+   },
+   {
+    "id": "extra_remote_dump",
+    "name_ru": "Сбросить лут на продажу дистанционно (сверх лимита)",
+    "price_dollars": {"value": 2, "proposed": true},
+    "note": "сверх 3 бесплатных в день за ролик (ads.daily_limits.remote_dump_loot_for_sale)"
+   },
+   {
+    "id": "well_offline_cap_extend",
+    "name_ru": "Удвоить офлайн-кап скважины на один сбор",
+    "price_dollars": {"value": 10, "proposed": true},
+    "note": "разово поднимает idle_well.offline_cap_hours с 8 до 16 часов для ближайшего окна отчёта — не влияет на базовую ставку дохода и не даёт скважине платить доллары (это запрещено owner-решением, см. data/balance.json -> idle_well.pays.note)"
+   }
+  ]
+ },
+
+ "ad_placements": {
+  "_note": "Единственный честный (без платежей) источник долларов в текущей сборке — см. scripts/shop/shop_service.gd:claim_ad. Дневные лимиты уже заданы владельцем в data/balance.json -> ads.daily_limits и не дублируются здесь: только id, где именно в игре предлагается ролик, и реализован ли он уже (award уже приходит от ShopCatalog.ad_reward+ShopService.claim_ad) или это ещё точка расширения для AdManager.show_rewarded_ad().",
+  "items": [
+   {"id": "small_coins", "trigger": "магазин еды, кнопка \"Немного монет\"", "implemented": true, "reward_source": "shop.json -> ad_rewards"},
+   {"id": "small_premium_currency", "trigger": "премиум-магазин, блок \"Доллары\"", "implemented": true, "reward_source": "shop.json -> ad_rewards"},
+   {"id": "double_income_on_sale", "trigger": "магазин еды, кнопка \"Удвоить доход с продажи\"", "implemented": true, "reward_source": "shop.json -> ad_rewards"},
+   {"id": "skip_sleep_at_home", "trigger": "кровать в спальне (house_sleep.gd) — кнопка 'Уснуть мгновенно за ролик'", "implemented": false, "note": "лимит уже задан (5/день), UI-точка и reward-запись в shop.json ещё не сделаны — см. docs/MONETIZATION.md чек-лист интеграции"},
+   {"id": "restore_stamina_hunger_in_mine", "trigger": "второе истощение в шахте (см. GDD п.9, энергетический батончик) — предложить ролик перед платным батончиком", "implemented": false},
+   {"id": "cancel_loot_loss_on_death", "trigger": "экран смерти/возрождения — до подтверждения потери лута", "implemented": false},
+   {"id": "remote_dump_loot_for_sale", "trigger": "полный рюкзак в шахте — рядом с обычной продажей на месте", "implemented": false}
+  ]
+ }
+}

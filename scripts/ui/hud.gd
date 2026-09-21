@@ -152,6 +152,9 @@ var _vision_toggle_btn: Button
 var _control_mode_buttons: Dictionary = {}   # mode:String -> Button
 var _language_buttons: Dictionary = {}       # code:String -> Button
 
+## Точка входа в покупки (scripts/core/iap_manager.gd) — см. _build_settings_iap_row.
+var _restore_purchases_btn: Button
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -768,6 +771,7 @@ func _build_settings_sheet(parent: Control) -> void:
 	_build_settings_control_row(body)
 	_build_settings_vision_row(body)
 	_build_settings_language_row(body)
+	_build_settings_iap_row(body)
 
 
 func _settings_section_label(parent: Control, text: String) -> void:
@@ -904,6 +908,38 @@ func _build_settings_language_row(parent: Control) -> void:
 			btn.pressed.connect(func(): Settings.set_language(code); _refresh_settings_panel())
 		row.add_child(btn)
 		_language_buttons[code] = btn
+
+
+## Единственная точка входа в покупки, подключённая к IAPManager (см.
+## scripts/core/iap_manager.gd) — решение владельца держать её в «Настройках»,
+## а не заводить отдельный полноэкранный магазин косметики прямо сейчас:
+## каталог (data/monetization.json) ещё черновой и ждёт утверждения, а
+## кнопка «Восстановить покупки» всё равно обязана быть где-то в игре для
+## будущей публикации в App Store (Apple отклоняет сборки с покупками без
+## неё). IAPManager.request_purchase()/restore_purchases() — честные
+## заглушки: они не покупают и не восстанавливают ничего по-настоящему, а
+## сразу сообщают об этом тостом — ту же фразу уже показывает премиум-магазин
+## для долларов (см. shop_ui.gd:_render_premium_screen). Когда появится
+## платёжный SDK, эта кнопка не изменится — изменится только тело
+## IAPManager.request_purchase().
+func _build_settings_iap_row(parent: Control) -> void:
+	_settings_section_label(parent, "ПОКУПКИ")
+	var hint := Label.new()
+	hint.text = "Платежи не подключены в этой сборке."
+	hint.add_theme_font_size_override("font_size", 8)
+	hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(hint)
+
+	_restore_purchases_btn = Button.new()
+	_restore_purchases_btn.text = "Восстановить покупки"
+	_restore_purchases_btn.add_theme_font_size_override("font_size", 10)
+	_restore_purchases_btn.custom_minimum_size = Vector2(0, 26)
+	_restore_purchases_btn.focus_mode = Control.FOCUS_NONE
+	_restore_purchases_btn.pressed.connect(func():
+		IAPManager.restore_purchases()
+		toast("Покупок для восстановления нет — платежи не подключены."))
+	parent.add_child(_restore_purchases_btn)
 
 
 ## Перечитывает Settings и красит все контролы панели — вызывается при

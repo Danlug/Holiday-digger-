@@ -648,6 +648,7 @@
   "known_mineral_prices_ref": "см. minerals.json -> price_coins"
  },
  "monetization": {
+  "_status": "ЧЕРНОВИК ПРЕЖНЕГО АГЕНТА, СУЖЕН ДО ССЫЛКИ (2026-09-21). Полный, проверенный на 'честно к игрокам' каталог теперь в data/monetization.json (там же пачки долларов, косметика, удобства, карта точек показа рекламы) и docs/MONETIZATION.md (дизайн-рационале). Здесь оставлены только id продуктов из таблицы GDD раздела 15, без 'strength' — прибавка к силе копки была прежним предложением агента, ещё не решением владельца, и прямо противоречит заданию 'честная монетизация' (сила игрока покупается только монетами за игру, см. data/monetization.json -> _fairness_note). Числа ниже ПОВТОРЯЮТ то, что уже есть в data/monetization.json -> iap_products — источник истины теперь тот файл, этот оставлен для обратной совместимости со старыми ссылками на balance.json.",
   "iap_products": [
    {
     "id": "remove_ads",
@@ -671,8 +672,14 @@
     "price_usd": 9.9,
     "grants": [
      "no_ads",
-     "inventory_boost",
-     "strength_boost",
+     {
+      "black_box_tier": "premium",
+      "note": "конкретизация 'inventory_boost': GameState.black_box_tier='premium' на время подписки — склад, не грузоподъёмность (см. data/monetization.json -> iap_products)"
+     },
+     {
+      "cosmetic_bundle_monthly": true,
+      "note": "ЗАМЕНА снятого 'strength_boost': один предмет из data/monetization.json -> cosmetic_catalog в месяц, а не прибавка к силе/копке"
+     },
      {
       "premium_currency_onetime": {
        "value": 50,
@@ -688,6 +695,10 @@
     "price_usd": 14.9,
     "grants": [
      "premium_monthly_benefits",
+     {
+      "black_box_tier": "premium_plus",
+      "note": "GameState.black_box_tier='premium_plus', перекрывает 'premium'"
+     },
      {
       "premium_currency_daily": {
        "value": 5,

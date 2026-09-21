@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kwg5j03rsmuy"
-path="res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"
+uid="uid://br7ry4xb5lpbm"
+path="res://.godot/imported/rig_exit.png-4dd097783b2a4bcfcccd2519c6f22bb7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/_source/house_modern.jpg"
-dest_files=["res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"]
+source_file="res://art/character/rig_exit.png"
+dest_files=["res://.godot/imported/rig_exit.png-4dd097783b2a4bcfcccd2519c6f22bb7.ctex"]
 
 [params]
 

@@ -115,6 +115,23 @@ var _sprite: Sprite2D
 var _stun_flash: ColorRect
 var _sheets: Dictionary = {}
 
+# ---------------------------------------------------------------------------
+# Выход/посадка в бурмобиль на поверхности (art/character/rig_exit.png +
+# .json, см. tools/import_rig_exit.py). Свой, отдельный от DIG_SHEETS/
+# SHEET_FRAME выше — те листы и фазы копки правит параллельно другой агент,
+# и общий кусок кода между двумя задачами усложнил бы слияние. Всё моё живёт
+# в этом блоке и в _draw_rig_transition().
+# ---------------------------------------------------------------------------
+const RIG_EXIT_SHEET_PATH := "res://art/character/rig_exit.png"
+const RIG_EXIT_META_PATH := "res://art/character/rig_exit.json"
+const RIG_EXIT_FRAMES := 7
+## Резерв на случай отсутствия JSON (тесты без art/) — тот же кадр, что
+## печатает tools/import_rig_exit.py по факту листа сейчас.
+const RIG_EXIT_GROUND_Y_FALLBACK := 150
+
+var _rig_exit_sheet: Texture2D = null
+var _rig_exit_ground_y: int = RIG_EXIT_GROUND_Y_FALLBACK
+
 ## Уровень снаряжения, выставленный снаружи. -1 значит «не выставляли» — тогда
 ## уровень спрашивается у самого героя, см. _flight_tier().
 var _tier_override: int = -1
@@ -138,6 +155,7 @@ func _ready() -> void:
 		var path: String = "res://art/character/" + sheet + ".png"
 		if ResourceLoader.exists(path):
 			_sheets[sheet] = load(path)
+	_load_rig_exit_sheet()
 
 
 ## Общее имя набора копки по текущему инструменту, БЕЗ суффикса направления
@@ -275,6 +293,15 @@ func _process(_dt: float) -> void:
 		return
 	position = Vector2(player.x * TILE, player.y * TILE)
 
+	# Выход из бурмобиля на поверхности / посадка в него — свой рисунок поверх
+	# всего остального (player.rig_transition != ""), пока анимация не
+	# доиграла управление и так заблокировано, см. player.gd). Держит экран,
+	# пока не закончится, — обычные ветки ниже (копка/полёт/ходьба) в это
+	# время не имеют смысла: герой либо в кабине, либо ещё не встал.
+	if String(player.get("rig_transition")) != "":
+		_draw_rig_transition()
+		return
+
 	# Бурмобиль под землёй — герой ВСЕГДА в кабине (решение владельца, задача
 	# «Бурмобиль — транспорт»): никаких листов ходьбы/полёта/падения пешком,
 	# пока едет машина. Отдельных кадров простоя/ходьбы/падения у машины нет
@@ -341,3 +368,38 @@ func _stun_shake() -> float:
 	if left <= 0.0:
 		return 0.0
 	return signf(sin(left / 1000.0 * TAU * SHAKE_HZ)) * SHAKE_PIXELS
+
+
+# ---------------------------------------------------------------------------
+# Выход/посадка в бурмобиль — см. блок объявлений в начале файла.
+# ---------------------------------------------------------------------------
+
+func _load_rig_exit_sheet() -> void:
+	if ResourceLoader.exists(RIG_EXIT_SHEET_PATH):
+		_rig_exit_sheet = load(RIG_EXIT_SHEET_PATH)
+	if ResourceLoader.exists(RIG_EXIT_META_PATH):
+		var f := FileAccess.open(RIG_EXIT_META_PATH, FileAccess.READ)
+		if f != null:
+			var parsed = JSON.parse_string(f.get_as_text())
+			if parsed is Dictionary and parsed.has("ground_y"):
+				_rig_exit_ground_y = int(parsed["ground_y"])
+
+
+## Кадр листа rig_exit.png по ключу (1..7), который держит player.gd
+## (rig_transition_key()) — семь поз без интерполяции между ними, ключ
+## переключается целиком, никакого anim-счётчика тут нет: это не цикл, а
+## одноразовая постановочная сценка.
+func _draw_rig_transition() -> void:
+	if _rig_exit_sheet == null or player == null:
+		return
+	var key: int = int(player.call("rig_transition_key")) if player.has_method("rig_transition_key") else 1
+	var fw: int = int(_rig_exit_sheet.get_width() / RIG_EXIT_FRAMES)
+	var fh: int = int(_rig_exit_sheet.get_height())
+	_sprite.texture = _rig_exit_sheet
+	_sprite.region_rect = Rect2(clampi(key - 1, 0, RIG_EXIT_FRAMES - 1) * fw, 0, fw, fh)
+	# Сцена выхода всегда смотрит в одну сторону (та, куда исходно смотрел
+	# художник — герой выходит из машины лицом от тоннеля): разворот по
+	# facing её не касается, машина не разворачивается вместе с героем.
+	_sprite.flip_h = false
+	_sprite.position = Vector2(-fw / (2.0 * ART_SCALE),
+			-HH * TILE - 16.0 + float(GROUND_Y - _rig_exit_ground_y) / ART_SCALE)

@@ -59,6 +59,12 @@ static func _serialize() -> Dictionary:
 		},
 		"tool": {
 			"current_tool": gs.current_tool,
+			# Припаркованная машина — объект мира, переживает перезапуск:
+			# без записи герой у себя дома нашёл бы бурмобиль пропавшим
+			# (см. GameState.rig_parked_at, player.gd "Бурмобиль как
+			# транспорт"). -1,-1 — не запаркована.
+			"rig_parked_x": gs.rig_parked_at.x,
+			"rig_parked_y": gs.rig_parked_at.y,
 		},
 		"depth": {
 			"max_depth_reached": gs.max_depth_reached,
@@ -166,6 +172,9 @@ static func _apply(data: Dictionary) -> void:
 
 	var tool: Dictionary = data.get("tool", {})
 	gs.current_tool = String(tool.get("current_tool", gs.current_tool))
+	# Сейв до бурмобиля-транспорта паркинга не знает — (-1,-1) по умолчанию
+	# уже значит "не запаркована" (см. GameState.rig_parked_at).
+	gs.rig_parked_at = Vector2i(int(tool.get("rig_parked_x", -1)), int(tool.get("rig_parked_y", -1)))
 
 	var depth: Dictionary = data.get("depth", {})
 	gs.max_depth_reached = int(depth.get("max_depth_reached", gs.max_depth_reached))

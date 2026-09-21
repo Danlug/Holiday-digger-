@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kwg5j03rsmuy"
-path="res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"
+uid="uid://cmjgjblbaulxp"
+path="res://.godot/imported/drill_mobile_parked.png-8f4d95e527d84d82001987acfafde65f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/_source/house_modern.jpg"
-dest_files=["res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"]
+source_file="res://art/env/drill_mobile_parked.png"
+dest_files=["res://.godot/imported/drill_mobile_parked.png-8f4d95e527d84d82001987acfafde65f.ctex"]
 
 [params]
 

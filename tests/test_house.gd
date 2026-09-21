@@ -46,7 +46,8 @@ func _ready() -> void:
 	_test_energy_bar_effect()
 	_test_enter_and_exit_keeps_state()
 	_test_tunnel_transition()
-	_test_tunnel_requires_fuel_for_rig()
+	_test_tunnel_descent_always_works_on_foot()
+	_test_rig_button_near_parked_rig()
 	_test_storage_access_rules()
 	_test_storage_survives_death_and_save()
 
@@ -430,21 +431,71 @@ func _test_tunnel_transition() -> void:
 ## player.gd — эта проверка обязана стоять и здесь. Тоннель уже построен
 ## предыдущим тестом (_test_tunnel_transition), поэтому house_hatch_built
 ## трогать не нужно.
-func _test_tunnel_requires_fuel_for_rig() -> void:
+##
+## Уточнение владельца от 2026-09-21: спуск пешком больше НИЧЕМ не гейтится —
+## ни бурмобилем в собственности без топлива (старое правило до этого
+## уточнения), ни вообще чем-либо. Топливо теперь проверяется только в
+## момент самой посадки в машину (player.gd:start_rig_boarding), а не на
+## входе в тоннель.
+func _test_tunnel_descent_always_works_on_foot() -> void:
 	GameState.owned_tools.append("drill_rig")
 	GameState.inventory.erase("fuel_block")
 	house.enter_house("workshop")
 
-	check("без брикетов спуск с бурмобилем отказывает",
-		not house.exit_through_tunnel())
-	check("герой остался дома", GameState.house_is_indoors)
+	check("без брикетов спуск пешком всё равно работает", house.exit_through_tunnel())
+	check("герой вышел из дома", not GameState.house_is_indoors)
+	check("инструмент не подменился машиной", GameState.current_tool != "drill_rig")
 
+	house.enter_house("workshop")
 	GameState.add_item("fuel_block", 2)
-	check("с брикетами спуск снова работает", house.exit_through_tunnel())
+	check("с брикетами спуск тоже работает", house.exit_through_tunnel())
 	check("герой вышел из дома", not GameState.house_is_indoors)
 
 	GameState.owned_tools.erase("drill_rig")
 	GameState.inventory.erase("fuel_block")
+
+
+## Кнопка «В бурмобиль» (решение владельца от 2026-09-21: посадка не
+## автоматическая) появляется только когда машина припаркована и герой рядом,
+## без брикетов отказывает тостом и не убирает машину с парковки, с
+## брикетами запускает посадку в player.gd.
+func _test_rig_button_near_parked_rig() -> void:
+	var mouth := world.tunnel_mouth()
+	GameState.owned_tools.append("drill_rig")
+	GameState.rig_parked_at = Vector2i(-1, -1)
+	GameState.inventory.erase("fuel_block")
+	GameState.house_is_indoors = false
+	player.frozen = false
+	player.x = float(mouth.x) + 0.5
+	player.y = 0.5
+
+	check("без парковки near_parked_rig() ложно", not house.near_parked_rig())
+
+	GameState.rig_parked_at = Vector2i(mouth.x, 0)
+	check("рядом с припаркованной машиной near_parked_rig() истинно", house.near_parked_rig())
+
+	house._on_rig_button()
+	check("без брикетов посадка не началась", player.rig_transition == "")
+	check("машина осталась на парковке без топлива", GameState.is_rig_parked())
+
+	GameState.add_item("fuel_block", 3)
+	house._on_rig_button()
+	check("с брикетами посадка началась", player.rig_transition == "enter")
+
+	_tick_house(int(10.0 / 0.016))
+	check("посадка закончилась, герой за рулём", GameState.current_tool == "drill_rig")
+	check("машина снята с парковки", not GameState.is_rig_parked())
+
+	GameState.owned_tools.erase("drill_rig")
+	GameState.inventory.erase("fuel_block")
+	GameState.current_tool = "shovel"
+	GameState.rig_parked_at = Vector2i(-1, -1)
+	player.frozen = false
+
+
+func _tick_house(n: int, dt: float = 0.016) -> void:
+	for i in range(n):
+		player.physics_tick(dt)
 
 
 # ---------------------------------------------------------------------------

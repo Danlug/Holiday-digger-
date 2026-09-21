@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kwg5j03rsmuy"
-path="res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"
+uid="uid://dlxeqsbh8iblx"
+path="res://.godot/imported/idle.png-89abc5e38ca96c322baffb3fe6eade37.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/_source/house_modern.jpg"
-dest_files=["res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"]
+source_file="res://art/character/robert/idle.png"
+dest_files=["res://.godot/imported/idle.png-89abc5e38ca96c322baffb3fe6eade37.ctex"]
 
 [params]
 

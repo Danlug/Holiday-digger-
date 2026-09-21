@@ -21,16 +21,23 @@ signal tool_auto_switched(tool_id: String)
 signal gear_unlocked(gear_id: String)
 signal jumped
 signal died_in_place
-## Герой сел в бурмобиль сам, автоматически, войдя в тоннель с машиной в
-## собственности, но не в руках (решение владельца: «спускаясь под землю он
-## должен быть только в нём»). Не путать с tool_auto_switched — тот сигнал
-## говорит только "инструмент сменился", этот — конкретно "ты за рулём".
+## Герой сел в бурмобиль — посадка закончилась (решение владельца от
+## 2026-09-21: посадка НЕ автоматическая, а кнопкой "В бурмобиль" у
+## припаркованной машины, см. start_rig_boarding()). Не путать с
+## tool_auto_switched — тот сигнал говорит только "инструмент сменился",
+## этот — конкретно "ты за рулём, анимация посадки доиграла".
 signal entered_rig
-## Бурмобиль без топлива: либо не пускает в тоннель с поверхности, либо
-## глохнет прямо под землёй (копать нечем). Текст сообщения — сюда, а не
-## отдельными сигналами на каждый случай: оба говорят игроку одно и то же —
-## "нужны брикеты" — разными словами момента.
+## Бурмобиль без топлива глохнет прямо под землёй (копать нечем) — или
+## посадка кнопкой "В бурмобиль" отказывает без брикетов. Текст сообщения —
+## сюда, а не отдельными сигналами на каждый случай: оба говорят игроку одно
+## и то же — "нужны брикеты" — разными словами момента.
 signal rig_fuel_warning(message: String)
+## Начался/закончился выход из бурмобиля на поверхности (проехал из-под
+## земли) или посадка в него (кнопка у припаркованной машины) — см. блок
+## "Выход и посадка в бурмобиль на поверхности" ниже. character_view.gd
+## слушает эти сигналы, чтобы не гадать о состоянии по кадрам.
+signal rig_transition_started(entering: bool)
+signal rig_transition_finished(entering: bool)
 
 const TILE := 32
 
@@ -135,22 +142,34 @@ var _announced_rig: bool = false
 
 # --- бурмобиль как транспорт (ГДД раздел 5, решение владельца) ---
 ## Была ли клетка под героем подземной в ПРЕДЫДУЩЕМ кадре — по перепаду
-## отсюда узнаём момент входа в тоннель (см. _check_rig_transitions), а не
-## пересчитываем его из типа тайла каждый раз.
+## отсюда узнаём момент выезда на поверхность (см. _check_rig_surface_exit),
+## а не пересчитываем его из типа тайла каждый раз.
 var _was_underground: bool = false
 ## Дробный остаток расхода топлива (blocks_per_cell меньше единицы — блок
 ## тратится не на каждой клетке). Не сохраняется между сессиями: точность в
 ## доли блока никто не заметит, а хранить её ради этого не стоит.
 var _rig_fuel_progress: float = 0.0
-## Тост «нет брикетов» у невидимой стены устья и тост «кончилось топливо»
-## при попытке копать без брикетов уже показаны для текущего непрерывного
-## упора в стену/удержания копки — оба места вызываются каждый кадр физики
-## (_move_y — пока держится вниз, _start_dig — пока держится направление
-## копки), и без этих флагов тост эмитился бы 60 раз в секунду вместо одного
-## раза за попытку. Сбрасываются на "отпустил ввод"/"перестал упираться" —
-## новая попытка снова получает своё сообщение.
-var _rig_wall_warned: bool = false
+## Тост «кончилось топливо» при попытке копать без брикетов уже показан для
+## текущего удержания копки — _start_dig вызывается каждый кадр физики, пока
+## держится направление копки, и без этого флага тост эмитился бы 60 раз в
+## секунду вместо одного раза за попытку. Сбрасывается на «отпустил ввод» —
+## новая попытка снова получает своё сообщение. (Стены у устья без топлива
+## больше нет — спуск пешком разрешён всегда, посадка только кнопкой.)
 var _rig_dig_stall_warned: bool = false
+
+# --- выход/посадка в бурмобиль на поверхности (свои переменные и функции —
+# см. блок ниже — держатся отдельно от фаз копки (DIG_PHASES в
+# character_view.gd), которые параллельно правит другой агент: слияние
+# должно остаться простым) ---
+## "" — герой не в переходе; "exit" — выезжает из-под земли (запускается
+## сам, см. _check_rig_surface_exit); "enter" — садится в припаркованную
+## машину (по кнопке "В бурмобиль", см. start_rig_boarding()).
+var rig_transition: String = ""
+## Индекс текущей фазы внутри _rig_transition_keys/_rig_transition_durations.
+var rig_transition_phase: int = 0
+var _rig_transition_t: float = 0.0
+var _rig_transition_keys: Array = []       # порядок ключей 1..7 текущего перехода
+var _rig_transition_durations: Array = []  # их длительности в секундах, тот же порядок
 
 var frozen: bool = false       # true во время сцены смерти/катсцен — герой не управляется
 
@@ -272,7 +291,8 @@ func has_hand_drill() -> bool:
 ## владение — разные вещи: has_drill_rig() говорит "можно собрать", а
 ## GameState.owned_tools.has("drill_rig") — "уже стоит в гараже". Само
 ## владение решает, ходит ли герой пешком или ездит (см. блок ниже:
-## "бурмобиль как транспорт" и _check_rig_transitions). Перегрев машины из
+## "бурмобиль как транспорт", start_rig_boarding и _check_rig_surface_exit).
+## Перегрев машины из
 ## ГДД раздела 5 по-прежнему не реализован — числа не заданы владельцем
 ## (см. balance.json -> survival.hazards.drill_overheat).
 func has_drill_rig() -> bool:
@@ -280,21 +300,28 @@ func has_drill_rig() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Бурмобиль как транспорт (ГДД раздел 5, решение владельца от 2026-09-21:
-# «когда он обретает бурмобиль, спускаясь под землю он должен быть только в
-# нём»; «если он экипирован бурмобилем, он должен иметь на себе топливо»).
+# Бурмобиль как транспорт (ГДД раздел 5). Уточнение владельца от 2026-09-21
+# (поверх более раннего «спускаясь под землю он должен быть только в нём»):
+# посадка НЕ автоматическая. Герой пешком подходит к припаркованной у устья
+# машине — контекстная кнопка «В бурмобиль» (HouseSystem, как «Зайти» у
+# веранды) запускает посадку. Не нажал и пошёл в тоннель вниз — спускается
+# пешком со своей экипировкой, машина остаётся на парковке. Под землёй
+# пешком теперь МОЖНО (старая невидимая стена на входе снята вместе с
+# автопосадкой): единственное, что по-прежнему нельзя без брикетов, — сама
+# посадка (см. start_rig_boarding) и копка в машине без топлива (см.
+# _start_dig).
 #
-# Единственная истина — GameState.current_tool == "drill_rig": надета машина
-# или нет. Отдельного признака in_rig нет намеренно (задача прямо разрешала
-# выбрать один способ) — current_tool и так решает, чем копать, и заводить
-# рядом второй флаг значило бы держать два источника правды, которые рано
-# или поздно разъедутся.
+# Единственная истина, надета ли машина, — GameState.current_tool ==
+# "drill_rig" (is_in_rig()). Где машина, когда НЕ надета, — GameState.
+# rig_parked_at (см. game_state.gd): либо нигде (ещё не куплена или впервые
+# едет вниз при разблокировке рецепта — та ветка не в зоне этой задачи), либо
+# на поверхности у устья тоннеля, куда её поставил _start_rig_exit.
 # ---------------------------------------------------------------------------
 
 ## Герой прямо сейчас "за рулём": машина в собственности и надета. Отдельно
 ## от того, под землёй он или нет, — character_view.gd решает по этому же
-## условию ПЛЮС cell_y() >= 1, потому что на поверхности машина просто стоит
-## и герой из неё не вылезает визуально до явной смены инструмента дома.
+## условию ПЛЮС cell_y() >= 1: на поверхности, пока не доиграла посадка,
+## машина просто стоит на парковке (рисуется миром, не героем).
 func is_in_rig() -> bool:
 	return GameState.current_tool == "drill_rig"
 
@@ -306,31 +333,208 @@ func _has_rig_fuel() -> bool:
 	return GameState.get_item_count("fuel_block") > 0
 
 
-## Бурмобиль в собственности, но топлива нет — тоннель для героя закрыт
-## (решение владельца: без топлива техника не подменяется чем-то другим,
-## значит и пешком с ней вниз тоже нельзя, раз машина уже есть). Собственно
-## блокировка входа — в _move_y (виртуальный пол на границе y=1); эта
-## функция — только условие.
-func _rig_blocks_descent() -> bool:
-	return GameState.owned_tools.has("drill_rig") and not _has_rig_fuel()
+## Публичная обёртка — HouseSystem (владелец кнопки «В бурмобиль») спрашивает
+## топливо ровно тем же способом, что и сам player.gd, чтобы кнопка и
+## реальная посадка не разошлись в том, что считается «есть топливо».
+func has_rig_fuel() -> bool:
+	return _has_rig_fuel()
 
 
-## Ловит момент пересечения границы "поверхность / под землёй" (y=1) и
-## решает, что должно произойти с бурмобилем: молча сесть за руль, если он
-## есть и не надет (и есть топливо — без него сюда просто не долетишь, см.
-## _move_y), или ничего, если он и так надет или его нет вовсе. Дёргается
-## каждый кадр физики, но реагирует только на перепад — идемпотентно, как
-## соседний _check_gear_unlocks.
-func _check_rig_transitions() -> void:
+## Лучший инструмент для копки в собственности игрока (не считая саму
+## машину) — на него переключается герой, выйдя из бурмобиля пешком
+## (решение владельца: «current_tool переключается на лучшую кирку в
+## собственности»). "Лучший" — по множителю скорости копки из balance.json,
+## а не по фиксированному списку: список кирок и так живёт в данных, и
+## дублировать его порядок здесь — плодить второй источник правды.
+func _best_owned_dig_tool() -> String:
+	var best := "shovel"
+	var best_mult := -1.0
+	for t in GameState.owned_tools:
+		var tool_id := String(t)
+		if tool_id == "drill_rig":
+			continue
+		var mult := Balance.get_tool_speed_multiplier(tool_id)
+		if mult > best_mult:
+			best_mult = mult
+			best = tool_id
+	return best
+
+
+## Ловит момент, когда герой ВЫЕХАЛ из-под земли на поверхность в бурмобиле
+## (пересёк границу y=1 снизу вверх) — начинает анимацию выхода (см.
+## _start_rig_exit). Обратное направление (спуск) больше не трогает: под
+## землю пешком теперь можно всегда, посадка в машину — отдельное явное
+## действие (start_rig_boarding), а не пересечение границы.
+func _check_rig_surface_exit() -> void:
 	var underground := cell_y() >= 1
-	if underground and not _was_underground \
-			and GameState.owned_tools.has("drill_rig") and not is_in_rig():
-		# Без топлива сюда не попасть вовсе (_move_y держит невидимую стену
-		# на входе) — если герой всё же здесь, топливо есть, и подсаживать
-		# можно смело.
-		GameState.set_current_tool("drill_rig")
-		entered_rig.emit()
+	if not underground and _was_underground and is_in_rig() and rig_transition == "":
+		_start_rig_exit()
 	_was_underground = underground
+
+
+# ---------------------------------------------------------------------------
+# Анимация выхода/посадки (art/character/rig_exit.png + rig_exit.json, см.
+# tools/import_rig_exit.py). Семь КЛЮЧЕВЫХ поз без интерполяции между ними —
+# пиксель-арт, "плавности" тут не бывает, только держим каждый ключ
+# положенное число кадров и режем на следующий.
+# ---------------------------------------------------------------------------
+
+const RIG_EXIT_META_PATH := "res://art/character/rig_exit.json"
+## Резервные числа на случай отсутствия JSON (тесты без art/, урезанная
+## сборка) — те же, что напечатал tools/import_rig_exit.py по факту листа.
+const RIG_EXIT_PHASES_FALLBACK := [8, 8, 8, 4, 6, 7, 8]
+const RIG_EXIT_FPS_FALLBACK := 7.0
+const RIG_EXIT_STAND_DX_FALLBACK := 15.0  # логические px, см. JSON stand_dx
+
+static var _rig_exit_meta: Dictionary = {}
+static var _rig_exit_meta_loaded: bool = false
+
+
+## Метаданные листа выхода — читаются один раз на весь процесс (общий файл
+## для всех героев, разбирать JSON каждый переход незачем).
+static func _rig_exit_meta_dict() -> Dictionary:
+	if not _rig_exit_meta_loaded:
+		_rig_exit_meta_loaded = true
+		if ResourceLoader.exists(RIG_EXIT_META_PATH):
+			var f := FileAccess.open(RIG_EXIT_META_PATH, FileAccess.READ)
+			if f != null:
+				var parsed = JSON.parse_string(f.get_as_text())
+				if parsed is Dictionary:
+					_rig_exit_meta = parsed
+	return _rig_exit_meta
+
+
+func _rig_phase_frames() -> Array:
+	var arr = _rig_exit_meta_dict().get("phase_frames", RIG_EXIT_PHASES_FALLBACK)
+	return arr if arr is Array and arr.size() == 7 else RIG_EXIT_PHASES_FALLBACK
+
+
+func _rig_exit_fps() -> float:
+	return float(_rig_exit_meta_dict().get("fps", RIG_EXIT_FPS_FALLBACK))
+
+
+## Смещение героя от центра припаркованной машины в ключе 7 (стоит рядом) —
+## переводится из логических px листа в клетки (x, y здесь — клетки).
+func _rig_stand_dx_cells() -> float:
+	return float(_rig_exit_meta_dict().get("stand_dx", RIG_EXIT_STAND_DX_FALLBACK)) / TILE
+
+
+## Ключ (1..7) листа rig_exit.png, который сейчас должен быть на экране —
+## character_view.gd спрашивает это, а не считает кадр сам: порядок ключей
+## при посадке обратный (7→1), и дублировать эту логику в двух файлах —
+## плодить рассинхрон.
+func rig_transition_key() -> int:
+	if _rig_transition_keys.is_empty():
+		return 1
+	return int(_rig_transition_keys[clampi(rig_transition_phase, 0, _rig_transition_keys.size() - 1)])
+
+
+func _rig_setup_transition(entering: bool) -> void:
+	var frames := _rig_phase_frames()
+	var fps := maxf(0.1, _rig_exit_fps())
+	var keys: Array = []
+	var secs: Array = []
+	if entering:
+		# Посадка — та же последовательность ключей в обратном порядке
+		# (решение владельца), с той же длительностью на каждый ключ.
+		for i in range(frames.size() - 1, -1, -1):
+			keys.append(i + 1)
+			secs.append(float(frames[i]) / fps)
+	else:
+		for i in range(frames.size()):
+			keys.append(i + 1)
+			secs.append(float(frames[i]) / fps)
+	_rig_transition_keys = keys
+	_rig_transition_durations = secs
+	rig_transition_phase = 0
+	_rig_transition_t = 0.0
+
+
+## Выезд из-под земли на поверхность (см. _check_rig_surface_exit) — играет
+## сам, без участия игрока. Машина паркуется ровно в клетке, где герой
+## пересёк границу (единственная вертикальная шахта — устье тоннеля, других
+## колонок сюда не приводит), он сам замирает рядом на время анимации.
+func _start_rig_exit() -> void:
+	rig_transition = "exit"
+	_rig_setup_transition(false)
+	var park_x := cell_x()
+	GameState.rig_parked_at = Vector2i(park_x, 0)
+	x = float(park_x) + 0.5
+	y = 0.5
+	vx = 0.0; vy = 0.0
+	digging = null
+	thrust = ""
+	frozen = true
+	rig_transition_started.emit(false)
+
+
+## Посадка в припаркованную машину — по кнопке "В бурмобиль" (HouseSystem),
+## НЕ автоматически (решение владельца от 2026-09-21). Без брикетов кнопка
+## есть, но посадка отказывает тостом — топливо проверяется здесь же, одной
+## точкой с _has_rig_fuel(), чтобы кнопка и реальная посадка не разошлись.
+## Возвращает false, если посадка не началась (не запаркована, уже едет,
+## переход уже идёт, нет топлива) — вызывающий сам решает, что сказать
+## игроку по ложному false по топливу (см. HouseSystem._on_rig_button).
+func start_rig_boarding() -> bool:
+	if rig_transition != "" or not GameState.is_rig_parked() or is_in_rig():
+		return false
+	if not _has_rig_fuel():
+		rig_fuel_warning.emit("Нет брикетов — сделай на верстаке из угля")
+		return false
+	rig_transition = "enter"
+	_rig_setup_transition(true)
+	x = float(GameState.rig_parked_at.x) + 0.5
+	y = 0.5
+	vx = 0.0; vy = 0.0
+	digging = null
+	thrust = ""
+	frozen = true
+	rig_transition_started.emit(true)
+	return true
+
+
+func _tick_rig_transition(dt: float) -> void:
+	_rig_transition_t += dt
+	var dur: float = 0.2
+	if rig_transition_phase < _rig_transition_durations.size():
+		dur = float(_rig_transition_durations[rig_transition_phase])
+	if _rig_transition_t < dur:
+		return
+	_rig_transition_t = 0.0
+	rig_transition_phase += 1
+	if rig_transition_phase >= _rig_transition_keys.size():
+		_finish_rig_transition()
+
+
+func _finish_rig_transition() -> void:
+	var entering := rig_transition == "enter"
+	rig_transition = ""
+	rig_transition_phase = 0
+	_rig_transition_keys = []
+	_rig_transition_durations = []
+	frozen = false
+	if entering:
+		# Машина уходит с парковки — она "надета": is_in_rig()/GameState.
+		# current_tool теперь единственная истина, второй записи об этой же
+		# машине существовать не должно (см. шапку блока "Бурмобиль как
+		# транспорт" выше).
+		GameState.rig_parked_at = Vector2i(-1, -1)
+		GameState.set_current_tool("drill_rig")
+		# Герой стоял точно у машины (start_rig_boarding уже поставил его
+		# туда) — вход в тоннель отсюда решает обычная физика/ввод игрока,
+		# как и раньше.
+		_was_underground = cell_y() >= 1
+		entered_rig.emit()
+	else:
+		# Приехал, вылез — берётся за лучшее, что есть в руках, а не остаётся
+		# голыми руками (решение владельца: "current_tool переключается на
+		# лучшую кирку в собственности").
+		GameState.set_current_tool(_best_owned_dig_tool())
+		var park: Vector2i = GameState.rig_parked_at
+		x = float(park.x) + 0.5 + _rig_stand_dx_cells()
+		y = 0.5
+		_was_underground = false
+	rig_transition_finished.emit(entering)
 
 
 ## Тратит топливо бурмобиля за одну прокопанную клетку (расход —
@@ -376,6 +580,15 @@ func _check_gear_unlocks() -> void:
 # ---------------------------------------------------------------------------
 
 func physics_tick(dt: float) -> void:
+	# Переход (выход/посадка) тикает ДО общей заморозки: он сам держит
+	# frozen=true на время анимации (управление и правда заблокировано), но
+	# кадры переключать обязан — иначе ранний return ниже никогда не даст
+	# анимации сдвинуться с первого ключа.
+	if rig_transition != "":
+		_tick_rig_transition(dt)
+		vx = 0.0
+		return
+
 	if frozen or not GameState.is_alive:
 		vx = 0.0
 		return
@@ -402,7 +615,7 @@ func physics_tick(dt: float) -> void:
 	_award_depth_milestones(GameState.max_depth_reached, cell_y())
 	GameState.update_max_depth(cell_y())
 	_check_gear_unlocks()
-	_check_rig_transitions()
+	_check_rig_surface_exit()
 
 
 ## Первое достижение каждой 10-й клетки глубины — бонус 50 * (глубина/10)
@@ -479,10 +692,6 @@ func _prop_ramp() -> float:
 
 
 func _move_y(dt: float) -> void:
-	# Граница поверхность/под землёй ДО интеграции скорости — нужна ниже,
-	# чтобы отличить "уже был внизу" (топливо кончилось на месте — не наш
-	# случай, см. _rig_blocks_descent) от "спускался только что" (наш).
-	var y0 := y
 	if thrust != "":
 		var jet := thrust == "jet"
 		# Множитель ступени ранца умножает ПОТОЛОК скорости подъёма (клеток в
@@ -516,26 +725,6 @@ func _move_y(dt: float) -> void:
 	if y < ceiling:
 		y = ceiling
 		vy = maxf(vy, 0.0)
-
-	# Бурмобиль без топлива не пускает под землю (решение владельца: "если он
-	# экипирован бурмобилем, он должен иметь на себе топливо") — тоннель на
-	# границе y=1 держит героя, как невидимая стена, тем же приёмом, что и
-	# небо выше: герой был на поверхности (y0 < 1.0) и своим ходом пытается
-	# провалиться под неё. Уже спустившегося героя, у которого топливо
-	# кончилось ПОД землёй, эта стена не трогает — тот попадает в другую
-	# ветку (см. _start_dig: копать нечем, но идти по прорытому можно).
-	if y0 < 1.0 and y + HH > 1.0 and _rig_blocks_descent():
-		y = 1.0 - HH - 0.002
-		vy = minf(vy, 0.0)
-		on_ground = true
-		# Пока герой упирается в стену, этот if бьёт каждый физический кадр —
-		# без флага тост сыпался бы 60 раз в секунду вместо одного раза за
-		# попытку (см. _rig_wall_warned выше).
-		if not _rig_wall_warned:
-			_rig_wall_warned = true
-			rig_fuel_warning.emit("Нет брикетов — сделай на верстаке из угля")
-		return
-	_rig_wall_warned = false
 
 	var left := x - HW + 0.02
 	var right := x + HW - 0.02
@@ -895,6 +1084,15 @@ func teleport_home() -> void:
 	# Герой оказался дома не своим ходом: следующий спуск обязан снова
 	# считаться входом в тоннель, а не "он и так был внизу".
 	_was_underground = false
+	# Смерть/телепорт не должны оставлять недоигранный переход висящим —
+	# frozen из него снимается здесь же, иначе герой дома навсегда замер бы
+	# в позе анимации выхода.
+	if rig_transition != "":
+		rig_transition = ""
+		rig_transition_phase = 0
+		_rig_transition_keys = []
+		_rig_transition_durations = []
+		frozen = false
 
 
 func camera() -> Vector2:

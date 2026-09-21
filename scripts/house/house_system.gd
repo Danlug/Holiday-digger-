@@ -70,6 +70,15 @@ var _prompt_action: String = ""
 var _outdoor_layer: CanvasLayer = null
 var _outdoor_button: Button = null
 
+## Кнопка «В бурмобиль» — тем же приёмом, что «Зайти» (решение владельца от
+## 2026-09-21: посадка не автоматическая, кнопка всплывает над героем, когда
+## он подошёл к припаркованной у устья машине). Дом не "владеет" бурмобилем
+## по смыслу (это транспорт игрока, а не часть дома) — но механизм кнопки
+## уже здесь и переиспользуется, чтобы не заводить второй CanvasLayer с той
+## же анимацией появления/скрытия ради одной кнопки.
+var _rig_layer: CanvasLayer = null
+var _rig_button: Button = null
+
 ## Идёт ли сейчас ~10-секундная анимация сна у кровати (ГДД: «спит быстро,
 ## буквально 10 секунд, показывая анимацию»). Гейт от повторного нажатия,
 ## пока таймер не истёк.
@@ -96,6 +105,7 @@ func _ready() -> void:
 	_build_world_props()
 	_build_scenes()
 	_build_outdoor_hotspot()
+	_build_rig_hotspot()
 
 	GameState.daily_reset.connect(_on_daily_reset)
 
@@ -202,6 +212,25 @@ func _build_outdoor_hotspot() -> void:
 	_outdoor_layer.add_child(_outdoor_button)
 
 
+## Кнопка «В бурмобиль» у припаркованной машины (решение владельца от
+## 2026-09-21) — тот же приём, что «Зайти»: свой CanvasLayer, видимость решает
+## near_parked_rig(), позиция — над героем, тем же _outdoor_camera().
+func _build_rig_hotspot() -> void:
+	_rig_layer = CanvasLayer.new()
+	_rig_layer.name = "RigHotspot"
+	_rig_layer.layer = 8
+	add_child(_rig_layer)
+
+	_rig_button = Button.new()
+	_rig_button.name = "BoardRigBtn"
+	_rig_button.text = "В бурмобиль"
+	_rig_button.custom_minimum_size = Vector2(88, 22)
+	_style_outdoor_button(_rig_button)
+	_rig_button.visible = false
+	_rig_button.pressed.connect(_on_rig_button)
+	_rig_layer.add_child(_rig_button)
+
+
 func _style_outdoor_button(b: Button) -> void:
 	b.add_theme_font_size_override("font_size", 10)
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
@@ -228,6 +257,7 @@ func _process(_dt: float) -> void:
 	_tick_tutorial()
 	_update_hud_button()
 	_update_outdoor_hotspot()
+	_update_rig_hotspot()
 	if _view != null and _view.visible:
 		_view.refresh()
 	if _storage_view != null and _storage_view.visible:
@@ -269,6 +299,40 @@ func _update_outdoor_hotspot() -> void:
 		_outdoor_button.custom_minimum_size.x / 2.0, _outdoor_button.custom_minimum_size.y + 4.0)
 
 
+## Видимость и позиция кнопки «В бурмобиль» — теми же правилами, что «Зайти»
+## (см. выше), плюс герой не должен уже быть за рулём и переход не должен
+## идти (двойное нажатие/повторная посадка во время анимации).
+func _update_rig_hotspot() -> void:
+	if _rig_button == null:
+		return
+	var busy: bool = player != null and player.has_method("is_in_rig") \
+		and (player.is_in_rig() or String(player.get("rig_transition")) != "")
+	if GameState.house_is_indoors or not GameState.is_alive or player == null \
+			or busy or not near_parked_rig():
+		_rig_button.visible = false
+		return
+	_rig_button.visible = true
+	if hud == null:
+		return
+	var cam := _outdoor_camera()
+	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
+	_rig_button.position = head - Vector2(
+		_rig_button.custom_minimum_size.x / 2.0, _rig_button.custom_minimum_size.y + 4.0)
+
+
+## Нажатие «В бурмобиль» — сама посадка (фазы, блокировка управления,
+## смена current_tool) целиком в player.gd:start_rig_boarding(); дом только
+## просит её начать и переводит отказ по топливу в тот же toast, каким
+## раньше отказывал спуск без брикетов (тот текст игрок уже знает).
+func _on_rig_button() -> void:
+	if player == null or not player.has_method("start_rig_boarding"):
+		return
+	if player.has_method("has_rig_fuel") and not player.has_rig_fuel():
+		_toast("Нет брикетов — сделай на верстаке из угля")
+		return
+	player.start_rig_boarding()
+
+
 # ---------------------------------------------------------------------------
 # Переходы
 # ---------------------------------------------------------------------------
@@ -283,6 +347,17 @@ func near_door() -> bool:
 		return false
 	var door := HouseConfig.door_cell()
 	return player.y < 1.5 and absf(player.x - (door.x + 0.5)) <= HouseConfig.interact_radius()
+
+
+## Стоит ли герой рядом с припаркованным у устья бурмобилем (решение
+## владельца от 2026-09-21: посадка кнопкой, не автоматически). Машина
+## паркуется на поверхности (GameState.rig_parked_at.y == 0) — see
+## player.gd:_start_rig_exit.
+func near_parked_rig() -> bool:
+	if player == null or not GameState.is_rig_parked():
+		return false
+	var p: Vector2i = GameState.rig_parked_at
+	return player.y < 1.5 and absf(player.x - (float(p.x) + 0.5)) <= HouseConfig.interact_radius()
 
 
 ## Устье тоннеля Роберта — верхняя клетка бетонного колодца (ГДД п.9,
@@ -341,16 +416,13 @@ func exit_through_tunnel() -> bool:
 		world = GameState.world_ref
 	if world == null:
 		return false
-	# Бурмобиль в собственности требует топлива ещё до выхода из дома —
-	# спуск отсюда телепортирует героя прямо в устье, минуя физическую
-	# границу поверхность/под землёй, где топливо проверяет player.gd
-	# (_rig_blocks_descent). Без этой проверки здесь герой оказался бы в
-	# шахте без топлива тем же способом, каким наружный вход это запрещает
-	# (решение владельца: «если он экипирован бурмобилем, он должен иметь на
-	# себе топливо»).
-	if GameState.owned_tools.has("drill_rig") and GameState.get_item_count("fuel_block") <= 0:
-		_toast("Нет брикетов — сделай на верстаке из угля")
-		return false
+	# Спуск пешком больше ничем не гейтится (уточнение владельца от
+	# 2026-09-21): бурмобиль без брикетов больше не запирает тоннель — герой
+	# просто идёт вниз со своей экипировкой, машина (если есть) остаётся на
+	# парковке у устья (см. player.gd "Бурмобиль как транспорт",
+	# GameState.rig_parked_at). Топливо теперь проверяется только в момент
+	# самой ПОСАДКИ в машину (see player.gd:start_rig_boarding) — герой,
+	# спустившийся пешком, за руль тут вообще не садится.
 	# Тоннель пробивается заново на каждом спуске: землетрясение (ГДД п.8)
 	# стирает диффы, и колодец зарастает обратно. Вызов идемпотентный —
 	# мир сам разбирается, что уже пробито.

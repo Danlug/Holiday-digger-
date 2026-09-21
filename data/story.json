@@ -173,7 +173,7 @@
 			"speaker": "speaker.boy"
 		},
 		"robert": {
-			"dir": "",
+			"dir": "robert",
 			"speaker": "speaker.robert"
 		},
 		"parents": {
@@ -1267,9 +1267,27 @@
 					"t": "clear"
 				},
 				{
+					"t": "show",
+					"actor": "robert",
+					"at": "right",
+					"pose": "idle"
+				},
+				{
+					"t": "show",
+					"actor": "robert",
+					"at": "right",
+					"pose": "talk"
+				},
+				{
 					"t": "say",
 					"who": "robert",
 					"text": "robert.r1"
+				},
+				{
+					"t": "show",
+					"actor": "robert",
+					"at": "right",
+					"pose": "idle"
 				},
 				{
 					"t": "show",
@@ -1283,9 +1301,21 @@
 					"text": "robert.s2"
 				},
 				{
+					"t": "show",
+					"actor": "robert",
+					"at": "right",
+					"pose": "talk"
+				},
+				{
 					"t": "say",
 					"who": "robert",
 					"text": "robert.r2"
+				},
+				{
+					"t": "show",
+					"actor": "robert",
+					"at": "right",
+					"pose": "idle"
 				}
 			],
 			"effects": [

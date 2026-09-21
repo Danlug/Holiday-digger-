@@ -197,11 +197,26 @@ func set_quest_cells(cells: Array) -> void:
 		_overlay.queue_redraw()
 
 
+## Летающий декор (бабочки, стрекозы над цветами) — не садится в траву, как
+## остальной декор: насекомое над цветком должно висеть, а не тонуть в земле
+## вместе со стеблем. Основание остаётся на верхней кромке тайла, как раньше.
+const GARDEN_DECOR_FLYING := ["flowers_butterflies", "flowers_dragonfly"]
+
 ## Декор огорода (art/env/garden/*.png) поверх тайла травы — деревья, грядки,
 ## камни. Свой draw_texture_rect, а не спрайт из пула _paint_cell: объекты
 ## разной высоты (дерево — под три клетки) и должны расти ВВЕРХ от границы
 ## y=0, залезая в клетки неба, а пул рисует ровно одну клетку на спрайт.
 ## Чисто декоративно — без коллизии, герой проходит сквозь них насквозь.
+##
+## Основание объекта — не на верхней кромке тайла травы (иначе он выглядит
+## поставленным НА траву), а на середине тайла (решение владельца: объекты
+## должны расти ИЗ травы). Трава при этом не перекрывает нижнюю половину:
+## декор рисуется на _overlay, который уже лежит поверх пула тайлов (см.
+## move_child(_overlay, ...) в _ready), поэтому нижняя половина объекта ложится
+## НАД непрозрачной травой, а не под ней. y=0 (верхняя кромка тайла травы) —
+## всегда трава: клетка y<1 не участвует в копке (WorldGen.get_tile/dig_cell),
+## так что декор никогда не повисает над выкопанной ямой — под травой ямы не
+## бывает.
 func _draw_garden_decor() -> void:
 	if world == null:
 		return
@@ -222,12 +237,50 @@ func _draw_garden_decor() -> void:
 		var w: float = tex.get_width() / ART_SCALE
 		var h: float = tex.get_height() / ART_SCALE
 		var x: float = wx * TILE + (TILE - w) / 2.0
-		var y: float = -h   # низ объекта — на линии земли (верх клетки y=0)
+		# Низ объекта: середина тайла травы — кроме летающего декора (см. выше).
+		var base_y: float = 0.0 if GARDEN_DECOR_FLYING.has(name) else TILE / 2.0
+		var y: float = base_y - h
 		_overlay.draw_texture_rect(tex, Rect2(x, y, w, h), false)
+
+
+## Припаркованный у устья бурмобиль (GameState.rig_parked_at, см.
+## player.gd "Бурмобиль как транспорт" и tools/import_rig_exit.py) — объект
+## мира, а не героя: он стоит там и когда герой давно ушёл в дом пешком.
+## Свой, отдельный от _draw_garden_decor (та функция и её данные — GARDEN_*
+## в world_gen.gd — чужая задача декора огорода, не трогаем).
+const RIG_PARKED_TEX_PATH := "res://art/env/drill_mobile_parked.png"
+var _rig_parked_tex: Texture2D = null
+var _rig_parked_tex_checked: bool = false
+
+
+func _draw_parked_rig() -> void:
+	if not GameState.is_rig_parked():
+		return
+	# Во время самой анимации выхода/посадки машина уже нарисована как часть
+	# кадра rig_exit.png (see character_view._draw_rig_transition) — второй,
+	# мировой спрайт поверх неё дал бы удвоенную машину на экране.
+	if player != null and String(player.get("rig_transition")) != "":
+		return
+	if not _rig_parked_tex_checked:
+		_rig_parked_tex_checked = true
+		if ResourceLoader.exists(RIG_PARKED_TEX_PATH):
+			_rig_parked_tex = load(RIG_PARKED_TEX_PATH)
+	if _rig_parked_tex == null:
+		return
+	var cell: Vector2i = GameState.rig_parked_at
+	var w: float = _rig_parked_tex.get_width() / ART_SCALE
+	var h: float = _rig_parked_tex.get_height() / ART_SCALE
+	# Низ машины — на линии земли (верх клетки y=0), центр — по клетке
+	# парковки; та же привязка, что у декора огорода до правки середины
+	# тайла (машина не "растение", ей стоять на кромке, а не расти из неё).
+	var x: float = cell.x * TILE + (TILE - w) / 2.0
+	var y: float = cell.y * TILE - h
+	_overlay.draw_texture_rect(_rig_parked_tex, Rect2(x, y, w, h), false)
 
 
 func _on_overlay_draw() -> void:
 	_draw_garden_decor()
+	_draw_parked_rig()
 	if player == null:
 		return
 	var pcx: float = player.x * TILE

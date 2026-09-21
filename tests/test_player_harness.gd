@@ -40,9 +40,12 @@ func _ready() -> void:
 	_test_sky_colors()
 	_test_sealed_garden_gives_no_xp()
 
-	# --- бурмобиль как транспорт (задача «Бурмобиль — транспорт») ---
-	_test_rig_blocks_tunnel_without_fuel()
-	_test_rig_auto_seats_with_fuel()
+	# --- бурмобиль как транспорт ---
+	_test_walks_underground_without_boarding()
+	_test_rig_boarding_blocked_without_fuel()
+	_test_rig_boarding_with_fuel()
+	_test_rig_exit_plays_all_phases_in_order()
+	_test_rig_parked_survives_save_load()
 	_test_rig_fuel_consumption_accumulator()
 	_test_rig_stalls_digging_without_fuel()
 
@@ -564,11 +567,13 @@ func _test_sky_colors() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Бурмобиль как транспорт (решение владельца, задача «Бурмобиль —
-# транспорт»): «спускаясь под землю он должен быть только в нём»; «если он
-# экипирован бурмобилем, он должен иметь на себе топливо (брикеты каменного
-# угля)». Единственная истина — GameState.current_tool == "drill_rig"
-# (player.is_in_rig()).
+# Бурмобиль как транспорт. Уточнение владельца от 2026-09-21 поверх более
+# раннего «спускаясь под землю он должен быть только в нём»: посадка НЕ
+# автоматическая — кнопка «В бурмобиль» у припаркованной машины
+# (player.start_rig_boarding, см. house_system.gd), а спуск пешком больше
+# ничем не гейтится. Единственная истина, надета ли машина, —
+# GameState.current_tool == "drill_rig" (player.is_in_rig()); где она, когда
+# не надета, — GameState.rig_parked_at.
 # ---------------------------------------------------------------------------
 
 ## Общая подготовка: настоящий тоннель Роберта (build_robert_tunnel) вместо
@@ -611,9 +616,10 @@ func _teardown_rig_world(_locked_world: WorldGen) -> void:
 	GameState.reset_progress()
 
 
-## На поверхности без брикетов бурмобиль в собственности не пускает в
-## тоннель вовсе — герой висит у входа, как перед невидимой стеной.
-func _test_rig_blocks_tunnel_without_fuel() -> void:
+## Под землю пешком теперь можно всегда — стены на входе больше нет, ни с
+## бурмобилем в собственности без топлива, ни вовсе без машины. Инструмент
+## при этом не трогается: спустился пешком — пешком и остался.
+func _test_walks_underground_without_boarding() -> void:
 	var w := _setup_rig_world()
 	GameState.inventory.clear()  # брикетов нет
 
@@ -623,37 +629,125 @@ func _test_rig_blocks_tunnel_without_fuel() -> void:
 	_tick(120)
 	player.rig_fuel_warning.disconnect(cb)
 
-	check("без топлива герой остаётся на поверхности", player.cell_y() == 0)
-	check("инструмент не переключился без топлива", GameState.current_tool == "shovel")
-	check("тост «нет брикетов» пришёл",
-		warnings.has("Нет брикетов — сделай на верстаке из угля"))
-	check("тост у стены не спамит каждый кадр (пришёл один раз, а не %d)" % warnings.size(),
-		warnings.size() == 1)
+	check("без топлива и без посадки герой всё равно уходит под тоннель", player.cell_y() >= 1)
+	check("инструмент не переключился сам", GameState.current_tool == "shovel")
+	check("не в бурмобиле", not player.is_in_rig())
+	check("тост о топливе на спуске пешком не приходит", warnings.is_empty())
+	check("машина не запаркована — её и не было", not GameState.is_rig_parked())
 
 	_teardown_rig_world(w)
 
 
-## С брикетами в рюкзаке герой спускается в тоннель и автоматически садится
-## в бурмобиль, даже если перед этим ходил пешком с киркой.
-func _test_rig_auto_seats_with_fuel() -> void:
+## Посадка кнопкой «В бурмобиль» (start_rig_boarding) требует, чтобы машина
+## была припаркована, и без топлива отказывает тостом, не трогая инструмент
+## и не убирая машину с парковки.
+func _test_rig_boarding_blocked_without_fuel() -> void:
+	var w := _setup_rig_world()
+	GameState.inventory.clear()  # брикетов нет
+	GameState.rig_parked_at = Vector2i(w.tunnel_mouth().x, 0)
+	player.x = float(GameState.rig_parked_at.x) + 0.5
+	player.y = 0.5
+
+	var warnings: Array = []
+	var cb := func(m): warnings.append(m)
+	player.rig_fuel_warning.connect(cb)
+	var started: bool = player.start_rig_boarding()
+	player.rig_fuel_warning.disconnect(cb)
+
+	check("посадка без топлива не началась", not started)
+	check("player.rig_transition пуст", player.rig_transition == "")
+	check("инструмент не переключился", GameState.current_tool == "shovel")
+	check("машина осталась на парковке", GameState.is_rig_parked())
+	check("тост «нет брикетов» пришёл", warnings.has("Нет брикетов — сделай на верстаке из угля"))
+
+	_teardown_rig_world(w)
+
+
+## С брикетами посадка играет фазами (7 ключей, суммарная длительность —
+## сумма phase_frames/fps) и заканчивается тем, что герой за рулём, машина
+## снята с парковки, управление разморожено.
+func _test_rig_boarding_with_fuel() -> void:
 	var w := _setup_rig_world()
 	GameState.add_item("fuel_block", 5)
+	GameState.rig_parked_at = Vector2i(w.tunnel_mouth().x, 0)
+	player.x = float(GameState.rig_parked_at.x) + 0.5
+	player.y = 0.5
 
-	# Массив, а не bool: лямбда в GDScript захватывает локальную bool-переменную
-	# КОПИЕЙ по значению, и cb() внутри менял бы только свою копию — Array
-	# захватывается тем же указателем на общее хранилище, и append снаружи виден.
 	var entered_events: Array = []
 	var cb := func(): entered_events.append(true)
 	player.entered_rig.connect(cb)
-	_tick(120)
+
+	var started: bool = player.start_rig_boarding()
+	check("посадка началась", started)
+	check("управление заблокировано на время посадки", player.frozen)
+	check("посадка идёт в обратном порядке, начиная с ключа 7", player.rig_transition_key() == 7)
+
+	# 10 секунд с запасом хватает на любую разумную сумму фаз (7×8 кадров при
+	# 7 fps — это 8 секунд).
+	_tick(int(10.0 / (1.0 / 30.0)))
 	player.entered_rig.disconnect(cb)
 
-	check("с топливом герой уходит под тоннель", player.cell_y() >= 1)
-	check("бурмобиль сел на инструмент автоматически", GameState.current_tool == "drill_rig")
-	check("is_in_rig() согласуется с current_tool", player.is_in_rig())
+	check("посадка закончилась", player.rig_transition == "")
+	check("управление разморожено", not player.frozen)
+	check("герой за рулём", player.is_in_rig())
+	check("машина снята с парковки", not GameState.is_rig_parked())
 	check("сигнал \"сел в бурмобиль\" пришёл ровно один раз", entered_events.size() == 1)
 
 	_teardown_rig_world(w)
+
+
+## Выезд из-под земли на поверхность запускается сам (без кнопки), играет
+## все семь ключей ПО ПОРЯДКУ и суммарная длительность равна сумме
+## phase_frames/fps (см. art/character/rig_exit.json).
+func _test_rig_exit_plays_all_phases_in_order() -> void:
+	var w := _setup_rig_world()
+	GameState.add_item("fuel_block", 99)
+	# Железная кирка в собственности рядом с лопатой — чтобы проверить, что
+	# после выезда встаёт именно ЛУЧШИЙ инструмент (по множителю скорости), а
+	# не первый попавшийся или всегда лопата.
+	GameState.owned_tools = ["shovel", "drill_rig", "iron_pickaxe"]
+	GameState.current_tool = "drill_rig"
+	player.x = float(w.tunnel_mouth().x) + 0.5
+	player.y = 1.2                     # чуть ниже границы, ещё под землёй
+	player.vy = -40.0                   # с запасом пересечёт y=1 за один тик
+	player._was_underground = true
+
+	_tick(1)
+	check("выезд запустился сам, без кнопки", player.rig_transition == "exit")
+
+	var seen_keys: Array = []
+	var last_key := 0
+	var frames := 0
+	var max_frames := int(15.0 / (1.0 / 30.0))
+	while player.rig_transition != "" and frames < max_frames:
+		var k: int = player.rig_transition_key()
+		if k != last_key:
+			seen_keys.append(k)
+			last_key = k
+		_tick(1)
+		frames += 1
+
+	check("выезд закончился в разумное время", player.rig_transition == "")
+	check("ключи шли по порядку 1..7", seen_keys == [1, 2, 3, 4, 5, 6, 7])
+	check("герой больше не в бурмобиле", not player.is_in_rig())
+	check("после выезда — лучший инструмент в собственности (кирка, не лопата)",
+		GameState.current_tool == "iron_pickaxe")
+	check("машина запаркована у устья", GameState.is_rig_parked())
+	check("машина запаркована на поверхности (y=0)", GameState.rig_parked_at.y == 0)
+
+	_teardown_rig_world(w)
+
+
+## GameState.rig_parked_at — обычное поле сейва: переживает save/load, как
+## house_hatch_built и остальной "дом" (см. save_system.gd).
+func _test_rig_parked_survives_save_load() -> void:
+	GameState.rig_parked_at = Vector2i(17, 0)
+	SaveSystem.save_game()
+	GameState.rig_parked_at = Vector2i(-1, -1)
+	SaveSystem.load_game()
+	check("парковка пережила save/load", GameState.rig_parked_at == Vector2i(17, 0))
+	SaveSystem.delete_save()
+	GameState.reset_progress()
 
 
 ## Расход топлива копится дробно (blocks_per_cell < 1) и списывает ровно один

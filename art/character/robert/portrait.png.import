@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kwg5j03rsmuy"
-path="res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"
+uid="uid://sa7bamy80em2"
+path="res://.godot/imported/portrait.png-2b5c00adaf8b58223b24486d110ffee2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/_source/house_modern.jpg"
-dest_files=["res://.godot/imported/house_modern.jpg-f3ab2ced6d8e157a940fe3969e2334e0.ctex"]
+source_file="res://art/character/robert/portrait.png"
+dest_files=["res://.godot/imported/portrait.png-2b5c00adaf8b58223b24486d110ffee2.ctex"]
 
 [params]
 

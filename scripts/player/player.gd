@@ -700,8 +700,21 @@ func _prop_ramp() -> float:
 	return PROP_RAMP / pow(0.85, GameState.get_total_weight() / 20.0)
 
 
+## Отладочный тумблер «Полёт 300» (debug_panel.gd). Скорость подъёма/падения,
+## клеток/с — перекрывает и тягу, и обычную гравитацию мгновенно, константой,
+## без разгона.
+const DEBUG_FLY_SPEED := 300.0
+
+
 func _move_y(dt: float) -> void:
-	if thrust != "":
+	if GameState.debug_fly_300:
+		# Единственное место, где vy окончательно применяется к позиции (см.
+		# y += vy * dt ниже) — override стоит здесь же, ДО этой строки, а не
+		# внутри if/else тяги, поэтому работает одинаково пешком (свободное
+		# падение), с ранцем/джетпаком (тяга) и в бурмобиле: снаряжение сюда
+		# не заглядывает вовсе.
+		vy = -DEBUG_FLY_SPEED if thrust != "" else DEBUG_FLY_SPEED
+	elif thrust != "":
 		var jet := thrust == "jet"
 		# Множитель ступени ранца умножает ПОТОЛОК скорости подъёма (клеток в
 		# секунду) базового ранца — и только его. «×2 скорости полёта» в
@@ -1018,15 +1031,25 @@ func _start_dig(tx: int, ty: int) -> void:
 		return
 
 	var mineral_id := MineralMap.mineral_id_for(type)
-	var base_secs := Balance.get_mineral_drill_seconds(mineral_id) if not mineral_id.is_empty() \
-		else float(Balance.unwrap(Balance.balance.get("digging", {}).get("base_seconds_per_cell", 3.0)))
-	var stage := GameState.get_skill_stage("dig_speed")
-	var total: float = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier() \
-		/ Balance.get_global_dig_speed_multiplier()
-	# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
-	total /= GameState.get_speed_multiplier()
+	var total: float
+	if GameState.debug_instant_dig:
+		# Отладочный тумблер «Копка» (debug_panel.gd): время копки — 0, клетка
+		# выкапывается на первом же физтике удержания (digging.t += dt сразу
+		# перевалит за total=0.0, см. physics_tick). Обычная формула ниже
+		# нарочно не считается вовсе — она пропускается, а не обнуляется
+		# постфактум, иначе maxf(total, 0.05) в конце вернул бы минимум 0.05с.
+		total = 0.0
+	else:
+		var base_secs := Balance.get_mineral_drill_seconds(mineral_id) if not mineral_id.is_empty() \
+			else float(Balance.unwrap(Balance.balance.get("digging", {}).get("base_seconds_per_cell", 3.0)))
+		var stage := GameState.get_skill_stage("dig_speed")
+		total = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier() \
+			/ Balance.get_global_dig_speed_multiplier()
+		# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
+		total /= GameState.get_speed_multiplier()
+		total = maxf(total, 0.05)
 
-	digging = {"x": tx, "y": ty, "t": 0.0, "total": maxf(total, 0.05), "type": type}
+	digging = {"x": tx, "y": ty, "t": 0.0, "total": total, "type": type}
 	dig_started.emit(tx, ty, type)
 
 

@@ -145,10 +145,25 @@ func _build_sky_colors() -> void:
 ## Цвет строки неба. Выше верхней кромки тоже спрашивают: render() рисует на
 ## клетку шире экрана, а камера стоит ровно на -SKY_HEIGHT — берём верхний
 ## цвет, чтобы на кромке не зияла дыра из неинициализированного спрайта.
+##
+## Затемнение суточного цикла (задание владельца: "синее небо ... постепенно
+## темнеет на 90 процентов с 6 до 8 вечера") применяется прямо здесь поверх
+## дневного градиента, а не отдельным слоем над тайлами: у неба нет тумана
+## войны (см. _paint_cell: wy<0 красится безусловно), поэтому подмешать
+## DayCycle.sky_dark() в уже готовый цвет ничего не ломает, и не нужен
+## отдельный полноэкранный оверлей, который просвечивал бы сквозь
+## непрозрачные тайлы земли/шахты, нарисованные этим же пулом спрайтов ниже
+## горизонта.
 func _sky_color(wy: int) -> Color:
+	var base: Color
 	if _sky_colors.is_empty():
-		return COLOR_SKY
-	return _sky_colors[clampi(-wy - 1, 0, _sky_colors.size() - 1)]
+		base = COLOR_SKY
+	else:
+		base = _sky_colors[clampi(-wy - 1, 0, _sky_colors.size() - 1)]
+	var day_cycle := get_node_or_null("/root/DayCycle")
+	if day_cycle != null:
+		base = base.lerp(Color.BLACK, day_cycle.sky_dark())
+	return base
 
 
 func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:

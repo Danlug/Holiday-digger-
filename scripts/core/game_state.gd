@@ -276,7 +276,16 @@ func reset_progress() -> void:
 
 func _tick_game_clock(delta_real_sec: float) -> void:
 	var game_hours_per_real_hour := Balance.get_game_hours_per_real_hour()
-	game_clock_hours += (delta_real_sec / 3600.0) * game_hours_per_real_hour
+	# DayCycle.time_scale — сценарии (интро деда и т.п.), которые гонят часы
+	# быстрее обычного, чтобы прогнать день за секунды показа. Часы двигает
+	# ТОЛЬКО эта строка — DayCycle сам собственного счётчика не ведёт (см.
+	# шапку day_cycle.gd), иначе game_clock_hours сдвигался бы дважды за
+	# кадр и рассинхронил бы сон/еду/рекламные лимиты со светом на экране.
+	var time_scale := 1.0
+	var day_cycle := get_node_or_null("/root/DayCycle")
+	if day_cycle != null:
+		time_scale = day_cycle.time_scale
+	game_clock_hours += (delta_real_sec / 3600.0) * game_hours_per_real_hour * time_scale
 
 
 ## Сон: анимация пропускается (см. GDD раздел 7), время сразу "прыгает".

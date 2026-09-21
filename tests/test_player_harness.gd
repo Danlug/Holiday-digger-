@@ -608,15 +608,19 @@ func _test_sky_ceiling() -> void:
 
 
 ## Кромка неба не должна зиять дырой: render() красит на клетку выше камеры,
-## а камера стоит ровно на -SKY_HEIGHT.
+## а камера стоит ровно на -SKY_HEIGHT. Небо больше не градиент по высоте
+## (решение владельца 2026-09-21: день 81D3F4, самая тёмная ночь 11053B
+## ровным цветом) — у земли и у верхней кромки днём один и тот же тон.
 func _test_sky_colors() -> void:
 	var view = load("res://scripts/world/world_view.gd").new()
 	add_child(view)  # _ready собирает таблицу цветов
 	var near_ground: Color = view._sky_color(-1)
 	var at_top: Color = view._sky_color(-view.SKY_HEIGHT)
-	check("небо у земли и у верхней кромки — разные тона", near_ground != at_top)
+	check("небо у земли и у верхней кромки — один тон (нет градиента по высоте)",
+		near_ground == at_top)
 	check("строка выше верха неба тоже покрашена",
 		view._sky_color(-view.SKY_HEIGHT - 1) == at_top)
+	check("днём небо — ровно COLOR_SKY (81D3F4)", near_ground == view.COLOR_SKY)
 	view.queue_free()
 
 

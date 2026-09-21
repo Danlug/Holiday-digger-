@@ -69,5 +69,33 @@ func _ready() -> void:
 			check("часы во дворе показывают то же время, что и DayCycle (\"День N, ЧЧ:ММ\")",
 				hud._clock_label.text == "День %d, 15:00" % DayCycle.day)
 
+	# Порядок слоёв ViewRoot — решение владельца 2026-09-21: подложка/звёзды/
+	# солнце-месяц (всё внутри SkyView, см. sky_view.gd:_draw_celestial),
+	# картинка горы, картинка забора (оба — Backdrop, гора добавлена первым
+	# ребёнком, значит рисуется раньше/под забором), трава+декор огорода
+	# (оба внутри WorldView — трава тайлами, декор оверлеем поверх них), дом
+	# (HouseSystem переставляет себя сразу после WorldView, см. его _ready),
+	# персонаж (Player+CharacterView). Порядок в дереве = порядок отрисовки
+	# (более поздний ребёнок рисуется поверх более раннего) — облака
+	# (CloudsView) не входят в список владельца отдельной строкой, но по
+	# смыслу параллакса стоят ближе камеры, чем гора/забор, и дальше травы —
+	# кладём их между Backdrop и WorldView, что уже так в main.gd.
+	var vr := root.find_child("ViewRoot", true, false)
+	if vr != null:
+		var order: Array = []
+		for n in vr.get_children():
+			order.append(n.name)
+		var idx_sky: int = order.find("SkyView")
+		var idx_backdrop: int = order.find("Backdrop")
+		var idx_clouds: int = order.find("CloudsView")
+		var idx_world: int = order.find("WorldView")
+		var idx_house: int = order.find("HouseSystem")
+		var idx_player: int = order.find("Player")
+		check("порядок слоёв ViewRoot: небо -> задник -> облака -> мир -> дом -> герой (%s)" % str(order),
+			idx_sky >= 0 and idx_backdrop >= 0 and idx_clouds >= 0 and idx_world >= 0
+				and idx_house >= 0 and idx_player >= 0
+				and idx_sky < idx_backdrop and idx_backdrop < idx_clouds
+				and idx_clouds < idx_world and idx_world < idx_house and idx_house < idx_player)
+
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)

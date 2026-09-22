@@ -1,0 +1,1595 @@
+{
+	"version": 1,
+	"_note": "Структура катсцен. Текстов здесь НЕТ — только ключи в data/story_<локаль>.json, чтобы переписывание реплик и перевод не задевали режиссуру, а режиссура не ломала перевод.",
+	"_beats": {
+		"card": "полноэкранная карточка-титр; sec — через сколько сама уйдёт (тап ускоряет)",
+		"narr": "закадровый текст, ждёт тапа",
+		"say": "реплика; who — id актёра (подпись берётся из speaker.<who>)",
+		"show": "поставить актёра: at=left|center|right, pose=имя листа в art/character/<actor>/, flip, scale; enter=far_left|left|center|right|far_right — актёр появляется не на месте, а входит туда пешком (enter_sec, по умолчанию 0.7); работает только при первом show нового актёра на сцене",
+		"hide": "убрать актёра; exit_to=far_left|left|center|right|far_right — актёр уходит туда пешком, а не исчезает мгновенно (exit_sec, по умолчанию 0.6), сцена дальше не ждёт",
+		"grow": "пролистать возрастные позы актёра (actor, poses=[age_8..age_15], sec на кадр, at/scale/flip) — рост героя в перемотке времени",
+		"prop": "поставить реквизит из таблицы props",
+		"clear": "убрать со сцены всё",
+		"mood": "сменить свет/фон сцены (таблица moods)",
+		"wait": "пауза sec секунд",
+		"fade": "dir=out затемнение, dir=in проявление",
+		"item": "карточка найденного предмета (icon, name, text)",
+		"tap": "обязательный тап по подсвеченной цели — обучение действием, а не текстом",
+		"move": "сдвинуть актёра на dy пикселей за sec (герой проваливается в яму)",
+		"shake": "тряска сцены",
+		"daynight": "ускоренная смена суток: cycles раз по sec секунд",
+		"world_actor": "поставить/переставить актёра НА ЖИВУЮ КАРТУ: actor, x, y (логические координаты, как player.x/y), pose, flip, camera=true — сделать его целью камеры/тумана (см. world_walk/world_dig ниже); работает только в сценах world:true",
+		"world_walk": "актёр идёт по живой карте до x (клеток/сек по умолчанию, либо sec); camera=true — камера идёт за ним",
+		"world_dig": "актёр НАСТОЯЩЕЙ лопатой/киркой выкапывает клетку (x,y) живой карты (world.dig_cell) — sec секунд играет pose (по умолчанию dig_shovel), потом клетка исчезает и актёр шагает в неё",
+		"world_fall": "визуальный сдвиг актёра на dy КЛЕТОК (не пикселей) за sec — попытка выбраться из ямы, копки не делает",
+		"world_dig_row": "весь ряд y от from_x до to_x одним проездом за sec — каждая клетка копается НАСТОЯЩЕЙ картой на лету, а не разом в конце",
+		"world_prop": "статичный предмет на живую карту (id, tex, x, y, scale) — без поз/кадров/разворота, как декор",
+		"world_enter": "войти в режим «мир» посреди сцены (era); симметричный выход — обычный clear",
+		"clock": "контракт DayCycle: hour — выставить час суток, scale — множитель скорости часов; не блокирует сцену",
+		"house_enter": "показать НАСТОЯЩИЙ интерьер дома (room, x — доля 0..1 ширины комнаты) вместо иллюстрации; house_mode гасится автоматически на старте следующей сцены (или кадром clear этой же)",
+		"house_sleep": "короткая анимация сна у настоящей кровати (sec) — тот же ролик, что и по кнопке «Спать»",
+		"house_npc_show": "поставить сюжетного NPC (не героя игрока) в уже открытую house_enter комнату: actor — id из таблицы actors (листы art/character/<actors[actor].dir>/idle.png и walk.png), x — доля 0..1 ширины комнаты, flip",
+		"house_npc_walk": "NPC из house_npc_show идёт по комнате до x за sec секунд (держит сцену); exit=true — по приходе исчезает (Роберт уходит за дверь)"
+	},
+	"_effects": {
+		"flag": "поставить сюжетный флаг id",
+		"tool": "выдать инструмент id",
+		"coins": "начислить n монет",
+		"dollars": "начислить n премиум-валюты",
+		"artifact": "положить артефакт id в коллекцию",
+		"xp": "начислить n опыта",
+		"sleep": "уснуть на hours игровых часов",
+		"stamina": "выставить бодрость в n процентов",
+		"hunger": "добавить n процентов сытости",
+		"toast": "показать подсказку HUD (ключ текста)",
+		"teleport_home": "вернуть героя на поверхность к дому",
+		"hook": "вызвать метод чужой системы, если она уже подключена (house/shop)"
+	},
+	"moods": {
+		"day": {
+			"sky": "#7d93a6",
+			"ground": "#6b5a3e"
+		},
+		"dusk": {
+			"sky": "#4a3f52",
+			"ground": "#493b29"
+		},
+		"night": {
+			"sky": "#141a2b",
+			"ground": "#2a2218"
+		},
+		"cellar": {
+			"sky": "#1c1712",
+			"ground": "#241c14"
+		},
+		"underground": {
+			"sky": "#241a12",
+			"ground": "#382a1c"
+		},
+		"dark": {
+			"sky": "#0b0806",
+			"ground": "#0b0806"
+		},
+		"room": {
+			"sky": "#2e2519",
+			"ground": "#3a2d1e"
+		}
+	},
+	"props": {
+		"house": {
+			"_comment": "Плейсхолдер-заглушка (gen_art.py), больше нигде не используется: сцены деда показывают shack (авторский рисунок лачуги), сцены внука и Роберта — house_rich (тот же дом, что и на игровой поверхности). Оставлен, чтобы не терять запись в таблице.",
+			"tex": "res://art/env/house_exterior.png",
+			"scale": 0.95,
+			"y": 0.0
+		},
+		"shack": {
+			"_comment": "Лачуга деда (art/_source/shack.jpg, tools/import_shack.py) — времена ДО Роберта/богатого дома. scale поднят с 0.48: при нём лачуга (210px * 0.48 = 101px) была почти одного роста с актёром (grandpa, default show.scale=2.0 -> 96px) и на сцене читалась не домом, а сарайчиком чуть выше деда. 0.95 -> 199.5px, вдвое больше актёра — дом обязан читаться домом. Шире сцены (224px) — overflow уводит лишнее за края вместо сжатия (см. cutscene_player.gd:_place_prop).",
+			"tex": "res://art/env/shack.png",
+			"scale": 0.95,
+			"overflow": true,
+			"y": 0.0
+		},
+		"house_rich": {
+			"_comment": "Тот же спрайт, что и на игровой поверхности (scripts/house/house_system.gd:HOUSE_SPRITE) — дом бабки после смерти деда.",
+			"tex": "res://art/env/house_rich.png",
+			"scale": 0.5,
+			"y": 0.0
+		},
+		"garden_bush": {
+			"_comment": "Ассорти огорода (tools/import_garden.py) — дикое состояние, сцена деда.",
+			"tex": "res://art/env/garden/bush_fir.png",
+			"scale": 0.55,
+			"y": 0.0
+		},
+		"garden_stone": {
+			"tex": "res://art/env/garden/stone_1.png",
+			"scale": 0.6,
+			"y": 0.0
+		},
+		"garden_cabbage": {
+			"_comment": "Ассорти огорода — ухоженное состояние (после Роберта).",
+			"tex": "res://art/env/garden/cabbage.png",
+			"scale": 0.9,
+			"y": 0.0
+		},
+		"garden_wheelbarrow": {
+			"tex": "res://art/env/garden/wheelbarrow.png",
+			"scale": 0.7,
+			"y": 0.0
+		},
+		"fence": {
+			"tex": "res://art/env/fence.png",
+			"scale": 1.6,
+			"y": 0.0
+		},
+		"grave": {
+			"tex": "res://art/env/grave.png",
+			"scale": 2.0,
+			"y": 0.0
+		},
+		"workbench": {
+			"tex": "res://art/env/workbench.png",
+			"scale": 2.4,
+			"y": 0.0
+		},
+		"bed": {
+			"tex": "res://art/env/bed.png",
+			"scale": 2.4,
+			"y": 0.0
+		},
+		"hatch": {
+			"_comment": "реквизит времён люка; люк отменён владельцем, в сценах больше не встречается — оставлен, чтобы не терять картинку",
+			"tex": "res://art/env/hatch.png",
+			"scale": 2.4,
+			"y": 0.0
+		},
+		"shovel": {
+			"tex": "res://art/items/shovel.png",
+			"scale": 1.8,
+			"y": 0.0
+		},
+		"pickaxe": {
+			"tex": "res://art/items/pickaxe_rusty.png",
+			"scale": 1.8,
+			"y": 0.0
+		},
+		"backpack": {
+			"tex": "res://art/items/backpack_propeller.png",
+			"scale": 1.8,
+			"y": 0.0
+		}
+	},
+	"actors": {
+		"grandpa": {
+			"dir": "grandpa",
+			"speaker": "speaker.grandpa"
+		},
+		"grandpa_gear": {
+			"dir": "grandpa_gear",
+			"speaker": "speaker.grandpa"
+		},
+		"grandma_poor": {
+			"dir": "grandma_poor",
+			"speaker": "speaker.grandma"
+		},
+		"grandma_rich": {
+			"dir": "grandma_rich",
+			"speaker": "speaker.grandma"
+		},
+		"boy": {
+			"dir": "boy",
+			"speaker": "speaker.boy"
+		},
+		"boy_gear": {
+			"dir": "boy_gear",
+			"speaker": "speaker.boy"
+		},
+		"robert": {
+			"dir": "robert",
+			"speaker": "speaker.robert"
+		},
+		"parents": {
+			"dir": "",
+			"speaker": "speaker.parents"
+		}
+	},
+	"scenes": [
+		{
+			"id": "intro_grandpa",
+			"title": "intro_grandpa.title",
+			"era": "grandpa",
+			"world": true,
+			"beats": [
+				{
+					"t": "clock",
+					"hour": 6.0,
+					"scale": 30.0
+				},
+				{
+					"t": "card",
+					"text": "intro_grandpa.card_when",
+					"sec": 3.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"x": 13.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n1"
+				},
+				{
+					"t": "world_walk",
+					"actor": "grandpa",
+					"x": 15.5
+				},
+				{
+					"t": "world_dig_row",
+					"actor": "grandpa",
+					"y": 1,
+					"from_x": 15,
+					"to_x": 31,
+					"sec": 2.4,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "clock",
+					"hour": 10.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 12.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g1"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s3"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_poor"
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"camera": true
+				},
+				{
+					"t": "world_dig_row",
+					"actor": "grandpa",
+					"y": 2,
+					"from_x": 15,
+					"to_x": 31,
+					"sec": 2.4,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "clock",
+					"hour": 15.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 12.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g2"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s4"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_poor"
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"camera": true
+				},
+				{
+					"t": "world_dig_row",
+					"actor": "grandpa",
+					"y": 3,
+					"from_x": 15,
+					"to_x": 31,
+					"sec": 2.4,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "clock",
+					"hour": 19.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 12.5,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g_call3"
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s_call3"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_poor"
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"camera": true
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandpa",
+					"x": 15.5,
+					"camera": true
+				},
+				{
+					"t": "clock",
+					"hour": 22.0
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 15,
+					"y": 4,
+					"sec": 1.2,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/tiles/ore_gold.png",
+					"name": "intro_grandpa.item_name",
+					"text": "intro_grandpa.item_text"
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 15,
+					"y": 5,
+					"sec": 1.2,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/tiles/ore_gold.png",
+					"name": "intro_grandpa.item_name",
+					"text": "intro_grandpa.item_text2"
+				},
+				{
+					"t": "world_dig",
+					"actor": "grandpa",
+					"x": 15,
+					"y": 6,
+					"sec": 1.2,
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/tiles/ore_gold.png",
+					"name": "intro_grandpa.item_name",
+					"text": "intro_grandpa.item_text3"
+				},
+				{
+					"t": "shake",
+					"sec": 0.3
+				},
+				{
+					"t": "say",
+					"who": "grandpa",
+					"text": "intro_grandpa.s_trapped"
+				},
+				{
+					"t": "world_fall",
+					"actor": "grandpa",
+					"dy": -0.5,
+					"sec": 0.35,
+					"pose": "walk"
+				},
+				{
+					"t": "world_fall",
+					"actor": "grandpa",
+					"dy": 0.5,
+					"sec": 0.35,
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n_trapped"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 1.2
+				},
+				{
+					"t": "hide",
+					"actor": "grandpa"
+				},
+				{
+					"t": "card",
+					"text": "intro_grandpa.card_death",
+					"sec": 4.0
+				},
+				{
+					"t": "clock",
+					"hour": 19.5
+				},
+				{
+					"t": "world_prop",
+					"id": "grave",
+					"tex": "res://art/env/grave.png",
+					"x": 4.0,
+					"y": 0.5,
+					"scale": 2.0
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_poor",
+					"x": 5.6,
+					"y": 0.5,
+					"pose": "idle",
+					"flip": true,
+					"camera": true
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.8
+				},
+				{
+					"t": "say",
+					"who": "grandma_poor",
+					"text": "intro_grandpa.g3"
+				},
+				{
+					"t": "narr",
+					"text": "intro_grandpa.n7"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.9
+				},
+				{
+					"t": "clear"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "intro_grandpa_seen"
+				}
+			]
+		},
+		{
+			"id": "intro_boy",
+			"title": "intro_boy.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_when",
+					"sec": 2.6
+				},
+				{
+					"t": "grow",
+					"actor": "boy",
+					"poses": [
+						"age_8",
+						"age_9",
+						"age_10",
+						"age_11",
+						"age_12",
+						"age_15"
+					],
+					"sec": 0.5,
+					"at": "center",
+					"scale": 2.2
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.7
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s1"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n2"
+				},
+				{
+					"t": "say",
+					"who": "parents",
+					"text": "intro_boy.p1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s2"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.7
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_there",
+					"sec": 2.2
+				},
+				{
+					"t": "world_enter",
+					"era": "now"
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"x": 10.5,
+					"y": 0.5,
+					"pose": "walk",
+					"camera": true
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.7
+				},
+				{
+					"t": "world_walk",
+					"actor": "boy",
+					"x": 13.5,
+					"sec": 1.4,
+					"arrive_pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n3"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s3"
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_rich",
+					"x": 17.5,
+					"y": 0.5,
+					"pose": "walk",
+					"flip": true
+				},
+				{
+					"t": "world_walk",
+					"actor": "grandma_rich",
+					"x": 14.5,
+					"sec": 1.4,
+					"arrive_pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s4"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g2"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "intro_boy.s5"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g3"
+				},
+				{
+					"t": "world_walk",
+					"actor": "grandma_rich",
+					"x": 17.5,
+					"sec": 1.2
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_rich"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n4"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_morning",
+					"sec": 2.6
+				},
+				{
+					"t": "world_actor",
+					"actor": "grandma_rich",
+					"x": 17.5,
+					"y": 0.5,
+					"pose": "walk",
+					"flip": true
+				},
+				{
+					"t": "world_walk",
+					"actor": "grandma_rich",
+					"x": 14.5,
+					"sec": 1.2,
+					"arrive_pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "intro_boy.g4"
+				},
+				{
+					"t": "hide",
+					"actor": "grandma_rich"
+				},
+				{
+					"t": "narr",
+					"text": "intro_boy.n5"
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "prop",
+					"id": "shovel",
+					"at": "center"
+				},
+				{
+					"t": "card",
+					"text": "intro_boy.card_shovel",
+					"sec": 2.8
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.6
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "intro_seen"
+				},
+				{
+					"do": "toast",
+					"text": "tutorial_dig.hint",
+					"sec": 6.0
+				}
+			]
+		},
+		{
+			"id": "autodig_start",
+			"title": "autodig.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "card",
+					"text": "autodig.card_start",
+					"sec": 2.4
+				}
+			],
+			"effects": []
+		},
+		{
+			"id": "autodig_done",
+			"title": "autodig.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "night"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "autodig.n_done"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "autodig_done"
+				},
+				{
+					"do": "toast",
+					"text": "autodig.toast_done",
+					"sec": 5.0
+				}
+			]
+		},
+		{
+			"id": "dud_treasure",
+			"title": "dud_treasure.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "narr",
+					"text": "dud_treasure.n1"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/ui/icon_blackbox.png",
+					"name": "item.dud_treasure",
+					"text": "dud_treasure.item_text"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "dud_treasure.s1"
+				},
+				{
+					"t": "narr",
+					"text": "dud_treasure.n2"
+				},
+				{
+					"t": "card",
+					"text": "dud_treasure.card_collection",
+					"sec": 3.0
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "dud_treasure_found"
+				},
+				{
+					"do": "artifact",
+					"id": "antiquity_1"
+				},
+				{
+					"do": "coins",
+					"n": 50
+				},
+				{
+					"do": "dollars",
+					"n": 5
+				}
+			]
+		},
+		{
+			"id": "workshop",
+			"title": "workshop.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_shovel"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n1"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "workshop.s1"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n2"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.6
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "cellar"
+				},
+				{
+					"t": "prop",
+					"id": "workbench",
+					"at": "right"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.9
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n3"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n4"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "workshop.s2"
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n5"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle",
+					"scale": 4.0
+				},
+				{
+					"t": "narr",
+					"text": "workshop.n6"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/items/pickaxe_rusty.png",
+					"name": "item.rusty_pickaxe",
+					"text": "workshop.item_text"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "workshop.s3"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "workshop_seen"
+				},
+				{
+					"do": "tool",
+					"id": "rusty_pickaxe"
+				},
+				{
+					"do": "toast",
+					"text": "workshop.toast_pickaxe",
+					"sec": 6.0
+				}
+			]
+		},
+		{
+			"id": "death",
+			"title": "death.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "card",
+					"text": "death.card_down",
+					"sec": 2.0
+				},
+				{
+					"t": "world_enter",
+					"era": "now"
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"pose": "dig_pick_rusty",
+					"camera": true
+				},
+				{
+					"t": "narr",
+					"text": "death.n1"
+				},
+				{
+					"t": "world_dig",
+					"actor": "boy",
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "world_dig",
+					"actor": "boy",
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "world_dig",
+					"actor": "boy",
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "death.s1"
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "death.n2"
+				},
+				{
+					"t": "shake",
+					"sec": 0.4
+				},
+				{
+					"t": "narr",
+					"text": "death.n3"
+				},
+				{
+					"t": "daynight",
+					"cycles": 3,
+					"sec": 0.65
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"pose": "sleep"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "death.s2"
+				},
+				{
+					"t": "narr",
+					"text": "death.n4"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 1.4
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "dark"
+				},
+				{
+					"t": "card",
+					"text": "death.card_same",
+					"sec": 3.0
+				},
+				{
+					"t": "house_enter",
+					"room": "bedroom",
+					"x": 0.42
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.8
+				},
+				{
+					"t": "house_sleep",
+					"sec": 1.8
+				},
+				{
+					"t": "narr",
+					"text": "death.n5"
+				},
+				{
+					"t": "narr",
+					"text": "death.n6"
+				},
+				{
+					"t": "house_enter",
+					"room": "workshop",
+					"x": 0.45
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "death.s3"
+				},
+				{
+					"t": "card",
+					"text": "death.card_bars",
+					"sec": 4.0
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "death_seen"
+				},
+				{
+					"do": "flag",
+					"id": "bars_introduced"
+				},
+				{
+					"do": "teleport_home"
+				},
+				{
+					"do": "enter_house",
+					"room": "workshop"
+				},
+				{
+					"do": "stamina",
+					"n": 100
+				},
+				{
+					"do": "hunger",
+					"n": 100
+				},
+				{
+					"do": "toast",
+					"text": "death.toast_bars",
+					"sec": 6.0
+				}
+			]
+		},
+		{
+			"id": "backpack",
+			"title": "backpack.title",
+			"_comment": "Решение владельца: ранец достаётся в НАСТОЯЩЕЙ мастерской (не иллюстрация «подвал»), а Роберта внук встречает СНАРУЖИ, на живой карте у места будущего тоннеля — не по телефону. Тоннель копает уже сцена «robert» (её эффекты), здесь Роберт только соглашается и отсылает внука домой ждать.",
+			"beats": [
+				{
+					"t": "house_enter",
+					"room": "workshop",
+					"x": 0.6
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n2"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "backpack.s1"
+				},
+				{
+					"t": "shake",
+					"sec": 0.3
+				},
+				{
+					"t": "wait",
+					"sec": 0.4
+				},
+				{
+					"t": "shake",
+					"sec": 0.3
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n3"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/items/backpack_propeller.png",
+					"name": "item.backpack",
+					"text": "backpack.item_text"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "backpack.s2"
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n1"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.8
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "world_enter",
+					"era": "now"
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"x": 17.0,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "world_actor",
+					"actor": "robert",
+					"x": 19.5,
+					"y": 0.5,
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.6
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "backpack.r1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "backpack.s3"
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "backpack.r2"
+				},
+				{
+					"t": "world_walk",
+					"actor": "boy",
+					"x": 11.5,
+					"camera": true
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n4"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.8
+				},
+				{
+					"t": "clear"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "backpack_owned"
+				}
+			]
+		},
+		{
+			"id": "robert",
+			"title": "robert.title",
+			"_comment": "Решение владельца: люк отменён. Роберт вместо лестницы пробивает вниз бетонный тоннель — колодец по клетке 17 глубиной 4, стенки 16 и 18 железобетонные, остальной огород засыпан и больше не копается. Флаг оставлен со старым именем hatch_built: по нему уже смотрят сейвы и соседние системы, смысл теперь «тоннель построен». Сама сцена теперь играет целиком в НАСТОЯЩЕМ салоне (house_enter) — внук встретил Роберта снаружи ещё в сцене «backpack» и отправлен домой ждать; здесь Роберт докладывает, что закончил, и уходит через ту же дверь, в которую стучал (hall.front_door — «Заказать»/доставка, см. data/rooms.json), НАСТОЯЩИМ NPC (house_npc_show/house_npc_walk), а не иллюстрацией.",
+			"beats": [
+				{
+					"t": "house_enter",
+					"room": "hall",
+					"x": 0.65
+				},
+				{
+					"t": "narr",
+					"text": "robert.n1"
+				},
+				{
+					"t": "house_npc_show",
+					"actor": "robert",
+					"x": 0.72,
+					"flip": true
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "robert.r1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "robert.s1"
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "robert.r2"
+				},
+				{
+					"t": "house_npc_walk",
+					"actor": "robert",
+					"x": 0.09,
+					"sec": 1.6,
+					"exit": true
+				},
+				{
+					"t": "narr",
+					"text": "robert.n2"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "robert_seen"
+				},
+				{
+					"do": "flag",
+					"id": "hatch_built"
+				},
+				{
+					"do": "hook",
+					"target": "house",
+					"method": "build_tunnel"
+				},
+				{
+					"do": "toast",
+					"text": "robert.toast_tunnel",
+					"sec": 5.0
+				}
+			]
+		},
+		{
+			"id": "fuel_station",
+			"title": "fuel.title",
+			"_comment": "Решение владельца: заправка появляется ПОСЛЕ разговора с бабкой и после того, как у героя завёлся ручной бур. Заказывает её бабка, ставится она в огороде, а сделка простая: ей удобрение с торфоперегонки, ему топливные блоки.",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "show",
+					"actor": "boy_gear",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "fuel.s1"
+				},
+				{
+					"t": "show",
+					"actor": "grandma_rich",
+					"at": "right",
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "fuel.g1"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "fuel.s2"
+				},
+				{
+					"t": "say",
+					"who": "grandma_rich",
+					"text": "fuel.g2"
+				},
+				{
+					"t": "narr",
+					"text": "fuel.n1"
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "mood",
+					"id": "day"
+				},
+				{
+					"t": "prop",
+					"id": "fence",
+					"at": "right"
+				},
+				{
+					"t": "narr",
+					"text": "fuel.n2"
+				},
+				{
+					"t": "show",
+					"actor": "boy_gear",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "fuel.s3"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "fuel_station_built"
+				},
+				{
+					"do": "toast",
+					"text": "fuel.toast",
+					"sec": 5.0
+				}
+			]
+		},
+		{
+			"id": "sleep_lesson_1",
+			"title": "sleep1.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "dusk"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "sleep1.n1"
+				},
+				{
+					"t": "mood",
+					"id": "room"
+				},
+				{
+					"t": "prop",
+					"id": "bed",
+					"at": "right"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "left",
+					"pose": "idle"
+				},
+				{
+					"t": "narr",
+					"text": "sleep1.n2"
+				},
+				{
+					"t": "tap",
+					"prop": "bed",
+					"text": "sleep1.tap_bed"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "right",
+					"pose": "sleep"
+				},
+				{
+					"t": "card",
+					"text": "sleep1.card_rules",
+					"sec": 4.5
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "sleep1.s1"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "sleep_lesson_1_seen"
+				},
+				{
+					"do": "teleport_home"
+				},
+				{
+					"do": "sleep",
+					"hours": 8
+				},
+				{
+					"do": "stamina",
+					"n": 100
+				}
+			]
+		},
+		{
+			"id": "sleep_lesson_2",
+			"title": "sleep2.title",
+			"beats": [
+				{
+					"t": "mood",
+					"id": "underground"
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "fall"
+				},
+				{
+					"t": "narr",
+					"text": "sleep2.n1"
+				},
+				{
+					"t": "narr",
+					"text": "sleep2.n2"
+				},
+				{
+					"t": "hide",
+					"actor": "boy"
+				},
+				{
+					"t": "item",
+					"icon": "res://art/ui/icon_stamina.png",
+					"name": "item.energy_bar",
+					"text": "sleep2.item_text"
+				},
+				{
+					"t": "tap",
+					"prop": "",
+					"text": "sleep2.tap_bar"
+				},
+				{
+					"t": "card",
+					"text": "sleep2.card_rules",
+					"sec": 4.5
+				},
+				{
+					"t": "show",
+					"actor": "boy",
+					"at": "center",
+					"pose": "idle"
+				},
+				{
+					"t": "say",
+					"who": "boy",
+					"text": "sleep2.s1"
+				}
+			],
+			"effects": [
+				{
+					"do": "flag",
+					"id": "sleep_lesson_2_seen"
+				},
+				{
+					"do": "stamina",
+					"n": 100
+				},
+				{
+					"do": "hunger",
+					"n": 50
+				},
+				{
+					"do": "hook",
+					"target": "shop",
+					"method": "unlock_doping_section"
+				}
+			]
+		}
+	]
+}

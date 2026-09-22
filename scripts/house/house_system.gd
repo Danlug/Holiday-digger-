@@ -1,0 +1,919 @@
+class_name HouseSystem
+extends Node2D
+## HouseSystem — дом как место в мире и как сцена (ГДД п.3, 7, 9).
+##
+## Зачем система вообще: полоски голода и бодрости тикали вниз и убивали
+## героя, а восполнить их было нечем — выживание работало в одну сторону.
+## Здесь закрывается обратная сторона: кровать (сон), доставка еды и сами
+## переходы «огород ↔ дом ↔ шахта».
+##
+## Подключается одной строкой из scripts/main.gd. Узел кладётся в ViewRoot,
+## потому что экстерьер дома — часть мира и обязан ездить вместе с камерой;
+## интерьер и модалка живут на своих CanvasLayer и от камеры не зависят.
+##
+## Роберту (ГДД п.9) достаточно вызвать robert_finished_garden(): дом сам
+## попросит мир пробить тоннель, откроет спуск из подвала и закроет огород.
+## Люка (старое решение) больше нет — владелец его отменил: единственный
+## вход в копальню теперь бетонный тоннель Роберта в клетке WorldGen.TUNNEL_X.
+##
+## «Дом» как контекстное меню карточек комнат ОТМЕНЕНО владельцем
+## (2026-09-16): интерьер (scripts/house/house_view.gd) — настоящее
+## пространство, герой в нём физически ходит, а кнопки действий (двери,
+## кровать, верстак, сундук...) всплывают над ним, когда он подошёл. Этот
+## файл по-прежнему решает, ЧТО происходит по нажатию (сон, магазин, склад,
+## переходы), вид отвечает только за то, КАК это показано.
+
+const TILE := 32
+## Дом бабки после смерти деда (решение владельца, картинка от него же):
+## двухэтажный, с навесом, машиной и забором — тот самый достаток, который
+## она тщательно скрывает (ГДД п.2). Старый house_exterior.png остаётся для
+## катсцен, где показывают время деда.
+const HOUSE_SPRITE := "res://art/env/house_rich.png"
+const HOUSE_META := "res://art/env/house_rich.json"
+## Лачуга деда (тот же спрайт, что показывает и катсцена интро — data/story.json
+## props.shack, art/_source/shack.jpg): пока GameState.era == "grandpa" (сцена
+## intro_grandpa играет НА ЖИВОЙ КАРТЕ, см. scripts/story/cutscene_player.gd:
+## _enter_world_mode), дом на поверхности рисуется ею вместо house_rich —
+## внук ещё не родился, дом ещё бедный. Входа у лачуги нет (владелец: "вход
+## не нужен") — кнопка "Зайти" гасится тем же условием, см. _update_outdoor_hotspot.
+const SHACK_SPRITE := "res://art/env/shack.png"
+const SHACK_SCALE := 0.5   # решение владельца: лачуга вдвое меньше дома
+const VIEW_SCENE := "res://scenes/house.tscn"
+const PROMPT_SCENE := "res://scenes/house_prompt.tscn"
+const STORAGE_SCENE := "res://scenes/house_storage.tscn"
+
+## Мастерская — чужая система (scripts/shop/), дом только просит её открыться
+## (ГДД: верстак и «Заказать» открывают одну и ту же витрину). Путь, а не
+## глобальное имя класса — по тем же причинам, что EXTERNAL_STATIC раньше:
+## если соседнюю систему выкинут или она не соберётся, дом не имеет права
+## упасть вместе с ней.
+const SHOP_SCRIPT := "res://scripts/shop/shop_ui.gd"
+
+## Высоту неба знает рендер мира — то же число, которым main.gd ограничивает
+## камеру сверху. Плавающая кнопка «Зайти» использует его для тех же расчётов
+## позиции на экране, что и main.gd:_camera(), не трогая сам main.gd.
+const SKY_HEIGHT: int = preload("res://scripts/world/world_view.gd").SKY_HEIGHT
+
+## Батончик, которым система учит есть при втором истощении (ГДД п.9).
+const TUTORIAL_FOOD := "energy_bar"
+
+static var instance: HouseSystem = null
+
+var player: Node = null
+var hud: Node = null
+var world: WorldGen = null
+
+var _view: CanvasLayer = null
+var _prompt: CanvasLayer = null
+var _storage_view: CanvasLayer = null
+var _exterior: Sprite2D = null
+var _exterior_era: String = ""   # какая текстура сейчас стоит в _exterior ("" — ещё не строили)
+var _button: Button = null
+var _button_action: String = ""
+var _storage_button: Button = null
+var _prompt_action: String = ""
+
+## Кнопка «Зайти», плавающая НАД ГЕРОЕМ у окна веранды (решение владельца:
+## «Дом» как контекстная кнопка внизу экрана отменяется). Живёт в собственном
+## CanvasLayer, а не в строке HUD — HUD дому не принадлежит.
+var _outdoor_layer: CanvasLayer = null
+var _outdoor_button: Button = null
+
+## Кнопка «В бурмобиль» — тем же приёмом, что «Зайти» (решение владельца от
+## 2026-09-21: посадка не автоматическая, кнопка всплывает над героем, когда
+## он подошёл к припаркованной у устья машине). Дом не "владеет" бурмобилем
+## по смыслу (это транспорт игрока, а не часть дома) — но механизм кнопки
+## уже здесь и переиспользуется, чтобы не заводить второй CanvasLayer с той
+## же анимацией появления/скрытия ради одной кнопки.
+var _rig_layer: CanvasLayer = null
+var _rig_button: Button = null
+
+## Идёт ли сейчас ~10-секундная анимация сна у кровати (ГДД: «спит быстро,
+## буквально 10 секунд, показывая анимацию»). Гейт от повторного нажатия,
+## пока таймер не истёк.
+var _sleeping: bool = false
+
+## Устье тоннеля втягивает в дом при касании (решение владельца), но только
+## после того, как от него отошли. Без этой защёлки спуск превращается в
+## петлю: герой выходит в устье, стоит в нём, и устье тут же забирает его
+## обратно. Раньше тем же латчем был защищён люк.
+var _story: Node = null
+
+
+func _ready() -> void:
+	instance = self
+	add_to_group("house_system")
+	name = "HouseSystem"
+
+	# Экстерьер рисуется ПОСЛЕ тайлов, но ДО героя: иначе дом закрывает
+	# героя, стоящего у двери, а если уйти под тайлы — дом закрывает небо.
+	# Встаём сразу за WorldView, а не на жёсткий индекс 1: перед тайлами в
+	# ViewRoot теперь лежат небо (SkyView) и задник (Backdrop), и индекс 1
+	# ставил бы дом за гору и забор.
+	var parent := get_parent()
+	if parent != null:
+		var wv := parent.get_node_or_null("WorldView")
+		if wv != null:
+			parent.move_child(self, wv.get_index() + 1)
+		elif parent.get_child_count() > 1:
+			parent.move_child(self, 1)
+
+	_build_world_props()
+	_build_scenes()
+	_build_outdoor_hotspot()
+	_build_rig_hotspot()
+
+	GameState.daily_reset.connect(_on_daily_reset)
+
+	_resolve_refs()
+
+
+func _resolve_refs() -> void:
+	if world == null:
+		world = GameState.world_ref
+	if player == null:
+		player = get_tree().get_first_node_in_group("player")
+		if player == null:
+			player = get_tree().root.find_child("Player", true, false)
+	if hud == null:
+		hud = get_tree().root.find_child("HUD", true, false)
+	if _story == null:
+		_story = get_tree().root.find_child("StoryDirector", true, false)
+		# Сюжетная система зовёт дом через свои хуки (build_tunnel у Роберта,
+		# ГДД п.9), но сама искать его не умеет — представляемся сами: дом
+		# знает про сюжет, сюжету про дом знать не обязательно.
+		if _story != null and _story.get("house") == null:
+			_story.set("house", self)
+	if _button == null:
+		_button = get_tree().get_first_node_in_group("house_button") as Button
+		if _button != null and not _button.pressed.is_connected(on_hud_button):
+			# Кнопку создаёт HUD (одна строка в его блоке), а связывает и
+			# ведёт дом: тексты и условия — знание дома, а не интерфейса.
+			_button.pressed.connect(on_hud_button)
+	if _storage_button == null:
+		_storage_button = get_tree().get_first_node_in_group("house_storage_button") as Button
+		if _storage_button != null and not _storage_button.pressed.is_connected(open_storage):
+			_storage_button.pressed.connect(open_storage)
+
+
+# ---------------------------------------------------------------------------
+# Мир: дом на поверхности. Тоннель Роберта дом не рисует — это тайлы, а их
+# геометрию держит scripts/world/world_gen.gd (build_robert_tunnel).
+# ---------------------------------------------------------------------------
+
+func _build_world_props() -> void:
+	_exterior = Sprite2D.new()
+	_exterior.name = "HouseExterior"
+	_exterior.centered = false
+	add_child(_exterior)
+	_update_exterior_sprite()
+
+
+## Домик на поверхности переключается лачуга ⇄ богатый дом по GameState.era
+## (см. заголовок SHACK_SPRITE) — вызывается каждый кадр из _process, но
+## перестраивает спрайт только когда эпоха и правда сменилась (_exterior_era).
+func _update_exterior_sprite() -> void:
+	if _exterior == null:
+		return
+	var era := String(GameState.era)
+	if era == _exterior_era:
+		return
+	_exterior_era = era
+	var path := SHACK_SPRITE if era == "grandpa" else HOUSE_SPRITE
+	if not ResourceLoader.exists(path):
+		_exterior.texture = null
+		return
+	_exterior.texture = load(path)
+	# Лачуга нарезана в том же масштабе, что дом, но по слову владельца
+	# должна быть вдвое меньше — дед с бабкой не великаны, а домик у них
+	# действительно крошечный. Дом внука — 1:1.
+	_exterior.scale = Vector2(SHACK_SCALE, SHACK_SCALE) if era == "grandpa" else Vector2.ONE
+	var size := _exterior.texture.get_size() * _exterior.scale
+	# Дом (и лачуга — тот же анкер, просто другой размер картинки) прижимается
+	# ПРАВЫМ краем к границе огорода, а не центрируется по двери: он шире
+	# своей половины карты не бывает, но и залезать на грядки не должен — там
+	# копают. Дверь на рисунке одна и не в центре (левее — навес с машиной),
+	# поэтому клетка двери в balance.json подобрана под рисунок, а не наоборот.
+	#
+	# Низ ставится на ВЕРХ первой земляной клетки (y = 1), а не на y = 0:
+	# земля начинается с первого слоя, и герой стоит ступнями именно там —
+	# по y = 0 дом висел бы на клетку выше уровня земли.
+	_exterior.position = Vector2(WorldGen.GARDEN_X_MIN * TILE - size.x, TILE - size.y)
+
+
+func _build_scenes() -> void:
+	if ResourceLoader.exists(VIEW_SCENE):
+		_view = (load(VIEW_SCENE) as PackedScene).instantiate()
+	else:
+		# Сцена — снимок того же кода (см. house_view.gd): если файл потеряли,
+		# дом всё равно должен открываться, иначе игрок остаётся без еды и сна.
+		_view = load("res://scripts/house/house_view.gd").new()
+	add_child(_view)
+	_view.action_requested.connect(_on_view_action)
+
+	if ResourceLoader.exists(PROMPT_SCENE):
+		_prompt = (load(PROMPT_SCENE) as PackedScene).instantiate()
+	else:
+		_prompt = load("res://scripts/house/house_prompt.gd").new()
+	add_child(_prompt)
+	_prompt.confirmed.connect(_on_prompt_confirmed)
+
+	if ResourceLoader.exists(STORAGE_SCENE):
+		_storage_view = (load(STORAGE_SCENE) as PackedScene).instantiate()
+	else:
+		_storage_view = load("res://scripts/house/house_storage_view.gd").new()
+	add_child(_storage_view)
+	_storage_view.closed.connect(_on_storage_closed)
+
+
+## Плавающая кнопка «Зайти» у окна веранды (решение владельца, 2026-09-16:
+## «Дом» отменён как контекстная кнопка внизу экрана — вместо этого над
+## героем загорается кнопка, когда он подошёл к окну). Свой CanvasLayer,
+## а не строка HUD: HUD — чужой файл, дом только читает его для расчёта
+## позиции на экране (_outdoor_camera), но не правит.
+func _build_outdoor_hotspot() -> void:
+	_outdoor_layer = CanvasLayer.new()
+	_outdoor_layer.name = "OutdoorHotspot"
+	_outdoor_layer.layer = 8
+	add_child(_outdoor_layer)
+
+	_outdoor_button = Button.new()
+	_outdoor_button.name = "EnterHouseBtn"
+	_outdoor_button.text = "Зайти"
+	_outdoor_button.custom_minimum_size = Vector2(64, 22)
+	_style_outdoor_button(_outdoor_button)
+	_outdoor_button.visible = false
+	_outdoor_button.pressed.connect(func(): enter_house("hall"))
+	_outdoor_layer.add_child(_outdoor_button)
+
+
+## Кнопка «В бурмобиль» у припаркованной машины (решение владельца от
+## 2026-09-21) — тот же приём, что «Зайти»: свой CanvasLayer, видимость решает
+## near_parked_rig(), позиция — над героем, тем же _outdoor_camera().
+func _build_rig_hotspot() -> void:
+	_rig_layer = CanvasLayer.new()
+	_rig_layer.name = "RigHotspot"
+	_rig_layer.layer = 8
+	add_child(_rig_layer)
+
+	_rig_button = Button.new()
+	_rig_button.name = "BoardRigBtn"
+	_rig_button.text = "В бурмобиль"
+	_rig_button.custom_minimum_size = Vector2(88, 22)
+	_style_outdoor_button(_rig_button)
+	_rig_button.visible = false
+	_rig_button.pressed.connect(_on_rig_button)
+	_rig_layer.add_child(_rig_button)
+
+
+func _style_outdoor_button(b: Button) -> void:
+	b.add_theme_font_size_override("font_size", 10)
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.06, 0.05, 0.04, 0.9)
+		sb.border_color = Color8(0xE0, 0xA9, 0x3B) if state == "pressed" else Color8(0x3E, 0x31, 0x25)
+		sb.set_border_width_all(1)
+		sb.content_margin_top = 2
+		sb.content_margin_bottom = 2
+		sb.content_margin_left = 6
+		sb.content_margin_right = 6
+		b.add_theme_stylebox_override(state, sb)
+	b.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	b.add_theme_color_override("font_hover_color", Color8(0xE0, 0xA9, 0x3B))
+	b.add_theme_color_override("font_pressed_color", Color8(0xE0, 0xA9, 0x3B))
+
+
+# ---------------------------------------------------------------------------
+# Кадр
+# ---------------------------------------------------------------------------
+
+func _process(_dt: float) -> void:
+	_resolve_refs()
+	_update_exterior_sprite()
+	_tick_tutorial()
+	_update_hud_button()
+	_update_outdoor_hotspot()
+	_update_rig_hotspot()
+	if _view != null and _view.visible:
+		_view.refresh()
+	if _storage_view != null and _storage_view.visible:
+		_storage_view.refresh()
+
+
+## Камера мира, посчитанная теми же числами, что main.gd:_camera() — не
+## вызываем main.gd напрямую (он не наш файл), а держим свою копию формулы:
+## клетка вида и потолок неба публичны (hud.get_view_cells(), SKY_HEIGHT),
+## разъехаться с оригиналом им попросту нечем.
+func _outdoor_camera() -> Vector2:
+	if hud == null or player == null:
+		return Vector2.ZERO
+	var view_cells: Vector2i = hud.get_view_cells()
+	var vw := float(view_cells.x)
+	var vh := float(view_cells.y)
+	var cam_x: float = clampf(player.x - vw / 2.0, 0.0, maxf(0.0, float(WorldGen.WIDTH) - vw))
+	var cam_y: float = maxf(player.y - vh / 2.0, -float(SKY_HEIGHT))
+	return Vector2(cam_x, cam_y)
+
+
+## Кнопка «Зайти» у окна веранды — над героем, не внизу экрана (решение
+## владельца). Видимость решает near_door() (та же клетка и радиус, что
+## раньше открывали дом); позицию на экране (без hud её взять не у кого)
+## можно не знать — тогда кнопка просто не подсвечивается там, где нужно, но
+## не падает.
+func _update_outdoor_hotspot() -> void:
+	if _outdoor_button == null:
+		return
+	# Лачуга деда (GameState.era == "grandpa") входа не имеет вовсе (владелец:
+	# "вход не нужен") — гасим кнопку явно, не полагаясь на то, что герой
+	# заморожен/спрятан на время сцены и без того далеко от двери.
+	if GameState.era == "grandpa" or GameState.house_is_indoors or not GameState.is_alive \
+			or player == null or not near_door():
+		_outdoor_button.visible = false
+		return
+	_outdoor_button.visible = true
+	if hud == null:
+		return
+	var cam := _outdoor_camera()
+	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
+	_outdoor_button.position = head - Vector2(
+		_outdoor_button.custom_minimum_size.x / 2.0, _outdoor_button.custom_minimum_size.y + 4.0)
+
+
+## Видимость и позиция кнопки «В бурмобиль» — теми же правилами, что «Зайти»
+## (см. выше), плюс герой не должен уже быть за рулём и переход не должен
+## идти (двойное нажатие/повторная посадка во время анимации).
+func _update_rig_hotspot() -> void:
+	if _rig_button == null:
+		return
+	var busy: bool = player != null and player.has_method("is_in_rig") \
+		and (player.is_in_rig() or String(player.get("rig_transition")) != "")
+	if GameState.era == "grandpa" or GameState.house_is_indoors or not GameState.is_alive \
+			or player == null or busy or not near_parked_rig():
+		_rig_button.visible = false
+		return
+	_rig_button.visible = true
+	if hud == null:
+		return
+	var cam := _outdoor_camera()
+	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
+	_rig_button.position = head - Vector2(
+		_rig_button.custom_minimum_size.x / 2.0, _rig_button.custom_minimum_size.y + 4.0)
+
+
+## Нажатие «В бурмобиль» — сама посадка (фазы, блокировка управления,
+## смена current_tool) целиком в player.gd:start_rig_boarding(); дом только
+## просит её начать и переводит отказ по топливу в тот же toast, каким
+## раньше отказывал спуск без брикетов (тот текст игрок уже знает).
+func _on_rig_button() -> void:
+	if player == null or not player.has_method("start_rig_boarding"):
+		return
+	if player.has_method("has_rig_fuel") and not player.has_rig_fuel():
+		_toast("Нет брикетов — сделай на верстаке из угля")
+		return
+	player.start_rig_boarding()
+
+
+# ---------------------------------------------------------------------------
+# Переходы
+# ---------------------------------------------------------------------------
+
+func is_indoors() -> bool:
+	return GameState.house_is_indoors
+
+
+## Стоит ли герой у входной двери (на поверхности, в радиусе взаимодействия).
+func near_door() -> bool:
+	if player == null:
+		return false
+	var door := HouseConfig.door_cell()
+	return player.y < 1.5 and absf(player.x - (door.x + 0.5)) <= HouseConfig.interact_radius()
+
+
+## Стоит ли герой рядом с припаркованным у устья бурмобилем (решение
+## владельца от 2026-09-21: посадка кнопкой, не автоматически). Машина
+## паркуется на поверхности (GameState.rig_parked_at.y == 0) — see
+## player.gd:_start_rig_exit.
+func near_parked_rig() -> bool:
+	if player == null or not GameState.is_rig_parked():
+		return false
+	var p: Vector2i = GameState.rig_parked_at
+	return player.y < 1.5 and absf(player.x - (float(p.x) + 0.5)) <= HouseConfig.interact_radius()
+
+
+## Устье тоннеля Роберта — верхняя клетка бетонного колодца (ГДД п.9,
+## решение владельца: единственный вход в копальню). Геометрию держит мир,
+## дом только спрашивает; HouseConfig отвечает запасным значением, пока мира
+## ещё нет (загрузка сейва до генерации, тесты дома в одиночку).
+func tunnel_mouth() -> Vector2i:
+	if world == null:
+		world = GameState.world_ref
+	if world != null:
+		return world.tunnel_mouth()
+	return HouseConfig.tunnel_mouth_cell()
+
+
+## Стоит ли герой в устье тоннеля (в радиусе взаимодействия).
+func near_tunnel_mouth() -> bool:
+	if player == null or not GameState.house_hatch_built:
+		return false
+	var mouth := tunnel_mouth()
+	return absf(player.x - (mouth.x + 0.5)) <= HouseConfig.interact_radius() \
+		and absf(player.y - (mouth.y + 0.5)) <= HouseConfig.interact_radius()
+
+
+## Старое имя времён люка. Оставлено обёрткой: на него мог ссылаться чужой
+## код, написанный до отмены люка.
+func near_hatch() -> bool:
+	return near_tunnel_mouth()
+
+
+## enter_x — доля 0..1, где встанет герой (см. house_view.open); -1 (по
+## умолчанию) — spawn_x комнаты. Параметр нужен сюжету (scripts/story/
+## cutscene_player.gd:"house_enter") — сцена ставит героя прямо у кровати
+## или верстака, а не куда попало.
+func enter_house(room: String = "hall", enter_x: float = -1.0) -> void:
+	GameState.house_is_indoors = true
+	GameState.house_room = room
+	_freeze_player(true)
+	if hud != null:
+		# HUD скрывается целиком: его джойстик и нижняя полоса иначе торчат
+		# поверх интерьера и ловят нажатия, адресованные комнатам. Полоски
+		# выживания продублированы в шапке дома.
+		hud.visible = false
+	if _view != null:
+		_view.open(room, enter_x)
+
+
+## Обёртки над house_view.gd для сюжета (см. cutscene_player.gd:"house_sleep")
+## — тот же ролик, что у кнопки "Спать" (_start_sleep_sequence), без самого
+## эффекта сна: сцена считает часы/голод/бодрость сама через effects.
+func play_sleep_animation(seconds: float) -> void:
+	if _view != null:
+		_view.set_locked(true)
+		_view.play_sleep_animation(seconds)
+
+
+func stop_sleep_animation() -> void:
+	if _view != null:
+		_view.stop_sleep_animation()
+		_view.set_locked(false)
+
+
+## Закрывает интерьер БЕЗ переезда героя наружу (в отличие от exit_to_door/
+## exit_through_tunnel) — вызывается катсценой (cutscene_player.gd:
+## _exit_house_mode), когда сцена уходит из дома в другую декорацию (или
+## заканчивается) ПОСЕРЕДИНЕ СЕБЯ ЖЕ, а не когда игрок физически вышел в
+## дверь. Позицию героя не трогает — это решает следующий кадр сцены, не дом
+## (тот же принцип, что у enter_house()). Видимость HUD тоже не трогает: пока
+## катсцена идёт, им целиком распоряжается StoryDirector (_take_control/
+## _release_control), а не дом.
+func exit_house_view() -> void:
+	GameState.house_is_indoors = false
+	if _view != null:
+		_view.close()
+
+
+## Сюжетный NPC (не герой) в уже открытой house_enter комнате — обёртки над
+## house_view.gd для cutscene_player.gd ("house_npc_show"/"house_npc_walk"),
+## тем же приёмом, что play_sleep_animation()/enter_house() выше: дом только
+## передаёт вызов виду, сам ничего не решает.
+func show_npc(idle_tex: Texture2D, walk_tex: Texture2D, x_fraction: float, flip: bool = false) -> void:
+	if _view != null:
+		_view.show_npc(idle_tex, walk_tex, x_fraction, flip)
+
+
+func npc_walk_to(x_fraction: float, seconds: float) -> void:
+	if _view != null:
+		_view.npc_walk_to(x_fraction, seconds)
+
+
+func hide_npc() -> void:
+	if _view != null:
+		_view.hide_npc()
+
+
+## Выход через входную дверь на поверхность (ГДД п.3: дом занимает клетки
+## 0–14, дверь — house.door_cell в balance.json).
+func exit_to_door() -> void:
+	var door := HouseConfig.door_cell()
+	_leave_house(Vector2(door.x + 0.5, 0.5))
+
+
+## Спуск из подвала в шахту (ГДД п.9). Возвращает false, пока Роберт не
+## пробил тоннель.
+func exit_through_tunnel() -> bool:
+	if not GameState.house_hatch_built:
+		return false
+	if world == null:
+		world = GameState.world_ref
+	if world == null:
+		return false
+	# Спуск пешком больше ничем не гейтится (уточнение владельца от
+	# 2026-09-21): бурмобиль без брикетов больше не запирает тоннель — герой
+	# просто идёт вниз со своей экипировкой, машина (если есть) остаётся на
+	# парковке у устья (см. player.gd "Бурмобиль как транспорт",
+	# GameState.rig_parked_at). Топливо теперь проверяется только в момент
+	# самой ПОСАДКИ в машину (see player.gd:start_rig_boarding) — герой,
+	# спустившийся пешком, за руль тут вообще не садится.
+	# Тоннель пробивается заново на каждом спуске: землетрясение (ГДД п.8)
+	# стирает диффы, и колодец зарастает обратно. Вызов идемпотентный —
+	# мир сам разбирается, что уже пробито.
+	world.build_robert_tunnel()
+	var mouth := world.tunnel_mouth()
+	# Герой встаёт РОВНО в устье (решение владельца): вниз ведёт только
+	# колодец, шага в сторону из него нет — стенки 16 и 18 железобетонные.
+	_reveal_around(mouth)
+	_leave_house(Vector2(mouth.x + 0.5, mouth.y + 0.5))
+	return true
+
+
+## Старое имя спуска (люк). Оставлено обёрткой ради старых сейвов и старых
+## записей очереди сюжета: люка больше нет, но падать на них нельзя.
+func exit_through_hatch() -> bool:
+	return exit_through_tunnel()
+
+
+func _leave_house(world_pos: Vector2) -> void:
+	GameState.house_is_indoors = false
+	if _view != null:
+		_view.close()
+	if hud != null:
+		hud.visible = true
+	if player != null:
+		player.x = world_pos.x
+		player.y = world_pos.y
+		player.vx = 0.0
+		player.vy = 0.0
+		player.digging = null
+		player.thrust = ""
+		player.release_control()
+	_freeze_player(false)
+
+
+## Туман вокруг клетки, куда герой только что попал не своим ходом: без
+## этого он вываливается в устье тоннеля посреди чёрного экрана.
+func _reveal_around(cell: Vector2i) -> void:
+	if GameState.fog_ref == null:
+		return
+	GameState.fog_ref.reveal_around_cell(cell.x, cell.y,
+		GameState.get_vision_terrain_radius(), GameState.get_vision_resource_radius())
+
+
+func _freeze_player(value: bool) -> void:
+	if player == null:
+		return
+	player.frozen = value
+	if value:
+		player.vx = 0.0
+		player.vy = 0.0
+		player.digging = null
+		player.release_control()
+
+
+## Хук сюжетной сцены Роберта (data/story.json: {"do":"hook","target":"house",
+## "method":"build_tunnel"}). Имя менять нельзя — на него ссылается сценарий.
+func build_tunnel() -> void:
+	robert_finished_garden()
+
+
+## Старое имя того же хука (люк отменён владельцем). Тонкая обёртка, а не
+## удалённый метод: в сейве лежит очередь сюжетных сцен, и у игрока со старым
+## сохранением в ней может остаться method="build_hatch" — без обёртки сцена
+## Роберта молча не построила бы ничего, и игрок остался бы без входа в шахту.
+func build_hatch() -> void:
+	build_tunnel()
+
+
+## Роберт закончил работу (ГДД п.9, решение владельца): огород засыпан и
+## закрыт навсегда, вместо лестницы вниз уходит бетонный тоннель. Одна точка
+## входа для сюжетной системы.
+func robert_finished_garden() -> void:
+	# Поле в GameState осталось со времён люка (house_hatch_built), смысл у
+	# него теперь один: Роберт построил тоннель. Переименование поля — за
+	# scripts/core, дому важно только значение.
+	GameState.house_hatch_built = true
+	GameState.house_garden_closed = true
+	if world == null:
+		world = GameState.world_ref
+	if world != null:
+		# Вся геометрия — знание мира: он пробивает колодец в клетке
+		# WorldGen.TUNNEL_X, ставит железобетонные стенки 16 и 18, засыпает
+		# остальной огород (копать там больше нельзя) и расчищает площадку
+		# под фундаментом. Выкопанное сценарное золото не отрастает — оно
+		# зафиксировано и уже унесено игроком.
+		world.build_robert_tunnel()
+	_toast("Роберт закончил: огород засыпан и закрыт, вниз ведёт бетонный тоннель.", 4.0)
+
+
+# ---------------------------------------------------------------------------
+# Контекстная кнопка HUD
+# ---------------------------------------------------------------------------
+
+## Устье тоннеля героя НИКУДА НЕ ТЯНЕТ (решение владельца): из шахты он
+## просто вылетает наверх, а в дом заходит сам — кнопкой «Зайти» у окна
+## веранды. Автоматический перенос читался как непонятный телепорт: игрок
+## поднимался по стволу и без спроса оказывался в подвале.
+## «Дом» как контекстная кнопка внизу экрана ОТМЕНЕНА владельцем (2026-09-16):
+## вход теперь через плавающую кнопку «Зайти» над героем у окна веранды (см.
+## _update_outdoor_hotspot). Метод и поле _button оставлены пустой обёрткой —
+## на группу "house_button" всё ещё может ссылаться HUD (чужой файл) и старый
+## тест; кнопка просто никогда не становится видимой.
+func _update_hud_button() -> void:
+	if _button == null:
+		return
+	_button_action = ""
+	_button.visible = false
+
+
+func on_hud_button() -> void:
+	pass
+
+
+# ---------------------------------------------------------------------------
+# Действия интерьера
+# ---------------------------------------------------------------------------
+
+func _on_view_action(action: String, arg: String) -> void:
+	match action:
+		"goto":
+			# Сам переезд герой уже сделал (это вид — go_to_room вызван внутри
+			# house_view.gd._fire до этого сигнала); здесь только бухгалтерия,
+			# которую обязан вести дом: где герой, знает сейв.
+			GameState.house_room = arg
+		"sleep":
+			_start_sleep_sequence()
+		"take_delivery":
+			_take_delivery()
+		"exit_door":
+			exit_to_door()
+		# exit_hatch — то же действие под старым именем: интерьер мог быть
+		# собран из сохранённой сцены, снятой до отмены люка.
+		"exit_tunnel", "exit_hatch":
+			if not exit_through_tunnel():
+				_toast("Тоннеля ещё нет — его пробьёт Роберт.")
+		"storage":
+			# Хотспот сундука виден только в мастерской — герой уже там, но
+			# фиксируем комнату на всякий случай (тот же вызов, что раньше).
+			GameState.house_room = HouseStorage.ROOM
+			open_storage()
+		"open_shop":
+			_open_shop("open_shop")
+		"open_equipment":
+			_open_shop("open_workshop")
+		"take_pickaxe":
+			take_starting_pickaxe()
+		"forced_confirm":
+			_finish_forced_sleep()
+
+
+## Ровно эффект сна (не меняется — см. HouseSleep.sleep_now): числа считает
+## HouseSleep, здесь только сообщение. Вызывается ОДИН раз — либо сразу
+## (обучающий форс-сон, _finish_forced_sleep), либо по концу анимации у
+## кровати (_finish_sleep_sequence).
+func _sleep() -> void:
+	var before := GameState.stamina
+	var result := HouseSleep.sleep_now()
+	if not bool(result["ok"]):
+		_toast(String(result["reason"]), 3.4)
+		return
+	_toast("Проспал %d игровых часов. Бодрость +%d%%." % [
+		int(round(float(result["hours"]))), int(round(GameState.stamina - before))], 3.0)
+
+
+## Кнопка «Спать» у кровати (ГДД, решение владельца: «спит быстро, буквально
+## 10 секунд, показывая анимацию»). Правила самого сна не меняются — меняется
+## только то, что эффект применяется не мгновенно по тапу, а по концу
+## короткого ролика: комната на это время «на паузе» (house_view.set_locked),
+## чтобы нельзя было утащить героя за дверь посреди сна.
+func _start_sleep_sequence() -> void:
+	if _sleeping or _view == null:
+		return
+	var plan := HouseSleep.plan(GameState.stamina, GameState.hunger)
+	if not bool(plan["ok"]):
+		_toast(String(plan["reason"]), 3.4)
+		return
+	_sleeping = true
+	_view.set_locked(true)
+	_view.play_sleep_animation(HouseConfig.sleep_animation_seconds())
+	var timer := get_tree().create_timer(HouseConfig.sleep_animation_seconds())
+	timer.timeout.connect(_finish_sleep_sequence)
+
+
+func _finish_sleep_sequence() -> void:
+	_sleeping = false
+	if _view != null:
+		_view.stop_sleep_animation()
+		_view.set_locked(false)
+	_sleep()
+
+
+## Мастерская (верстак и «Заказать» в салоне открывают одну и ту же витрину —
+## решение владельца). Сам магазин переписывает другой агент: дому важен
+## только вызов ShopUI.open_workshop().
+## Две точки входа в одну шторку: «Заказать» у входной двери — магазин
+## (open_shop), «Верстак» в мастерской — экипировка (open_workshop): что
+## куплено, то и надеть. Раньше оба вели в один экран, и верстак продавал.
+func _open_shop(entry: String = "open_shop") -> void:
+	if not ResourceLoader.exists(SHOP_SCRIPT):
+		_toast("Мастерская пока недоступна.")
+		return
+	load(SHOP_SCRIPT).call(entry)
+
+
+## Точка выдачи ржавой кирки (ГДД, решение владельца: «кирку он берёт на
+## анимации отсюда, среди удочек и швабр» — стена мастерской).
+##
+## РАНЬШЕ здесь запускалась полноценная катсцена "workshop" (data/story.json,
+## ~18 кадров: подвал, верстак, открытка предмета, реплики) через
+## StoryState.enqueue("workshop"). Решение владельца (2026-09-22): "когда он
+## берёт кирку, нужно убрать сюжет, просто показать ЮИ, что теперь у него
+## есть кирка и он может собирать ресурсы" — взятие кирки обязано быть UI-
+## моментом (тост), а не сюжетной остановкой игры. Раньше этот же прямой путь
+## уже жил здесь как "запасной" (для тестов без сюжетной системы, см. git
+## history) — теперь он единственный и безусловный, сюжетная ветка
+## (enqueue/StoryDirector) для этой сцены больше не используется НИГДЕ
+## (сцена "workshop" в data/story.json намеренно оставлена нетронутой —
+## данные не мешают, а enqueue("workshop") руками всё ещё нужен тестам).
+##
+## Гейт — StoryState.is_seen("workshop"), а НЕ GameState.owns_tool():
+## ржавая кирка бесплатна (сюжетная ступень, is_tool_free в game_state.gd),
+## и owns_tool() отвечает true на неё всегда, даже до того, как её вообще
+## взяли — по нему нельзя понять, брал ли игрок кирку здесь.
+func take_starting_pickaxe() -> void:
+	if StoryState.is_seen("workshop"):
+		return
+	GameState.grant_tool("rusty_pickaxe")
+	GameState.set_current_tool("rusty_pickaxe")
+	# is_seen("workshop") — реальный гейт, на который завязаны другие системы
+	# (player.gd: золото/фундамент до мастерской, house_view.gd: хотспот
+	# кирки, story_director.gd: задание "собери золото"). "workshop_seen" —
+	# отдельный флаг эффекта сцены (data/story.json) сохранён тоже, на случай
+	# если что-то будущее станет гейтиться именно им.
+	StoryState.mark_seen("workshop")
+	StoryState.set_flag("workshop_seen")
+	# Тот же текст, что раньше показывал toast-эффект сцены после катсцены —
+	# кирка + объяснение, что теперь доступна добыча минералов, одной строкой.
+	_toast(StoryText.get_text("workshop.toast_pickaxe"), 6.0)
+
+
+## Заказ еды из магазина у входной двери. Магазин только берёт деньги и зовёт
+## сюда: доставка — дело дома (таймер и порция у двери), а знать про него
+## магазину незачем.
+##
+## Непереносимую еду (стейк, пельмени — решение владельца) нести некуда,
+## поэтому её не доставляют, а съедают сразу: игрок и так стоит у своей двери.
+static func order_food(id: String) -> Dictionary:
+	if not HouseFood.pay_for_order(id):
+		return {"ok": false, "message": String(HouseFood.can_order(id).get("reason", "Заказать нельзя."))}
+	var name := HouseConfig.food_name(id)
+	if not HouseConfig.is_portable(id):
+		var eaten := HouseFood.eat_now(id)
+		return {"ok": true, "message": "%s — съедено на месте: голод +%d%%." % [
+			name, int(eaten.get("hunger", 0.0))]}
+	if instance != null:
+		instance._start_delivery(id)
+	else:
+		HouseFood.deliver(id)
+	return {"ok": true, "message": "%s: курьер будет у двери через %d с." % [
+		name, int(round(HouseConfig.delivery_seconds()))]}
+
+
+## Курьер едет к двери — порция появляется там через delivery_seconds (ГДД
+## п.7). Таймер именно здесь: заказ из шахты иначе телепортировал бы обед
+## прямо в руки, и «сбегать домой» перестало бы быть решением игрока.
+func _start_delivery(id: String) -> void:
+	var timer := get_tree().create_timer(HouseConfig.delivery_seconds())
+	timer.timeout.connect(func():
+		HouseFood.deliver(id)
+		_toast("Доставка у двери: %s." % HouseConfig.food_name(id), 3.0)
+	)
+
+
+## Заказ и доставка еды (HouseFood.pay_for_order/deliver) больше не ведутся
+## отсюда: «Заказать» в салоне и «Верстак» в мастерской открывают магазин
+## (_open_shop), и заказ теперь его забота — см. отчёт агента дома. Здесь
+## остаётся только «Забрать»: у входной двери он всплывает, пока там лежит
+## уже оплаченная доставка (data/rooms.json: hall.front_door, condition
+## food_at_door), и это чисто «дом» дело — до чего донесли, то и забираем.
+func _take_delivery() -> void:
+	var taken := HouseFood.take_from_door()
+	if taken <= 0:
+		_toast("Забрать нечего — либо у двери пусто, либо рюкзак переполнен.", 3.2)
+		return
+	_toast("Забрал порций: %d." % taken)
+
+
+# ---------------------------------------------------------------------------
+# Обучение сну и еде (ГДД п.9), две стадии
+# ---------------------------------------------------------------------------
+
+## Двухстадийное обучение сну и еде (ГДД п.9). Если в сцене есть сюжетная
+## система, обучение ведёт она — у неё те же две стадии сняты катсценами
+## (sleep_lesson_1 и sleep_lesson_2 в data/story.json), и два учителя разом
+## показали бы игроку два экрана про одно и то же. Дом в этом случае держит
+## наготове сами действия: open_bedroom(), give_energy_bar(), build_tunnel().
+func _tick_tutorial() -> void:
+	if not GameState.is_alive or player == null or _story != null:
+		return
+	if GameState.house_tutorial_stage == 0:
+		# Первое истощение: телепорт домой в спальню и принудительный тап по
+		# кровати. Ловим именно бодрость — она и есть та полоска, которой
+		# учат пользоваться кроватью.
+		if GameState.stamina <= 0.0:
+			_start_forced_sleep()
+	elif GameState.house_tutorial_stage == 1:
+		# Второе истощение — в шахте (ГДД п.9): домой уже не ведут, вместо
+		# этого в портфель падает батончик и его заставляют съесть.
+		if not GameState.house_is_indoors and player.cell_y() >= 1 \
+				and (GameState.stamina <= 0.0 or GameState.hunger <= 0.0) \
+				and _prompt_action.is_empty():
+			_start_forced_bar()
+
+
+func _start_forced_sleep() -> void:
+	if GameState.house_is_indoors and _view != null and _view.forced_mode() == "sleep":
+		return
+	enter_house("bedroom")
+	_view.set_forced("sleep",
+		"Ты вымотался. Пустая полоска бодрости жжёт HP, пока не выспишься.\n\n"
+		+ "Спать можно только дома, в кровати: 8 игровых часов проходят за один реальный, "
+		+ "а кровать отматывает их сразу — 12.5% бодрости за каждый игровой час.",
+		"Лечь спать")
+
+
+func _finish_forced_sleep() -> void:
+	HouseSleep.sleep_now(true)
+	GameState.house_tutorial_stage = 1
+	_view.set_forced("")
+	_toast("Выспался. Дальше кровать работает так же, но за сон тратится сытость.", 4.2)
+
+
+func _start_forced_bar() -> void:
+	_prompt_action = "eat_bar"
+	give_energy_bar()
+	_freeze_player(true)
+	_prompt.show_prompt(
+		"Полоска кончилась прямо в шахте. Домой отсюда не добежать.\n\n"
+		+ "В портфеле нашёлся энергетический батончик: 100% бодрости и 50% сытости. "
+		+ "Такие продаются в магазине — отдел допингов теперь открыт.",
+		"Съесть батончик")
+
+
+func _on_prompt_confirmed() -> void:
+	if _prompt_action == "eat_bar":
+		HouseFood.eat(TUTORIAL_FOOD)
+		GameState.house_tutorial_stage = 2
+		GameState.house_dopings_shop_unlocked = true
+	_prompt_action = ""
+	_prompt.hide_prompt()
+	if not GameState.house_is_indoors:
+		_freeze_player(false)
+
+
+## Открыть панель склада. Снаружи она работает как витрина «что у меня дома»
+## (ГДД п.14: смотреть можно откуда угодно), у самого склада — как склад.
+func open_storage() -> void:
+	if _storage_view == null:
+		return
+	# Пока панель открыта, герой стоит: она может открыться прямо в шахте, а
+	# палец, нажимающий «Взять», под панелью попадает в джойстик и уводит
+	# героя копать вслепую.
+	_freeze_player(true)
+	_storage_view.open()
+
+
+func _on_storage_closed() -> void:
+	if not GameState.house_is_indoors:
+		_freeze_player(false)
+
+
+## Показать интерьер в нужной комнате — для сюжетных сцен («телепорт домой в
+## спальню», ГДД п.9) и для любой системы, которой нужен дом открытым.
+func open_bedroom() -> void:
+	enter_house("bedroom")
+
+
+## Положить герою батончик в портфель (второе истощение, ГДД п.9). Вес не
+## проверяется: подарок обучения не должен зависеть от того, полон ли рюкзак.
+func give_energy_bar() -> void:
+	if GameState.add_item(TUTORIAL_FOOD, 1) <= 0:
+		GameState.inventory[TUTORIAL_FOOD] = GameState.get_item_count(TUTORIAL_FOOD) + 1
+		GameState.inventory_changed.emit()
+
+
+func _on_daily_reset() -> void:
+	# Бесплатные доставки обнуляются вместе с рекламными лимитами — по
+	# РЕАЛЬНЫМ суткам: мгновенный сон прокручивает игровые часы как угодно
+	# быстро, и привязка к игровому дню кормила бы героя бесконечно.
+	GameState.house_free_orders_used_today = 0
+
+
+## Сообщение игроку. В доме HUD скрыт, поэтому текст идёт в шапку интерьера,
+## снаружи — обычным тостом HUD. Одна точка, чтобы ни одно сообщение системы
+## не пропало из-за того, что игрок оказался не на том экране.
+func _toast(text: String, seconds: float = 2.6) -> void:
+	if GameState.house_is_indoors and _view != null and _view.has_method("notify"):
+		_view.notify(text, seconds)
+		return
+	if hud != null and hud.has_method("toast"):
+		hud.toast(text, seconds)

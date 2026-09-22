@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c1jf8m2wq0y3a"]
+
+[ext_resource type="Script" path="res://tests/test_screenshot_arrows.gd" id="1_shot"]
+
+[node name="TestScreenshotArrows" type="Node"]
+script = ExtResource("1_shot")

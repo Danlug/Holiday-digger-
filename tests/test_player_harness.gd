@@ -1012,7 +1012,7 @@ func _test_corner_rounding_horizontal_step() -> void:
 		player.on_ground = true
 		player._move_x(1.0 / 600.0)  # ничтожный dt: проверяем именно угол, не пробег
 		var slipped: bool = player.vx != 0.0
-		var expect_slip: bool = px <= 7
+		var expect_slip: bool = px <= 5
 		check("выступ %d px: %s" % [px, "проскользнул, идёт дальше" if expect_slip else "остановлен честным блоком"],
 			slipped == expect_slip)
 		_hitbox_overlap_clear("выступ %d px: хитбокс не глубже CORNER в стене" % px)
@@ -1050,7 +1050,7 @@ func _test_corner_rounding_vertical_ascend_shaft() -> void:
 		player.coasting = false
 		player._move_y(1.0 / 30.0)
 		var slipped: bool = player.vy < 0.0
-		var expect_slip: bool = px <= 7
+		var expect_slip: bool = px <= 5
 		check("шахта, взлёт, смещение %d px: %s" % [px,
 			"соскользнул к центру, летит дальше" if expect_slip else "сел на карниз (честный блок)"],
 			slipped == expect_slip)
@@ -1085,7 +1085,7 @@ func _test_corner_rounding_vertical_descend_shaft() -> void:
 		player.coasting = false
 		player._move_y(1.0 / 30.0)
 		var slipped: bool = player.vy > 0.0 and not player.on_ground
-		var expect_slip: bool = px <= 7
+		var expect_slip: bool = px <= 5
 		check("шахта, падение, смещение %d px: %s" % [px,
 			"соскользнул к центру, летит дальше" if expect_slip else "сел на карниз (честный блок)"],
 			slipped == expect_slip)
@@ -1135,8 +1135,8 @@ func _test_corner_rounding_diagonal_input_along_staircase() -> void:
 
 	var climbed: float = start_y - player.y
 	print("  -- A: диагональный ввод (↗) в шахте за 1 игровую секунду --")
-	print("     подъём за 1с: %.4f клеток (было бы 5/32=%.4f клетки — старый допуск на один угол)"
-		% [climbed, 5.0 / 32.0])
+	print("     подъём за 1с: %.4f клеток (застрявший на углу герой показал бы ~0)"
+		% climbed)
 	print("     разброс x за это время: [%.4f; %.4f] (безопасное окно шахты — 0.28 клетки)" % [min_x, max_x])
 	# Разгон ранца ступенчатый (3 с до потолка скорости, ГДД раздел 5) — за
 	# первую секунду полного 2.5 кл/с ещё нет, поэтому порог не "почти клетка

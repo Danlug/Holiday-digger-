@@ -42,18 +42,61 @@ const MOON_TEX_PATH := "res://art/env/moon.png"
 const ART_SCALE_TEX := 3.0
 
 ## Ширина ПОЛОСЫ, на которую раскиданы звёзды/расчерчена дуга солнца-месяца
-## (не окно камеры!) и её X-параллакс — задание владельца: "ширина неба на
-## 10% шире горы... на 10% меньше параллакс, чем гора". Гора — Backdrop
-## (MOUNTAIN_W_LOGICAL=800, MOUNTAIN_PARALLAX_X=0.35), Backdrop уже
-## class_name, поэтому берём константы прямо оттуда, а не дублируем числа.
+## (не окно камеры!) и её X-параллакс — задание владельца (первый заход):
+## "ширина неба на 10% шире горы... на 10% меньше параллакс, чем гора". Гора —
+## Backdrop (MOUNTAIN_W_LOGICAL=800, MOUNTAIN_PARALLAX_X=0.35), Backdrop уже
+## class_name, поэтому берём константы прямо оттуда, а не дублируем числа. Эти
+## две константы остаются как есть — ими по-прежнему рисуются СОЛНЦЕ и МЕСЯЦ
+## (_celestial, см. ниже), для которых ничего не менялось.
 const SKY_W_LOGICAL: float = Backdrop.MOUNTAIN_W_LOGICAL * 1.1        # 880
 const SKY_PARALLAX_X: float = Backdrop.MOUNTAIN_PARALLAX_X * 0.9      # 0.315
 
-## Столько звёзд раскидано по ОДНОЙ полосе SKY_W_LOGICAL (мировой режим).
-## Плотность подобрана так, чтобы в типичном окне камеры стоящего на земле
-## героя (~224 логич. px) было около 20-40 звёзд, как просил владелец:
-## 150 / 880 * 224 ≈ 38.
-const STAR_COUNT_WORLD := 150
+## ЗВЁЗДЫ (в отличие от солнца/месяца/горы) рисуются отдельным слоем
+## _star_layer, не _celestial — задание владельца (второй заход, отчёт с
+## реального iPhone): "на уровне месяца вообще нет звёзд... прорисуй звёзды
+## ниже персонажа тоже, так как когда взлетаешь над землёй там просто нет
+## звёзд... прорисуй звёздное небо ещё на 10% больше и увеличь параллакс".
+##
+## Корень первых двух багов ("нет звёзд"/"нет звёзд ниже при полёте") —
+## ОДИН: _celestial.position.y раньше ставился РОВНО в cam_px.y (полная
+## компенсация сдвига view_root, см. set_camera() ниже, до правки) — слой
+## был ЖЁСТКО ПРИКОЛОЧЕН К ЭКРАНУ, как гора (закреплена по высоте — и это
+## для горы правильно, она бесконечно далёкая деталь пейзажа). Для звёзд
+## это ломает и заметность, и полёт разом: измерено диагностикой
+## (tests/tmp_star_diag.gd, удалён) — ровно 28 из 150 звёзд оказываются в
+## пределах экрана, и ЭТО ЖЕ САМОЕ число (28/150), БЕЗ ЕДИНОЙ звезды
+## разницы, что стоя на земле, что после подъёма на 22 клетки к потолку
+## неба: слой вообще не двигался вертикально ни на пиксель, что бы ни делал
+## игрок. Фикс — свой параллакс-слой для звёзд (STAR_PARALLAX ниже, есть и
+## по X, и по Y, в отличие от _celestial, где Y всегда был жёстко заперт), и
+## поле разброса по строкам расширено до самого потолка полёта (см.
+## STAR_TOP_ROW), а не только до высоты человеческого роста.
+const STAR_W_LOGICAL: float = SKY_W_LOGICAL * 1.1                     # ~968, "ещё на 10% больше"
+## Доля движения камеры, которая реально доходит до звёзд — 0 значит "звёзды
+## приколочены к экрану" (старое поведение, и есть баг), 1 значит "звёзды
+## едут вместе с миром 1:1, как обычный передний план" (слишком быстро для
+## фона на глаз, при таком масштабе экрана звёзды бы неслись). 0.85 —
+## заметное, почти как у переднего плана, движение и по X, и по Y (раньше по
+## Y не было ВООБЩЕ, слой стоял насмерть) — задание владельца "увеличь
+## параллакс звёзд" без точного числа, подобрано измерением через
+## tests/tmp_star_diag.gd (временный диагностический инструмент, удалён из
+## финального коммита): на этом значении видимое число звёзд ощутимо растёт
+## по мере подъёма (25 на земле -> 78 у потолка неба, см. STAR_COUNT_WORLD
+## ниже), а не остаётся одним и тем же, как было с жёсткой прикруткой.
+const STAR_PARALLAX := 0.85
+
+## Столько звёзд раскидано по ОДНОЙ полосе STAR_W_LOGICAL (мировой режим).
+## Раньше (STAR_TOP_ROW=12, жёсткая прикрутка к экрану) было 150 — но поле
+## разброса стало вдвое выше (STAR_TOP_ROW: 12 -> 24) и на 10% шире
+## (STAR_W_LOGICAL), то есть звёзды размазаны по ~2.2× большей площади;
+## простое умножение на неё (150 * 2.2 ≈ 330) с новым, не запертым
+## параллаксом (STAR_PARALLAX=0.85) всё ещё давало маловато на земле —
+## подобрано измерением (tests/tmp_star_diag.gd, временный инструмент,
+## удалён из финального коммита) до значения, при котором на земле видно
+## около 25 звёзд (цель владельца, тот же расчёт что и раньше — "20-40 в
+## типичном окне"), а у самого потолка неба — уже 78 (звёзды честно
+## сгущаются с высотой вместе с камерой, не одно и то же число всегда).
+const STAR_COUNT_WORLD := 420
 ## Катсцена (see шапка файла) — старое поведение, звёзды на всю ширину
 ## экрана сцены (vp.x, обычно ~224px), не трогаем плотность интро.
 const STAR_COUNT_SCENE := 260
@@ -65,10 +108,16 @@ const STAR_SEED := 20260921
 ## никогда) не наезжал на них силуэтом.
 const MOON_GAP_TOP_ROW := 3.3
 const MOON_GAP_BOTTOM_ROW := 5.7
-## Верхняя граница разброса — не весь SKY_HEIGHT (там смотрит только герой в
-## полёте на пределе ранца), а с небольшим запасом за типичное окно камеры
-## стоящего на земле героя.
-const STAR_TOP_ROW := 12
+## Верхняя граница разброса строк — весь SKY_HEIGHT (потолок полёта, см.
+## player.gd:_sky_ceiling()/JET_DEPTH). РАНЬШЕ стояло 12 (половина высоты
+## неба, "типичное окно камеры стоящего на земле героя") — из-за жёсткой
+## фиксации слоя по Y (см. STAR_PARALLAX выше) это уже само по себе не имело
+## значения (звёзды всё равно не двигались), но теперь, когда звёзды честно
+## едут с камерой, полю разброса ОБЯЗАНО хватать на весь путь героя вверх —
+## иначе на подлёте к потолку кончились бы сами звёзды, а не только вид на
+## них (отчёт владельца: "звёзды ниже персонажа тоже", то есть по всей
+## высоте полёта, а не только у земли).
+const STAR_TOP_ROW := SKY_HEIGHT
 ## Раскладка звёзд — «дрожащая сетка» (см. _spawn_stars): поле от края
 ## каждой ячейки, за которое не заходит случайная точка внутри неё, — не 0
 ## и не 0.5 (иначе звёзды либо садятся на границы соседних ячеек почти
@@ -126,11 +175,18 @@ var _rect_top_y: float = -float(SKY_HEIGHT) * float(TILE)
 var _screen_w_px: float = float(WorldGen.WIDTH) * float(TILE)
 var _cam_x_px: float = 0.0
 
-## Слой светил/звёзд — свой Node2D с собственным _draw(), а не часть
-## _draw() этого узла: ему нужна СВОЯ позиция (параллакс + фиксация по
+## Слой светил (солнце+месяц) — свой Node2D с собственным _draw(), а не
+## часть _draw() этого узла: ему нужна СВОЯ позиция (параллакс + фиксация по
 ## высоте), а _draw()-градиенту — нет (см. шапку файла и backdrop.gd про
-## тот же приём с _mountain_layer/_fence_layer).
+## тот же приём с _mountain_layer/_fence_layer). Остаётся ЖЁСТКО закреплён по
+## высоте ("всегда ~4.5 клетки над головой") — так и было задумано, не
+## трогаем.
 var _celestial: Node2D
+## Звёзды — ОТДЕЛЬНЫЙ слой от _celestial (см. STAR_PARALLAX выше и его же
+## комментарий про баг "звёзды не видно"/"не видно при полёте"): в отличие
+## от солнца/месяца, звёздам нужен настоящий параллакс и по X, и по Y, а не
+## жёсткая прикрутка к экрану.
+var _star_layer: Node2D
 
 var _day_cycle: Node = null
 
@@ -139,6 +195,14 @@ func _ready() -> void:
 	_day_cycle = get_node_or_null("/root/DayCycle")
 	_load_stars()
 	_load_sun_moon()
+
+	# Порядок детей = порядок отрисовки (задание владельца: "звёзды, потом
+	# солнце/месяц") — звёздный слой добавлен ПЕРВЫМ, светила рисуются
+	# поверх них, как и раньше.
+	_star_layer = Node2D.new()
+	_star_layer.name = "Stars"
+	_star_layer.draw.connect(_draw_stars)
+	add_child(_star_layer)
 
 	_celestial = Node2D.new()
 	_celestial.name = "Celestial"
@@ -158,13 +222,16 @@ func set_scene_rect(width_px: float, horizon_y: float, top_y: float) -> void:
 	_rect_horizon_y = horizon_y
 	_rect_top_y = top_y
 	# У катсцены нет прокрутки камеры — "экран" сцены и есть вся её ширина,
-	# а смещение нулевое (see set_camera()); _celestial тоже остаётся на
-	# Vector2.ZERO (set_camera() в этом режиме больше не двигает его,
-	# см. ниже) — точь-в-точь как раньше.
+	# а смещение нулевое (see set_camera()); _celestial и _star_layer тоже
+	# остаются на Vector2.ZERO (set_camera() в этом режиме больше их не
+	# двигает, см. ниже) — точь-в-точь как раньше (катсцены этот агент не
+	# трогает, см. задание).
 	_screen_w_px = width_px
 	_cam_x_px = 0.0
 	if _celestial != null:
 		_celestial.position = Vector2.ZERO
+	if _star_layer != null:
+		_star_layer.position = Vector2.ZERO
 	_spawn_stars()
 
 
@@ -177,10 +244,18 @@ func set_scene_rect(width_px: float, horizon_y: float, top_y: float) -> void:
 func set_camera(cam: Vector2, view_w_cells: int) -> void:
 	_cam_x_px = cam.x * float(TILE)
 	_screen_w_px = float(view_w_cells) * float(TILE)
-	if _mode_scene or _celestial == null:
+	if _mode_scene:
 		return
 	var cam_px := cam * float(TILE)
-	_celestial.position = Vector2((1.0 - SKY_PARALLAX_X) * cam_px.x, cam_px.y)
+	if _celestial != null:
+		_celestial.position = Vector2((1.0 - SKY_PARALLAX_X) * cam_px.x, cam_px.y)
+	# Звёзды — свой, куда более "живой" параллакс, и по X, и (что раньше
+	# отсутствовало вовсе) по Y (см. STAR_PARALLAX и комментарий у него же):
+	# баг владельца "нет звёзд"/"нет звёзд при полёте" был в том, что этот
+	# слой двигался ТОЧНО как _celestial (в частности, Y гасился ПОЛНОСТЬЮ,
+	# 0% движения) — звёздное поле было прибито к экрану намертво.
+	if _star_layer != null:
+		_star_layer.position = Vector2((1.0 - STAR_PARALLAX) * cam_px.x, (1.0 - STAR_PARALLAX) * cam_px.y)
 
 
 func _load_stars() -> void:
@@ -226,9 +301,15 @@ func _spawn_stars() -> void:
 	# против пиксельной высоты полосы STAR_TOP_ROW строк), а не константой:
 	# у катсцены (set_scene_rect) своя ширина/высота, сильно отличная от
 	# мирового режима.
+	#
+	# Ширина полосы звёзд — STAR_W_LOGICAL в мировом режиме (СВОЯ, шире
+	# SKY_W_LOGICAL/_rect_w_px на 10% — задание владельца "звёздное небо ещё
+	# на 10% больше", см. STAR_W_LOGICAL выше), у катсцены — по-прежнему
+	# _rect_w_px (там своя, отдельная договорённость, не трогаем).
+	var star_w: float = _rect_w_px if _mode_scene else STAR_W_LOGICAL
 	var span_top_px: float = row_to_y.call(-float(STAR_TOP_ROW))
 	var span_bottom_px: float = row_to_y.call(-1.0)
-	var aspect: float = _rect_w_px / maxf(1.0, absf(span_top_px - span_bottom_px))
+	var aspect: float = star_w / maxf(1.0, absf(span_top_px - span_bottom_px))
 	var cols: int = maxi(1, int(ceil(sqrt(float(count) * aspect))))
 	var rows: int = maxi(1, int(ceil(float(count) / float(cols))))
 	var total_cells := cols * rows
@@ -257,10 +338,18 @@ func _spawn_stars() -> void:
 			var to_top := row - MOON_GAP_TOP_ROW
 			var to_bottom := MOON_GAP_BOTTOM_ROW - row
 			row = MOON_GAP_TOP_ROW if to_top < to_bottom else MOON_GAP_BOTTOM_ROW
-		var y: float = _world_y_to_local(row_to_y.call(-row))
+		# В мировом режиме звёзды больше НЕ идут через _world_y_to_local
+		# (та фиксирует Y относительно Backdrop.MOUNTAIN_REF_CAM_Y_PX — приём,
+		# рассчитанный на слой, жёстко прибитый к экрану, как гора/солнце/
+		# месяц). Звёздный слой теперь сам возит свою позицию параллаксом
+		# (см. set_camera()/STAR_PARALLAX), поэтому локальная координата
+		# звезды — просто её МИРОВОЙ пиксель Y как есть: тот же приём, что и
+		# у обычных тайлов WorldView. В катсцене (_mode_scene) ничего не
+		# меняется — _world_y_to_local там и раньше была тождеством.
+		var y: float = row_to_y.call(-row) if not _mode_scene else _world_y_to_local(row_to_y.call(-row))
 		var star := {
 			"region": region,
-			"x": x_norm * _rect_w_px,
+			"x": x_norm * star_w,
 			"y": y,
 			"timer": rng.randf_range(0.0, DIP_INTERVAL_MAX),
 			"in_dip": false,
@@ -277,6 +366,8 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if _celestial != null:
 		_celestial.queue_redraw()
+	if _star_layer != null:
+		_star_layer.queue_redraw()
 
 
 func _tick_stars(delta: float) -> void:
@@ -372,13 +463,12 @@ func _sun_moon_y() -> float:
 ## Порядок слоёв на небе — задание владельца (2026-09-21): подложка (см.
 ## _draw_sky_gradient выше — рисуется этим же узлом, но раньше, до всех
 ## детей), ЗВЁЗДЫ, потом солнце/месяц, потом уже гора/забор (Backdrop) и
-## всё остальное поверх. Звёзды рисуются первыми в этой функции, чтобы
-## солнце/месяц (взаимоисключающие по часу суток, но порядок всё равно
-## важен на стыке рассвета/заката) легли поверх них, а не наоборот.
+## всё остальное поверх. Звёзды теперь рисует отдельный узел _star_layer,
+## добавленный в дерево ПЕРЕД _celestial (см. _ready()) — порядок детей и
+## даёт "звёзды, потом солнце/месяц" без явного вызова отсюда.
 func _draw_celestial() -> void:
 	if _day_cycle == null:
 		return
-	_draw_stars()
 	_draw_sun()
 	_draw_moon()
 
@@ -427,8 +517,15 @@ func _draw_moon() -> void:
 			MOON_RADIUS * 0.92, MOON_BITE_COLOR)
 
 
+## Отрисовка звёзд — теперь колбэк _star_layer.draw (свой слой, см.
+## STAR_PARALLAX и _ready() выше), а не часть _draw_celestial(): звёздам
+## нужна ОТДЕЛЬНАЯ позиция узла (параллакс), а не позиция _celestial
+## (солнце/месяц, жёстко закреплены по высоте) — раньше оба набора рисовало
+## одно и то же _celestial.draw_texture_rect_region(...) с ОДНОЙ на двоих
+## позицией узла, и звёзды поэтому были обречены двигаться как солнце с
+## месяцем ("приколочены к экрану"), а не как самостоятельный фон.
 func _draw_stars() -> void:
-	if _star_atlas == null:
+	if _star_atlas == null or _day_cycle == null:
 		return
 	var global_alpha: float = _day_cycle.stars_alpha()
 	if global_alpha <= 0.0:
@@ -442,5 +539,5 @@ func _draw_stars() -> void:
 		var dst_w: float = float(r.w) / ART_SCALE_TEX
 		var dst_h: float = float(r.h) / ART_SCALE_TEX
 		var pos := Vector2(star.x - dst_w * 0.5, star.y - dst_h * 0.5)
-		_celestial.draw_texture_rect_region(_star_atlas, Rect2(pos, Vector2(dst_w, dst_h)), region,
+		_star_layer.draw_texture_rect_region(_star_atlas, Rect2(pos, Vector2(dst_w, dst_h)), region,
 			Color(1.0, 1.0, 1.0, a))

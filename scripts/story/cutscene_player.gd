@@ -165,6 +165,19 @@ var _world_dig: Dictionary = {}      # {"actor","cell":Vector2i,"left","total"} 
 ## физтик перепрыгнул сразу через несколько клеток экрана.
 var _world_dig_row: Dictionary = {}
 var _world_fall: Dictionary = {}     # {"actor","from","to","left","total"} или {}
+## Ограничивающий прямоугольник (в клеточных координатах, с дробной частью)
+## всех точек, куда за время режима "мир" реально указывала камера (см.
+## _tick_world: player.x/y зеркалит актёра из _camera_actor_id) — main.gd
+## каждый кадр раскрывает туман войны РОВНО вокруг текущего player.x/y
+## (main.gd:_reveal_around_player), не различая, герой ли это по-настоящему
+## идёт или это сюжет ведёт камеру по актёру катсцены. Без этой границы
+## огород, который дед раскопал за три года до игры (intro_grandpa),
+## оставался бы разведанным туманом и для внука, только что приехавшего в
+## деревню (отчёт владельца: "видно некоторые тайлы под землёй" сразу после
+## intro_boy) — см. использование в _exit_world_mode().
+var _world_reveal_min: Vector2 = Vector2.ZERO
+var _world_reveal_max: Vector2 = Vector2.ZERO
+var _world_reveal_seen: bool = false
 ## Последний час, выставленный кадром "clock" — публично, чтобы тесты могли
 ## проверить ход времени сцены даже там, где автозагрузки /root/DayCycle ещё
 ## нет (см. GDD-контракт DayCycle в задании, узел параллельного агента).
@@ -973,6 +986,22 @@ func _hide_actor(beat: Dictionary) -> void:
 		_world_actors.erase(id)
 		if _camera_actor_id == id:
 			_camera_actor_id = ""
+			# Устойчивость к ошибке сценариста (отчёт владельца: "сцена
+			# замирает на бабке" — камера должна была вернуться на деда, пока
+			# он копает, а бабку показывать только пока она говорит).
+			# _tick_world зеркалит x/y ТОЛЬКО актёра из _camera_actor_id — если
+			# кадр, прячущий текущую цель камеры (здесь), не сопровождается ТУТ
+			# ЖЕ следующим кадром с "camera": true (пропущен в данных сцены,
+			# переставлен местами, или скрипт сцены прерван/пропущен
+			# посередине), камера/туман застревают ровно там, где стоял
+			# спрятанный актёр, — до конца сцены. Если на живой карте остался
+			# ровно один актёр — это почти всегда тот, кого сцена собирается
+			# показывать дальше (обычно снова дед) — переключаем камеру на
+			# него сами, не дожидаясь явного "camera": true следующим кадром.
+			# При нескольких/нуле оставшихся актёрах угадывать не пытаемся —
+			# сцена обязана назвать цель явно (и это её обычный путь).
+			if _world_actors.size() == 1:
+				_camera_actor_id = _world_actors.keys()[0]
 		return
 	if not _actors.has(id):
 		return
@@ -1303,6 +1332,7 @@ func _enter_world_mode(era: String = "now") -> void:
 	if house_mode:
 		_exit_house_mode()
 	world_mode = true
+	_world_reveal_seen = false
 	# Небо/земля катсцены прячутся — живая карта показывается КАК ЕСТЬ, её
 	# рисует main.gd/world_view.gd под этим CanvasLayer, а не мы.
 	_sky.visible = false
@@ -1369,6 +1399,34 @@ func _exit_world_mode() -> void:
 		player.y = 0.5
 		player.vx = 0.0
 		player.vy = 0.0
+
+	# БАГ (отчёт владельца, реальный iPhone, живая веб-сборка): "после того как
+	# мальчик приезжает в деревню, видно некоторые тайлы под землёй" — main.gd
+	# каждый кадр раскрывает туман войны вокруг ТЕКУЩЕГО player.x/y
+	# (main.gd:_reveal_around_player), не различая, герой ли это по-настоящему
+	# идёт или сюжет ведёт камеру по актёру сцены (см. _tick_world выше). Три
+	# года копки деда (intro_grandpa) на живой карте оставляли туман
+	# раскрытым по всему ряду, что он копал, — внук, приехавший в деревню
+	# СРАЗУ следующей сценой, находил на своей нетронутой карте уже
+	# разведанные клетки. forget_dug_cells() выше отменяет саму копку, но
+	# туман — отдельное состояние (main.gd:fog, не world), и его тоже нужно
+	# закрыть обратно — ровно там, куда камера сцены реально успела
+	# посмотреть (_world_reveal_min/_max, копится в _tick_world), а не всю
+	# карту разом (reset_all() стёр бы настоящую разведку игрока, если
+	# режим "мир" сработает посреди обычной игры — "death"/"backpack"/
+	# "intro_boy" тоже проходят через _enter_world_mode/_exit_world_mode).
+	if _world_reveal_seen and GameState.fog_ref != null:
+		# Паддинг — радиус ауры обзора (та же формула, что и у настоящего
+		# раскрытия, см. main.gd:_reveal_around_player и fog.gd:vision_radius),
+		# с запасом в одну клетку на округление: иначе кромка ауры вокруг
+		# самой дальней точки сцены осталась бы неразобранной.
+		var pad: int = int(ceil(FogOfWar.vision_radius(GameState.get_vision_terrain_radius()))) + 1
+		var x0 := int(floor(_world_reveal_min.x)) - pad
+		var y0 := int(floor(_world_reveal_min.y)) - pad
+		var x1 := int(ceil(_world_reveal_max.x)) + pad
+		var y1 := int(ceil(_world_reveal_max.y)) + pad
+		GameState.fog_ref.reset_rect(x0, y0, x1 - x0 + 1, y1 - y0 + 1)
+	_world_reveal_seen = false
 
 
 ## Задник (забор/гора) — параллельная задача, контракт: узел с именем
@@ -1708,6 +1766,22 @@ func _tick_world(dt: float) -> void:
 		var cam_a: WorldActor = _world_actors[_camera_actor_id]
 		player.x = cam_a.x
 		player.y = cam_a.y
+		_track_world_reveal_bounds(cam_a.x, cam_a.y)
+
+
+## Копит границы всего, что main.gd успел раскрыть туманом за кадром (см.
+## _world_reveal_min/_max выше) — вызывается из _tick_world на каждый кадр,
+## когда камера реально смотрит на живую карту глазами актёра сцены.
+func _track_world_reveal_bounds(x: float, y: float) -> void:
+	if not _world_reveal_seen:
+		_world_reveal_min = Vector2(x, y)
+		_world_reveal_max = Vector2(x, y)
+		_world_reveal_seen = true
+		return
+	_world_reveal_min.x = minf(_world_reveal_min.x, x)
+	_world_reveal_min.y = minf(_world_reveal_min.y, y)
+	_world_reveal_max.x = maxf(_world_reveal_max.x, x)
+	_world_reveal_max.y = maxf(_world_reveal_max.y, y)
 
 
 func _tick_world_walk(dt: float) -> void:

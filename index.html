@@ -116,7 +116,7 @@ body {
 // не дотягивается. Подмена стоит ДО загрузки index.js: движок просит wasm,
 // пак и ворклеты сам.
 (function () {
-	const V = "20260922-0045";
+	const V = "20260922-0103";
 	const TOUCH = /index(\.[a-z.]+)?\.(js|wasm|pck)(\?|$)/;
 	function bust(url) {
 		if (typeof url !== "string" || !TOUCH.test(url) || url.indexOf("v=" + V) !== -1) {
@@ -146,9 +146,9 @@ body {
 	}
 }());
 		</script>
-		<script src="index.js?v=20260922-0045"></script>
+		<script src="index.js?v=20260922-0103"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":18713600,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":18679360,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

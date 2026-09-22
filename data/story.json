@@ -22,7 +22,14 @@
 		"world_walk": "актёр идёт по живой карте до x (клеток/сек по умолчанию, либо sec); camera=true — камера идёт за ним",
 		"world_dig": "актёр НАСТОЯЩЕЙ лопатой/киркой выкапывает клетку (x,y) живой карты (world.dig_cell) — sec секунд играет pose (по умолчанию dig_shovel), потом клетка исчезает и актёр шагает в неё",
 		"world_fall": "визуальный сдвиг актёра на dy КЛЕТОК (не пикселей) за sec — попытка выбраться из ямы, копки не делает",
-		"clock": "контракт DayCycle: hour — выставить час суток, scale — множитель скорости часов; не блокирует сцену"
+		"world_dig_row": "весь ряд y от from_x до to_x одним проездом за sec — каждая клетка копается НАСТОЯЩЕЙ картой на лету, а не разом в конце",
+		"world_prop": "статичный предмет на живую карту (id, tex, x, y, scale) — без поз/кадров/разворота, как декор",
+		"world_enter": "войти в режим «мир» посреди сцены (era); симметричный выход — обычный clear",
+		"clock": "контракт DayCycle: hour — выставить час суток, scale — множитель скорости часов; не блокирует сцену",
+		"house_enter": "показать НАСТОЯЩИЙ интерьер дома (room, x — доля 0..1 ширины комнаты) вместо иллюстрации; house_mode гасится автоматически на старте следующей сцены (или кадром clear этой же)",
+		"house_sleep": "короткая анимация сна у настоящей кровати (sec) — тот же ролик, что и по кнопке «Спать»",
+		"house_npc_show": "поставить сюжетного NPC (не героя игрока) в уже открытую house_enter комнату: actor — id из таблицы actors (листы art/character/<actors[actor].dir>/idle.png и walk.png), x — доля 0..1 ширины комнаты, flip",
+		"house_npc_walk": "NPC из house_npc_show идёт по комнате до x за sec секунд (держит сцену); exit=true — по приходе исчезает (Роберт уходит за дверь)"
 	},
 	"_effects": {
 		"flag": "поставить сюжетный флаг id",
@@ -1148,25 +1155,12 @@
 		{
 			"id": "backpack",
 			"title": "backpack.title",
+			"_comment": "Решение владельца: ранец достаётся в НАСТОЯЩЕЙ мастерской (не иллюстрация «подвал»), а Роберта внук встречает СНАРУЖИ, на живой карте у места будущего тоннеля — не по телефону. Тоннель копает уже сцена «robert» (её эффекты), здесь Роберт только соглашается и отсылает внука домой ждать.",
 			"beats": [
 				{
-					"t": "mood",
-					"id": "cellar"
-				},
-				{
-					"t": "prop",
-					"id": "workbench",
-					"at": "right"
-				},
-				{
-					"t": "show",
-					"actor": "boy",
-					"at": "left",
-					"pose": "idle"
-				},
-				{
-					"t": "narr",
-					"text": "backpack.n1"
+					"t": "house_enter",
+					"room": "workshop",
+					"x": 0.6
 				},
 				{
 					"t": "narr",
@@ -1176,12 +1170,6 @@
 					"t": "say",
 					"who": "boy",
 					"text": "backpack.s1"
-				},
-				{
-					"t": "show",
-					"actor": "boy",
-					"at": "left",
-					"pose": "dig_pick_rusty"
 				},
 				{
 					"t": "shake",
@@ -1200,25 +1188,85 @@
 					"text": "backpack.n3"
 				},
 				{
-					"t": "hide",
-					"actor": "boy"
-				},
-				{
 					"t": "item",
 					"icon": "res://art/items/backpack_propeller.png",
 					"name": "item.backpack",
 					"text": "backpack.item_text"
 				},
 				{
-					"t": "show",
-					"actor": "boy_gear",
-					"at": "center",
-					"pose": "idle"
+					"t": "say",
+					"who": "boy",
+					"text": "backpack.s2"
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n1"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.8
+				},
+				{
+					"t": "clear"
+				},
+				{
+					"t": "world_enter",
+					"era": "now"
+				},
+				{
+					"t": "world_actor",
+					"actor": "boy",
+					"x": 17.0,
+					"y": 0.5,
+					"pose": "idle",
+					"camera": true
+				},
+				{
+					"t": "world_actor",
+					"actor": "robert",
+					"x": 19.5,
+					"y": 0.5,
+					"pose": "idle",
+					"flip": true
+				},
+				{
+					"t": "fade",
+					"dir": "in",
+					"sec": 0.6
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "backpack.r1"
 				},
 				{
 					"t": "say",
 					"who": "boy",
-					"text": "backpack.s2"
+					"text": "backpack.s3"
+				},
+				{
+					"t": "say",
+					"who": "robert",
+					"text": "backpack.r2"
+				},
+				{
+					"t": "world_walk",
+					"actor": "boy",
+					"x": 11.5,
+					"camera": true
+				},
+				{
+					"t": "narr",
+					"text": "backpack.n4"
+				},
+				{
+					"t": "fade",
+					"dir": "out",
+					"sec": 0.8
+				},
+				{
+					"t": "clear"
 				}
 			],
 			"effects": [
@@ -1231,100 +1279,22 @@
 		{
 			"id": "robert",
 			"title": "robert.title",
-			"_comment": "Решение владельца: люк отменён. Роберт вместо лестницы пробивает вниз бетонный тоннель — колодец по клетке 17 глубиной 4, стенки 16 и 18 железобетонные, остальной огород засыпан и больше не копается. Флаг оставлен со старым именем hatch_built: по нему уже смотрят сейвы и соседние системы, смысл теперь «тоннель построен».",
+			"_comment": "Решение владельца: люк отменён. Роберт вместо лестницы пробивает вниз бетонный тоннель — колодец по клетке 17 глубиной 4, стенки 16 и 18 железобетонные, остальной огород засыпан и больше не копается. Флаг оставлен со старым именем hatch_built: по нему уже смотрят сейвы и соседние системы, смысл теперь «тоннель построен». Сама сцена теперь играет целиком в НАСТОЯЩЕМ салоне (house_enter) — внук встретил Роберта снаружи ещё в сцене «backpack» и отправлен домой ждать; здесь Роберт докладывает, что закончил, и уходит через ту же дверь, в которую стучал (hall.front_door — «Заказать»/доставка, см. data/rooms.json), НАСТОЯЩИМ NPC (house_npc_show/house_npc_walk), а не иллюстрацией.",
 			"beats": [
 				{
-					"t": "mood",
-					"id": "room"
-				},
-				{
-					"t": "show",
-					"actor": "boy",
-					"at": "left",
-					"pose": "idle"
-				},
-				{
-					"t": "say",
-					"who": "boy",
-					"text": "robert.s1"
-				},
-				{
-					"t": "show",
-					"actor": "grandma_rich",
-					"at": "right",
-					"pose": "idle",
-					"flip": true
-				},
-				{
-					"t": "shake",
-					"sec": 0.5
-				},
-				{
-					"t": "say",
-					"who": "grandma_rich",
-					"text": "robert.g1"
+					"t": "house_enter",
+					"room": "hall",
+					"x": 0.65
 				},
 				{
 					"t": "narr",
 					"text": "robert.n1"
 				},
 				{
-					"t": "say",
-					"who": "grandma_rich",
-					"text": "robert.g2"
-				},
-				{
-					"t": "clear"
-				},
-				{
-					"t": "mood",
-					"id": "day"
-				},
-				{
-					"t": "prop",
-					"id": "house_rich",
-					"at": "right"
-				},
-				{
-					"t": "prop",
-					"id": "garden_wheelbarrow",
-					"at": "left"
-				},
-				{
-					"t": "prop",
-					"id": "garden_cabbage",
-					"at": "center"
-				},
-				{
-					"t": "narr",
-					"text": "robert.n2"
-				},
-				{
-					"t": "mood",
-					"id": "dusk"
-				},
-				{
-					"t": "narr",
-					"text": "robert.n3"
-				},
-				{
-					"t": "narr",
-					"text": "robert.n4"
-				},
-				{
-					"t": "clear"
-				},
-				{
-					"t": "show",
+					"t": "house_npc_show",
 					"actor": "robert",
-					"at": "right",
-					"pose": "idle"
-				},
-				{
-					"t": "show",
-					"actor": "robert",
-					"at": "right",
-					"pose": "talk"
+					"x": 0.72,
+					"flip": true
 				},
 				{
 					"t": "say",
@@ -1332,27 +1302,9 @@
 					"text": "robert.r1"
 				},
 				{
-					"t": "show",
-					"actor": "robert",
-					"at": "right",
-					"pose": "idle"
-				},
-				{
-					"t": "show",
-					"actor": "boy",
-					"at": "left",
-					"pose": "idle"
-				},
-				{
 					"t": "say",
 					"who": "boy",
-					"text": "robert.s2"
-				},
-				{
-					"t": "show",
-					"actor": "robert",
-					"at": "right",
-					"pose": "talk"
+					"text": "robert.s1"
 				},
 				{
 					"t": "say",
@@ -1360,10 +1312,15 @@
 					"text": "robert.r2"
 				},
 				{
-					"t": "show",
+					"t": "house_npc_walk",
 					"actor": "robert",
-					"at": "right",
-					"pose": "idle"
+					"x": 0.09,
+					"sec": 1.6,
+					"exit": true
+				},
+				{
+					"t": "narr",
+					"text": "robert.n2"
 				}
 			],
 			"effects": [

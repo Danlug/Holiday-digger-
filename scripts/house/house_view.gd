@@ -43,7 +43,31 @@ const DIM := Color8(0x9D, 0x8B, 0x73)
 ## статами (HUD на время дома скрыт целиком, см. house_system.enter_house).
 const HEADER_HEIGHT := 40.0
 const STAGE_HEIGHT := 440.0
-const VIEW_W := 224.0  # project.godot: window/size/viewport_width
+## project.godot: window/size/viewport_width — запасное значение на случай,
+## когда узел ещё вне дерева и вьюпорт спросить не у кого (сборка сцены
+## tools/gen_house_scenes.gd, первый кадр до add_child). ФАКТИЧЕСКАЯ ширина
+## живёт в _view_w ниже и обновляется по-настоящему живому вьюпорту — этот
+## constant отныне НЕ читают напрямую нигде в расчётах камеры/хотспотов/
+## ширины комнаты, только как начальное значение _view_w и _room_width_px.
+##
+## Баг (отчёт владельца, реальный iPhone, живая веб-сборка): фон комнаты дома
+## не дотягивался до правого края экрана — вертикальная чёрная полоса
+## неизменной ширины у правого края, той же ширины что бы ни делала камера, а
+## шапка HUD над ним (полоски/«Магазин») экран заполняла честно. Причина —
+## этот файл везде считал ширину экрана ЖЁСТКО 224 (project.godot:
+## window/size/viewport_width), а project.godot держит
+## stretch/mode="canvas_items" + stretch/aspect="expand": на реальном
+## устройстве, чьё физическое соотношение сторон шире дизайнерского портрета
+## 224×480, движок сам РАСШИРЯЕТ логический вьюпорт вбок сверх 224 — то есть
+## настоящая ширина экрана в вебе/на телефоне может быть больше 224, а не
+## равна ему. HUD (scripts/ui/hud.gd) той же ловушки не ловит: его элементы —
+## anchor-based Control на PRESET_FULL_RECT, они тянутся сами при ресайзе;
+## этот файл, наоборот, считает камеру/ширину комнаты/клампинг хотспотов
+## вручную в пикселях против константы — и без живого чтения вьюпорта не
+## узнаёт, что экран стал шире. Тот же класс бага (жёсткая ширина вместо
+## живого вьюпорта) чинит cutscene_player.gd своим _relayout_if_resized()
+## (см. его _last_vp) — здесь тот же приём под другим именем поля.
+const VIEW_W := 224.0
 
 ## Скорость ходьбы по комнате — решение владельца (2026-09-21): «ходить он
 ## должен в 2 раза быстрее». Было 130 (тот же порядок, что WALK*TILE в шахте:
@@ -124,7 +148,14 @@ var _cur_frame_idx: int = -1
 
 var _room_id: String = ""
 var _room_def: Dictionary = {}
+## Живая ширина вьюпорта в логических px — см. VIEW_W выше и _refresh_view_w().
+var _view_w: float = VIEW_W
 var _room_width_px: float = float(VIEW_W)
+## Естественный размер картинки комнаты (или заглушки), масштабированной к
+## STAGE_HEIGHT, — см. _load_background()/_apply_room_width(). Держим
+## отдельно от _room_width_px, чтобы ресайз вьюпорта (_refresh_view_w) мог
+## пересчитать ширину комнаты БЕЗ перезагрузки текстуры с диска.
+var _bg_declared_size: Vector2 = Vector2(VIEW_W, STAGE_HEIGHT)
 var _floor_y_px: float = STAGE_HEIGHT * 0.86
 var _hero_x_px: float = 0.0
 var _facing: int = 1
@@ -136,6 +167,24 @@ var _hold_right: bool = false
 var _hotspot_buttons: Array = []
 var _hotspot_signature: String = ""
 var _locked: bool = false        # внешняя блокировка (форс-режим/сон — своя)
+
+## --- Сюжетный NPC-гость (не герой игрока) в открытой комнате ---------------
+## Тот же визуальный приём, что герой (те же лист/масштаб/пол), но x/pose
+## ведёт СЮЖЕТ (scripts/story/cutscene_player.gd:"house_npc_show"/
+## "house_npc_walk"), не собственный ввод игрока: та же роль, что WorldActor
+## на живой карте (scripts/story/world_actor.gd), только внутри комнаты дома.
+## Один слот, не словарь: гостит ровно один сюжетный персонаж за раз (сейчас —
+## докладывающий и уходящий Роберт, data/story.json:robert).
+var _npc: TextureRect = null
+var _npc_idle_tex: Texture2D = null
+var _npc_walk_tex: Texture2D = null
+var _npc_x_px: float = 0.0
+var _npc_from_px: float = 0.0
+var _npc_target_px: float = -1.0
+var _npc_walk_total: float = 0.0
+var _npc_walk_left: float = 0.0
+var _npc_facing: int = 1
+var _npc_frame_t: float = 0.0
 
 var _sleeping: bool = false
 var _sleep_t: float = 0.0
@@ -476,14 +525,26 @@ func close() -> void:
 	_sleeping = false
 	if _sleep_overlay != null:
 		_sleep_overlay.visible = false
+	hide_npc()
 
 
 func go_to_room(id: String, enter_x: float = -1.0) -> void:
+	# Живая ширина ДО расчёта доли/ширины комнаты — иначе самый первый вход в
+	# дом после запуска на реальном устройстве (до того, как хоть один кадр
+	# _process/refresh успел спросить вьюпорт) выставил бы героя по доле от
+	# ещё не обновлённой _room_width_px (см. VIEW_W выше).
+	_refresh_view_w()
 	var changed := id != _room_id
 	_room_id = id
 	_room_def = HouseRoomsConfig.room(id)
 	if changed:
 		_load_background()
+		# Гость (Роберт и т.п.) принадлежит комнате, в которой сцена его
+		# поставила, — переход героя в другую комнату не тащит его следом
+		# (никакой сюжет сейчас так и не просит — Роберт стоит и уходит в
+		# одной и той же комнате), а забытый видимый узел в комнате, куда
+		# NPC никто не звал, был бы куда заметнее одного лишнего queue_free().
+		hide_npc()
 	var frac: float = enter_x if enter_x >= 0.0 else float(_room_def.get("spawn_x", 0.5))
 	# "Разместить чуть дальше" (решение владельца, 2026-09-21): точки входа —
 	# дверь, лестница, веранда — стоят у самого края комнаты (enter_at из
@@ -504,7 +565,16 @@ func go_to_room(id: String, enter_x: float = -1.0) -> void:
 	_hold_left = false
 	_hold_right = false
 	_walk_dir = 0
-	_hotspot_signature = ""  # гарантированно пересобрать кнопки на новом месте
+	# БАГ (найден скриншотом при проверке новой сцены "robert", см. отчёт):
+	# сигнатура пустой активной кнопки ТОЖЕ пустая строка ("|".join([]) в
+	# _signature_for) — сброс в "" здесь совпадал с ней, "sig != _hotspot_
+	# signature" читалось как "ничего не изменилось", и _update_hotspots()
+	# пропускала _clear_hotspots(): кнопки прежней комнаты (например,
+	# "Верстак" мастерской) оставались висеть на экране, стоило герою попасть
+	# в комнату, где рядом с точкой входа вовсе нет хотспотов. "@"-сигил —
+	# тот же приём, что уже используют "@locked"/"@sleeping" ниже: реальная
+	# сигнатура (склейка action-строк точек) никогда не начинается с "@".
+	_hotspot_signature = "@room_changed"
 	refresh()
 
 
@@ -524,12 +594,41 @@ func _load_background() -> void:
 		_bg.texture = null
 		_bg.visible = false
 		_bg_fallback.visible = true
-	var h: float = maxf(1.0, size.y)
+	_bg_declared_size = size
+	_apply_room_width()
+	_floor_y_px = HouseRoomsConfig.floor_y(_room_id) * STAGE_HEIGHT
+
+
+## Пересчитывает _room_width_px/размер фона из уже загруженного
+## _bg_declared_size и ЖИВОЙ _view_w — общая часть _load_background() (после
+## реальной загрузки картинки) и _refresh_view_w() (когда картинка не
+## менялась, изменился только вьюпорт): второму незачем перечитывать файл с
+## диска ради пересчёта одних чисел.
+func _apply_room_width() -> void:
+	var h: float = maxf(1.0, _bg_declared_size.y)
 	var scale_to_stage: float = STAGE_HEIGHT / h
-	_room_width_px = maxf(float(VIEW_W), size.x * scale_to_stage)
+	_room_width_px = maxf(_view_w, _bg_declared_size.x * scale_to_stage)
 	_bg.size = Vector2(_room_width_px, STAGE_HEIGHT)
 	_bg_fallback.size = Vector2(_room_width_px, STAGE_HEIGHT)
-	_floor_y_px = HouseRoomsConfig.floor_y(_room_id) * STAGE_HEIGHT
+
+
+## Живое чтение ширины вьюпорта (см. VIEW_W выше) — тот же приём, что
+## cutscene_player.gd:_relayout_if_resized()/_last_vp, под именами этого
+## файла. Вызывается и из go_to_room() (до первого кадра), и из refresh()
+## (каждый кадр, пока дом открыт) — оба места дешёвы при отсутствии ресайза:
+## сравнение с уже известной шириной и выход, без пересчёта размеров фона.
+func _refresh_view_w() -> void:
+	if not is_inside_tree():
+		return
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var w: float = vp.get_visible_rect().size.x
+	if w <= 0.0 or is_equal_approx(w, _view_w):
+		return
+	_view_w = w
+	if not _room_id.is_empty():
+		_apply_room_width()
 
 
 # ---------------------------------------------------------------------------
@@ -552,6 +651,7 @@ func _process(delta: float) -> void:
 		_hold_right = _walk_right_btn != null and _walk_right_btn.is_pressed()
 		_update_walk(delta)
 
+	_update_npc(delta)
 	refresh()
 
 
@@ -580,6 +680,7 @@ func _update_walk(delta: float) -> void:
 func refresh() -> void:
 	if not visible:
 		return
+	_refresh_view_w()
 	_refresh_header()
 	_apply_night_dim()
 	_update_camera_and_hero()
@@ -640,8 +741,15 @@ func _set_bar(id: String, fraction: float) -> void:
 		fill.size = Vector2(42.0 * clampf(fraction, 0.0, 1.0), 4)
 
 
+## Горизонтальный сдвиг камеры (левый край комнаты в кадре) — общая формула
+## для героя (_update_camera_and_hero) и гостя (_position_npc): оба следуют
+## за одной и той же камерой, которую водит герой, а не NPC.
+func _camera_x() -> float:
+	return clampf(_hero_x_px - _view_w / 2.0, 0.0, maxf(0.0, _room_width_px - _view_w))
+
+
 func _update_camera_and_hero() -> void:
-	var cam_x: float = clampf(_hero_x_px - VIEW_W / 2.0, 0.0, maxf(0.0, _room_width_px - VIEW_W))
+	var cam_x: float = _camera_x()
 	_bg.position.x = -cam_x
 	_bg_fallback.position.x = -cam_x
 
@@ -653,6 +761,7 @@ func _update_camera_and_hero() -> void:
 	_hero.position = Vector2(screen_x - HERO_W * HERO_SCALE / 2.0,
 		_floor_y_px - (HERO_H - FOOT_PAD) * HERO_SCALE)
 	_hero.flip_h = _facing < 0
+	_position_npc()
 
 
 func _update_hero_frame() -> void:
@@ -674,6 +783,122 @@ func _update_hero_frame() -> void:
 	atlas.atlas = sheet
 	atlas.region = Rect2(idx * frame_w, 0, frame_w, int(HERO_H * ART_SCALE))
 	_hero.texture = atlas
+
+
+# ---------------------------------------------------------------------------
+# NPC-гость (не герой) — Роберт и подобные сюжетные визиты, см. поля выше.
+# Зовётся снаружи катсценой (scripts/story/cutscene_player.gd, через
+# scripts/house/house_system.gd), сам дом NPC не заводит.
+# ---------------------------------------------------------------------------
+
+## Показывает гостя в открытой комнате. idle_tex обязателен (без базовой позы
+## NPC не показываем — это решает сама катсцена, см. её _house_npc_show);
+## walk_tex может быть null (актёр без листа ходьбы, как Роберт сейчас —
+## art/character/robert/ есть idle.png и talk.png, walk.png нет): гость тогда
+## просто едет статичной позой, вместо ног перебирающих кадры, — тот же
+## деградационный приём, что и у классического "show"/"hide" с enter/exit_to,
+## когда лист ходьбы актёра отсутствует (см. cutscene_player.gd:_show_actor).
+func show_npc(idle_tex: Texture2D, walk_tex: Texture2D, x_fraction: float, flip: bool = false) -> void:
+	if idle_tex == null:
+		return
+	if _npc == null:
+		_npc = TextureRect.new()
+		_npc.name = "Npc"
+		_npc.stretch_mode = TextureRect.STRETCH_KEEP
+		_npc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_npc.size = Vector2(HERO_W * ART_SCALE, HERO_H * ART_SCALE)
+		_npc.scale = Vector2(HERO_SCALE / ART_SCALE, HERO_SCALE / ART_SCALE)
+		_stage.add_child(_npc)
+		# НИЖЕ героя в дереве: если оба окажутся в одной точке, герой игрока
+		# не должен прятаться под гостем.
+		_stage.move_child(_npc, _hero.get_index())
+	_npc_idle_tex = idle_tex
+	_npc_walk_tex = walk_tex
+	_npc_facing = -1 if flip else 1
+	_npc_x_px = clampf(x_fraction, 0.0, 1.0) * _room_width_px
+	_npc_from_px = _npc_x_px
+	_npc_target_px = -1.0
+	_npc_walk_left = 0.0
+	_npc_frame_t = 0.0
+	_npc.visible = true
+	_update_npc(0.0)
+
+
+## Ведёт гостя к x_fraction (доля 0..1 ширины комнаты) за seconds секунд —
+## тем же приёмом, что world_walk у WorldActor: секунды задаёт кадр сцены, а
+## не константа скорости, дому спорить с постановщиком незачем.
+func npc_walk_to(x_fraction: float, seconds: float) -> void:
+	if _npc == null:
+		return
+	_npc_from_px = _npc_x_px
+	_npc_target_px = clampf(x_fraction, 0.0, 1.0) * _room_width_px
+	_npc_walk_total = maxf(0.05, seconds)
+	_npc_walk_left = _npc_walk_total
+	_npc_facing = 1 if _npc_target_px >= _npc_from_px else -1
+
+
+func hide_npc() -> void:
+	if _npc != null:
+		_npc.visible = false
+	_npc_target_px = -1.0
+	_npc_walk_left = 0.0
+
+
+func _update_npc(delta: float) -> void:
+	if _npc == null or not _npc.visible:
+		return
+	var moving := false
+	if _npc_walk_left > 0.0:
+		_npc_walk_left = maxf(0.0, _npc_walk_left - delta)
+		var t: float = 1.0 - clampf(_npc_walk_left / _npc_walk_total, 0.0, 1.0)
+		_npc_x_px = lerpf(_npc_from_px, _npc_target_px, t)
+		moving = true
+		if _npc_walk_left <= 0.0:
+			_npc_x_px = _npc_target_px
+	if moving:
+		_npc_frame_t += delta
+	else:
+		_npc_frame_t = 0.0
+	var sheet: Texture2D = _npc_walk_tex if (moving and _npc_walk_tex != null) else _npc_idle_tex
+	if sheet == null:
+		_npc.texture = null
+	else:
+		var frame_w := int(HERO_W * ART_SCALE)
+		var frame_count: int = maxi(1, int(sheet.get_width()) / frame_w)
+		var idx := 0
+		if moving:
+			idx = int(_npc_frame_t * WALK_FPS) % frame_count
+		var atlas := AtlasTexture.new()
+		atlas.atlas = sheet
+		atlas.region = Rect2(idx * frame_w, 0, frame_w, int(HERO_H * ART_SCALE))
+		_npc.texture = atlas
+	_npc.flip_h = _npc_facing < 0
+	_position_npc()
+
+
+## Экранная позиция гостя — та же камера (_camera_x), тот же пол
+## (_floor_y_px), что у героя (_update_camera_and_hero); зовётся и из
+## _update_npc, и из _update_camera_and_hero (когда меняется только камера, а
+## гость сам стоит на месте — иначе он отставал бы от панорамы на кадр).
+func _position_npc() -> void:
+	if _npc == null:
+		return
+	var cam_x: float = _camera_x()
+	var screen_x: float = _npc_x_px - cam_x
+	_npc.position = Vector2(screen_x - HERO_W * HERO_SCALE / 2.0,
+		_floor_y_px - (HERO_H - FOOT_PAD) * HERO_SCALE)
+
+
+func is_npc_visible() -> bool:
+	return _npc != null and _npc.visible
+
+
+func is_npc_walking() -> bool:
+	return _npc_walk_left > 0.0
+
+
+func npc_x_fraction() -> float:
+	return _npc_x_px / maxf(1.0, _room_width_px)
 
 
 # ---------------------------------------------------------------------------
@@ -774,7 +999,7 @@ func _position_hotspot_buttons() -> void:
 		widths.append(w)
 		total += w
 	total += gap * float(maxi(0, n - 1))
-	var hi: float = maxf(4.0, VIEW_W - total - 4.0)
+	var hi: float = maxf(4.0, _view_w - total - 4.0)
 	var start_x: float = clampf(hero_center_x - total / 2.0, 4.0, hi)
 	var x := start_x
 	for i in range(n):

@@ -16,7 +16,10 @@ const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	"world_prop", "world_enter",
 	# Режим "дом" (см. cutscene_player.gd:house_mode) — сцена играет в НАСТОЯЩЕМ
 	# интерьере (scripts/house/house_view.gd), не в иллюстрации "mood room".
-	"house_enter", "house_sleep"]
+	# house_npc_show/house_npc_walk — сюжетный NPC (не герой) в открытой
+	# комнате (Роберт, докладывающий об окончании тоннеля и уходящий за
+	# дверь — data/story.json:robert).
+	"house_enter", "house_sleep", "house_npc_show", "house_npc_walk"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
 	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
@@ -148,6 +151,14 @@ func _test_art_present() -> void:
 				"world_prop":
 					var wp_tex := String(beat.get("tex", ""))
 					check("%s: есть картинка %s" % [id, wp_tex], ResourceLoader.exists(wp_tex))
+				"house_npc_show":
+					# house_npc_show без idle-листа NPC не показывает вовсе
+					# (см. cutscene_player.gd:_house_npc_show) — тихо потерянный
+					# Роберт посреди сцены это уже баг, а не решение.
+					var npc_id := String(beat.get("actor", ""))
+					var npc_path := StoryData.actor_sheet_path(npc_id, "idle")
+					check("%s: у NPC '%s' есть idle-лист %s" % [id, npc_id, npc_path],
+						not npc_path.is_empty() and ResourceLoader.exists(npc_path))
 
 
 ## Флаги, по которым другие системы (дом, магазин, игрок) узнают о сюжете,

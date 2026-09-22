@@ -459,6 +459,39 @@ func stop_sleep_animation() -> void:
 		_view.set_locked(false)
 
 
+## Закрывает интерьер БЕЗ переезда героя наружу (в отличие от exit_to_door/
+## exit_through_tunnel) — вызывается катсценой (cutscene_player.gd:
+## _exit_house_mode), когда сцена уходит из дома в другую декорацию (или
+## заканчивается) ПОСЕРЕДИНЕ СЕБЯ ЖЕ, а не когда игрок физически вышел в
+## дверь. Позицию героя не трогает — это решает следующий кадр сцены, не дом
+## (тот же принцип, что у enter_house()). Видимость HUD тоже не трогает: пока
+## катсцена идёт, им целиком распоряжается StoryDirector (_take_control/
+## _release_control), а не дом.
+func exit_house_view() -> void:
+	GameState.house_is_indoors = false
+	if _view != null:
+		_view.close()
+
+
+## Сюжетный NPC (не герой) в уже открытой house_enter комнате — обёртки над
+## house_view.gd для cutscene_player.gd ("house_npc_show"/"house_npc_walk"),
+## тем же приёмом, что play_sleep_animation()/enter_house() выше: дом только
+## передаёт вызов виду, сам ничего не решает.
+func show_npc(idle_tex: Texture2D, walk_tex: Texture2D, x_fraction: float, flip: bool = false) -> void:
+	if _view != null:
+		_view.show_npc(idle_tex, walk_tex, x_fraction, flip)
+
+
+func npc_walk_to(x_fraction: float, seconds: float) -> void:
+	if _view != null:
+		_view.npc_walk_to(x_fraction, seconds)
+
+
+func hide_npc() -> void:
+	if _view != null:
+		_view.hide_npc()
+
+
 ## Выход через входную дверь на поверхность (ГДД п.3: дом занимает клетки
 ## 0–14, дверь — house.door_cell в balance.json).
 func exit_to_door() -> void:

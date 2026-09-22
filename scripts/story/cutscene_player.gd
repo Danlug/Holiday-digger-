@@ -72,6 +72,12 @@ var player: Node = null
 ## автоматически.
 var house_mode: bool = false
 var _house_sleep_left: float = 0.0
+## NPC-спутник в открытой house_enter комнате (see "house_npc_show"/
+## "house_npc_walk" ниже) — держит длительность текущего хода, чтобы по её
+## истечении спрятать гостя (exit=true), тем же приёмом, что _house_sleep_left
+## держит длительность анимации сна.
+var _house_npc_walk_left: float = 0.0
+var _house_npc_hide_on_arrive: bool = false
 
 var _beats: Array = []
 var _index: int = 0
@@ -474,6 +480,21 @@ func play(id: String, opts: Dictionary = {}) -> void:
 	_moves.clear()
 	current_clock_hour = -1.0
 	_clear_stage()
+	# БАГ (отчёт владельца, реальный iPhone, живая веб-сборка): сцена "death"
+	# нарочно заканчивается house_mode=true (герой остаётся стоять в
+	# настоящей мастерской — см. комментарий у house_mode выше), а
+	# СЛЕДУЮЩАЯ по очереди сцена "backpack" была классической иллюстрацией
+	# ("show actor boy" поверх задника подвала). Без сброса ЗДЕСЬ настоящий
+	# HouseView (слой 9) так и оставался открытым ПОД катсценой (слой 100) —
+	# и на экране оказывались сразу два мальчика: настоящий герой в доме и
+	# иллюстрированный актёр новой сцены. Место сброса — именно верх play(),
+	# а не _clear_stage() выше (её зовёт ещё и honest-finish той же "death",
+	# которому house_mode=true — НЕ баг, а решение владельца, и гасить его
+	# там нельзя, см. комментарий в _clear_stage()): каждая НОВАЯ сцена
+	# обязана начинаться, не унаследовав чужой house_mode, симметрично тому,
+	# как world_mode уже давно не наследуется (_clear_stage() выше).
+	if house_mode:
+		_exit_house_mode()
 	_fade.color = Color(0, 0, 0, 0)
 	_skip_btn.text = StoryText.get_text("ui.skip")
 	is_playing = true
@@ -585,6 +606,7 @@ func _process(dt: float) -> void:
 	_tick_slides(dt)
 	_tick_world(dt)
 	_tick_house_sleep(dt)
+	_tick_house_npc_walk(dt)
 	# В самом конце — иначе mood/daynight, отработавшие чуть выше, перезапишут
 	# цвет неба обратно и часы DayCycle не будет видно.
 	_apply_day_cycle_sky()
@@ -679,6 +701,17 @@ func _run_beat(beat: Dictionary) -> bool:
 			return false
 		"clear":
 			_clear_stage()
+			# В отличие от world_mode (уже гасится внутри _clear_stage()),
+			# house_mode кадр "clear" гасит явно здесь, а не в самой
+			# _clear_stage() — та же причина, что у play() (см. его
+			# комментарий): _clear_stage() зовёт ещё и honest-finish, для
+			# которого house_mode иногда остаётся ВКЛЮЧЁННЫМ намеренно
+			# (сцена "death"). Кадр "clear" внутри сцены — наоборот, всегда
+			# явное решение сценариста "уйти из этой декорации" (например,
+			# "backpack" уходит из настоящей мастерской на живую карту), и
+			# обязан гасить house_mode, если тот был включён.
+			if house_mode:
+				_exit_house_mode()
 			return false
 		"mood":
 			_set_mood(String(beat.get("id", "dark")))
@@ -743,6 +776,11 @@ func _run_beat(beat: Dictionary) -> bool:
 			return false
 		"house_sleep":
 			return _house_start_sleep(beat)
+		"house_npc_show":
+			_house_npc_show(beat)
+			return false
+		"house_npc_walk":
+			return _house_npc_start_walk(beat)
 	return false
 
 
@@ -1004,6 +1042,7 @@ func _clear_stage() -> void:
 	_slides.clear()
 	_tap_target.visible = false
 	_house_sleep_left = 0.0
+	_house_npc_walk_left = 0.0
 	if world_mode:
 		_exit_world_mode()
 	# "house_enter" (см. house_mode выше) прячет CharacterView тем же
@@ -1015,10 +1054,23 @@ func _clear_stage() -> void:
 	# CharacterView обязан вернуться, даже когда сама сцена решила остаться
 	# "в доме": без этой строки герой навсегда пропадал бы с улицы стоило
 	# катсцене хоть раз войти в дом (баг владельца: "зашёл в дом, вышел —
-	# персонажа вообще нет").
+	# персонажа вообще нет"). Безопасно и пока house_mode остаётся включённым
+	# (та же "death"): HouseView (layer 9) рисует собственный непрозрачный
+	# фон на весь экран поверх CharacterView, так что тот, будучи технически
+	# visible=true, всё равно не виден, пока герой физически не выйдет из
+	# дома, — а вот house_mode как флаг САМ здесь не гасится (см. ниже).
 	var cv := get_tree().root.find_child("CharacterView", true, false)
 	if cv != null:
 		cv.visible = true
+	# house_mode НЕ гасится здесь, в отличие от world_mode выше — нарочно, в
+	# отличие от world_mode: _clear_stage() зовётся и на honest-finish/skip()/
+	# abort() (см. _finish()/abort() ниже), а сцена "death" специально
+	# заканчивается house_mode=true (герой остаётся в настоящей мастерской,
+	# см. комментарий у house_mode в начале файла) — общий сброс здесь стёр бы
+	# это НАМЕРЕННОЕ поведение на каждом honest-finish. Место сброса — play()
+	# (унаследованный от ПРЕДЫДУЩЕЙ сцены house_mode) и сам кадр "clear" (см.
+	# _run_beat) — оба зовут _exit_house_mode() явно, ПОСЛЕ этой функции, а не
+	# отсюда.
 
 
 func _place_all() -> void:
@@ -1242,6 +1294,14 @@ const WORLD_DIG_ROW_SEC := 2.4
 ## появлением вторых сцен режима "мир" ("intro_boy", "death") хардкод стал
 ## неверен для них.
 func _enter_world_mode(era: String = "now") -> void:
+	# Защита от той же категории бага, что чинит _clear_stage() ниже
+	# (двойной мальчик "death"→"backpack"): кадр "world_enter" ПОСЕРЕДИНЕ
+	# сцены (см. его же комментарий у "world_enter" в _run_beat) не проходит
+	# через _clear_stage/"clear", а house_mode тем не менее обязан быть снят
+	# ДО того, как живая карта покажется, — иначе настоящий HouseView (слой 9)
+	# остаётся открытым ПОД живой картой того же кадра.
+	if house_mode:
+		_exit_house_mode()
 	world_mode = true
 	# Небо/земля катсцены прячутся — живая карта показывается КАК ЕСТЬ, её
 	# рисует main.gd/world_view.gd под этим CanvasLayer, а не мы.
@@ -1339,6 +1399,12 @@ func _house_enter(beat: Dictionary) -> void:
 	var hs := _find_house_system()
 	if hs == null or not hs.has_method("enter_house"):
 		return
+	# Симметричная защита (см. _enter_world_mode выше): "house_enter" тоже
+	# может прийти ПОСЕРЕДИНЕ сцены, минуя "clear" (сейчас так не делает ни
+	# одна сцена, но кадр обязан быть безопасен сам по себе, а не полагаться
+	# на дисциплину сценариста).
+	if world_mode:
+		_exit_world_mode()
 	_sky.visible = false
 	_ground.visible = false
 	var cv := get_tree().root.find_child("CharacterView", true, false)
@@ -1346,6 +1412,28 @@ func _house_enter(beat: Dictionary) -> void:
 		cv.visible = false
 	hs.call("enter_house", String(beat.get("room", "hall")), float(beat.get("x", -1.0)))
 	house_mode = true
+
+
+## Симметрично _exit_world_mode() — гасит house_mode, унаследованный от
+## предыдущей сцены (см. play() ниже) или снятый кадром "clear" внутри самой
+## сцены (см. _clear_stage()). Прячет НАСТОЯЩИЙ интерьер (house_view.gd) и
+## возвращает то, что нужно классическому режиму/режиму "мир" (небо и земля
+## катсцены, спрайт героя в игровом мире) — но НЕ трогает позицию героя:
+## куда его поставить дальше (world_enter/world_actor, новый house_enter или
+## классический "show"), решает следующий кадр сцены, не этот метод.
+func _exit_house_mode() -> void:
+	house_mode = false
+	var hs := _find_house_system()
+	if hs != null:
+		if hs.has_method("hide_npc"):
+			hs.call("hide_npc")
+		if hs.has_method("exit_house_view"):
+			hs.call("exit_house_view")
+	_sky.visible = true
+	_ground.visible = true
+	var cv := get_tree().root.find_child("CharacterView", true, false)
+	if cv != null:
+		cv.visible = true
 
 
 ## "house_sleep" — короткая анимация сна у настоящей кровати, тот же ролик,
@@ -1371,6 +1459,58 @@ func _tick_house_sleep(dt: float) -> void:
 		var hs := _find_house_system()
 		if hs != null and hs.has_method("stop_sleep_animation"):
 			hs.call("stop_sleep_animation")
+
+
+## "house_npc_show" — сюжетный NPC (не герой игрока) в уже открытой
+## house_enter комнате (Роберт, докладывающий об окончании тоннеля и уходящий
+## за дверь — data/story.json:robert). Не актёр классического режима и не
+## world_actor: ни тот, ни другой не рисуются, пока настоящий интерьер
+## house_view.gd открыт (см. house_mode выше) — у комнаты своя, независимая
+## отрисовка гостя (house_view.gd:show_npc), тем же приёмом (лист
+## art/character/<dir>/idle.png|walk.png), каким классика рисует актёра, а
+## режим "мир" — WorldActor. beat: actor — id из таблицы actors
+## (data/story.json), x — доля 0..1 ширины комнаты, flip.
+func _house_npc_show(beat: Dictionary) -> void:
+	var hs := _find_house_system()
+	if hs == null or not hs.has_method("show_npc"):
+		return
+	var actor_id := String(beat.get("actor", ""))
+	var idle_path := StoryData.actor_sheet_path(actor_id, "idle")
+	var walk_path := StoryData.actor_sheet_path(actor_id, "walk")
+	var idle_tex: Texture2D = load(idle_path) if not idle_path.is_empty() and ResourceLoader.exists(idle_path) else null
+	# Без базовой позы NPC молча не показываем — тот же приём, что у
+	# классического "show" (см. _show_actor: "Спрайта нет — реплика идёт
+	# голосом за кадром"), сцена не обязана падать из-за пропавшего листа.
+	if idle_tex == null:
+		return
+	var walk_tex: Texture2D = load(walk_path) if not walk_path.is_empty() and ResourceLoader.exists(walk_path) else null
+	hs.call("show_npc", idle_tex, walk_tex, float(beat.get("x", 0.5)), bool(beat.get("flip", false)))
+
+
+## "house_npc_walk" — NPC из "house_npc_show" идёт по комнате до x за sec
+## секунд (держит сцену, как world_walk держит режим "мир"). exit=true —
+## по приходе исчезает (Роберт, дошедший до двери и вышедший).
+func _house_npc_start_walk(beat: Dictionary) -> bool:
+	var hs := _find_house_system()
+	var sec: float = maxf(0.1, float(beat.get("sec", 1.4)))
+	if hs != null and hs.has_method("npc_walk_to"):
+		hs.call("npc_walk_to", float(beat.get("x", 1.0)), sec)
+	_house_npc_walk_left = sec
+	_house_npc_hide_on_arrive = bool(beat.get("exit", false))
+	_beat_timer = sec
+	return true
+
+
+func _tick_house_npc_walk(dt: float) -> void:
+	if _house_npc_walk_left <= 0.0:
+		return
+	_house_npc_walk_left -= dt
+	if _house_npc_walk_left <= 0.0:
+		_house_npc_walk_left = 0.0
+		if _house_npc_hide_on_arrive:
+			var hs := _find_house_system()
+			if hs != null and hs.has_method("hide_npc"):
+				hs.call("hide_npc")
 
 
 ## "world_actor" — поставить (или переставить/переодеть) актёра в клетку

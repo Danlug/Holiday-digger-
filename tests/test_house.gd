@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_storage_survives_death_and_save()
 
 	_test_room_hotspots_appear_and_fade()
+	_test_room_change_clears_stale_hotspots()
 	_test_room_two_buttons_on_overlap()
 	_test_room_transitions_use_enter_points()
 	_test_pickaxe_hotspot()
@@ -545,6 +546,30 @@ func _test_room_hotspots_appear_and_fade() -> void:
 	var gap := (_px("hall", "front_door") + _px("hall", "door_bedroom")) / 2.0
 	house._view.set_hero_x_fraction(gap)
 	check("вдали от всех точек хотспотов нет", _actions().is_empty())
+
+
+## БАГ (найден скриншотом при проверке сцены "robert", см. отчёт агента
+## сюжета/дома): go_to_room() сбрасывал _hotspot_signature в "" ("пересобрать
+## кнопки на новом месте"), но у комнаты БЕЗ активных точек вокруг героя
+## сигнатура тоже пустая строка ("|".join([]) в _signature_for) — "ничего не
+## изменилось" читалось буквально, и _update_hotspots() пропускала
+## _clear_hotspots(): кнопка предыдущей комнаты (например, "Верстак"
+## мастерской) оставалась висеть на экране и в новой комнате, где рядом с
+## точкой входа вовсе нет хотспотов.
+func _test_room_change_clears_stale_hotspots() -> void:
+	if GameState.house_is_indoors:
+		house.exit_to_door()
+	house.enter_house("workshop")
+	house._view.set_hero_x_fraction(_px("workshop", "workbench"))
+	check("в мастерской у верстака — «Верстак»", _actions().has("open_equipment"))
+
+	# Переход в другую комнату, в точку БЕЗ единого активного хотспота
+	# (середина пустой стены салона, как и в _test_room_hotspots_appear_and_fade).
+	var gap := (_px("hall", "front_door") + _px("hall", "door_bedroom")) / 2.0
+	house.enter_house("hall", gap)
+	check("вошёл в салон", house._view.room_id() == "hall")
+	check("в новой комнате хотспотов нет — старая кнопка «Верстак» не тянется следом",
+		_actions().is_empty())
 
 
 func _test_room_two_buttons_on_overlap() -> void:

@@ -14,3 +14,7 @@ tools/__pycache__/
 # агентов, которые заводятся прямо внутри репозитория). Это временные копии
 # самого проекта, в историю им нельзя.
 .claude/
+
+# graphify (knowledge-graph build tool) working directory — intermediate
+# extraction/cache files, not meant to be committed.
+graphify-out/

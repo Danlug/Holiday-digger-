@@ -54,6 +54,8 @@ func _ready() -> void:
 	for _i in 6:
 		await get_tree().process_frame
 	var director: StoryDirector = main.find_child("StoryDirector", true, false)
+	# Настройки читаются при старте main-сцены, поэтому «меньше движения» ставим уже после неё.
+	Settings.reduce_motion = _calm
 	if _en:
 		StoryText.load_locale("en")
 	for e in StoryData.depth_scenes():
@@ -127,6 +129,8 @@ func _scene(director: StoryDirector, id: String) -> void:
 func _synthetic(director: StoryDirector) -> void:
 	var cs := director.cutscene
 	cs.abort()
+	cs._kill_fade_tween()
+	cs._fade.color = Color(0, 0, 0, 0)
 	cs.scene_id = "synthetic"
 	cs.is_playing = true
 	cs._root.visible = true

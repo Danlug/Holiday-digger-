@@ -120,6 +120,7 @@ static func sell(items: Dictionary, remote: bool = false) -> Dictionary:
 
 	GameState.add_coins(coins)
 	GameState.lifetime_coins_from_sales += coins
+	GameState.emit_event(&"sold", {"coins": coins, "count": int(q["count"])})
 	SaveSystem.save_game()
 	return {"ok": true, "coins": coins, "count": int(q["count"]), "weight": float(q["weight"]), "doubled": doubled}
 

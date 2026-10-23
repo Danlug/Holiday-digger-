@@ -1193,6 +1193,9 @@ func _finish_dig() -> void:
 	if not was_loot:
 		dig_finished.emit(d.x, d.y, d.type, mineral_id, false, price)
 
+	GameState.emit_event(&"dug", {"cell": Vector2i(d.x, d.y), "tile": d.type, "mineral": mineral_id, "loot": was_loot,
+			"pos": Vector2(d.x * 32.0 + 16.0, d.y * 32.0 + 16.0)})
+
 	# Дедова кирка трескается на сценарном алмазе глубины 80 (ГДД раздел 4).
 	if d.y == 80 and d.type == TileTypes.Type.DIAMOND and GameState.current_tool == "rusty_pickaxe":
 		rusty_pickaxe_cracked = true

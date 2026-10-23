@@ -72,6 +72,19 @@ func _ready() -> void:
 	GameState.reset_progress()
 	check("reset_progress очищает ext", GameState.ext.is_empty())
 
+	# --- шина событий ---
+	var got: Array = []
+	var cb := func(id: StringName, data: Dictionary) -> void: got.append([id, data])
+	GameState.game_event.connect(cb)
+	GameState.emit_event(&"probe_event", {"x": 1})
+	GameState.inventory.clear()
+	GameState.add_item("gold", 1)
+	GameState.game_event.disconnect(cb)
+	check("emit_event доходит до подписчика", got.size() >= 1 and got[0][0] == &"probe_event" and int(got[0][1]["x"]) == 1)
+	var picked: Array = got.filter(func(e: Array) -> bool: return e[0] == &"picked")
+	check("add_item эмитит picked с предметом и количеством", picked.size() == 1 and picked[0][1]["item"] == "gold" and int(picked[0][1]["count"]) == 1)
+	GameState.inventory.clear()
+
 	# --- подсказка Tip ---
 	var layer := CanvasLayer.new()
 	add_child(layer)

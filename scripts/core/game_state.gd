@@ -458,6 +458,7 @@ func add_item(id: String, count: int) -> int:
 		return 0
 	inventory[id] = current_count + to_add
 	inventory_changed.emit()
+	emit_event(&"picked", {"item": id, "count": to_add})
 	return to_add
 
 
@@ -662,6 +663,29 @@ var pending_earthquake: bool = false
 ## float, так что int() на чтении обязателен.
 signal ext_changed(key: String)
 var ext: Dictionary = {}
+
+
+## Шина игровых событий. Подсистемы (квесты, достижения, звук и частицы, сюжет)
+## подписываются на неё, а не лезут в player.gd/shop_service.gd; тот, кто
+## владеет механикой, — эмитит. Договорённый словарь событий (новые —
+## дописывайте сюда, данные — только простые типы):
+##   dug            {cell: Vector2i, tile: int, mineral: String, loot: bool, pos: Vector2}
+##                  — клетка выкопана; pos — центр клетки в мировых пикселях
+##   picked         {item: String, count: int} — предмет лёг в рюкзак
+##   sold           {coins: int, count: int}   — сделка в мастерской
+##   bought         {id: String, currency: String} — покупка в магазине
+##   fuel_used / refueled {amount: float}      — топливо бура
+##   monster_killed {id: String, depth: int, pos: Vector2}
+##   boss_defeated  {id: String}
+##   quest_done     {id: String}
+##   story_beat     {id: String} — сюжетная сцена сыграна
+## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
+## остаются как есть — на них подписываются напрямую.
+signal game_event(id: StringName, data: Dictionary)
+
+
+func emit_event(id: StringName, data: Dictionary = {}) -> void:
+	game_event.emit(id, data)
 
 
 func ext_get(key: String, default = null):

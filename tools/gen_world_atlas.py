@@ -47,22 +47,24 @@ def main() -> int:
 	entries = []  # (ключ, изображение 96x96 RGB)
 	for path in sorted(glob.glob(os.path.join(TILES, "*.png"))):
 		name = os.path.splitext(os.path.basename(path))[0]
-		im = Image.open(path).convert("RGB")
+		if name == "world_atlas":
+			continue   # сам результат
+		im = Image.open(path).convert("RGBA")
 		if im.size != (CELL, CELL):
 			print("пропущен %s: размер %s, не %dx%d" % (name, im.size, CELL, CELL))
 			continue
 		entries.append(("0/" + name, im))
 	for belt in range(1, 8):
-		src = Image.open(os.path.join(DEEP, "belt_%d.png" % belt)).convert("RGB")
+		src = Image.open(os.path.join(DEEP, "belt_%d.png" % belt)).convert("RGBA")
 		for i, name in enumerate(meta["names"]):
 			x = (i % b_cols) * b_stride + b_pad
 			y = (i // b_cols) * b_stride + b_pad
-			entries.append(("%d/%s" % (belt, name), src.crop((x, y, x + CELL, y + CELL))))
-	entries.append(("white", Image.new("RGB", (CELL, CELL), (255, 255, 255))))
+			entries.append(("%d/%s" % (belt, name), src.crop((x, y, x + CELL, y + CELL)).convert("RGBA")))
+	entries.append(("white", Image.new("RGBA", (CELL, CELL), (255, 255, 255, 255))))
 
 	rows = (len(entries) + COLS - 1) // COLS
 	stride = CELL + 2 * PAD
-	atlas = Image.new("RGB", (COLS * stride, rows * stride), (0, 0, 0))
+	atlas = Image.new("RGBA", (COLS * stride, rows * stride), (0, 0, 0, 255))
 	index = {}
 	for n, (key, im) in enumerate(entries):
 		cx, cy = (n % COLS) * stride, (n // COLS) * stride
@@ -70,6 +72,10 @@ def main() -> int:
 		arr = np.pad(np.asarray(im), ((PAD, PAD), (PAD, PAD), (0, 0)), mode="edge")
 		atlas.paste(Image.fromarray(arr), (cx, cy))
 		index[key] = n
+	# Непрозрачные тайлы (сейчас все) хранятся без альфа-канала: файл и видеопамять меньше. Появится
+	# прозрачный — атлас сам останется RGBA.
+	if int(np.asarray(atlas)[:, :, 3].min()) == 255:
+		atlas = atlas.convert("RGB")
 	out_png = os.path.join(TILES, "world_atlas.png")
 	atlas.save(out_png, optimize=True)
 	out_json = os.path.join(TILES, "world_atlas.json")

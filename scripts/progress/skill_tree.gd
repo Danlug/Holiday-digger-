@@ -41,6 +41,8 @@ func _ready() -> void:
 	_build()
 	resized.connect(_layout)
 	visibility_changed.connect(func() -> void: set_process(is_visible_in_tree()))
+	# Движок включает _process при READY, даже если скрыт с самого начала: сигнал видимости до первого показа молчит.
+	set_process(is_visible_in_tree())
 	GameState.skill_points_changed.connect(_on_points_changed)
 	refresh()
 

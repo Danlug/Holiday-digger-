@@ -78,8 +78,14 @@ func _camera_cells() -> Vector2i:
 
 
 func _rebuild_lava() -> void:
-	_lava_cells.clear()
+	_lava_cells = []
 	if world == null:
+		return
+	# Разведанную лаву в окне уже знает WorldView (рисует её): берём его список, а не гоняем get_tile
+	# и туман по всем клеткам экрана (≈0,5 мс на каждое пересобирание раз в 0,2 с).
+	var wv := get_parent().get_node_or_null("WorldView") if get_parent() != null else null
+	if wv != null and wv.has_method("lava_cells"):
+		_lava_cells = wv.lava_cells()
 		return
 	var cam := _camera_cells()
 	var vs := get_viewport_rect().size

@@ -246,6 +246,12 @@ func set_camera(cam: Vector2, view_w_cells: int) -> void:
 	_screen_w_px = float(view_w_cells) * float(TILE)
 	if _mode_scene:
 		return
+	# Верх экрана ниже травы: на экране только тайлы и стена пояса, неба нет совсем. Не рисуем и не
+	# считаем его (звёзды, градиент, светила): под землёй это была четверть стоимости _process.
+	var under: bool = cam.y >= 1.0
+	if under != _underground:
+		_underground = under
+		visible = not under
 	var cam_px := cam * float(TILE)
 	if _celestial != null:
 		_celestial.position = Vector2((1.0 - SKY_PARALLAX_X) * cam_px.x, cam_px.y)
@@ -361,8 +367,15 @@ func _spawn_stars() -> void:
 		_stars.append(star)
 
 
+var _underground: bool = false
+
+
 func _process(delta: float) -> void:
-	_tick_stars(delta)
+	if _underground:
+		return
+	# Днём звёзд не видно (alpha 0): тикать 420 звёзд впустую незачем, к вечеру их таймеры и так случайны.
+	if _day_cycle == null or _day_cycle.stars_alpha() > 0.0:
+		_tick_stars(delta)
 	queue_redraw()
 	if _celestial != null:
 		_celestial.queue_redraw()

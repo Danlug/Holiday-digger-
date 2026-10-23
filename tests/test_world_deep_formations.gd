@@ -322,8 +322,11 @@ func test_art_complete() -> void:
 	check("в каждом поясе у каждого типа есть тайл 96x96 из атласа (проблемы: %s)" % ", ".join(bad_belts), bad_belts.is_empty())
 	var tex1 := TileArt.texture_for(TileTypes.Type.DIRT, 5, 1500)
 	var tex0 := TileArt.texture_for(TileTypes.Type.DIRT, 5, 500)
-	check("земля пояса 1 — вырезка из атласа, пояса 0 — отдельный файл",
-			tex1 is AtlasTexture and not (tex0 is AtlasTexture))
+	# Раньше пояс 0 был отдельными файлами. Теперь все пояса — вырезки одного атласа мира
+	# (tools/gen_world_atlas.py), чтобы слой мира рисовался одним пакетом; без атласа — по-старому.
+	check("земля поясов 0 и 1 — разные вырезки одного атласа мира",
+			tex1 is AtlasTexture and tex0 is AtlasTexture and tex0 != tex1
+			and (tex0 as AtlasTexture).atlas == (tex1 as AtlasTexture).atlas)
 	var walls_ok := true
 	for i in range(Biomes.count()):
 		if not ResourceLoader.exists("res://art/env/deep/wall_%s.png" % Biomes.get_biome(i).wall):

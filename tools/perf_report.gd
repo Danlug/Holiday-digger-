@@ -69,6 +69,19 @@ func _world_numbers() -> void:
 	_out["get_tile_us_with_8000_diffs"] = _bench(20000, func(i): w.get_tile(i % WorldGen.WIDTH, 6 + (i / 32) % 470))
 	var fog := FogOfWar.new()
 	_out["fog_get_state_us"] = _bench(20000, func(i): fog.get_state(i % 32, 6 + i % 400))
+	# События мира на большой шахте (20 000 выкопанных клеток): разовые подвисы кадра.
+	var ev := WorldGen.new(778)
+	for i in range(20000):
+		ev.diffs[(6 + i / 17) * WorldGen.WIDTH + WorldGen.GARDEN_X_MIN + i % 17] = true
+	var t1 := Time.get_ticks_usec()
+	ev.apply_chunk_event(18, 300, 8, 8, 5)
+	_out["event_collapse_ms_20k_diffs"] = float(Time.get_ticks_usec() - t1) / 1000.0
+	t1 = Time.get_ticks_usec()
+	ev.apply_global_event(6)
+	_out["event_earthquake_ms_20k_diffs"] = float(Time.get_ticks_usec() - t1) / 1000.0
+	t1 = Time.get_ticks_usec()
+	fog.reset_all()
+	_out["event_fog_reset_all_ms"] = float(Time.get_ticks_usec() - t1) / 1000.0
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +114,10 @@ func _scene_numbers() -> void:
 	_out["frame_player_tick_us"] = _bench(n, func(_i): player.physics_tick(0.016))
 	_out["frame_hud_intent_us"] = _bench(n, func(_i): hud.update_input_intent())
 	_out["frame_fog_reveal_us"] = _bench(n, func(_i): main._reveal_around_player())
+	_out["frame_fog_reveal_radii_us"] = _bench(n, func(_i): GameState.get_vision_terrain_radius() + GameState.get_vision_resource_radius())
+	var tr: int = GameState.get_vision_terrain_radius()
+	var rr: int = GameState.get_vision_resource_radius()
+	_out["frame_fog_reveal_circles_us"] = _bench(n, func(_i): main.fog.reveal_around(player.x, player.y, tr, rr))
 	_out["frame_sky_set_camera_us"] = _bench(n, func(_i): main.sky_view.set_camera(cam, 7))
 	_out["frame_backdrop_us"] = _bench(n, func(_i): main.backdrop.update(cam))
 	_out["frame_clouds_us"] = _bench(n, func(_i): main.clouds_view.update(cam))

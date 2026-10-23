@@ -128,6 +128,8 @@ static func _serialize() -> Dictionary:
 			"lifetime_coins_from_sales": gs.lifetime_coins_from_sales,
 			"craft_invested": gs.craft_invested,
 		},
+
+		"ext": gs.ext,
 	}
 
 
@@ -236,6 +238,9 @@ static func _apply(data: Dictionary) -> void:
 	gs.next_sale_doubled = bool(economy.get("next_sale_doubled", false))
 	gs.lifetime_coins_from_sales = int(economy.get("lifetime_coins_from_sales", 0))
 	gs.craft_invested = economy.get("craft_invested", {})
+
+	var ext_data = data.get("ext", {})
+	gs.ext = ext_data if typeof(ext_data) == TYPE_DICTIONARY else {}
 
 	var world_data: Dictionary = data.get("world", {})
 	if world_data.has("gen") and gs.world_ref != null:

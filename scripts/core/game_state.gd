@@ -260,6 +260,7 @@ func reset_progress() -> void:
 	game_clock_hours = 0.0
 	world_dug_cells.clear()
 	pending_earthquake = false
+	ext.clear()
 	reset_economy()
 	reset_house()
 	hp_changed.emit(hp, get_max_hp())
@@ -651,6 +652,25 @@ func ensure_world_seed() -> int:
 ## Применяет его main.gd, как только герой оказывается в безопасности
 ## (CollapseEvents.is_safe_for_full_reset).
 var pending_earthquake: bool = false
+
+
+## Расширяемое хранилище для новых подсистем (квесты, бой, топливо и т.д.):
+## словарь «ключ подсистемы → её данные» сохраняется в сейв целиком и
+## сбрасывается вместе с прогрессом. Так новой подсистеме не надо править ни
+## GameState, ни SaveSystem — это общие файлы, в которых параллельные ветки
+## конфликтуют. Владелец ключа сам приводит типы: JSON возвращает числа
+## float, так что int() на чтении обязателен.
+signal ext_changed(key: String)
+var ext: Dictionary = {}
+
+
+func ext_get(key: String, default = null):
+	return ext.get(key, default)
+
+
+func ext_set(key: String, value) -> void:
+	ext[key] = value
+	ext_changed.emit(key)
 
 ## Диффы выкопанных клеток мира — запасной путь, если world_ref не назначен
 ## (например, старый сейв или тест). В обычной игре не используется: реальный

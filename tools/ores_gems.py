@@ -959,3 +959,340 @@ def _divine_heart(mode):
 
 TILES["ore_divine_heart"] = lambda: _divine_heart("tile")
 ICONS["divine_heart"] = lambda: _divine_heart("icon")
+
+
+# ── добыча монстров (только значки): один предмет по центру, крупный, жирный контур ──
+
+def _cinder_ash():
+    """Куча золы с тлеющими угольками и обломками обугленного дерева."""
+    cv = Cv("cinder_ash")
+    P = {
+        "out": lch(14, 8, 40), "deep": lch(22, 6, 50), "shade": lch(34, 6, 55), "base": lch(48, 5, 60),
+        "light": lch(64, 4, 70), "hi": lch(78, 3, 80), "ember": lch(62, 92, 52), "ember2": lch(84, 78, 84),
+        "red": lch(40, 78, 40), "wood": lch(18, 10, 50), "wood2": lch(30, 14, 50),
+    }
+    bumps = {5: 1.0, 7: -0.5, 9: 1.0, 12: -1.0, 14: 0.5, 17: -0.5, 20: 1.0, 23: -1.0, 25: 0.5}
+    mound = np.zeros((G, G), dtype=bool)
+    for x in range(2, 30):
+        u = (x - 15.5) / 14.0
+        h = 15.0 * max(0.0, 1 - u * u) ** 0.62 + bumps.get(x, 0.0)
+        mound[int(round(27 - h)):28, x] = True
+    tones = [P["deep"], P["shade"], P["base"], P["light"], P["hi"]]
+    for y, x in zip(*np.nonzero(mound)):
+        d = (x - 9.0) * 0.42 + (y - 12.0) * 0.95
+        t = 0 if d > 16.5 else (1 if d > 12 else (2 if d > 6 else (3 if d > 2.5 else 4)))
+        j = t + (1 if cv.rng.random() < 0.16 else (-1 if cv.rng.random() < 0.1 else 0))
+        cv.put(x, y, tones[min(max(j, 0), 4)])
+    brands = ([(17, 9), (21, 7), (23, 11), (20, 14)], [(9, 12), (12, 10), (14, 13), (11, 16)])
+    both = np.zeros((G, G), dtype=bool)
+    for pts in brands:
+        w = poly_mask(pts)
+        both |= w
+        cv.fill(w, P["wood"])
+        cv.fill(w & poly_mask([pts[0], pts[1], (pts[2][0], pts[2][1] - 3)]), P["wood2"])
+        cv.rim(w, P["shade"], None, 0.5)
+        cv.ring(w, P["out"])
+    cv.rim(mound, P["hi"], P["shade"], 0.5, 0.4)
+    cv.ring(mound & ~both, P["out"])
+    for (x, y) in ((12, 22), (17, 19), (21, 24), (8, 24), (15, 25), (24, 21)):
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            if cv.a[y + dy, x + dx, 3]:
+                cv.put(x + dx, y + dy, mix(tuple(cv.a[y + dy, x + dx][:3]), P["red"], 0.8))
+        cv.put(x, y, P["ember"])
+    for (x, y) in ((17, 19), (12, 22), (21, 24)):
+        cv.put(x, y, P["ember2"])
+    for (x, y, c) in ((14, 9, "light"), (15, 6, "base"), (13, 11, "shade"), (18, 4, "shade"), (6, 10, "base"), (26, 7, "shade")):
+        cv.put(x, y, P[c], 200)
+    cv.shadow()
+    return cv.sprite()
+
+
+def _moth_dust():
+    """Склянка с пробкой: внутри горка светящейся сине-фиолетовой пыльцы, мерцающие пылинки вокруг."""
+    cv = Cv("moth_dust")
+    P = {
+        "out": lch(16, 40, 300), "glass": lch(86, 10, 285), "glass2": lch(68, 18, 290), "cork": lch(52, 30, 62),
+        "cork2": lch(36, 28, 56), "cork3": lch(66, 30, 70),
+        "d0": lch(30, 62, 305), "d1": lch(46, 76, 302), "d2": lch(64, 66, 298), "d3": lch(84, 40, 290),
+        "spec": lch(98, 6, 270),
+    }
+    body = ell_mask(15.5, 20, 9.2, 8.6)
+    neck = poly_mask([(13, 9), (18, 9), (19, 14), (12, 14)])
+    glass = body | neck
+    cv.fill(glass, P["glass"])
+    cv.fill(glass & ~ell_mask(14.5, 19.2, 8.2, 7.6), P["glass2"])
+    inside = ell_mask(15.5, 20.2, 7.4, 7.0)
+    for y, x in zip(*np.nonzero(inside)):
+        top = 17.0 + abs(x - 15.0) * 0.55           # горка с вершиной у центра
+        if y >= top:
+            d = (y - top) / 7.0
+            i = 3 if (y - top < 1.2 and abs(x - 15.0) < 4) else (2 if d < 0.3 else (1 if d < 0.65 else 0))
+            if cv.rng.random() < 0.22:
+                i = min(i + 1, 3)
+            cv.put(x, y, P[f"d{i}"])
+    for (x, y) in ((11, 20), (14, 23), (19, 22), (16, 19), (21, 24), (12, 25), (17, 25), (15, 21)):
+        cv.put(x, y, P["d3"])
+    cv.put(15, 17, P["spec"])
+    cv.rim(glass, P["spec"], None, 0.8)
+    cv.ring(glass, P["out"])
+    for (x, y) in ((10, 17), (10, 18), (11, 16)):
+        cv.put(x, y, P["spec"])
+    cork = poly_mask([(12, 5), (19, 5), (20, 9), (11, 9)])
+    cv.fill(cork, P["cork"])
+    cv.fill(poly_mask([(12, 5), (14, 5), (13, 9), (11, 9)]), P["cork3"])
+    cv.fill(poly_mask([(18, 5), (19, 5), (20, 9), (18, 9)]), P["cork2"])
+    cv.ring(cork, P["out"])
+    for (x, y, c) in ((10, 3, "d2"), (21, 2, "d3"), (24, 8, "d2"), (6, 9, "d1"), (26, 15, "d1"), (4, 22, "d2"), (27, 24, "d3"), (8, 27, "d1"), (24, 28, "d2")):
+        cv.put(x, y, P[c])
+    cv.spark(23, 4, P["spec"], P["d3"], 1)
+    cv.spark(6, 5, P["d3"], P["d2"], 0)
+    cv.spark(27, 20, P["d3"], P["d2"], 0)
+    cv.shadow()
+    cv.halo(lch(58, 78, 302), 2.0, 0.55)
+    return cv.sprite()
+
+
+def _hopper_fang():
+    """Изогнутый клык: костяной белый, у основания красная десна, острый кончик."""
+    cv = Cv("hopper_fang")
+    P = {
+        "out": lch(24, 22, 55), "deep": lch(58, 14, 78), "shade": lch(74, 12, 84), "base": lch(86, 10, 90),
+        "light": lch(95, 6, 95), "hi": (255, 255, 250), "red": lch(36, 66, 34), "red2": lch(26, 56, 30), "red3": lch(48, 72, 36),
+    }
+    p0, p1, p2 = (10.0, 5.0), (7.0, 21.0), (25.0, 28.0)
+    info = {}
+    for i in range(0, 61):
+        t = i / 60.0
+        x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0]
+        y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]
+        dx = 2 * (1 - t) * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0])
+        dy = 2 * (1 - t) * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1])
+        n = math.hypot(dx, dy)
+        nx, ny = -dy / n, dx / n
+        w = 5.4 * (1 - t) ** 0.85 + 0.35
+        for yy in range(G):
+            for xx in range(G):
+                d = math.hypot(xx - x, yy - y)
+                if d <= w:
+                    s = ((xx - x) * nx + (yy - y) * ny) / max(w, 0.5)
+                    if (xx, yy) not in info or d < info[(xx, yy)][2]:
+                        info[(xx, yy)] = (t, s, d)
+    m = np.zeros((G, G), dtype=bool)
+    for (xx, yy), (t, s, d) in info.items():
+        m[yy, xx] = True
+        if t < 0.17:
+            col = P["red3"] if s < -0.2 else (P["red"] if s < 0.45 else P["red2"])
+        else:
+            col = P["light"] if s < -0.45 else (P["base"] if s < 0.1 else (P["shade"] if s < 0.6 else P["deep"]))
+        cv.put(xx, yy, col)
+    for (xx, yy), (t, s, d) in info.items():
+        if 0.17 <= t < 0.23:
+            cv.put(xx, yy, mix(tuple(cv.a[yy, xx][:3]), P["red3"], 0.4))
+    cv.rim(m, P["hi"], None, 0.35)
+    cv.ring(m, P["out"])
+    cv.put(24, 27, P["hi"])
+    cv.line((13, 9), (9, 17), P["hi"])
+    cv.shadow()
+    return cv.sprite()
+
+
+def _blob(cx, cy, radii, rot=0.0):
+    """Неровный овал-валун: радиусы по кругу через равные углы (рваный край)."""
+    n = len(radii)
+    return [(cx + r * math.cos(math.radians(rot + i * 360.0 / n)), cy + r * math.sin(math.radians(rot + i * 360.0 / n)))
+            for i, r in enumerate(radii)]
+
+
+def _mimic_geode():
+    """Расколотая жеода: бугристая серая корка, светлая агатовая полоска и пещерка с аметистом и голубыми кристаллами."""
+    cv = Cv("mimic_geode")
+    P = {
+        "out": lch(14, 8, 60), "rock0": lch(26, 8, 62), "rock1": lch(40, 9, 66), "rock2": lch(54, 9, 70), "rock3": lch(67, 8, 76),
+        "band": lch(84, 12, 250), "band2": lch(66, 16, 262), "cav": lch(12, 36, 305),
+        "a0": lch(26, 58, 308), "a1": lch(42, 68, 308), "a2": lch(58, 62, 306), "a3": lch(78, 40, 300),
+        "c0": lch(46, 40, 218), "c1": lch(62, 38, 214), "c2": lch(78, 30, 208), "c3": lch(92, 12, 205), "spec": lch(98, 4, 250),
+    }
+    outer = poly_mask(_blob(15.5, 17, [13.5, 12, 13, 12.5, 13.8, 12.3, 12.8, 13.6, 12.2, 13.2], 8))
+    cv.fill(outer, P["rock2"])
+    for y, x in zip(*np.nonzero(outer)):
+        d = (x - 8) * 0.55 + (y - 7) * 0.8
+        cv.put(x, y, P["rock3"] if d < 3 else (P["rock2"] if d < 13 else (P["rock1"] if d < 20 else P["rock0"])))
+    cv.speckle(outer, [P["rock1"], P["rock3"], P["rock0"]], 26)
+    cv.rim(outer, P["spec"], P["rock0"], 0.5, 0.4, bottom=True)
+    cv.ring(outer, P["out"])
+    band = poly_mask(_blob(15.5, 17.4, [10.6, 9.4, 10.2, 9.8, 10.8, 9.6, 10.0, 10.6, 9.4, 10.4], 14))
+    cv.fill(band, P["band"])
+    cv.fill(band & ~ell_mask(14.5, 16.4, 9.2, 8.6), P["band2"])
+    cav = poly_mask(_blob(15.5, 17.6, [8.6, 7.4, 8.2, 7.8, 8.8, 7.5, 8.0, 8.6, 7.4, 8.4], 20))
+    cv.fill(cav, P["cav"])
+    cv.ring(cav, P["band2"])
+
+    def spike(bx, by, ln, w, ang, c0, c1, c2):
+        b = blade(bx, by, ln, w, ang, 0.0, 0.7, 0.5, 0.05)
+        sil = poly_mask([b["BL"], b["KL"], b["T"], b["KR"], b["BR"]]) & cav
+        cv.fill(sil, c1)
+        cv.fill(poly_mask([b["BL"], b["KL"], b["T"], b["M"]]) & sil, c2)
+        cv.fill(poly_mask([b["KR"], b["BR"], b["M"], b["T"]]) & sil, c0)
+        cv.put(b["T"][0], b["T"][1] + 1, P["spec"])
+
+    spike(19, 24, 13, 5.2, 14, P["a0"], P["a1"], P["a2"])
+    spike(13, 25, 11, 4.8, -16, P["a0"], P["a1"], P["a3"])
+    spike(23, 22, 7, 4.0, 42, P["a0"], P["a1"], P["a2"])
+    spike(8.5, 22, 8, 3.8, -46, P["c0"], P["c1"], P["c2"])
+    spike(16, 25, 6, 3.6, 3, P["c0"], P["c1"], P["c3"])
+    cv.spark(21, 12, P["spec"], P["a3"], 1)
+    cv.put(11, 13, P["c3"])
+    cv.shadow()
+    return cv.sprite()
+
+
+def _bolt(cv, p0, p1, col, col2, rng, jag=2.0, steps=5):
+    pts = [p0]
+    for i in range(1, steps):
+        t = i / steps
+        pts.append((p0[0] + (p1[0] - p0[0]) * t + rng.uniform(-jag, jag), p0[1] + (p1[1] - p0[1]) * t + rng.uniform(-jag, jag)))
+    pts.append(p1)
+    cv.poly_line([(round(x) + 1, round(y)) for x, y in pts], col2, 150)
+    cv.poly_line(pts, col)
+
+
+def _spark_core():
+    """Жёлто-белая электрическая сфера с дугами разрядов."""
+    cv = Cv("spark_core")
+    P = {
+        "out": lch(34, 60, 70), "a": lch(52, 82, 66), "b": lch(70, 90, 78), "c": lch(88, 70, 92), "d": lch(97, 16, 98),
+        "blue": lch(84, 34, 225),
+    }
+    cx = cy = 15.5
+    sphere(cv, cx, cy, 6.8, [P["a"], P["b"], P["c"], P["d"]], light=(-0.25, -0.3), bias=0.1)
+    cv.ring(ell_mask(cx, cy, 6.8, 6.8), P["out"])
+    rng = random.Random(11)
+    for ang, ln in ((-70, 15.0), (-5, 15.0), (60, 14.5), (125, 15.0), (-140, 14.0), (190, 13.0)):
+        a = math.radians(ang)
+        p0 = (cx + math.cos(a) * 7.4, cy + math.sin(a) * 7.4)
+        p1 = (cx + math.cos(a) * ln, cy + math.sin(a) * ln)
+        _bolt(cv, p0, p1, (255, 255, 240), P["blue"], rng, 2.3, 6)
+    for (x, y) in ((12, 12), (13, 12), (12, 13)):
+        cv.put(x, y, (255, 255, 255))
+    cv.halo(lch(86, 80, 90), 2.4, 0.6, lch(60, 84, 70))
+    return cv.sprite()
+
+
+def _warden_plate():
+    """Бронепластина стража: тёмная сталь, фаска, заклёпки, оранжевая светящаяся руна."""
+    cv = Cv("warden_plate")
+    P = {
+        "out": lch(8, 14, 255), "s0": lch(18, 14, 255), "s1": lch(28, 16, 252), "s2": lch(42, 14, 248), "s3": lch(58, 12, 245),
+        "hi": lch(80, 8, 240), "rune": lch(70, 95, 55), "rune2": lch(92, 70, 85), "rune3": lch(48, 84, 42), "bolt": lch(66, 10, 245),
+    }
+    shape = [(6, 5), (25, 4), (29, 9), (28, 21), (17, 29), (4, 22), (3, 10)]
+    m = poly_mask(shape)
+    cv.fill(m, P["s1"])
+    inner = poly_mask([(9, 8), (23, 7), (26, 11), (25, 20), (16, 26), (7, 20), (6, 12)])
+    cv.fill(poly_mask([(6, 5), (25, 4), (23, 7), (9, 8)]) | poly_mask([(6, 5), (3, 10), (6, 12), (9, 8)]), P["s3"])
+    cv.fill(poly_mask([(25, 4), (29, 9), (26, 11), (23, 7)]), P["s2"])
+    cv.fill(poly_mask([(29, 9), (28, 21), (25, 20), (26, 11)]) | poly_mask([(28, 21), (17, 29), (16, 26), (25, 20)]), P["s0"])
+    cv.fill(poly_mask([(3, 10), (4, 22), (7, 20), (6, 12)]) | poly_mask([(4, 22), (17, 29), (16, 26), (7, 20)]), P["s1"])
+    cv.fill(inner, P["s1"])
+    for y, x in zip(*np.nonzero(inner)):
+        if (x - 12) + (y - 10) * 0.8 < -2:
+            cv.put(x, y, P["s2"])
+    cv.speckle(inner, [P["s0"], P["s2"]], 10)
+    cv.rim(m, P["hi"], P["s2"], 0.8, 0.4)
+    cv.ring(m, P["out"])
+    for (x, y) in ((8, 7), (24, 6), (8, 21), (25, 15)):
+        cv.put(x, y, P["bolt"])
+        cv.put(x + 1, y + 1, P["s0"])
+    rune = [(16, 10), (16, 11), (16, 12), (16, 13), (16, 14), (16, 15), (16, 16), (16, 17), (16, 18), (16, 19),
+            (14, 12), (15, 11), (18, 12), (17, 11), (14, 16), (15, 17), (17, 17), (18, 16), (15, 20), (17, 20)]
+    glow = np.zeros((G, G), dtype=bool)
+    for (x, y) in rune:
+        glow[y, x] = True
+    near = (_shift(glow, 1, 0) | _shift(glow, -1, 0) | _shift(glow, 0, 1) | _shift(glow, 0, -1)) & ~glow & inner
+    for y, x in zip(*np.nonzero(near)):
+        cv.put(x, y, mix(tuple(cv.a[y, x][:3]), P["rune3"], 0.55))
+    for (x, y) in rune:
+        cv.put(x, y, P["rune"])
+    for y in range(12, 17):
+        cv.put(16, y, P["rune2"])
+    cv.shadow()
+    cv.halo(lch(60, 90, 50), 1.6, 0.45)
+    return cv.sprite()
+
+
+def _abyss_core():
+    """Индиго-чёрный шар с голубыми вихрями: спиральные рукава к центру, холодный ободок."""
+    cv = Cv("abyss_core")
+    P = {
+        "out": lch(3, 18, 290), "t0": lch(2, 12, 290), "t1": lch(5, 22, 290), "t2": lch(8, 30, 290), "t3": lch(13, 36, 289),
+        "w0": lch(46, 60, 248), "w1": lch(66, 52, 232), "w2": lch(90, 22, 215), "rim": lch(52, 60, 252),
+    }
+    cx = cy = 15.5
+    r = 12.0
+    m = sphere(cv, cx, cy, r, [P["t0"], P["t1"], P["t2"], P["t3"]], light=(-0.45, -0.55), bias=0.2)
+    for arm in range(3):
+        a0 = arm * (math.tau / 3) + 0.4
+        prev = None
+        for i in range(60):
+            t = i / 59.0
+            rad = r * 0.92 * (1 - t) ** 0.9
+            ang = a0 + t * 4.2
+            pt = (round(cx + rad * math.cos(ang)), round(cy + rad * math.sin(ang) * 0.95))
+            if pt != prev and 0 <= pt[0] < G and 0 <= pt[1] < G and m[pt[1], pt[0]]:
+                cv.put(pt[0], pt[1], P["w2"] if t > 0.72 else (P["w1"] if t > 0.4 else P["w0"]))
+            prev = pt
+    cv.put(15, 15, P["w2"])
+    cv.put(16, 16, P["w2"])
+    cv.rim(m, P["rim"], P["t3"], 0.7, 0.6, bottom=True)
+    cv.ring(m, P["out"])
+    for (x, y) in ((10, 9), (11, 8), (9, 11)):
+        cv.put(x, y, P["w2"])
+    cv.shadow()
+    cv.halo(lch(42, 66, 266), 2.4, 0.55)
+    return cv.sprite()
+
+
+def _idol_shard():
+    """Осколок резной статуи: песчаный камень, скол, канавки резьбы, бирюзовая светящаяся руна."""
+    cv = Cv("idol_shard")
+    P = {
+        "out": lch(16, 14, 70), "s0": lch(32, 12, 72), "s1": lch(48, 12, 76), "s2": lch(62, 12, 82), "s3": lch(76, 10, 88),
+        "hi": lch(88, 6, 92), "g": lch(26, 14, 66), "rune": lch(82, 62, 190), "rune2": lch(96, 22, 190), "rune3": lch(52, 54, 196),
+    }
+    shape = [(9, 4), (20, 3), (26, 8), (28, 16), (24, 20), (26, 27), (13, 29), (7, 24), (5, 14)]
+    m = poly_mask(shape)
+    cv.fill(m, P["s2"])
+    for y, x in zip(*np.nonzero(m)):
+        d = (x - 9) * 0.5 + (y - 5) * 0.9
+        cv.put(x, y, P["s3"] if d < 2.5 else (P["s2"] if d < 12 else (P["s1"] if d < 19 else P["s0"])))
+    cv.fill(poly_mask([(28, 16), (24, 20), (26, 27), (13, 29), (18, 24), (22, 18)]) & m, P["s0"])
+    cv.speckle(m, [P["s1"], P["s3"]], 20)
+    for pts in ([(9, 8), (21, 7), (24, 11)], [(9, 8), (8, 20)], [(11, 11), (19, 11)], [(11, 11), (11, 18)]):
+        cv.poly_line(pts, P["g"])
+    cv.poly_line([(10, 9), (20, 8), (23, 12)], P["hi"], 160)
+    cv.rim(m, P["hi"], P["s1"], 0.7, 0.3)
+    cv.ring(m, P["out"])
+    rune = [(16, 12), (16, 13), (16, 14), (16, 15), (16, 16), (14, 13), (15, 12), (18, 13), (17, 12), (14, 17), (15, 16), (17, 16), (18, 17), (15, 18), (17, 18)]
+    glow = np.zeros((G, G), dtype=bool)
+    for (x, y) in rune:
+        glow[y, x] = True
+    near = (_shift(glow, 1, 0) | _shift(glow, -1, 0) | _shift(glow, 0, 1) | _shift(glow, 0, -1)) & ~glow & m
+    for y, x in zip(*np.nonzero(near)):
+        cv.put(x, y, mix(tuple(cv.a[y, x][:3]), P["rune3"], 0.6))
+    for (x, y) in rune:
+        cv.put(x, y, P["rune"])
+    for y in range(13, 16):
+        cv.put(16, y, P["rune2"])
+    cv.shadow()
+    cv.halo(lch(76, 62, 190), 1.8, 0.5)
+    return cv.sprite()
+
+
+ICONS["cinder_ash"] = _cinder_ash
+ICONS["moth_dust"] = _moth_dust
+ICONS["hopper_fang"] = _hopper_fang
+ICONS["mimic_geode"] = _mimic_geode
+ICONS["spark_core"] = _spark_core
+ICONS["warden_plate"] = _warden_plate
+ICONS["abyss_core"] = _abyss_core
+ICONS["idol_shard"] = _idol_shard

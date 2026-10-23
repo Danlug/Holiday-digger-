@@ -150,7 +150,7 @@ func _draw_bar() -> void:
 	_bar.draw_rect(Rect2(x0, 6, (BAR_W - 6.0) * frac, BAR_H), fill)
 	# метки фаз на 66% и 33%
 	for t in [0.66, 0.33]:
-		var mx := x0 + (BAR_W - 6.0) * t
+		var mx: float = x0 + (BAR_W - 6.0) * float(t)
 		_bar.draw_rect(Rect2(mx, 5, 1, BAR_H + 2), Color(0, 0, 0, 0.9))
 	_bar.draw_rect(Rect2(x0, 6, BAR_W - 6.0, BAR_H), GOLD if vul else BORDER, false, 1.0)
 	# три фишки фаз под полоской

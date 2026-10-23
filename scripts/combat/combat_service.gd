@@ -458,5 +458,21 @@ static func attach(host: Node) -> Node:
 	var d: Node = load("res://scripts/combat/combat_director.gd").new()
 	d.name = "CombatDirector"
 	host.add_child(d)
+	d.call("setup", host)
 	director = d
+	_hook_exit()
 	return d
+
+
+## Директор — узел, а в статической переменной он пережил бы выход из движка
+## (как лямбды реестра меню): очищаем, пока корень дерева ещё жив.
+static func _hook_exit() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root.tree_exiting.is_connected(_on_exit):
+		return
+	tree.root.tree_exiting.connect(_on_exit)
+
+
+static func _on_exit() -> void:
+	director = null
+	BossArena.sealed = false

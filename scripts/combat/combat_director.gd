@@ -43,6 +43,9 @@ var boss_flash: float = 0.0
 var boss_death_t: float = -1.0
 var boss_phase_shown: int = 1
 
+## Выключатель спавна (для тестов и отладки): живых монстров не трогает.
+var spawning_enabled: bool = true
+
 var swing_cd: float = 0.0
 var swing_total: float = 0.5
 var iframes: float = 0.0
@@ -54,6 +57,7 @@ var _last_hurt_ms: int = 0
 var _regen_acc: float = 0.0
 var _stats: Dictionary = {}
 var _stats_dirty: bool = true
+var _stats_ms: int = 0
 var _blink_node: CanvasItem = null
 
 
@@ -123,10 +127,14 @@ func open_equipment() -> void:
 		equip_screen.open()
 
 
+## Характеристики кэшируются, но не дольше секунды: сброс прогресса чистит
+## GameState.ext без сигнала, и устаревший кэш не должен жить долго.
 func stats() -> Dictionary:
-	if _stats_dirty or _stats.is_empty():
+	var now := Time.get_ticks_msec()
+	if _stats_dirty or _stats.is_empty() or now - _stats_ms > 1000:
 		_stats = CombatService.stats()
 		_stats_dirty = false
+		_stats_ms = now
 	return _stats
 
 
@@ -182,7 +190,7 @@ func _process(delta: float) -> void:
 
 
 func _tick_spawn(dt: float) -> void:
-	if boss_death_t >= 0.0:
+	if boss_death_t >= 0.0 or not spawning_enabled:
 		return
 	var depth := int(floor(player.y))
 	if depth < CombatData.start_depth() or BossArena.contains_point(player.x, player.y):
@@ -281,7 +289,7 @@ func _nearest_target(wide: bool) -> Variant:
 			continue
 		var dx: float = m.x - player.x
 		var gap := absf(dx) - m.hw - HERO_HW
-		if gap > reach - HERO_HW * 0.0 or absf(m.y - player.y) > half_h + m.hh:
+		if gap > reach or absf(m.y - player.y) > half_h + m.hh:
 			continue
 		if gap < best_d:
 			best_d = gap
@@ -334,8 +342,10 @@ func tap_enemy_at(world_px: Vector2) -> bool:
 func _do_swing(dir: int, st: Dictionary) -> void:
 	var reach := float(st["reach"])
 	var half_h := float(CombatData.player_cfg("swing_height", 1.0)) * 0.5
-	var x0: float = player.x - 0.15 if dir > 0 else player.x - reach
-	var rect := Rect2(x0, player.y - half_h, reach + 0.15, half_h * 2.0)
+	# reach — от края тела героя, как и в _nearest_target: цель, которую автоатака
+	# считает «в зоне», обязана попадать под взмах
+	var x0: float = player.x - 0.15 if dir > 0 else player.x - HERO_HW - reach
+	var rect := Rect2(x0, player.y - half_h, HERO_HW + reach + 0.15, half_h * 2.0)
 	var hits := 0
 	slashes.append({"x": player.x + float(dir) * 0.85, "y": player.y - 0.1, "dir": dir, "t": 0.0})
 	Sfx.play("swing", randf_range(0.95, 1.1))

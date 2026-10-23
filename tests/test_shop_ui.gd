@@ -35,6 +35,7 @@ func _ready() -> void:
 	await _test_extension_by_data()
 	await _test_empty_backpack()
 	await _test_navigation()
+	await _test_pointer_input()
 
 	ui.queue_free()
 	_fresh()
@@ -481,3 +482,69 @@ func _test_navigation() -> void:
 	check("вкладки возвращаются", ui._nav_tabs.visible and not ui._nav_done.visible)
 	ui.close()
 	check("шторка закрывается", not ui.is_open())
+
+
+## Настоящие события указателя: тап покупает через карточку, перетаскивание
+## (прокрутка) и долгое нажатие (подсказка) — нет.
+func _test_pointer_input() -> void:
+	# В headless окно 64×64, и события указателя до интерфейса не доходят —
+	# проверка работает только под настоящим рендером (xvfb-run, см. шапку
+	# test_screenshot_shop), в run_tests.sh она честно пропускается.
+	if DisplayServer.get_name() == "headless":
+		print("[--] события указателя: headless, проверка пропущена")
+		return
+	_fresh()
+	GameState.coins = 600
+	ui.open(ShopUI.TAB_PICKS)
+	await _frames(3)
+	var t: ShopTile = ui._tiles["tool:iron_pickaxe"]
+	var pos := t.get_global_rect().get_center()
+
+	_motion(pos, Vector2.ZERO)
+	await _frames(1)
+	_mouse(pos, true)
+	await _frames(1)
+	_mouse(pos, false)
+	await _frames(2)
+	check("короткий тап пальцем открывает карточку", ui._card != null)
+	ui._close_card(false)
+	await _frames(2)
+
+	_mouse(pos, true)
+	await _frames(1)
+	for i in range(1, 6):
+		_motion(pos + Vector2(0, 8.0 * i), Vector2(0, 8))
+		await _frames(1)
+	_mouse(pos + Vector2(0, 40), false)
+	await _frames(2)
+	check("перетаскивание по плитке — прокрутка, карточка не открывается", ui._card == null)
+	check("и ничего не куплено", not GameState.owns_tool("iron_pickaxe") and GameState.coins == 600)
+
+	_mouse(pos, true)
+	await get_tree().create_timer(0.6).timeout
+	var tip_shown := Tip.is_showing()
+	_mouse(pos, false)
+	await _frames(2)
+	check("долгое нажатие показывает подсказку", tip_shown)
+	check("долгое нажатие не открывает карточку и не покупает", ui._card == null and not GameState.owns_tool("iron_pickaxe"))
+	Tip.hide_all()
+	ui.close()
+
+
+func _mouse(pos: Vector2, pressed: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	e.position = pos
+	e.global_position = pos
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	get_viewport().push_input(e)
+
+
+func _motion(pos: Vector2, rel: Vector2) -> void:
+	var e := InputEventMouseMotion.new()
+	e.position = pos
+	e.global_position = pos
+	e.relative = rel
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT
+	get_viewport().push_input(e)

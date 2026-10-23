@@ -82,6 +82,7 @@ var _action: Control
 var _sell_btn: Button
 var _sell_label: Label
 var _sell_x2: TextureRect
+var _sell_uses: Label
 var _sell_lead: TextureRect
 var _ad_btn: Button
 var _ad_label: Label
@@ -161,9 +162,6 @@ func open(tab: String = TAB_FOOD) -> void:
 	_close_card(false)
 	_root.visible = true
 	_root.modulate.a = 1.0
-	if not ShopFx.reduced():
-		_root.modulate.a = 0.0
-		create_tween().tween_property(_root, "modulate:a", 1.0, 0.12)
 	Sfx.play("ui_open")
 	if tab == SCREEN_EQUIP:
 		# Ржавая кирка находится в мастерской среди удочек, лопат и палок (слова
@@ -511,6 +509,17 @@ func _build_action_bar() -> void:
 	_sell_x2 = ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(134, 8), Vector2(22, 22))
 	_sell_x2.visible = false
 	_sell_btn.add_child(_sell_x2)
+	_sell_uses = Label.new()
+	_sell_uses.position = Vector2(2, 20)
+	_sell_uses.size = Vector2(36, 16)
+	_sell_uses.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_sell_uses.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_sell_uses.add_theme_font_size_override("font_size", 9)
+	_sell_uses.add_theme_color_override("font_outline_color", Color(0.2, 0.12, 0.02))
+	_sell_uses.add_theme_constant_override("outline_size", 4)
+	_sell_uses.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sell_uses.visible = false
+	_sell_btn.add_child(_sell_uses)
 	_sell_btn.pressed.connect(_on_sell_pressed)
 	_action.add_child(_sell_btn)
 
@@ -1284,6 +1293,9 @@ func _update_action_bar() -> void:
 	var doubled := GameState.next_sale_doubled and coins > 0
 	_sell_label.text = ShopArt.full(coins * 2 if doubled else coins) if coins < 100000000 else ShopArt.compact(coins)
 	_sell_x2.visible = doubled
+	_sell_uses.visible = remote
+	_sell_uses.text = "%d/%d" % [ShopService.ad_uses_left("remote_dump_loot_for_sale"),
+		Balance.get_ad_daily_limit("remote_dump_loot_for_sale")]
 	_sell_lead.texture = ShopArt.tex("item_ad_tv") if remote else ShopArt.ui("icon_inventory")
 	var btn_disabled := coins <= 0
 	if remote:

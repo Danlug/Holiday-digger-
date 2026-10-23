@@ -188,7 +188,7 @@ func _tick_spawn(dt: float) -> void:
 	if depth < CombatData.start_depth() or BossArena.contains_point(player.x, player.y):
 		return
 	var alive := 0
-	for m in monsters:
+	for m: Monster in monsters:
 		if m.alive:
 			alive += 1
 	for req in spawner.tick(dt, player.x, player.y, alive):
@@ -210,7 +210,7 @@ func _tick_monsters(dt: float) -> void:
 	var despawn := float(CombatData.spawn_cfg("despawn_dist", 20.0))
 	var hero := hero_info()
 	var hp_pos := Vector2(player.x, player.y)
-	for m in monsters.duplicate():
+	for m: Monster in monsters.duplicate():
 		var d := Vector2(m.x, m.y).distance_to(hp_pos)
 		if d > despawn and m.alive:
 			monsters.erase(m)
@@ -276,7 +276,7 @@ func _nearest_target(wide: bool) -> Variant:
 	var half_h := float(CombatData.player_cfg("swing_height", 1.0)) * 0.5
 	var best: Variant = null
 	var best_d := 1e9
-	for m in monsters:
+	for m: Monster in monsters:
 		if not m.alive or m.state == "dormant":
 			continue
 		var dx: float = m.x - player.x
@@ -315,29 +315,31 @@ func try_swing(dir: int = 0) -> bool:
 	return true
 
 
-## Тап по врагу на экране: развернуться к нему и ударить, если он рядом.
+## Тап по врагу на экране: развернуться к нему и ударить. true — тап пришёлся
+## на врага (даже если удар на кулдауне), событие нельзя отдавать джойстику.
 func tap_enemy_at(world_px: Vector2) -> bool:
 	var cell := world_px / float(TILE)
-	for m in monsters:
+	for m: Monster in monsters:
 		if not m.alive:
 			continue
 		if m.hurtbox().grow(0.35).has_point(cell):
-			var dir := 1 if m.x >= player.x else -1
-			return try_swing(dir)
+			try_swing(1 if m.x >= player.x else -1)
+			return true
 	if boss != null and boss.is_active() and boss.hurtbox().grow(0.2).has_point(cell):
-		return try_swing(1 if boss.center_x >= player.x else -1)
+		try_swing(1 if boss.center_x >= player.x else -1)
+		return true
 	return false
 
 
 func _do_swing(dir: int, st: Dictionary) -> void:
 	var reach := float(st["reach"])
 	var half_h := float(CombatData.player_cfg("swing_height", 1.0)) * 0.5
-	var x0 := player.x - 0.15 if dir > 0 else player.x - reach
+	var x0: float = player.x - 0.15 if dir > 0 else player.x - reach
 	var rect := Rect2(x0, player.y - half_h, reach + 0.15, half_h * 2.0)
 	var hits := 0
 	slashes.append({"x": player.x + float(dir) * 0.85, "y": player.y - 0.1, "dir": dir, "t": 0.0})
 	Sfx.play("swing", randf_range(0.95, 1.1))
-	for m in monsters.duplicate():
+	for m: Monster in monsters.duplicate():
 		if not m.alive:
 			continue
 		if m.state == "dormant" and m.hurtbox().grow(0.5).intersects(rect):
@@ -549,7 +551,7 @@ func _boss_defeated() -> void:
 	var pos := hb.get_center() * TILE
 	GameState.emit_event(&"monster_killed", {"id": boss_id, "depth": BossArena.floor_y() - 1, "pos": pos})
 	GameState.emit_event(&"boss_defeated", {"id": boss_id})
-	for m in monsters:
+	for m: Monster in monsters:
 		if m.alive:
 			m.take_hit(1e9, 1)
 	Fx.burst("enemy_die", pos, 3.0)

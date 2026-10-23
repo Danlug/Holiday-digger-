@@ -103,8 +103,11 @@ func anim_name() -> String:
 			return "idle"
 
 
+## Зона, по которой бьёт герой. У крупных монстров шире хитбокса: картинка
+## стража больше клетки тоннеля, и удар по видимому телу обязан засчитываться.
 func hurtbox() -> Rect2:
-	return Rect2(x - hw, y - hh, hw * 2.0, hh * 2.0)
+	var pad := float(def.get("hit_pad", 0.0))
+	return Rect2(x - hw - pad, y - hh - pad, (hw + pad) * 2.0, (hh + pad) * 2.0)
 
 
 func is_flying() -> bool:
@@ -387,13 +390,13 @@ func _ai_jumper(dt: float, hero: Dictionary, hero_ok: bool, solid: Callable, ev:
 				state = "chase"
 				facing = 1 if d.x >= 0.0 else -1
 				vx = 0.0
-				# прыжок на расстоянии: ближе 1 клетки некуда, дальше 6 не долетит
-				if on_ground and t > 0.4 and absf(d.x) <= 6.0:
+				# прыжок на расстоянии: дальше ~5 клеток не долетит
+				if on_ground and t > 0.4 and absf(d.x) <= 4.6:
 					state = "windup"
 					t = 0.0
 					telegraph = true
 					ev.append({"type": "windup"})
-				elif on_ground and absf(d.x) > 6.0:
+				elif on_ground and absf(d.x) > 4.6:
 					vx = float(facing) * speed_cfg("speed")
 			else:
 				state = "patrol"

@@ -157,8 +157,8 @@
 			"sight": 7.0,
 			"attack": {
 				"windup": 0.5,
-				"leap_vx": 5.5,
-				"leap_vy": 9.0,
+				"leap_vx": 6.5,
+				"leap_vy": 6.0,
 				"recover": 0.9
 			},
 			"depth": [
@@ -275,9 +275,11 @@
 			"speed": 0.9,
 			"chase_speed": 1.3,
 			"size": [
-				1.4,
-				1.8
+				1.0,
+				0.95
 			],
+			"hit_pad": 0.3,
+			"super_armor": true,
 			"sight": 7.0,
 			"attack": {
 				"windup": 0.9,

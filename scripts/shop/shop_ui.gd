@@ -1,87 +1,101 @@
 class_name ShopUI
 extends CanvasLayer
-## ShopUI — две шторки в одном слое: МАГАЗИН у входной двери и ЭКИПИРОВКА
-## (верстак) в мастерской. Владелец развёл их по смыслу:
-##   магазин — только продаёт и покупает, четыре раздела: Кирки, Техника,
-##     Еда, Продать;
-##   верстак — выбираешь, какой киркой копать и какой ранец надеть из уже
-##     купленных; туда же со временем уйдут улучшения и починка.
+## ShopUI — витрина мобильной игры: магазин у входной двери и экипировка
+## (верстак) в мастерской. Текста на экране нет: плитки с иконкой и числом, а
+## название, описание и цена — в подсказке Tip (наведение / долгое нажатие).
 ##
-## Классов всё-таки один, а не два: шторка целиком состоит из общей обвязки —
-## заморозка героя, выключение ввода HUD, кошелёк в шапке, всплывающее
-## сообщение, скролл на 224 точки ширины. Разводить это по двум CanvasLayer
-## значило бы продублировать полторы сотни строк ради двух разных списков, а
-## новый узел в сцену магазина (scenes/shop.tscn) отсюда всё равно не
-## добавить. Разведено то, что действительно разное: логика экипировки живёт
-## своим файлом scripts/shop/equipment.gd, логика торговли — в ShopService.
+## Вкладки внизу, в зоне большого пальца: Еда, Снаряга, Техника, Продать и
+## отдельная заметная вкладка «магазин за доллары». Тап по плитке открывает
+## компактную карточку подтверждения (зелёная галочка / красный крестик) —
+## случайная покупка невозможна; «Продать» — крупная кнопка с суммой.
 ##
-## Лежит поверх игрового экрана отдельным слоем, как и весь остальной
-## интерфейс (ГДД раздел 16): отдельных панелей вокруг экрана нет, на
-## телефоне каждая такая панель съедает высоту, которой и так мало.
+## Состав плиток считает ShopItems (из data/shop.json, balance.json и состояния
+## игрока), рисует ShopTile, эффекты — ShopFx. Торговая логика — ShopService,
+## ShopCatalog и Equipment — здесь не дублируется.
 ##
 ## Точки входа:
-##   ShopUI.open_shop()      — от входной двери (её подсказку «заказать»
-##                             рисует scripts/house/);
-##   ShopUI.open_workshop()  — верстак из комнаты мастерской (scripts/house/),
-##                             открывает ЭКИПИРОВКУ, а не магазин;
-##   ShopUI.open_premium()   — доллары; ведёт в раздел «Еда», см. ниже.
+##   ShopUI.open_shop()      — от входной двери, открывает «Еду»;
+##   ShopUI.open_workshop()  — верстак: экипировка надетого (не магазин);
+##   ShopUI.open_premium()   — витрина за доллары.
 ##
 ## Пока шторка открыта, герой заморожен, а ввод HUD выключен: джойстик лежит
-## под шторкой на всю ширину экрана и иначе перехватывал бы нажатия у кнопок.
+## под шторкой на всю ширину экрана и иначе перехватывал бы нажатия.
 
 const TAB_PICKS := "picks"
 const TAB_TECH := "tech"
 const TAB_FOOD := "food"
 const TAB_SELL := "sell"
-## Экипировка — не пятая вкладка магазина, а отдельный экран: у верстака своя
-## дверь (кнопка в мастерской) и вкладок над ним нет.
+## Экипировка — не вкладка магазина, а отдельный экран со своей дверью.
 const SCREEN_EQUIP := "equip"
+## Витрина за доллары — вкладка, но заметная: шире остальных и с ореолом.
 const SCREEN_PREMIUM := "premium"
 
-## Доллары (премиум-валюта) остались на месте, но БЕЗ своей вкладки: на экране
-## в 224 точки четыре вкладки уже по 52 точки каждая, пятая начала бы резать
-## слова. Разложены по смыслу:
-##   товары за доллары (батончик, энергетик, таблетка, часы-телепорт) — в
-##     «Еде», рядом с обычными допингами: это всё расходники, и делить их по
-##     валюте значит заставлять игрока помнить, в каком кармане что лежит;
-##   обмен долларов на монеты и ролик «чуть-чуть долларов» — внизу «Продать»:
-##     эта вкладка и так про то, как в кошельке появляются монеты.
-## Сам кошелёк с обеими валютами виден в шапке на любой вкладке.
+const NAV_TABS := [TAB_FOOD, TAB_PICKS, TAB_TECH, TAB_SELL, SCREEN_PREMIUM]
+const NAV_ICONS := {TAB_FOOD: "tab_food", TAB_PICKS: "tab_picks", TAB_TECH: "tab_tech",
+	TAB_SELL: "tab_sell", SCREEN_PREMIUM: "tab_premium"}
+const NAV_TIPS := {TAB_FOOD: ["Еда", "Заказ с доставкой к двери и допинги"],
+	TAB_PICKS: ["Снаряжение", "Кирки и ранцы за монеты"],
+	TAB_TECH: ["Техника", "Собирается на верстаке из материалов"],
+	TAB_SELL: ["Продать", "Сдать руду из рюкзака"],
+	SCREEN_PREMIUM: ["Магазин за доллары", "Гаджеты, обмен и ролики"]}
+
+const NAV_H := 38.0
+const HEAD_H := 32.0
+const ACTION_H := 46.0
 
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GREEN := Color8(0x7F, 0xB8, 0x6B)
-const DIM := Color8(0x9D, 0x8B, 0x73)
-const BAD := Color8(0xB8, 0x5A, 0x52)
+const INK := Color(0.05, 0.04, 0.08)
 
 ## Единственный живой экземпляр — чтобы дом мог открыть магазин одной
 ## строкой, не протаскивая ссылку через полдерева сцен.
 static var instance: ShopUI = null
 
-var _tab: String = TAB_PICKS
+var _tab: String = TAB_FOOD
 ## "sell" — обычная скупка дома, "remote" — дистанционная сдача за ролик.
 var _footer_mode: String = "sell"
 var _selected: Dictionary = {}   # mineral_id -> true, что отмечено к продаже
+var _busy: bool = false
+var _shown_new: Array = []
 
 var _root: Control
-var _title: Label
-var _purse: Label
-var _tab_buttons: Dictionary = {}
-## Ряд вкладок целиком — на экране экипировки он прячется: там выбирать
-## нечего, а пустая полоса кнопок читалась бы как «магазин сломался».
-var _tabs_row: Control
+var _scroll: ScrollContainer
 var _list: VBoxContainer
-var _footer: HBoxContainer
-var _footer_total: Label
-var _footer_button: Button
+var _drag: DragScroll
+var _tiles: Dictionary = {}      # key предложения -> ShopTile
+
+var _chips: Dictionary = {}      # "coins" / "dollars" / "dig" / "fly" -> {root, icon, label}
+var _shown_coins: int = 0
+var _shown_dollars: int = 0
+var _wallet_hold: bool = false
+var _wallet_tween: Dictionary = {}
+var _close_btn: Button
+
+var _nav: Control
+var _nav_tabs: Control
+var _nav_done: Button
+var _tab_buttons: Dictionary = {}
+var _tab_badges: Dictionary = {}
+var _marker: NinePatchRect
+var _premium_glow: TextureRect
+
+var _action: Control
+var _sell_btn: Button
+var _sell_label: Label
+var _sell_x2: TextureRect
+var _sell_lead: TextureRect
+var _ad_btn: Button
+var _ad_label: Label
+
+var _card: Control = null
+var _card_offer: Dictionary = {}
+var _card_ok: Button = null
+
 var _notice_panel: Panel
 var _notice_label: Label
 var _notice_timer: Timer
 
 var _player: Node = null
 var _hud: Node = null
-
-## Состояние мира до открытия шторки — чтобы вернуть его как было, а не
-## "разморозить всё" (в доме и в катсценах герой заморожен не нами).
 var _was_frozen: bool = false
 var _hud_input_was_on: bool = true
 
@@ -90,9 +104,8 @@ var _hud_input_was_on: bool = true
 # Точки входа
 # ---------------------------------------------------------------------------
 
-## Верстак из комнаты мастерской (scripts/house/) — ровно одна строка на их
-## стороне. Открывает ЭКИПИРОВКУ: магазин переехал к входной двери, и верстак
-## теперь ничего не продаёт.
+## Верстак из комнаты мастерской (scripts/house/) — одна строка на их стороне.
+## Открывает ЭКИПИРОВКУ: магазин переехал к входной двери.
 static func open_workshop() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
@@ -108,9 +121,7 @@ static func open_shop() -> void:
 	instance.open(TAB_FOOD)
 
 
-## Премиум-магазин: всё, что за доллары (решение владельца — вынести из
-## разделов заказа в отдельную витрину). Доступен всегда и везде, в том числе
-## из шахты: кнопка «Магазин» висит в правом верхнем углу экрана.
+## Витрина за доллары: доступна всегда и везде, в том числе из шахты.
 static func open_premium() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
@@ -124,8 +135,8 @@ func _ready() -> void:
 	_build()
 	_root.visible = false
 	GameState.tool_purchase_required.connect(_on_tool_purchase_required)
-	GameState.coins_changed.connect(func(_c): _sync_purse())
-	GameState.dollars_changed.connect(func(_d): _sync_purse())
+	GameState.coins_changed.connect(func(_c): _sync_wallet(true))
+	GameState.dollars_changed.connect(func(_d): _sync_wallet(true))
 
 
 func _exit_tree() -> void:
@@ -137,26 +148,39 @@ func is_open() -> bool:
 	return _root != null and _root.visible
 
 
-func open(tab: String = TAB_PICKS) -> void:
+func open(tab: String = TAB_FOOD) -> void:
 	_resolve_refs()
 	_freeze_world(true)
+	ShopItems.seed_seen()
 	_selected.clear()
 	# По умолчанию отмечено всё: типовой сценарий — поднялся с полным рюкзаком
-	# и сдал его целиком, а снимать галочки нужно в порядке исключения.
+	# и сдал его целиком, а снимать отметки нужно в порядке исключения.
 	for row in ShopService.sellable_stacks():
 		_selected[row["id"]] = true
+	_busy = false
+	_close_card(false)
 	_root.visible = true
+	_root.modulate.a = 1.0
+	if not ShopFx.reduced():
+		_root.modulate.a = 0.0
+		create_tween().tween_property(_root, "modulate:a", 1.0, 0.12)
+	Sfx.play("ui_open")
 	if tab == SCREEN_EQUIP:
-		# Ржавая кирка находится в мастерской среди удочек, лопат и палок
-		# (слова владельца) — то есть ровно здесь, у верстака, а не в
-		# магазине: магазин её и не продаёт.
+		# Ржавая кирка находится в мастерской среди удочек, лопат и палок (слова
+		# владельца) — то есть ровно здесь, у верстака, а не в магазине.
 		if ShopService.visit_workshop():
 			notice("Среди удочек, лопат и палок нашлась ржавая кирка.", 4.0)
-	_set_tab(tab)
+	_set_tab(tab, false)
 
 
 func close() -> void:
+	if _root == null or not _root.visible:
+		return
+	_close_card(false)
+	_leave_tab()
 	_root.visible = false
+	Tip.hide_all()
+	Sfx.play("ui_close")
 	_freeze_world(false)
 
 
@@ -169,16 +193,14 @@ func _resolve_refs() -> void:
 		_hud = get_tree().root.find_child("HUD", true, false)
 
 
-## Пока шторка открыта, герой стоит (ГДД раздел 16: "пока шторка открыта,
-## герой стоит"), а ввод HUD выключен — иначе джойстик, лежащий под шторкой,
-## перехватывает нажатия раньше кнопок магазина.
+## Пока шторка открыта, герой стоит (ГДД раздел 16), а ввод HUD выключен —
+## иначе джойстик, лежащий под шторкой, перехватывает нажатия раньше плиток.
 func _freeze_world(frozen: bool) -> void:
 	if _player != null and is_instance_valid(_player):
 		if frozen:
-			# Запоминаем, как было. Магазин открывается и из комнаты
-			# мастерской, а внутри дома герой уже заморожен домом — снять
-			# заморозку на закрытии значило бы отпустить его копать где-то
-			# под домом, пока игрок смотрит на интерьер.
+			# Запоминаем, как было: внутри дома герой уже заморожен домом, и
+			# снять заморозку на закрытии значило бы отпустить его копать
+			# где-то под домом, пока игрок смотрит на интерьер.
 			_was_frozen = bool(_player.frozen)
 			_player.frozen = true
 			_player.digging = null
@@ -195,8 +217,18 @@ func _freeze_world(frozen: bool) -> void:
 			_hud.set_process_input(_hud_input_was_on)
 
 
+func _input(event: InputEvent) -> void:
+	if not is_open() or not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	if _card != null:
+		_close_card(true)
+	else:
+		close()
+
+
 # ---------------------------------------------------------------------------
-# Построение интерфейса
+# Построение каркаса
 # ---------------------------------------------------------------------------
 
 func _build() -> void:
@@ -206,475 +238,1021 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.97)
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color8(0x26, 0x1E, 0x30), Color8(0x14, 0x0F, 0x1B)])
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(0, 1)
+	gt.width = 8
+	gt.height = 64
+	var bg := TextureRect.new()
+	bg.texture = gt
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bg)
 
-	var head := HBoxContainer.new()
-	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	head.offset_left = 8; head.offset_right = -8
-	head.offset_top = 6; head.offset_bottom = 26
-	_root.add_child(head)
+	_build_scroll()
+	_build_header()
+	_build_action_bar()
+	_build_nav()
+	_build_notice()
 
-	_title = Label.new()
-	_title.add_theme_font_size_override("font_size", 12)
-	head.add_child(_title)
 
-	_purse = Label.new()
-	_purse.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_purse.add_theme_font_size_override("font_size", 10)
-	_purse.add_theme_color_override("font_color", GOLD)
-	head.add_child(_purse)
-
-	var close_btn := Button.new()
-	# Именно × (U+00D7), а не ✕: последнего в шрифте темы нет, и он рисуется
-	# пустым квадратом — та же ловушка, что со стрелкой ↺ в нижней полосе HUD.
-	close_btn.text = "×"
-	close_btn.add_theme_font_size_override("font_size", 14)
-	close_btn.custom_minimum_size = Vector2(22, 20)
-	close_btn.add_theme_font_size_override("font_size", 10)
-	close_btn.pressed.connect(close)
-	head.add_child(close_btn)
-
-	var tabs := HBoxContainer.new()
-	tabs.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	tabs.offset_left = 8; tabs.offset_right = -8
-	tabs.offset_top = 28; tabs.offset_bottom = 46
-	tabs.add_theme_constant_override("separation", 3)
-	_root.add_child(tabs)
-	_tabs_row = tabs
-	# Порядок и названия — решение владельца: «первый раздел продовольствие,
-	# второй экипировка, третий техника». «Продать» он не называл, но убрать
-	# её некуда: руду больше нигде не сдать, а без этого вылазка бессмысленна.
-	_tab_buttons[TAB_FOOD] = _make_tab(tabs, TAB_FOOD, "Еда")
-	_tab_buttons[TAB_PICKS] = _make_tab(tabs, TAB_PICKS, "Снаряга")
-	_tab_buttons[TAB_TECH] = _make_tab(tabs, TAB_TECH, "Техника")
-	_tab_buttons[TAB_SELL] = _make_tab(tabs, TAB_SELL, "Продать")
-
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 8; scroll.offset_right = -8
-	scroll.offset_top = 50; scroll.offset_bottom = -30
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_root.add_child(scroll)
-
+func _build_scroll() -> void:
+	_scroll = ScrollContainer.new()
+	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scroll.offset_top = HEAD_H + 2.0
+	_scroll.offset_bottom = -NAV_H
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_root.add_child(_scroll)
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	_scroll.add_child(margin)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.add_theme_constant_override("separation", 3)
-	scroll.add_child(_list)
+	_list.add_theme_constant_override("separation", 6)
+	margin.add_child(_list)
+	_drag = DragScroll.attach(_scroll)
 
-	_footer = HBoxContainer.new()
-	_footer.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_footer.offset_left = 8; _footer.offset_right = -8
-	_footer.offset_top = -26; _footer.offset_bottom = -4
-	_root.add_child(_footer)
 
-	_footer_total = Label.new()
-	_footer_total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_footer_total.add_theme_font_size_override("font_size", 10)
-	_footer_total.add_theme_color_override("font_color", GOLD)
-	_footer.add_child(_footer_total)
+func _build_header() -> void:
+	var line := ColorRect.new()
+	line.color = Color8(0x4A, 0x3F, 0x5C)
+	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	line.offset_top = HEAD_H
+	line.offset_bottom = HEAD_H + 1.0
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(line)
 
-	_footer_button = Button.new()
-	_footer_button.add_theme_font_size_override("font_size", 10)
-	_footer_button.pressed.connect(_on_footer_pressed)
-	_footer.add_child(_footer_button)
+	_chips["coins"] = _make_chip(ShopArt.ui("icon_coin"), 80.0, Vector2(6, 6))
+	_chips["dollars"] = _make_chip(ShopArt.ui("icon_dollar"), 64.0, Vector2(90, 6))
+	_chips["dig"] = _make_chip(ShopArt.tex("glyph_dig"), 56.0, Vector2(6, 6))
+	_chips["fly"] = _make_chip(ShopArt.tex("glyph_fly"), 56.0, Vector2(66, 6))
 
-	_build_notice()
+	_close_btn = _make_btn("red", "glyph_cross", Vector2(32, 24), 14.0)
+	_close_btn.position = Vector2(224.0 - 32.0 - 6.0, 4.0)
+	_close_btn.anchor_left = 1.0
+	_close_btn.anchor_right = 1.0
+	_close_btn.offset_left = -38.0
+	_close_btn.offset_right = -6.0
+	_close_btn.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			close())
+	Tip.bind(_close_btn, "Закрыть")
+	_root.add_child(_close_btn)
+
+
+func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
+	var root := Control.new()
+	root.position = pos
+	root.size = Vector2(w, 20)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	var bg := NinePatchRect.new()
+	bg.texture = ShopArt.tex("pill")
+	for m in ["left", "right", "top", "bottom"]:
+		bg.set("patch_margin_" + m, 4)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(bg)
+	var ic := ShopArt.rect(icon, Vector2(3, 3), Vector2(14, 14))
+	root.add_child(ic)
+	var lb := Label.new()
+	lb.position = Vector2(20, 1)
+	lb.size = Vector2(w - 24.0, 18)
+	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lb.add_theme_font_size_override("font_size", 10)
+	lb.add_theme_color_override("font_outline_color", INK)
+	lb.add_theme_constant_override("outline_size", 3)
+	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lb.clip_text = true
+	root.add_child(lb)
+	_root.add_child(root)
+	return {"root": root, "icon": ic, "label": lb}
+
+
+## Кнопка-картинка: рамка из девятизонника, знак по центру.
+func _make_btn(kind: String, glyph: String, sz: Vector2, icon_px: float = 16.0) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = sz
+	b.size = sz
+	b.focus_mode = Control.FOCUS_NONE
+	var tex := ShopArt.tex("btn_" + kind)
+	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+		var sb := StyleBoxTexture.new()
+		sb.texture = tex
+		sb.texture_margin_left = 5
+		sb.texture_margin_right = 5
+		sb.texture_margin_top = 5
+		sb.texture_margin_bottom = 5
+		match st:
+			"pressed", "hover_pressed":
+				sb.modulate_color = Color(0.78, 0.78, 0.78)
+			"disabled":
+				sb.modulate_color = Color(0.45, 0.45, 0.5)
+		b.add_theme_stylebox_override(st, sb)
+	if glyph != "":
+		var ic := ShopArt.rect(ShopArt.tex(glyph), (sz - Vector2(icon_px, icon_px)) * 0.5, Vector2(icon_px, icon_px))
+		ic.name = "Glyph"
+		b.add_child(ic)
+	b.button_down.connect(func() -> void:
+		if b.disabled:
+			return
+		b.pivot_offset = b.size * 0.5
+		b.create_tween().tween_property(b, "scale", Vector2(0.94, 0.94), 0.05))
+	b.button_up.connect(func() -> void:
+		b.pivot_offset = b.size * 0.5
+		b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.12) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+	return b
+
+
+func _build_nav() -> void:
+	_nav = Control.new()
+	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_nav.offset_top = -NAV_H
+	_nav.offset_bottom = 0.0
+	_nav.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.add_child(_nav)
+	var back := NinePatchRect.new()
+	back.texture = ShopArt.tex("bar")
+	for m in ["left", "right", "top", "bottom"]:
+		back.set("patch_margin_" + m, 3)
+	back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_nav.add_child(back)
+
+	_nav_tabs = Control.new()
+	_nav_tabs.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_nav_tabs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_nav.add_child(_nav_tabs)
+
+	_marker = NinePatchRect.new()
+	_marker.texture = ShopArt.tex("tab_marker")
+	for m in ["left", "right", "top", "bottom"]:
+		_marker.set("patch_margin_" + m, 5)
+	_marker.size = Vector2(40, NAV_H - 6.0)
+	_marker.position = Vector2(2, 3)
+	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_nav_tabs.add_child(_marker)
+
+	var widths := {TAB_FOOD: 42.0, TAB_PICKS: 42.0, TAB_TECH: 42.0, TAB_SELL: 42.0, SCREEN_PREMIUM: 56.0}
+	var x := 0.0
+	for id in NAV_TABS:
+		var w: float = widths[id]
+		var b := Button.new()
+		b.flat = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.position = Vector2(x, 0)
+		b.size = Vector2(w, NAV_H)
+		b.custom_minimum_size = b.size
+		for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+			b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+		if id == SCREEN_PREMIUM:
+			_premium_glow = ShopArt.rect(ShopArt.tex("glow"), Vector2(0, -2), Vector2(w, NAV_H + 4.0))
+			_premium_glow.stretch_mode = TextureRect.STRETCH_SCALE
+			_premium_glow.modulate = Color(0.4, 1.0, 0.65, 0.5)
+			b.add_child(_premium_glow)
+		var isz := 30.0 if id == SCREEN_PREMIUM else 26.0
+		var ic := ShopArt.rect(ShopArt.tex(String(NAV_ICONS[id])),
+			Vector2((w - isz) * 0.5, (NAV_H - isz) * 0.5), Vector2(isz, isz))
+		ic.name = "Icon"
+		ic.pivot_offset = ic.size * 0.5
+		b.add_child(ic)
+		var badge := ShopArt.rect(ShopArt.tex("glyph_new"), Vector2(w - 15.0, 2), Vector2(11, 11))
+		badge.visible = false
+		b.add_child(badge)
+		_tab_badges[id] = badge
+		b.pressed.connect(func() -> void:
+			if Tip.swallowed():
+				return
+			if _tab != id:
+				_set_tab(id, true)
+			else:
+				_scroll.scroll_vertical = 0)
+		var tip: Array = NAV_TIPS[id]
+		Tip.bind(b, String(tip[0]), String(tip[1]))
+		_nav_tabs.add_child(b)
+		_tab_buttons[id] = b
+		x += w
+	_marker.get_parent().move_child(_marker, 0)
+
+	# На экране верстака вкладок нет: одна большая кнопка «готово» под большим пальцем.
+	_nav_done = _make_btn("green", "glyph_check", Vector2(96, 28), 18.0)
+	_nav_done.anchor_left = 0.5
+	_nav_done.anchor_right = 0.5
+	_nav_done.offset_left = -48.0
+	_nav_done.offset_right = 48.0
+	_nav_done.offset_top = 5.0
+	_nav_done.offset_bottom = 33.0
+	_nav_done.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			close())
+	Tip.bind(_nav_done, "Готово")
+	_nav.add_child(_nav_done)
+
+
+func _build_action_bar() -> void:
+	_action = Control.new()
+	_action.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_action.offset_top = -(NAV_H + ACTION_H)
+	_action.offset_bottom = -NAV_H
+	_action.mouse_filter = Control.MOUSE_FILTER_STOP
+	_action.visible = false
+	_root.add_child(_action)
+	var back := NinePatchRect.new()
+	back.texture = ShopArt.tex("bar")
+	for m in ["left", "right", "top", "bottom"]:
+		back.set("patch_margin_" + m, 3)
+	back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_action.add_child(back)
+
+	# Ролик «×2»: слева, маленькая кнопка; справа — крупная «Продать».
+	_ad_btn = _make_btn("gray", "", Vector2(48, 36))
+	_ad_btn.position = Vector2(6, 5)
+	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_video"), Vector2(4, 3), Vector2(14, 14)))
+	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(14, 8), Vector2(30, 24)))
+	_ad_label = Label.new()
+	_ad_label.position = Vector2(2, 20)
+	_ad_label.size = Vector2(44, 14)
+	_ad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_ad_label.add_theme_font_size_override("font_size", 8)
+	_ad_label.add_theme_color_override("font_outline_color", INK)
+	_ad_label.add_theme_constant_override("outline_size", 3)
+	_ad_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ad_btn.add_child(_ad_label)
+	_ad_btn.pressed.connect(_on_ad_x2_pressed)
+	_action.add_child(_ad_btn)
+
+	_sell_btn = _make_btn("gold", "", Vector2(158, 38))
+	_sell_btn.position = Vector2(60, 4)
+	_sell_lead = ShopArt.rect(ShopArt.ui("icon_inventory"), Vector2(8, 5), Vector2(28, 28))
+	_sell_btn.add_child(_sell_lead)
+	_sell_btn.add_child(ShopArt.rect(ShopArt.ui("icon_coin"), Vector2(42, 11), Vector2(18, 18)))
+	_sell_label = Label.new()
+	_sell_label.position = Vector2(62, 6)
+	_sell_label.size = Vector2(70, 26)
+	_sell_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_sell_label.add_theme_font_size_override("font_size", 14)
+	_sell_label.add_theme_color_override("font_color", Color.WHITE)
+	_sell_label.add_theme_color_override("font_outline_color", Color8(0x6A, 0x3E, 0x0A))
+	_sell_label.add_theme_constant_override("outline_size", 4)
+	_sell_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sell_label.clip_text = true
+	_sell_btn.add_child(_sell_label)
+	_sell_x2 = ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(134, 8), Vector2(22, 22))
+	_sell_x2.visible = false
+	_sell_btn.add_child(_sell_x2)
+	_sell_btn.pressed.connect(_on_sell_pressed)
+	_action.add_child(_sell_btn)
 
 
 ## Сообщение магазина. Живёт ВНЕ шторки: о том, что бур теперь собирается на
 ## верстаке, игрок узнаёт на глубине 100, когда никакого магазина не открыто.
 func _build_notice() -> void:
 	_notice_panel = Panel.new()
-	_notice_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_notice_panel.offset_left = 10; _notice_panel.offset_right = -10
-	_notice_panel.offset_top = -76; _notice_panel.offset_bottom = -32
+	_notice_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_notice_panel.offset_left = 10
+	_notice_panel.offset_right = -10
+	_notice_panel.offset_top = HEAD_H + 6.0
+	_notice_panel.offset_bottom = HEAD_H + 46.0
+	_notice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_notice_panel.visible = false
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.043, 0.035, 0.027, 0.94)
 	sb.border_color = GOLD
 	sb.set_border_width_all(1)
-	sb.content_margin_left = 6; sb.content_margin_right = 6
-	sb.content_margin_top = 4; sb.content_margin_bottom = 4
 	_notice_panel.add_theme_stylebox_override("panel", sb)
 	add_child(_notice_panel)
 
 	_notice_label = Label.new()
 	_notice_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_notice_label.offset_left = 6; _notice_label.offset_right = -6
+	_notice_label.offset_left = 6
+	_notice_label.offset_right = -6
 	_notice_label.add_theme_font_size_override("font_size", 9)
-	_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_notice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_notice_panel.add_child(_notice_label)
 
 	_notice_timer = Timer.new()
 	_notice_timer.one_shot = true
-	_notice_timer.timeout.connect(func(): _notice_panel.visible = false)
+	_notice_timer.timeout.connect(func() -> void: _notice_panel.visible = false)
 	add_child(_notice_timer)
 
 
-func notice(text: String, seconds: float = 2.6) -> void:
+## Короткая плашка. Нужна для отказов («не хватает», «под землёй не бросить») и
+## для сообщений игры вне магазина; об успешной покупке рассказывают анимация и звук.
+func notice(text: String, seconds: float = 2.4) -> void:
 	_notice_label.text = text
 	_notice_panel.visible = true
 	_notice_timer.start(seconds)
 
 
-func _make_tab(parent: Control, id: String, text: String) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", 9)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size = Vector2(0, 18)
-	b.toggle_mode = true
-	b.pressed.connect(func(): _set_tab(id))
-	parent.add_child(b)
-	return b
+# ---------------------------------------------------------------------------
+# Кошелёк
+# ---------------------------------------------------------------------------
+
+## Число в плашке кошелька: целиком, пока влезает, дальше 1.23M. Плашка с
+## долларами уже монетной, поэтому ей «длинно» наступает раньше.
+static func wallet_text(n: int, compact_from: int = 1000000) -> String:
+	return ShopArt.full(n) if n < compact_from else ShopArt.compact(n)
 
 
-## Строка-переключатель: выбранная подсвечивается золотой рамкой, невыбранная
-## гаснет. Тема Godot по умолчанию различает состояния слишком слабо.
-func _style_row_button(b: Button) -> void:
-	for state in ["normal", "hover", "pressed", "focus"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.11, 0.09, 0.06, 1.0) if state == "pressed" else Color(0, 0, 0, 0)
-		sb.border_color = GOLD if state == "pressed" else Color8(0x3E, 0x31, 0x25)
-		sb.set_border_width_all(1)
-		sb.content_margin_left = 2
-		sb.content_margin_right = 2
-		b.add_theme_stylebox_override(state, sb)
+func _chip_fmt(which: String, n: int) -> String:
+	return wallet_text(n, 1000000 if which == "coins" else 10000)
 
 
-func _make_button(text: String, font_size: int = 9) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", font_size)
-	return b
-
-
-func _sync_purse() -> void:
-	if _purse == null:
+func _sync_wallet(animate: bool) -> void:
+	if _chips.is_empty():
 		return
-	_purse.text = "%d монет · %d $" % [GameState.coins, GameState.dollars]
+	if _wallet_hold:
+		return
+	_set_chip_value("coins", GameState.coins, animate)
+	_set_chip_value("dollars", GameState.dollars, animate)
+	Tip.bind(_chips["coins"]["root"], "Монеты", "", ShopArt.full(GameState.coins))
+	Tip.bind(_chips["dollars"]["root"], "Доллары", "", ShopArt.full(GameState.dollars))
+
+
+func _set_chip_value(which: String, value: int, animate: bool) -> void:
+	var chip: Dictionary = _chips[which]
+	var label: Label = chip["label"]
+	var shown: int = _shown_coins if which == "coins" else _shown_dollars
+	if _wallet_tween.has(which) and _wallet_tween[which] != null:
+		(_wallet_tween[which] as Tween).kill()
+		_wallet_tween[which] = null
+	if animate and is_open() and shown != value:
+		_wallet_tween[which] = ShopFx.count_up(self, label, shown, value, 0.45, 0.0, _chip_fmt.bind(which))
+		ShopFx.pop(chip["root"], 0.12, 0.2)
+	else:
+		label.text = _chip_fmt(which, value)
+	if which == "coins":
+		_shown_coins = value
+	else:
+		_shown_dollars = value
+
+
+## Кошелёк в шапке ждёт долёта монет: цифры добавляются, когда монеты прилетают.
+func _sync_equip_chips() -> void:
+	var dig: Dictionary = _chips["dig"]
+	var fly: Dictionary = _chips["fly"]
+	(dig["label"] as Label).text = "×" + ShopCatalog.mult_text(Equipment.current_dig_multiplier())
+	var speed := Equipment.current_fly_speed()
+	(fly["label"] as Label).text = ShopCatalog.mult_text(speed) if speed > 0.0 else "0"
+	Tip.bind(dig["root"], "Скорость копки", "Кирка в руках")
+	Tip.bind(fly["root"], "Скорость подъёма", "Ранец на спине, клеток в секунду")
 
 
 # ---------------------------------------------------------------------------
 # Вкладки
 # ---------------------------------------------------------------------------
 
-func _set_tab(tab: String) -> void:
+func _set_tab(tab: String, animate: bool) -> void:
+	var old_index := NAV_TABS.find(_tab)
+	if animate:
+		_leave_tab()
+		Sfx.play("ui_tab")
+		Haptics.tap()
 	_tab = tab
-	for id in _tab_buttons.keys():
-		_tab_buttons[id].button_pressed = (id == tab)
-	if _tabs_row != null:
-		_tabs_row.visible = tab != SCREEN_EQUIP and tab != SCREEN_PREMIUM
-	match tab:
-		TAB_PICKS: _title.text = "Кирки и ранцы"
-		TAB_TECH: _title.text = "Техника"
-		TAB_FOOD: _title.text = "Еда"
-		TAB_SELL: _title.text = "Скупка сырья"
-		SCREEN_EQUIP: _title.text = "Экипировка"
-		SCREEN_PREMIUM: _title.text = "Премиум-магазин"
+	_close_card(false)
+	var equip := tab == SCREEN_EQUIP
+	_nav_tabs.visible = not equip
+	_nav_done.visible = equip
+	_chips["coins"]["root"].visible = not equip
+	_chips["dollars"]["root"].visible = not equip
+	_chips["dig"]["root"].visible = equip
+	_chips["fly"]["root"].visible = equip
+	_scroll.scroll_vertical = 0
 	_render()
+	_move_marker(animate)
+	if animate and not ShopFx.reduced():
+		var dir := 1.0 if NAV_TABS.find(tab) >= old_index else -1.0
+		_scroll.modulate.a = 0.0
+		_scroll.offset_left = 18.0 * dir
+		_scroll.offset_right = 18.0 * dir
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(_scroll, "modulate:a", 1.0, 0.16)
+		tw.tween_property(_scroll, "offset_left", 0.0, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(_scroll, "offset_right", 0.0, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	else:
+		_scroll.modulate.a = 1.0
+		_scroll.offset_left = 0.0
+		_scroll.offset_right = 0.0
+
+
+## Покидая вкладку, всё, что на ней светилось «новинкой», считаем увиденным.
+func _leave_tab() -> void:
+	if not _shown_new.is_empty():
+		ShopItems.mark_seen(_shown_new)
+		_shown_new = []
+
+
+func _move_marker(animate: bool) -> void:
+	var b: Button = _tab_buttons.get(_tab)
+	for id in _tab_buttons.keys():
+		var btn: Button = _tab_buttons[id]
+		var ic: Control = btn.get_node("Icon")
+		var on: bool = id == _tab
+		ic.modulate = Color.WHITE if on else Color(0.7, 0.7, 0.78, 0.8)
+		var target := Vector2.ONE * (1.14 if on else 1.0)
+		if animate:
+			ic.create_tween().tween_property(ic, "scale", target, 0.14).set_trans(Tween.TRANS_BACK)
+		else:
+			ic.scale = target
+	if b == null:
+		_marker.visible = false
+		return
+	_marker.visible = true
+	var pos := Vector2(b.position.x + 2.0, 3.0)
+	_marker.size = Vector2(b.size.x - 4.0, NAV_H - 6.0)
+	if animate:
+		create_tween().tween_property(_marker, "position", pos, 0.18) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	else:
+		_marker.position = pos
+	if _premium_glow != null:
+		_premium_glow.visible = true
+
+
+func _update_badges() -> void:
+	for id in NAV_TABS:
+		var badge: TextureRect = _tab_badges[id]
+		badge.visible = id != _tab and ShopItems.new_count(id) > 0
+
+
+# ---------------------------------------------------------------------------
+# Содержимое вкладки
+# ---------------------------------------------------------------------------
+
+func _clear_content() -> void:
+	for c in _list.get_children():
+		_list.remove_child(c)
+		c.queue_free()
+	_tiles.clear()
 
 
 func _render() -> void:
-	_sync_purse()
-	for c in _list.get_children():
-		c.queue_free()
-	match _tab:
-		TAB_PICKS: _render_picks()
-		TAB_TECH: _render_tech()
-		TAB_FOOD: _render_food()
-		TAB_SELL: _render_sell()
-		SCREEN_EQUIP: _render_equip()
-		SCREEN_PREMIUM: _render_premium_screen()
+	_sync_wallet(false)
+	_shown_coins = GameState.coins
+	_shown_dollars = GameState.dollars
+	_clear_content()
+	_footer_mode = "sell"
+	if _tab == TAB_SELL and not ShopService.is_at_workshop():
+		# Скупка работает только дома: иначе «продать со дна шахты» убило бы
+		# решение игрока подниматься с грузом. Отсюда — только ролик.
+		_footer_mode = "remote"
+	if _tab == SCREEN_EQUIP:
+		_sync_equip_chips()
+	var sections := ShopItems.sections(_tab, _selected, _footer_mode == "remote")
+	_shown_new = []
+	var first := true
+	for s in sections:
+		var offers: Array = s["offers"]
+		var extra := ""
+		if first and _tab == TAB_FOOD and HouseFood.free_orders_left() > 0:
+			extra = str(HouseFood.free_orders_left())
+		_list.add_child(_make_section_header(s["icon"], extra))
+		_list.add_child(_make_grid(offers))
+		first = false
+		for o in offers:
+			if bool(o.get("new", false)):
+				_shown_new.append(String(o["key"]))
+	if _tab == TAB_SELL and ShopService.sellable_stacks().is_empty():
+		_list.add_child(_make_empty_state())
+	_update_badges()
+	_update_action_bar()
 
 
-func _add_hint(text: String, color: Color = DIM) -> void:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", 9)
-	l.add_theme_color_override("font_color", color)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.add_child(l)
-
-
-# --- Кирки и ранцы: покупка за монеты ----------------------------------------
-
-## Раздел «Кирки». Ранцы лежат здесь же, вторым блоком, а не пятой вкладкой:
-## владелец просил четыре раздела, а кирка и ранец — это одно и то же по
-## смыслу покупки (личное снаряжение героя за монеты, без единого материала).
-## В «Технике» им не место: там всё собирается из руды.
-func _render_picks() -> void:
-	_footer.visible = false
-	_add_hint("Ступени покупаются за монеты, материалы не нужны. Выбрать, чем копать и что надеть, можно на верстаке в мастерской.")
-
-	_add_section("Кирки")
-	for row in ShopCatalog.pickaxes():
-		_list.add_child(_make_buy_row(row, "tool"))
-
-	_add_section("Ранцы")
-	for row in ShopCatalog.gear_line():
-		_list.add_child(_make_buy_row(row, "gear"))
-
-
-## Заголовок блока внутри вкладки.
-func _add_section(text: String) -> void:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", 10)
-	l.add_theme_color_override("font_color", GOLD)
-	_list.add_child(l)
-
-
-## Строка покупки ступени: иконка (если арт уже есть), название с эффектом и
-## кнопка с ценой. kind: "tool" — кирка, "gear" — ранец.
-func _make_buy_row(row: Dictionary, kind: String) -> Control:
-	var id := String(row["id"])
-	var price := int(row["price_coins"])
-	var owned: bool = GameState.owns_tool(id) if kind == "tool" else GameState.has_gear(id)
-	var box := HBoxContainer.new()
-
-	# Иконки может ещё не быть: арт ранцев владелец пришлёт позже, новые кирки
-	# рисует другой агент. Чего нет — того и не показываем, подставлять чужую
-	# картинку нельзя: игрок запомнит её как «ту самую кирку».
-	var icon_path := String(row.get("icon", ""))
-	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(16, 16)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture = load(icon_path)
-		box.add_child(icon)
-
-	var text := Label.new()
-	text.text = "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
-	text.add_theme_font_size_override("font_size", 9)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	box.add_child(text)
-
-	var btn := _make_button("")
-	btn.custom_minimum_size = Vector2(52, 18)
-	if owned:
-		btn.text = "Есть"
-		btn.disabled = true
-	elif price <= 0:
-		# Ржавая кирка не продаётся: она находится в мастерской среди удочек,
-		# лопат и палок (слова владельца).
-		btn.text = "В мастерской"
-		btn.disabled = true
-	else:
-		btn.text = str(price)
-		btn.disabled = GameState.coins < price
-		btn.pressed.connect(func(): _do_buy_tier(id, kind))
-	box.add_child(btn)
-	return box
-
-
-func _do_buy_tier(id: String, kind: String) -> void:
-	var result := ShopService.buy_tool(id) if kind == "tool" else ShopService.buy_gear(id)
-	notice(String(result["message"]), 3.0)
-	_render()
-
-
-# --- Экипировка (верстак в мастерской) ---------------------------------------
-
-## Отдельный экран, а не вкладка магазина: у верстака своя дверь. Здесь ничего
-## не покупается — только выбирается, чем копать и что надеть из уже купленного.
-func _render_equip() -> void:
-	_footer.visible = false
-	if not Equipment.is_at_workbench():
-		_add_hint("Верстак стоит в подвале дома. Отсюда видно, что есть, но переодеться нельзя.", GOLD)
-	_add_hint("Кирка × скорость копки: %s. Ранец: %s." % [
-		ShopCatalog.mult_text(Equipment.current_dig_multiplier()),
-		("%s кл/с" % ShopCatalog.mult_text(Equipment.current_fly_speed()))
-			if Equipment.current_fly_speed() > 0.0 else "нет"])
-
-	_add_section("Чем копать")
-	var any_tool := false
-	for row in Equipment.pickaxe_rows():
-		if not bool(row["owned"]):
-			continue
-		any_tool = true
-		_list.add_child(_make_equip_row(row, "tool"))
-	if not any_tool:
-		_add_hint("Кирок пока нет — ржавая лежит где-то здесь же, в мастерской.")
-
-	_add_section("Что надеть")
-	var any_gear := false
-	for row in Equipment.gear_rows():
-		if not bool(row["owned"]):
-			continue
-		any_gear = true
-		_list.add_child(_make_equip_row(row, "gear"))
-	if not any_gear:
-		_add_hint("Ранцев пока нет. Первый стоит %d монет в магазине у входной двери."
-			% Balance.get_gear_cost_coins("backpack"))
-
-
-func _make_equip_row(row: Dictionary, kind: String) -> Control:
-	var id := String(row["id"])
-	var active := bool(row["active"])
-	var box := HBoxContainer.new()
-
-	var text := Label.new()
-	text.text = "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
-	text.add_theme_font_size_override("font_size", 9)
-	text.add_theme_color_override("font_color", GREEN if active else Color(1, 1, 1))
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	box.add_child(text)
-
-	var btn := _make_button("Надето" if active else ("Взять" if kind == "tool" else "Надеть"))
-	btn.custom_minimum_size = Vector2(48, 18)
-	btn.disabled = active or not Equipment.is_at_workbench()
-	if not btn.disabled:
-		btn.pressed.connect(func(): _do_equip(id, kind))
-	box.add_child(btn)
-	return box
-
-
-func _do_equip(id: String, kind: String) -> void:
-	var result := Equipment.equip_tool(id) if kind == "tool" else Equipment.equip_gear(id)
-	notice(String(result["message"]), 2.6)
-	_render()
-
-
-# --- Продажа -----------------------------------------------------------------
-
-func _render_sell() -> void:
-	var rows := ShopService.sellable_stacks()
-	_footer.visible = true
-	# Скупка работает только дома. Иначе кнопка магазина превращается в
-	# "продать со дна шахты", и подъём с грузом — то самое решение игрока,
-	# ради которого монеты за копку и убраны, — перестаёт существовать.
-	_footer_mode = "sell" if ShopService.is_at_workshop() else "remote"
-	if _footer_mode == "remote":
-		_add_hint("Мастерская в подвале дома — сюда лут надо донести. Отсюда можно только скинуть его на продажу дистанционно, за ролик (ГДД раздел 15, %d раза в день)."
-			% Balance.get_ad_daily_limit("remote_dump_loot_for_sale"))
-	if rows.is_empty():
-		_add_hint("Продавать нечего. Мастерская принимает только руду и находки — земля и камень не добыча (ГДД раздел 4).")
-		_footer_total.text = "0 монет"
-		_footer_button.text = "Продать"
-		_footer_button.disabled = true
-		_show_unsellable_hint()
-		return
-
-	for row in rows:
-		var r := _make_sell_row(row)
-		# Вне дома строки показываем как прайс-лист: выбирать нечего, ролик
-		# скидывает весь лут целиком.
-		if _footer_mode == "remote":
-			# Вне дома это прайс-лист, а не выбор: галочки убираем, чтобы не
-			# обещать выбор, которого нет — ролик скидывает весь лут целиком.
-			r.disabled = true
-			r.button_pressed = false
-		_list.add_child(r)
-	_show_unsellable_hint()
-	_update_sell_footer()
-
-
-## Отдельной строкой — что мастерская НЕ покупает. Иначе игрок, принёсший
-## бронзу, видит пустой список и решает, что продажа сломана.
-func _show_unsellable_hint() -> void:
-	var stuck: Array = []
-	for id in GameState.inventory.keys():
-		if int(GameState.inventory[id]) > 0 and ShopService.sell_price(String(id)) <= 0:
-			stuck.append(ShopCatalog.item_name(String(id)))
-	if stuck.is_empty():
-		return
-	_add_hint("Не скупается: " + ", ".join(stuck) + ". Это либо материал для брони, либо то, что мастерская сама и делает.")
-
-
-func _make_sell_row(row: Dictionary) -> Button:
-	var id := String(row["id"])
-	var b := Button.new()
-	b.toggle_mode = true
-	b.button_pressed = bool(_selected.get(id, false))
-	b.custom_minimum_size = Vector2(0, 22)
-	_style_row_button(b)
-	var mark := Label.new()
-	b.toggled.connect(func(on: bool):
-		_selected[id] = on
-		# Галочку рисуем сами: у кнопки темы по умолчанию нажатое состояние
-		# отличается едва заметно, и на списке из пяти строк непонятно, что
-		# именно уйдёт в продажу.
-		mark.text = "v" if on else " "
-		_update_sell_footer()
-	)
-
-	var line := HBoxContainer.new()
-	line.set_anchors_preset(Control.PRESET_FULL_RECT)
-	line.offset_left = 4; line.offset_right = -4
+func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 5)
+	row.custom_minimum_size = Vector2(0, 18)
+	var ic := TextureRect.new()
+	ic.texture = icon
+	ic.custom_minimum_size = Vector2(16, 16)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(ic)
+	var line := ColorRect.new()
+	line.color = Color8(0x4A, 0x3F, 0x5C)
+	line.custom_minimum_size = Vector2(0, 2)
+	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(line)
-
-	mark.text = "v" if b.button_pressed else " "
-	mark.custom_minimum_size = Vector2(9, 0)
-	mark.add_theme_font_size_override("font_size", 9)
-	mark.add_theme_color_override("font_color", GOLD)
-	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_child(mark)
-
-	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(16, 16)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tex := TileArt.texture_for(MineralMap.tile_type_for(id), 0, 0)
-	if tex != null:
-		icon.texture = tex
-	line.add_child(icon)
-
-	var name_label := Label.new()
-	name_label.text = "%s ×%d" % [ShopCatalog.item_name(id), int(row["count"])]
-	name_label.add_theme_font_size_override("font_size", 9)
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.clip_text = true
-	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_child(name_label)
-
-	var price_label := Label.new()
-	price_label.text = "%d/шт" % int(row["price"])
-	price_label.add_theme_font_size_override("font_size", 8)
-	price_label.add_theme_color_override("font_color", DIM)
-	price_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_child(price_label)
-
-	var sum_label := Label.new()
-	sum_label.text = str(int(row["sum"]))
-	sum_label.add_theme_font_size_override("font_size", 10)
-	sum_label.add_theme_color_override("font_color", GOLD)
-	sum_label.custom_minimum_size = Vector2(40, 0)
-	sum_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	sum_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_child(sum_label)
-	return b
+	row.add_child(line)
+	if badge_text != "":
+		var gift := TextureRect.new()
+		gift.texture = ShopArt.tex("glyph_gift")
+		gift.custom_minimum_size = Vector2(16, 16)
+		gift.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		gift.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		gift.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(gift)
+		var l := Label.new()
+		l.text = badge_text
+		l.add_theme_font_size_override("font_size", 10)
+		l.add_theme_color_override("font_color", ShopArt.COL_GOOD)
+		l.add_theme_color_override("font_outline_color", INK)
+		l.add_theme_constant_override("outline_size", 3)
+		row.add_child(l)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		Tip.bind(row, "Бесплатные заказы", "Бабка оставила денег: сегодня еда даром", "Осталось: " + badge_text)
+	return row
 
 
-## Итог к продаже пересчитывается до подтверждения (ГДД раздел 15: "показ
-## цен и итоговой суммы перед подтверждением").
-func _update_sell_footer() -> void:
-	var remote := _footer_mode == "remote"
-	var items := _selection_items() if not remote else _all_sellable_items()
-	var q := ShopService.quote(items)
-	var coins := int(q["coins"])
-	var text := "%d монет · %.0f кг" % [coins, float(q["weight"])]
-	if GameState.next_sale_doubled and coins > 0:
-		text = "%d монет (×2 по рекламе) · %.0f кг" % [coins * 2, float(q["weight"])]
-	_footer_total.text = text
-	if remote:
-		var left := ShopService.ad_uses_left("remote_dump_loot_for_sale")
-		_footer_button.text = "Ролик %d/%d" % [left, Balance.get_ad_daily_limit("remote_dump_loot_for_sale")]
-		_footer_button.disabled = coins <= 0 or left <= 0
+func _make_grid(offers: Array) -> GridContainer:
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	for o in offers:
+		var t := ShopTile.new()
+		t.setup(o)
+		var offer: Dictionary = o
+		t.pressed.connect(func() -> void: _on_tile_pressed(offer, t))
+		_tiles[String(o["key"])] = t
+		grid.add_child(t)
+	return grid
+
+
+func _make_empty_state() -> Control:
+	var box := CenterContainer.new()
+	box.custom_minimum_size = Vector2(0, 150)
+	var ic := TextureRect.new()
+	ic.texture = ShopArt.ui("icon_backpack")
+	ic.custom_minimum_size = Vector2(64, 64)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.modulate = Color(0.6, 0.6, 0.68, 0.7)
+	ic.mouse_filter = Control.MOUSE_FILTER_PASS
+	Tip.bind(ic, "Рюкзак пуст", "Руду и находки продают в мастерской: сначала накопай.")
+	box.add_child(ic)
+	return box
+
+
+# ---------------------------------------------------------------------------
+# Нажатие на плитку
+# ---------------------------------------------------------------------------
+
+func _on_tile_pressed(offer: Dictionary, tile: ShopTile) -> void:
+	if Tip.swallowed() or _busy:
+		return
+	var state := String(offer["state"])
+	match String(offer["kind"]):
+		"sell":
+			_toggle_sell(offer, tile)
+		"nosale", "info":
+			Sfx.play("ui_deny")
+			tile.deny()
+		"ad":
+			_claim_ad(offer, tile)
+		"equip_tool", "equip_gear":
+			_equip(offer, tile)
+		_:
+			match state:
+				"owned":
+					Sfx.play("ui_tap")
+					ShopFx.pop(tile, 0.08, 0.18)
+				"locked", "away":
+					Sfx.play("ui_deny")
+					Haptics.tap()
+					tile.deny()
+				"poor":
+					if String(offer["kind"]) == "recipe":
+						Sfx.play("ui_tap")
+						_open_card(offer, tile)
+					else:
+						Sfx.play("ui_deny")
+						Haptics.tap()
+						tile.deny()
+				_:
+					Sfx.play("ui_tap")
+					Haptics.tap()
+					_open_card(offer, tile)
+
+
+func _toggle_sell(offer: Dictionary, tile: ShopTile) -> void:
+	if _footer_mode == "remote":
+		Sfx.play("ui_deny")
+		tile.deny()
+		return
+	var id := String(offer["ref"])
+	var on := not bool(_selected.get(id, false))
+	_selected[id] = on
+	offer["selected"] = on
+	tile.setup(offer)
+	Sfx.play("ui_toggle")
+	ShopFx.pop(tile, 0.1, 0.16)
+	_update_action_bar()
+
+
+func _equip(offer: Dictionary, tile: ShopTile) -> void:
+	var state := String(offer["state"])
+	if state == "active":
+		Sfx.play("ui_tap")
+		ShopFx.pop(tile, 0.06, 0.16)
+		return
+	if state == "locked":
+		Sfx.play("ui_deny")
+		tile.deny()
+		return
+	if state == "away":
+		Sfx.play("ui_deny")
+		tile.deny()
+		notice("Верстак дома, в подвале")
+		return
+	var id := String(offer["ref"])
+	var kind := String(offer["kind"])
+	var result := Equipment.equip_tool(id) if kind == "equip_tool" else Equipment.equip_gear(id)
+	if not bool(result["ok"]):
+		Sfx.play("ui_deny")
+		tile.deny()
+		notice(String(result["message"]))
+		return
+	Sfx.play("ui_toggle")
+	Haptics.tap()
+	_render()
+	var t: ShopTile = _tiles.get(String(offer["key"]))
+	if t != null:
+		_after_snap(t, ShopArt.COL_GOLD)
+
+
+## Плитка «щёлкнула» в новое состояние: упругий скачок, искры, короткая вспышка.
+func _after_snap(tile: ShopTile, color: Color) -> void:
+	ShopFx.pop(tile, 0.22, 0.32)
+	var rect := tile.get_global_rect()
+	ShopFx.sparkles(_root, rect.get_center(), color, 14, 32.0)
+	ShopFx.flash(_root, rect, Color(1, 1, 1, 0.55), 0.22)
+
+
+# ---------------------------------------------------------------------------
+# Карточка подтверждения
+# ---------------------------------------------------------------------------
+
+func _close_card(animate: bool) -> void:
+	if _card == null:
+		return
+	var c := _card
+	_card = null
+	_card_ok = null
+	_drag.set_process_input(true)
+	if animate and c.is_inside_tree():
+		Sfx.play("ui_close")
+		var tw := create_tween()
+		tw.tween_property(c, "modulate:a", 0.0, 0.1)
+		tw.tween_callback(c.queue_free)
 	else:
-		_footer_button.text = "Продать"
-		_footer_button.disabled = coins <= 0
+		c.queue_free()
+
+
+func _open_card(offer: Dictionary, tile: ShopTile) -> void:
+	_close_card(false)
+	_card_offer = offer
+	var kind := String(offer["kind"])
+	var is_recipe := kind == "recipe"
+	_card = Control.new()
+	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.add_child(_card)
+	_drag.set_process_input(false)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.62)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed or ev is InputEventScreenTouch and ev.pressed:
+			if not Tip.swallowed():
+				_close_card(true))
+	_card.add_child(dim)
+
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 1.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 10.0
+	panel.offset_right = -10.0
+	panel.offset_bottom = -(NAV_H + 8.0)
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb := StyleBoxTexture.new()
+	sb.texture = ShopArt.tex("panel")
+	for m in ["left", "right", "top", "bottom"]:
+		sb.set("texture_margin_" + m, 6)
+		sb.set("content_margin_" + m, 9)
+	panel.add_theme_stylebox_override("panel", sb)
+	_card.add_child(panel)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 7)
+	panel.add_child(col)
+
+	# Верх: большая плитка товара и чипы эффекта справа.
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 10)
+	top.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_child(top)
+	var preview := ShopTile.new()
+	var po: Dictionary = offer.duplicate()
+	po["pill"] = {}
+	po["new"] = false
+	if String(po["state"]) == "poor":
+		po["state"] = "available"
+	po["count_text"] = ""
+	preview.setup(po)
+	preview.disabled = false
+	top.add_child(preview)
+
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 4)
+	side.alignment = BoxContainer.ALIGNMENT_CENTER
+	top.add_child(side)
+	if offer.has("compare"):
+		side.add_child(_make_compare_row(offer["compare"]))
+	else:
+		for e in offer.get("effects", []):
+			side.add_child(_make_chip_row(e["icon"], String(e["text"]), Color.WHITE))
+
+	if is_recipe:
+		col.add_child(_make_inputs_grid(offer))
+	else:
+		col.add_child(_make_price_row(offer))
+
+	# Низ: красный крестик слева, зелёная галочка справа — под большим пальцем.
+	var btns := HBoxContainer.new()
+	btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	btns.add_theme_constant_override("separation", 8)
+	col.add_child(btns)
+	var cancel := _make_btn("red", "glyph_cross", Vector2(52, 32), 18.0)
+	cancel.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			_close_card(true))
+	Tip.bind(cancel, "Отмена")
+	if is_recipe and bool(offer.get("can_invest", false)):
+		var inv := _make_btn("gray", "glyph_storage", Vector2(52, 32), 18.0)
+		inv.pressed.connect(func() -> void: _invest(offer))
+		Tip.bind(inv, "На склад", "Переложить из рюкзака то, чего рецепту не хватает")
+		btns.add_child(inv)
+	btns.add_child(cancel)
+	btns.move_child(cancel, 0)
+	var ok_glyph := "glyph_hammer" if is_recipe else "glyph_check"
+	_card_ok = _make_btn("green", ok_glyph, Vector2(96, 32), 20.0)
+	var can_do := _card_can_confirm(offer)
+	_card_ok.disabled = not can_do
+	_card_ok.pressed.connect(_confirm_card)
+	Tip.bind(_card_ok, String(offer["title"]), String(offer["body"]), String(offer["extra"]))
+	btns.add_child(_card_ok)
+
+	if ShopFx.reduced():
+		return
+	_card.modulate.a = 0.0
+	await get_tree().process_frame
+	if _card == null or not is_instance_valid(panel):
+		return
+	_card.modulate.a = 1.0
+	panel.pivot_offset = Vector2(panel.size.x * 0.5, panel.size.y)
+	panel.scale = Vector2(0.9, 0.9)
+	panel.modulate.a = 0.0
+	dim.modulate.a = 0.0
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.12)
+	tw.tween_property(dim, "modulate:a", 1.0, 0.15)
+
+
+func _card_can_confirm(offer: Dictionary) -> bool:
+	if String(offer["kind"]) == "recipe":
+		return String(offer["state"]) == "ready"
+	return String(offer["state"]) == "available"
+
+
+func _make_chip_row(icon: Texture2D, text: String, color: Color) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 3)
+	if icon != null:
+		var ic := TextureRect.new()
+		ic.texture = icon
+		ic.custom_minimum_size = Vector2(16, 16)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(ic)
+	if text != "":
+		var l := Label.new()
+		l.text = text
+		l.add_theme_font_size_override("font_size", 12)
+		l.add_theme_color_override("font_color", color)
+		l.add_theme_color_override("font_outline_color", INK)
+		l.add_theme_constant_override("outline_size", 3)
+		row.add_child(l)
+	return row
+
+
+## «Было → станет»: значок, текущее значение, стрелка и новое.
+func _make_compare_row(cmp: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var ic := TextureRect.new()
+	ic.texture = cmp["icon"]
+	ic.custom_minimum_size = Vector2(18, 18)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(ic)
+	var from_l := Label.new()
+	from_l.text = String(cmp["from"])
+	from_l.add_theme_font_size_override("font_size", 11)
+	from_l.add_theme_color_override("font_color", Color(0.7, 0.7, 0.76))
+	from_l.add_theme_color_override("font_outline_color", INK)
+	from_l.add_theme_constant_override("outline_size", 3)
+	row.add_child(from_l)
+	var arrow := TextureRect.new()
+	arrow.texture = ShopArt.tex("glyph_arrow")
+	arrow.custom_minimum_size = Vector2(14, 14)
+	arrow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(arrow)
+	var to_l := Label.new()
+	to_l.text = String(cmp["to"])
+	to_l.add_theme_font_size_override("font_size", 13)
+	to_l.add_theme_color_override("font_color", ShopArt.COL_GOOD)
+	to_l.add_theme_color_override("font_outline_color", INK)
+	to_l.add_theme_constant_override("outline_size", 3)
+	row.add_child(to_l)
+	return row
+
+
+func _make_price_row(offer: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 5)
+	var cur := String(offer.get("currency", ""))
+	var price := int(offer.get("price", 0))
+	var ok := ShopItems.can_pay(cur, price)
+	var ic := TextureRect.new()
+	ic.texture = ShopItems.currency_icon(cur if cur != "" else ShopItems.COINS)
+	ic.custom_minimum_size = Vector2(20, 20)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(ic)
+	var l := Label.new()
+	l.text = "0" if bool(offer.get("free", false)) else ShopArt.full(price)
+	l.add_theme_font_size_override("font_size", 15)
+	l.add_theme_color_override("font_color", Color.WHITE if ok else ShopArt.COL_BAD)
+	l.add_theme_color_override("font_outline_color", INK)
+	l.add_theme_constant_override("outline_size", 4)
+	row.add_child(l)
+	return row
+
+
+## Материалы рецепта значками: «есть/нужно», зелёное — хватает, красное — нет.
+func _make_inputs_grid(offer: Dictionary) -> Control:
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 3)
+	var wrap := CenterContainer.new()
+	for inp in offer.get("inputs", []):
+		var have := int(inp["have"])
+		var need := int(inp["need"])
+		grid.add_child(_make_chip_row(inp["icon"], "%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)],
+			ShopArt.COL_GOOD if have >= need else ShopArt.COL_BAD))
+	var coins_need := int(offer.get("coins_need", 0))
+	if coins_need > 0:
+		var have := int(offer.get("coins_have", 0))
+		grid.add_child(_make_chip_row(ShopArt.ui("icon_coin"),
+			"%s/%s" % [ShopArt.compact(have), ShopArt.compact(coins_need)],
+			ShopArt.COL_GOOD if have >= coins_need or GameState.debug_free_shop else ShopArt.COL_BAD))
+	wrap.add_child(grid)
+	return wrap
+
+
+func _confirm_card() -> void:
+	if Tip.swallowed() or _card == null:
+		return
+	var offer := _card_offer
+	var result := _perform(offer)
+	if not bool(result.get("ok", false)):
+		Sfx.play("ui_deny")
+		Haptics.tap()
+		if _card_ok != null:
+			ShopFx.wiggle(_card_ok)
+		notice(String(result.get("message", "Не получилось")))
+		return
+	_close_card(false)
+	Sfx.play("ui_buy")
+	Haptics.tap()
+	if String(offer["kind"]) == "food":
+		notice(String(result.get("message", "")), 3.0)
+	if bool(result.get("ok", false)) and String(result.get("effect", "")) == "teleport_home":
+		_teleport_home()
+	_render()
+	var t: ShopTile = _tiles.get(String(offer["key"]))
+	if t != null:
+		_after_snap(t, ShopArt.COL_GOLD if String(offer["kind"]) != "recipe" else ShopArt.COL_GOOD)
+
+
+## Единая точка вызова торговой логики для всех видов плиток.
+func _perform(offer: Dictionary) -> Dictionary:
+	var ref := String(offer["ref"])
+	match String(offer["kind"]):
+		"tool":
+			return ShopService.buy_tool(ref)
+		"gear":
+			return ShopService.buy_gear(ref)
+		"drill":
+			return ShopService.buy_drill_upgrade()
+		"recipe":
+			return ShopService.craft(ref)
+		"food":
+			return HouseSystem.order_food(ref)
+		"good":
+			return ShopService.buy(ref, String(offer["currency"]))
+		"exchange":
+			return ShopService.exchange_dollars_to_coins(1)
+	return {"ok": false, "message": ""}
+
+
+func _invest(offer: Dictionary) -> void:
+	if Tip.swallowed():
+		return
+	var result := ShopService.invest(String(offer["ref"]))
+	if not bool(result["ok"]):
+		Sfx.play("ui_deny")
+		notice(String(result["message"]))
+		return
+	Sfx.play("ui_tap")
+	Haptics.tap()
+	var key := String(offer["key"])
+	_close_card(false)
+	_render()
+	var t: ShopTile = _tiles.get(key)
+	if t != null:
+		ShopFx.pop(t, 0.16, 0.26)
+		t.pressed.emit()
+
+
+## Часы-телепорт: единственный товар, который трогает не GameState, а героя.
+func _teleport_home() -> void:
+	_resolve_refs()
+	if _player != null and is_instance_valid(_player) and _player.has_method("teleport_home"):
+		_player.teleport_home()
+
+
+# ---------------------------------------------------------------------------
+# Ролики и продажа
+# ---------------------------------------------------------------------------
+
+func _claim_ad(offer: Dictionary, tile: ShopTile) -> void:
+	if int(offer.get("left", 0)) <= 0:
+		Sfx.play("ui_deny")
+		tile.deny()
+		return
+	var r := ShopService.claim_ad(String(offer["ref"]))
+	if not bool(r["ok"]):
+		Sfx.play("ui_deny")
+		tile.deny()
+		notice(String(r["message"]))
+		return
+	Sfx.play("reward")
+	Haptics.tap()
+	_render()
+	var t: ShopTile = _tiles.get(String(offer["key"]))
+	if t != null:
+		_after_snap(t, ShopArt.COL_GOLD)
+
+
+func _on_ad_x2_pressed() -> void:
+	if Tip.swallowed() or _busy:
+		return
+	var ad_id := ShopCatalog.ad_double_sale_id()
+	if GameState.next_sale_doubled or ShopService.ad_uses_left(ad_id) <= 0:
+		Sfx.play("ui_deny")
+		ShopFx.wiggle(_ad_btn)
+		return
+	var r := ShopService.claim_ad(ad_id)
+	if not bool(r["ok"]):
+		Sfx.play("ui_deny")
+		return
+	Sfx.play("reward")
+	Haptics.tap()
+	_update_action_bar()
+	ShopFx.pop(_sell_btn, 0.1, 0.3)
+	ShopFx.sparkles(_root, _sell_btn.get_global_rect().get_center(), ShopArt.COL_GOLD, 12, 36.0)
 
 
 func _all_sellable_items() -> Dictionary:
@@ -692,393 +1270,142 @@ func _selection_items() -> Dictionary:
 	return items
 
 
-func _do_sell() -> void:
-	var result := ShopService.sell(_selection_items())
-	if not bool(result["ok"]):
-		notice("Нечего продавать.")
+## Панель продажи: крупная кнопка с суммой (итог пересчитывается до нажатия,
+## ГДД раздел 15) и значок ролика «×2».
+func _update_action_bar() -> void:
+	_action.visible = _tab == TAB_SELL
+	_scroll.offset_bottom = -(NAV_H + (ACTION_H if _tab == TAB_SELL else 0.0))
+	if _tab != TAB_SELL:
 		return
-	var text := "Продано %d шт: +%d монет, рюкзак легче на %.0f кг." % [
-		int(result["count"]), int(result["coins"]), float(result["weight"])]
-	if bool(result["doubled"]):
-		text += " Реклама удвоила выручку."
-	notice(text, 3.4)
-	_selected.clear()
-	_render()
-
-
-# --- Техника -----------------------------------------------------------------
-
-## Единственный раздел, где ещё нужны материалы: скважина, бурмобиль,
-## ручной бур (и плавка с перегонкой, без которых их не собрать). Кирки и
-## ранцы отсюда ушли — они покупаются за монеты.
-func _render_tech() -> void:
-	_footer.visible = false
-	if not ShopService.is_at_workshop():
-		_add_hint("Техника собирается на верстаке в подвале дома — складывать и собирать можно только там. Отсюда видно только, чего ещё не хватает.", GOLD)
-	_add_hint("Техника — единственное, что ещё собирается из материалов. Они копятся на складе в мастерской: ручной бур стоит 500 железа при рюкзаке в 60, за одну ходку столько не принести. Верстак берёт со склада и из рюкзака.")
-	for r in ShopCatalog.recipes():
-		_list.add_child(_make_craft_row(r))
-
-	# Апгрейд бура (задача «Апгрейд бура») — виден только когда сам бурмобиль
-	# уже есть (открыт с глубины 1000, см. data/shop.json ->
-	# craft.unlock_depth.drill_rig): апгрейд ступени того, чего ещё нет,
-	# читался бы как отдельная покупка бурмобиля во второй раз.
-	if GameState.owns_tool("drill_rig"):
-		_add_section("Апгрейд бура")
-		for row in ShopCatalog.drill_upgrade_rows():
-			_list.add_child(_make_drill_upgrade_row(row))
-
-
-## Строка ступени апгрейда бура: {id, tier, name_ru, price_coins,
-## speed_multiplier, desc_ru, status}. За монеты (не материалы), поэтому
-## строка ближе к _make_buy_row (кирки/ранцы), чем к _make_craft_row
-## (рецепты из руды) — но с третьим состоянием "locked", которого у кирок и
-## ранцев нет: апгрейды бура строго последовательны.
-func _make_drill_upgrade_row(row: Dictionary) -> Control:
-	var status := String(row["status"])
-	var box := HBoxContainer.new()
-
-	# Та же иконка-опционально, что у _make_buy_row: перекрашенный бур по
-	# ступени (см. ShopCatalog.drill_upgrade_rows), если художник её положил.
-	var icon_path := String(row.get("icon", ""))
-	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(16, 16)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture = load(icon_path)
-		box.add_child(icon)
-
-	var label_text := "%s — %s" % [String(row["name_ru"]), String(row["desc_ru"])]
-	if status == "locked":
-		# Название нужной более ранней ступени — то же самое "сначала
-		# титановый", каким в игре объясняются другие последовательные
-		# апгрейды, а не голое "недоступно". В подписи строки, а не на самой
-		# кнопке: "сначала обсидиановый бур" на кнопке в 52 точки не влезает.
-		label_text += " (сначала %s)" % Balance.get_drill_rig_tier_name_ru(int(row["tier"]) - 1).to_lower()
-
-	var text := Label.new()
-	text.text = label_text
-	text.add_theme_font_size_override("font_size", 9)
-	text.add_theme_color_override("font_color", GREEN if status == "owned" else \
-			(Color(1, 1, 1) if status == "next" else DIM))
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	box.add_child(text)
-
-	var btn := _make_button("")
-	btn.custom_minimum_size = Vector2(52, 18)
-	match status:
-		"owned":
-			btn.text = "Есть"
-			btn.disabled = true
-		"locked":
-			btn.text = "Заперто"
-			btn.disabled = true
-		_:
-			var price := int(row["price_coins"])
-			btn.text = str(price)
-			btn.disabled = GameState.coins < price and not GameState.debug_free_shop
-			btn.pressed.connect(func(): _do_buy_drill_upgrade())
-	box.add_child(btn)
-	return box
-
-
-func _do_buy_drill_upgrade() -> void:
-	var result := ShopService.buy_drill_upgrade()
-	notice(String(result["message"]), 3.0)
-	_render()
-
-
-func _make_craft_row(r: Dictionary) -> Control:
-	var recipe_id := String(r["id"])
-	var check := ShopService.check_craft(recipe_id)
-	var project := ShopService.is_project(recipe_id)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 0)
-
-	var head := HBoxContainer.new()
-	box.add_child(head)
-
-	var title := Label.new()
-	title.text = String(r["name_ru"])
-	title.add_theme_font_size_override("font_size", 10)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Без обрезки Label требует себе всю ширину текста, и длинное название
-	# («Ранец с пропеллерами») распирает ряд шире экрана — вместе с ним за
-	# правый край уезжают кнопки «На склад» и «Собрать».
-	title.clip_text = true
-	title.custom_minimum_size = Vector2(40, 0)
-	head.add_child(title)
-
-	# «На склад» — та же кнопка, что раньше была «Вложить», но теперь это
-	# тонкая обёртка над складом (ГДД п.14): переложить из рюкзака ровно то,
-	# чего рецепту не хватает. Со склада это можно забрать обратно.
-	if project and not bool(check["ok"]) and not bool(check["locked"]) and String(check["reason"]) != "Уже собрано":
-		var invest_btn := _make_button("На склад")
-		invest_btn.custom_minimum_size = Vector2(52, 18)
-		invest_btn.pressed.connect(func(): _do_invest(recipe_id))
-		head.add_child(invest_btn)
-
-	var btn := _make_button("Собрать")
-	btn.disabled = not bool(check["ok"])
-	btn.custom_minimum_size = Vector2(48, 18)
-	btn.pressed.connect(func(): _do_craft(recipe_id))
-	head.add_child(btn)
-
-	var desc := Label.new()
-	desc.text = String(r["desc_ru"])
-	desc.add_theme_font_size_override("font_size", 8)
-	desc.add_theme_color_override("font_color", DIM)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(desc)
-
-	var parts: Array = []
-	for id in r["inputs"].keys():
-		var want := int(r["inputs"][id])
-		var have := ShopService.held_for(recipe_id, String(id))
-		parts.append(_need_part("%s %d/%d" % [ShopCatalog.item_name(String(id)), have, want], have >= want))
-	if int(r["coins"]) > 0:
-		parts.append(_need_part("монет %d/%d" % [GameState.coins, int(r["coins"])],
-			GameState.coins >= int(r["coins"])))
-	box.add_child(_need_line("  ".join(parts)))
-
-	if not bool(check["ok"]) and String(check["reason"]) != "Не хватает материалов":
-		var reason := Label.new()
-		reason.text = String(check["reason"])
-		reason.add_theme_font_size_override("font_size", 8)
-		reason.add_theme_color_override("font_color", GREEN if String(check["reason"]) == "Уже собрано" else DIM)
-		reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		reason.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		box.add_child(reason)
-
-	box.add_child(HSeparator.new())
-	return box
-
-
-func _do_invest(recipe_id: String) -> void:
-	var result := ShopService.invest(recipe_id)
-	notice(String(result["message"]), 3.0)
-	_render()
-
-
-## Список материалов рецепта — ОДНОЙ переносимой строкой, а не рядом меток:
-## ряд из пяти-шести пунктов ("Железо 0/500  Бронза 0/100  ...") шире экрана
-## в 224 точки, и вместе с ним за правый край уезжает вся строка рецепта
-## вместе с кнопкой "Собрать".
-func _need_line(bbcode: String) -> RichTextLabel:
-	var rt := RichTextLabel.new()
-	rt.bbcode_enabled = true
-	rt.fit_content = true
-	rt.scroll_active = false
-	rt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rt.custom_minimum_size = Vector2(0, 10)
-	rt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rt.add_theme_font_size_override("normal_font_size", 8)
-	rt.text = bbcode
-	return rt
-
-
-func _need_part(text: String, ok: bool) -> String:
-	return "[color=#%s]%s[/color]" % [(GREEN if ok else BAD).to_html(false), text]
-
-
-func _do_craft(recipe_id: String) -> void:
-	var result := ShopService.craft(recipe_id)
-	notice(String(result["message"]), 3.0)
-	_render()
-
-
-# --- Еда: расходники за обе валюты -------------------------------------------
-
-## Раздел «Еда». Товары за доллары лежат здесь же, а не отдельной вкладкой:
-## это ровно такие же расходники (батончик, энергетик, таблетка, часы), и
-## разложить их по валютам значит заставить игрока помнить, в каком кармане
-## что лежит. Цена на кнопке всегда со своим знаком — монеты или $.
-## Продовольствие — первый раздел заказа у двери (решение владельца). Всё,
-## что за доллары, отсюда ушло в премиум-магазин.
-func _render_food() -> void:
-	_footer.visible = false
-	var free_left := HouseFood.free_orders_left()
-	if free_left > 0:
-		_add_hint("Бабка оставила денег: бесплатных заказов сегодня — %d." % free_left)
-	for f in HouseConfig.delivery_menu():
-		_list.add_child(_make_food_row(f))
-
-	var goods := ShopCatalog.goods_coins()
-	if not goods.is_empty():
-		_add_section("Допинги")
-		for g in goods:
-			_list.add_child(_make_good_row(g, "coins"))
-
-	_add_hint("Ролики (лимит на сегодня, ГДД раздел 15):")
-	for a in ShopCatalog.ad_rewards():
-		if String(a.get("id", "")) == "small_premium_currency":
-			continue  # ролик за доллары — в премиум-магазине
-		_list.add_child(_make_ad_row(a))
-
-
-## Строка блюда. Непереносимое помечено прямо в подписи: узнать об этом уже в
-## шахте, когда рюкзак пуст, — худший момент.
-func _make_food_row(f: Dictionary) -> Control:
-	var id := String(f.get("id", ""))
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 0)
-
-	var head := HBoxContainer.new()
-	var name_label := Label.new()
-	name_label.text = HouseConfig.food_name(id)
-	name_label.add_theme_font_size_override("font_size", 10)
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.clip_text = true
-	name_label.custom_minimum_size = Vector2(40, 0)
-	head.add_child(name_label)
-
-	var check := HouseFood.can_order(id)
-	var price := HouseConfig.food_price_coins(id)
-	var btn := _make_button("даром" if bool(check.get("free", false)) else "%d" % price)
-	btn.disabled = not bool(check.get("ok", false))
-	btn.custom_minimum_size = Vector2(52, 18)
-	btn.pressed.connect(func(): _do_order_food(id))
-	head.add_child(btn)
-	box.add_child(head)
-
-	var desc := Label.new()
-	var hunger := int(round(HouseConfig.food_hunger_percent(id)))
-	var stamina := int(round(HouseConfig.food_stamina_percent(id)))
-	var parts: Array = ["голод +%d%%" % hunger]
-	if stamina > 0:
-		parts.append("бодрость +%d%%" % stamina)
-	parts.append("с собой" if HouseConfig.is_portable(id) else "только дома")
-	desc.text = "  ·  ".join(parts)
-	desc.add_theme_font_size_override("font_size", 8)
-	desc.add_theme_color_override("font_color",
-		DIM if HouseConfig.is_portable(id) else Color8(0xB8, 0x8A, 0x52))
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(desc)
-
-	box.add_child(HSeparator.new())
-	return box
-
-
-func _do_order_food(id: String) -> void:
-	var r := HouseSystem.order_food(id)
-	notice(String(r.get("message", "")), 3.0)
-	_render()
-
-
-## Премиум-магазин: отдельная витрина за доллары (решение владельца). Сюда же
-## обмен и ролик за доллары — всё про вторую валюту в одном месте.
-func _render_premium_screen() -> void:
-	_footer.visible = false
-	_add_hint("Доллары в этой сборке нельзя купить: платежей нет. Их дают ролики, клады и закрытые ветки коллекции.", DIM)
-	var premium := ShopCatalog.goods_dollars()
-	if premium.is_empty():
-		_add_hint("За доллары пока ничего нет.")
-	for g in premium:
-		_list.add_child(_make_good_row(g, "dollars"))
-	_add_dollars_block()
-
-
-## Обмен долларов на монеты и ролик за доллары. Живёт в премиум-магазине:
-## владелец попросил вынести туда всё, что связано с долларами.
-func _add_dollars_block() -> void:
-	_add_section("Доллары")
-	var ex := HBoxContainer.new()
-	var ex_label := Label.new()
-	ex_label.text = "1 $ = %d монет" % ShopCatalog.coins_per_dollar()
-	ex_label.add_theme_font_size_override("font_size", 9)
-	ex_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ex.add_child(ex_label)
-	var ex_btn := _make_button("Обменять")
-	ex_btn.disabled = GameState.dollars < 1
-	ex_btn.pressed.connect(func():
-		var r := ShopService.exchange_dollars_to_coins(1)
-		notice(String(r["message"]))
-		_render()
-	)
-	ex.add_child(ex_btn)
-	_list.add_child(ex)
-
-	var ad := ShopCatalog.ad_reward("small_premium_currency")
-	if not ad.is_empty():
-		_list.add_child(_make_ad_row(ad))
-
-
-func _make_good_row(g: Dictionary, currency: String) -> Control:
-	var price := ShopCatalog.good_price(g, currency)
-	var box := HBoxContainer.new()
-
-	var text := Label.new()
-	text.text = "%s — %s" % [String(g.get("name_ru", "")), String(g.get("desc_ru", ""))]
-	text.add_theme_font_size_override("font_size", 9)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	box.add_child(text)
-
-	var btn := _make_button("%d %s" % [price, "монет" if currency == "coins" else "$"])
-	btn.disabled = (GameState.coins < price) if currency == "coins" else (GameState.dollars < price)
-	btn.pressed.connect(func(): _do_buy(String(g.get("id", "")), currency))
-	box.add_child(btn)
-	return box
-
-
-func _do_buy(good_id: String, currency: String) -> void:
-	var result := ShopService.buy(good_id, currency)
-	notice(String(result["message"]), 3.0)
-	if bool(result["ok"]) and String(result["effect"]) == "teleport_home":
-		_teleport_home()
-	_render()
-
-
-## Часы-телепорт: единственный товар, который трогает не GameState, а героя.
-func _teleport_home() -> void:
-	_resolve_refs()
-	if _player != null and is_instance_valid(_player) and _player.has_method("teleport_home"):
-		_player.teleport_home()
-
-
-func _make_ad_row(a: Dictionary) -> Control:
-	var ad_id := String(a.get("id", ""))
+	var remote := _footer_mode == "remote"
+	var items := _all_sellable_items() if remote else _selection_items()
+	var q := ShopService.quote(items)
+	var coins := int(q["coins"])
+	var doubled := GameState.next_sale_doubled and coins > 0
+	_sell_label.text = ShopArt.full(coins * 2 if doubled else coins) if coins < 100000000 else ShopArt.compact(coins)
+	_sell_x2.visible = doubled
+	_sell_lead.texture = ShopArt.tex("item_ad_tv") if remote else ShopArt.ui("icon_inventory")
+	var btn_disabled := coins <= 0
+	if remote:
+		btn_disabled = btn_disabled or ShopService.ad_uses_left("remote_dump_loot_for_sale") <= 0
+	_sell_btn.disabled = btn_disabled
+	var tip_title := "Сдать за ролик" if remote else "Продать"
+	var tip_body := "Мастерская в подвале дома. Отсюда весь лут уходит за ролик (%d/%d сегодня)." % [
+		ShopService.ad_uses_left("remote_dump_loot_for_sale"), Balance.get_ad_daily_limit("remote_dump_loot_for_sale")] \
+		if remote else "Выбранное уходит в скупку. Тап по плитке — убрать из продажи."
+	Tip.bind(_sell_btn, tip_title, tip_body, "Выручка: %s монет%s" % [ShopArt.full(coins * 2 if doubled else coins),
+		" (×2 за ролик)" if doubled else ""])
+	# ролик ×2: золотой — можно смотреть, зелёный — уже включён, серый — лимит
+	var ad_id := ShopCatalog.ad_double_sale_id()
 	var left := ShopService.ad_uses_left(ad_id)
-	var box := HBoxContainer.new()
+	var kind := "gold" if left > 0 and not GameState.next_sale_doubled else \
+			("green" if GameState.next_sale_doubled else "gray")
+	var tex := ShopArt.tex("btn_" + kind)
+	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+		var sbx := _ad_btn.get_theme_stylebox(st) as StyleBoxTexture
+		if sbx != null:
+			sbx.texture = tex
+	_ad_label.text = str(left)
+	_ad_label.visible = not GameState.next_sale_doubled
+	Tip.bind(_ad_btn, "Удвоить выручку", "Ролик удвоит следующую продажу целиком.",
+		"Включено" if GameState.next_sale_doubled else "Сегодня осталось: %d из %d" % [
+			left, Balance.get_ad_daily_limit(ad_id)])
 
-	var text := Label.new()
-	text.text = String(a.get("name_ru", ad_id))
-	text.add_theme_font_size_override("font_size", 9)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(text)
 
-	var btn := _make_button("Ролик %d/%d" % [left, Balance.get_ad_daily_limit(ad_id)])
-	btn.disabled = left <= 0
-	btn.pressed.connect(func():
-		var r := ShopService.claim_ad(ad_id)
-		notice(String(r["message"]), 3.0)
+func _on_sell_pressed() -> void:
+	if Tip.swallowed() or _busy:
+		return
+	if _footer_mode == "remote":
+		_do_sell(true)
+	else:
+		_do_sell(false)
+
+
+## Продажа с анимацией: плитки схлопываются, монеты разлетаются и летят в
+## кошелёк, цифры в шапке накручиваются по мере долёта.
+func _do_sell(remote: bool) -> void:
+	var items := _all_sellable_items() if remote else _selection_items()
+	var coins_before := GameState.coins
+	var sold_tiles: Array = []
+	for id in items.keys():
+		var t: ShopTile = _tiles.get("sell:" + String(id))
+		if t != null:
+			sold_tiles.append(t)
+	var result: Dictionary
+	if remote:
+		var r := ShopService.remote_dump_loot()
+		result = {"ok": bool(r["ok"]), "coins": GameState.coins - coins_before, "doubled": false,
+			"message": String(r["message"])}
+	else:
+		result = ShopService.sell(items)
+	if not bool(result["ok"]):
+		Sfx.play("ui_deny")
+		Haptics.tap()
+		ShopFx.wiggle(_sell_btn)
+		if result.has("message"):
+			notice(String(result["message"]))
+		return
+	_busy = true
+	var gained := int(result["coins"])
+	var doubled := bool(result.get("doubled", false))
+	Sfx.play("sell")
+	Haptics.tap()
+	if gained >= 1000 or doubled:
+		Sfx.play("coins_big")
+
+	var coin_tex := ShopArt.ui("icon_coin")
+	var wallet: Vector2 = (_chips["coins"]["icon"] as Control).get_global_rect().get_center()
+	_wallet_hold = true
+	_shown_coins = coins_before
+	var per_tile := 3 if sold_tiles.size() <= 4 else 2
+	var arrived := 0
+	var total := mini(sold_tiles.size() * per_tile, 14)
+	var n_total := maxi(total, 1)
+	var on_arrive := func(_i: int) -> void:
+		arrived += 1
+		Sfx.play("coin", 1.0 + 0.04 * float(arrived % 6))
+		var part := coins_before + int(round(float(gained) * float(arrived) / float(n_total)))
+		(_chips["coins"]["label"] as Label).text = _chip_fmt("coins", mini(part, coins_before + gained))
+		ShopFx.pop(_chips["coins"]["root"], 0.1, 0.12)
+	var spawned := 0
+	for t in sold_tiles:
+		var tile: ShopTile = t
+		var c := tile.get_global_rect().get_center() - Vector2(0, 6)
+		var k := mini(per_tile, total - spawned)
+		if k > 0:
+			ShopFx.coins(_root, coin_tex, c, wallet, k, on_arrive)
+			spawned += k
+		tile.pivot_offset = tile.size * 0.5
+		var tw := tile.create_tween()
+		tw.tween_interval(0.04 * float(sold_tiles.find(t)))
+		tw.tween_property(tile, "scale", Vector2(1.12, 1.12), 0.08)
+		tw.tween_property(tile, "scale", Vector2(0.0, 0.0), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	if spawned == 0:
+		on_arrive.call(0)
+	if doubled:
+		ShopFx.sparkles(_root, _sell_btn.get_global_rect().get_center(), ShopArt.COL_GOLD, 16, 44.0)
+		ShopFx.pop(_sell_btn, 0.2, 0.4)
+
+	# дождаться долёта последней монеты, потом перерисовать вкладку
+	var wait := 0.04 * float(maxi(sold_tiles.size(), 1)) + 0.85 + 0.04 * float(per_tile)
+	await get_tree().create_timer(wait).timeout
+	_wallet_hold = false
+	_busy = false
+	_selected.clear()
+	for row in ShopService.sellable_stacks():
+		_selected[row["id"]] = true
+	if is_open():
+		_sync_wallet(false)
 		_render()
-	)
-	box.add_child(btn)
-	return box
 
 
 # ---------------------------------------------------------------------------
 # Реакции
 # ---------------------------------------------------------------------------
 
-func _on_footer_pressed() -> void:
-	if _tab != TAB_SELL:
-		return
-	if _footer_mode == "remote":
-		var r := ShopService.remote_dump_loot()
-		notice(String(r["message"]), 3.4)
-		_render()
-	else:
-		_do_sell()
-
-
 ## Игра попыталась надеть инструмент, которого у игрока нет. Объясняем, где он
-## берётся, — иначе игрок видит, что "ничего не произошло". Ответ теперь
-## зависит от того, что это: кирку покупают, технику собирают.
+## берётся, — иначе игрок видит, что «ничего не произошло». Ответ зависит от
+## того, что это: кирку покупают, технику собирают.
 func _on_tool_purchase_required(tool_id: String) -> void:
 	var name_ru := Balance.get_tool_name_ru(tool_id)
 	if Balance.tool_needs_materials(tool_id):

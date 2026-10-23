@@ -108,6 +108,24 @@ static func lava_file(wx: int, wy: int) -> String:
 	return "lava_%d" % (1 + (int(Time.get_ticks_msec() / LAVA_FRAME_MS) + phase) % LAVA_FRAMES)
 
 
+static var _lava_tex: Array = []
+
+
+## Номер такта анимации лавы (одинаков для всех клеток, у каждой своя фаза поверх него).
+static func lava_tick() -> int:
+	return int(Time.get_ticks_msec() / LAVA_FRAME_MS)
+
+
+## Текстура лавы клетки на такте tick — то же, что texture_for(LAVA, …) в этот миг, но без
+## строк и поиска по словарю: WorldView зовёт её на каждую видимую клетку лавы.
+static func lava_texture(wx: int, wy: int, tick: int) -> Texture2D:
+	if _lava_tex.is_empty():
+		for i in range(LAVA_FRAMES):
+			_lava_tex.append(_load("lava_%d" % (i + 1)))
+	var phase: int = ((wx * 73856093) ^ (wy * 19349663)) & 0xFF
+	return _lava_tex[(tick + phase) % LAVA_FRAMES]
+
+
 ## Текстура клетки по типу и мировым координатам (для варианта земли и пояса).
 ## Возвращает null, если графики для этого типа нет — рендерер должен
 ## нарисовать плейсхолдер-заливку.

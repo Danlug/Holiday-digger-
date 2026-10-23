@@ -21,6 +21,16 @@ const DEFAULT_RESOURCE_RADIUS := 1  # ГДД раздел 12: старт рес�
 # chunk_index:int -> {"terrain": PackedByteArray, "resource": PackedByteArray}
 var _chunks: Dictionary = {}
 
+# ---- версия тумана для кэша WorldView (см. changed_since) ----
+# Каждое изменение битов поднимает version и кладёт в кольцо ключи затронутых клеток
+# (y * WIDTH + x); сброс и загрузка помечают «всё». Читать можно из любого числа потребителей:
+# ничего не стирается.
+const LOG := 32
+const LOG_MAX_CELLS := 600   # сброс больше этого — проще перечитать окно целиком
+var version: int = 0
+var _all_version: int = 0
+var _log_keys: Array = []
+
 
 ## Доля клетки, которую круг обзора должен накрыть, чтобы клетка открылась
 ## (решение владельца). Половина — потому что это единственный порог, который
@@ -93,6 +103,7 @@ func get_state(x: int, y: int) -> int:
 ## O(глубина × ширина).
 func reset_all() -> void:
 	_chunks.clear()
+	_touch_all()
 
 
 ## Сброс тумана по прямоугольнику клеток — ровно зона обвала и ничего больше
@@ -112,6 +123,14 @@ func reset_rect(x0: int, y0: int, w: int, h: int) -> void:
 	var y_to := y0 + h - 1
 	if x_from > x_to or y_from > y_to:
 		return
+	if (x_to - x_from + 1) * (y_to - y_from + 1) > LOG_MAX_CELLS:
+		_touch_all()
+	else:
+		var keys := PackedInt32Array()
+		for y in range(y_from, y_to + 1):
+			for x in range(x_from, x_to + 1):
+				keys.append(y * WIDTH + x)
+		_touch_keys(keys)
 	for y in range(y_from, y_to + 1):
 		var chunk: Dictionary = _get_chunk(_chunk_index(y), false)
 		# Неразведанный чанк не аллоцирован — он и так весь чёрный, а создать
@@ -136,6 +155,7 @@ func to_save_data() -> Dictionary:
 
 
 func load_save_data(data: Dictionary) -> void:
+	_touch_all()
 	_chunks.clear()
 	for key in data.keys():
 		var entry: Dictionary = data[key]
@@ -143,6 +163,31 @@ func load_save_data(data: Dictionary) -> void:
 			"terrain": Marshalls.base64_to_raw(entry.get("terrain", "")),
 			"resource": Marshalls.base64_to_raw(entry.get("resource", "")),
 		}
+
+
+## Ключи (y * WIDTH + x) клеток, у которых могло измениться состояние после версии v. null —
+## «менялось всё или v слишком стара» (перечитай окно целиком); пустой массив — ничего.
+func changed_since(v: int) -> Variant:
+	if v == version:
+		return PackedInt32Array()
+	if v > version or _all_version > v or version - v > LOG:
+		return null
+	var out := PackedInt32Array()
+	for i in range(v + 1, version + 1):
+		out.append_array(_log_keys[i % LOG])
+	return out
+
+
+func _touch_keys(keys: PackedInt32Array) -> void:
+	if _log_keys.is_empty():
+		_log_keys.resize(LOG)
+	version += 1
+	_log_keys[version % LOG] = keys
+
+
+func _touch_all() -> void:
+	version += 1
+	_all_version = version
 
 
 # ============================== ВНУТРЕННЕЕ ==============================
@@ -160,18 +205,43 @@ func _reveal_circle(center_x: float, center_y: float, radius: int, is_terrain: b
 	if radius <= 0:
 		return
 	var r := vision_radius(radius)
+	var r2 := r * r
 	var y_from := maxi(int(floor(center_y - r)), 1)
 	var y_to := int(ceil(center_y + r))
+	var x_lim_from := maxi(int(floor(center_x - r)), 0)
+	var x_lim_to := mini(int(ceil(center_x + r)), WIDTH - 1)
+	if x_lim_from > x_lim_to:
+		return
+	# Реально открытые клетки — в журнал версий (WorldView перекрасит только их).
+	var opened := PackedInt32Array()
 	for y in range(y_from, y_to + 1):
-		var x_from := maxi(int(floor(center_x - r)), 0)
-		var x_to := mini(int(ceil(center_x + r)), WIDTH - 1)
-		if x_from > x_to:
-			continue
 		var chunk: Dictionary = _get_chunk(_chunk_index(y), true)
 		var arr: PackedByteArray = chunk.terrain if is_terrain else chunk.resource
+		# Ближайшая к центру горизонталь клетки: дальше неё по вертикали круг клетку не касается,
+		# а по горизонтали — не дальше half. Клетки вне [cx-half, cx+half] имеют покрытие 0 и
+		# раньше отсеивались внутри _coverage; результат тот же, но без O(R²) вызовов.
+		var dy0 := float(y) - center_y
+		var dy1 := dy0 + 1.0
+		var near_y: float = 0.0 if (dy0 <= 0.0 and dy1 >= 0.0) else minf(absf(dy0), absf(dy1))
+		var rem := r2 - near_y * near_y
+		if rem <= 0.0:
+			continue
+		var half := sqrt(rem)
+		var x_from := maxi(int(floor(center_x - half)), x_lim_from)
+		var x_to := mini(int(ceil(center_x + half)), x_lim_to)
+		var row_base := ((y - 1) % CHUNK_H) * WIDTH
 		for x in range(x_from, x_to + 1):
+			var idx := row_base + x
+			var byte_i := idx >> 3
+			var mask := 1 << (idx & 7)
+			# Бит уже стоит — туман только открывается, считать площадь незачем.
+			if byte_i >= arr.size() or (arr[byte_i] & mask) != 0:
+				continue
 			if _coverage(center_x, center_y, r, float(x), float(y)) >= COVERAGE_TO_REVEAL:
-				_set_bit(arr, _local_index(x, y))
+				arr[byte_i] = arr[byte_i] | mask
+				opened.append(y * WIDTH + x)
+	if not opened.is_empty():
+		_touch_keys(opened)
 
 
 ## Какая доля клетки [cx, cx+1] × [cy, cy+1] накрыта кругом (0..1).

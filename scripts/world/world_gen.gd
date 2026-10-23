@@ -66,8 +66,22 @@ var events: Array = []          # [{x0:int, y0:int, w:int, h:int, salt:int}, ...
 ## Хук «структура поверх мира» (арена рейдбосса на дне, ветка combat): ниже
 ## overlay_y_min get_tile сперва спрашивает overlay(x, y) -> int; -1 — клетка
 ## обычная. Пока хук не задан, мир не меняется ни на байт.
-var overlay: Callable = Callable()
-var overlay_y_min: int = 1 << 30
+var overlay: Callable = Callable():
+	set(v):
+		overlay = v
+		_touch_all()
+var overlay_y_min: int = 1 << 30:
+	set(v):
+		overlay_y_min = v
+		_touch_all()
+
+# ---- версия видимого мира для кэша WorldView (см. changes_since) ----
+# Любая правка, меняющая то, что вернёт get_tile, поднимает version. Копка кладёт ключ клетки в
+# кольцо, массовые правки (обвал, землетрясение, загрузка, засыпка огорода) помечают «всё».
+const DIG_LOG := 128
+var version: int = 0
+var _all_version: int = 0
+var _dig_log: PackedInt32Array = PackedInt32Array()
 
 # ---- кэш разобранного world_layers.json, чтобы не парсить JSON на каждый tile ----
 var _shallow_layers: Array = []
@@ -155,7 +169,11 @@ var _pre_autodig_locked: bool = false
 ## лестницу поставят(?) позже (см. _permanent_feature_type). Тоннеля тоже
 ## нет ни там, ни там — он появляется только после Роберта, это уже
 ## учтено полем _garden_locked отдельно от era.
-var era: String = "now"
+var era: String = "now":
+	set(v):
+		if era != v:
+			era = v
+			_touch_all()
 
 
 func _init(p_world_seed: int) -> void:
@@ -309,6 +327,7 @@ func dig_cell(x: int, y: int) -> bool:
 	if not TileTypes.is_diggable(current):
 		return false
 	diffs[_key(x, y)] = true
+	_touch_cell(_key(x, y))
 	return true
 
 
@@ -459,6 +478,7 @@ func build_robert_tunnel() -> void:
 			if is_permanent_feature(x, y):
 				continue
 			dig_cell(x, y)
+	_touch_all()
 
 
 ## Огород закрыт Робертом: лестницы нет, копать нечего, вход только тоннелем.
@@ -559,6 +579,7 @@ func forget_dug_cells(cells: Array) -> void:
 	for c in cells:
 		var v: Vector2i = c
 		diffs.erase(_key(v.x, v.y))
+	_touch_all()
 
 
 ## Клетка не участвует в событиях сброса, пока не выкопана (фундамент,
@@ -612,6 +633,37 @@ func load_save_data(data: Dictionary) -> void:
 	_garden_locked = bool(data.get("garden_locked", false))
 
 
+## Правку мира сделали мимо WorldGen (например, прямая запись в diffs): просим кэш рендера
+## перечитать всё. WorldView и так перепроверяет по строке за кадр, но этот вызов — мгновенный.
+func mark_changed() -> void:
+	_touch_all()
+
+
+## Что изменилось после версии v: ключи клеток (y * WIDTH + x), если это были только копки, пустой
+## массив, если ничего, и null, если менялось «всё» или v слишком стара — тогда надо перечитать окно.
+func changes_since(v: int) -> Variant:
+	if v == version:
+		return PackedInt32Array()
+	if v > version or _all_version > v or version - v > DIG_LOG:
+		return null
+	var out := PackedInt32Array()
+	for i in range(v + 1, version + 1):
+		out.append(_dig_log[i % DIG_LOG])
+	return out
+
+
+func _touch_cell(key: int) -> void:
+	if _dig_log.is_empty():
+		_dig_log.resize(DIG_LOG)
+	version += 1
+	_dig_log[version % DIG_LOG] = key
+
+
+func _touch_all() -> void:
+	version += 1
+	_all_version = version
+
+
 # ============================== ВНУТРЕННЕЕ ==============================
 
 func _key(x: int, y: int) -> int:
@@ -619,6 +671,7 @@ func _key(x: int, y: int) -> int:
 
 
 func _clear_diffs_in_rect(x0: int, y0: int, w: int, h: int) -> void:
+	_touch_all()
 	var x1 := x0 + w
 	var y1 := y0 + h
 	for key in diffs.keys():
@@ -712,6 +765,7 @@ func _cached_layered(x: int, y: int) -> int:
 
 
 func _cache_reset() -> void:
+	_touch_all()
 	var n := (max_depth + 64) * WIDTH
 	if _cells.size() != n:
 		_cells.resize(n)

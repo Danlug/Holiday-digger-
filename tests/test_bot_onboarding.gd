@@ -106,11 +106,15 @@ func _run_isolated(args: PackedStringArray) -> void:
 		for i in range(mini(bad.size(), 8)):
 			print("    ", bad[i])
 	print("[%s] дочерний прогон: код %d, ошибок в логе %d" % ["OK" if ok else "FAIL", code, bad.size()])
-	var summary := ""
+	var child_summary := ""
 	for line in text.split("\n"):
 		if line.contains("Итог:"):
-			summary = line
-	print("=== Итог: %d проверок, %d провалов ===" % [1, 0 if ok else 1] if summary.is_empty() else summary.replace("===", "===").strip_edges())
+			child_summary = line.strip_edges()
+	# Строку «Итог» ждёт run_tests.sh: берём детский счёт и добавляем свою проверку лога.
+	if child_summary.is_empty():
+		print("=== Итог: 1 проверок, 1 провалов ===")
+	else:
+		print(child_summary if ok else child_summary.replace("0 провалов", "1+ провалов"))
 	get_tree().quit(0 if ok else 1)
 
 
@@ -266,6 +270,11 @@ func _run() -> void:
 	await _phase_intro()
 	await _phase_manual_digs()
 	await _phase_autodig()
+	await _phase_shovel_limits()
+	await _phase_workshop()
+	await _phase_gold()
+	await _phase_foundation_and_death()
+	await _phase_sell_and_food()
 	_finish()
 
 
@@ -329,14 +338,230 @@ func _phase_manual_digs() -> void:
 	bot.release_all()
 
 
+func _autodig_finished() -> bool:
+	return StoryState.is_seen("autodig_done") and not director.cutscene.is_playing \
+		and not director.auto_dig.running
+
+
 func _phase_autodig() -> void:
 	if _dead:
 		return
 	await _until(func(): return StoryState.is_seen("autodig_start"), 30.0, "автокопка запущена после трёх копок")
-	await _until(func(): return StoryState.is_seen("autodig_done") and not director.cutscene.is_playing
-		and not director.auto_dig.running, 240.0, "автокопка и сцены клада доиграны")
+	await _until(_autodig_finished, 240.0, "автокопка и сцены клада доиграны")
 	if _dead:
 		return
 	check("никчёмный клад: 50 монет, 5 премиума", GameState.coins == 50 and GameState.dollars == 5,
 		"монеты %d, доллары %d" % [GameState.coins, GameState.dollars])
 	check("гейт огорода снят", not world.is_pre_autodig_locked_cell(16, 2))
+
+
+## Лопата перед золотом и фундаментом: слова вместо стана (ГДД раздел 9).
+func _phase_shovel_limits() -> void:
+	if _dead:
+		return
+	var gold: Array = world.scripted_loot_cells()
+	check("сценарного золота ровно пять", gold.size() == 5)
+	if gold.size() != 5:
+		return
+	var row: int = gold[0].y
+	await _until(func(): return player.on_ground and player.cell_y() == row, 15.0, "после автокопки герой стоит на четвёртом уровне")
+	if _dead:
+		return
+	# Подходим к самому левому самородку слева и бьём лопатой.
+	var left: Vector2i = gold[0]
+	for g: Vector2i in gold:
+		if g.x < left.x:
+			left = g
+	_refusals.clear()
+	if not await _walk_to_x(float(left.x) - 0.5, "подойти к золоту слева"):
+		return
+	bot.hold([KEY_D])
+	await _until(func(): return _refusals.has("gold_needs_pickaxe"), 8.0, "лопата о золото: объяснение вместо стана")
+	bot.release_all()
+	check("стана от золота нет", player.stun_until_msec <= Time.get_ticks_msec())
+
+	# Фундамент: под ногами, строго вниз.
+	_refusals.clear()
+	bot.hold([KEY_S])
+	await _until(func(): return _refusals.has("foundation_needs_pickaxe"), 8.0, "лопата о фундамент: «нужна кирка»")
+	bot.release_all()
+
+
+
+
+# ---------------------------------------------------------------------------
+# Дом: настоящая ходьба клавишами A/D и нажатие кнопок над героем
+# ---------------------------------------------------------------------------
+
+func _view() -> Node:
+	return house._view
+
+
+## Нажимает кнопку действия в текущей комнате так, как это делает игрок: идёт
+## клавишами к точке, ждёт, пока над героем загорится кнопка, жмёт её.
+func _house_press(action: String, label: String) -> bool:
+	if _dead:
+		return false
+	var view := _view()
+	var pts: Dictionary = HouseRoomsConfig.points(String(view.room_id()))
+	var px := -1.0
+	var radius := 0.05
+	for id in pts.keys():
+		for b in (pts[id].get("buttons", []) as Array):
+			if String(b.get("action", "")) == action:
+				px = float(pts[id].get("x", 0.5))
+				radius = float(pts[id].get("radius", 0.08))
+	if px < 0.0:
+		check("в комнате %s есть действие %s" % [view.room_id(), action], false)
+		_dead = true
+		return false
+	var t0 := _sim
+	while absf(float(view.hero_x_fraction()) - px) > radius * 0.5 and _sim - t0 < 20.0:
+		bot.hold([KEY_D if px > float(view.hero_x_fraction()) else KEY_A])
+		await _step()
+	bot.release_all()
+	await _frames_n(2)
+	for btn in view._hotspot_buttons:
+		if String(btn.get_meta("action", "")) == action:
+			btn.pressed.emit()
+			await _frames_n(2)
+			_timeline.append([label, _sim - t0])
+			check(label, true)
+			return true
+	check("не застряли: " + label, false, "кнопки над героем: %s, вид виден=%s заперт=%s (внешний=%s сон=%s форс='%s') x=%.2f, HUD виден=%s\n%s" % [
+		str(view.active_hotspots()), view.visible, view._is_locked(), view._locked, view._sleeping,
+		view._forced_mode, view.hero_x_fraction(), hud.visible, _dump()])
+	_dead = true
+	return false
+
+
+## Домой: вылезти по лестнице, зайти, взять кирку на стене мастерской, выйти.
+func _phase_workshop() -> void:
+	if _dead:
+		return
+	var door := HouseConfig.door_cell()
+	if not await _walk_to_x(float(door.x) + 0.5, "вылезти по лестнице и дойти до двери", 90.0):
+		return
+	await _until(func(): return house.near_door() and house._outdoor_button.visible, 5.0, "у входной двери появляется «Зайти»")
+	if _dead:
+		return
+	house._outdoor_button.pressed.emit()
+	await _frames_n(3)
+	check("герой в доме, интерфейс шахты спрятан, герой заморожен",
+		GameState.house_is_indoors and not hud.visible and player.frozen and _view().room_id() == "hall")
+	if not await _house_press("goto:workshop", "салон → мастерская"):
+		return
+	check("в мастерской пока нет кирки в руках", GameState.current_tool == "shovel")
+	if not await _house_press("take_pickaxe", "взять кирку со стены"):
+		return
+	check("кирка выдана и надета", GameState.current_tool == "rusty_pickaxe" and GameState.owns_tool("rusty_pickaxe"))
+	check("мастерская засчитана", StoryState.is_seen("workshop"))
+	await _frames_n(3)
+	check("задание — собрать золото (5)", director._objective.contains("5") and director._objective.contains("золото"),
+		"«%s»" % director._objective)
+	check("пять самородков подсвечены в мире", director._quest_cells.size() == 5)
+	if not await _house_press("goto:hall", "мастерская → салон"):
+		return
+	if not await _house_press("exit_door", "выйти на улицу"):
+		return
+	check("снова на улице: герой свободен, интерфейс виден",
+		not GameState.house_is_indoors and hud.visible and not player.frozen)
+
+
+## Золото киркой: идём по четвёртому уровню слева направо, упёршись — копаем.
+func _phase_gold() -> void:
+	if _dead:
+		return
+	var gold: Array = world.scripted_loot_cells()
+	var first_x := 99
+	for g: Vector2i in gold:
+		first_x = mini(first_x, g.x)
+	# Вниз по лестнице: идём вправо, герой сам спускается в расчищенный огород.
+	if not await _walk_to_x(float(first_x) - 0.5, "дойти до первого самородка", 60.0):
+		return
+	await _until(func(): return player.on_ground and player.cell_y() == gold[0].y, 10.0, "герой на уровне золота")
+	if _dead:
+		return
+	bot.hold([KEY_D])
+	await _until(func(): return StoryState.has_flag("gold_taken"), 90.0, "пять самородков выкопаны киркой")
+	bot.release_all()
+	if _dead:
+		return
+	check("золото в рюкзаке", GameState.get_item_count("gold") == 5, "золота: %d" % GameState.get_item_count("gold"))
+	await _frames_n(3)
+	check("задание — пробить фундамент", director._objective.contains("фундамент"), "«%s»" % director._objective)
+
+
+## Фундамент: стоим на месте и жмём «вниз» киркой. Пробитие зовёт сцену смерти.
+func _phase_foundation_and_death() -> void:
+	if _dead:
+		return
+	var foundation_y: int = world.foundation_y()
+	# Встаём туда, где под ногами фундамент (не на яму после автокопки).
+	bot.hold([KEY_S])
+	await _until(func(): return StoryState.has_flag("foundation_broken"), 60.0, "фундамент пробит киркой")
+	bot.release_all()
+	if _dead:
+		return
+	check("сцена смерти встала в очередь или уже идёт",
+		GameState.story_queue.has("death") or director.cutscene.scene_id == "death" or StoryState.is_seen("death"))
+	await _until(func(): return StoryState.is_seen("death"), 240.0, "сцена смерти доиграна")
+	if _dead:
+		return
+	check("инвентарь пережил смерть (единственный раз): пять золота", GameState.get_item_count("gold") == 5,
+		"золота: %d" % GameState.get_item_count("gold"))
+	check("полоски выживания введены", StoryState.has_flag("bars_introduced") and hud.are_gauges_visible())
+	check("герой жив", GameState.is_alive)
+	check("респавн в доме", GameState.house_is_indoors)
+	await _until(func(): return StoryState.is_seen("robert") and not director.cutscene.is_playing, 400.0,
+		"после смерти доиграны ранец и Роберт")
+	if _dead:
+		return
+	check("Роберт построил тоннель", GameState.house_hatch_built and StoryState.has_flag("hatch_built"))
+	check("инвентарь цел после всех сцен", GameState.get_item_count("gold") == 5)
+	# Сцены кончаются внутри дома: тот, кто листает комнату клавишами A/D, не должен
+	# одновременно водить живого героя по огороду под домом.
+	check("после сцен герой остаётся в доме: заморожен, интерфейс шахты спрятан",
+		GameState.house_is_indoors and player.frozen and not hud.visible,
+		"в доме=%s заморожен=%s HUD=%s" % [GameState.house_is_indoors, player.frozen, hud.visible])
+
+
+## «Продай золото» → «закажи еду».
+func _phase_sell_and_food() -> void:
+	if _dead:
+		return
+	await _frames_n(3)
+	check("задание — продать золото", director._objective.contains("продай"), "«%s»" % director._objective)
+	check("в доме можно торговать", ShopService.is_at_workshop())
+	var before := GameState.coins
+	var r := ShopService.sell_all()
+	check("золото продано", bool(r["ok"]) and GameState.get_item_count("gold") == 0 and GameState.coins > before,
+		"монеты %d → %d" % [before, GameState.coins])
+	await _frames_n(3)
+	check("продажа закрыла задание", StoryState.has_flag("gold_sold"))
+	check("задание — заказать еду", director._objective.contains("еду"), "«%s»" % director._objective)
+
+	# Еда: в прихожей «Заказать» открывает магазин.
+	if _view().room_id() != "hall":
+		if _view().room_id() == "workshop":
+			if not await _house_press("goto:hall", "в салон за едой"):
+				return
+	if not await _house_press("open_shop", "«Заказать» у входной двери"):
+		return
+	check("магазин открылся", ShopUI.instance != null and ShopUI.instance.is_open())
+	ShopUI.instance.close()
+	var menu: Array = HouseConfig.delivery_menu()
+	check("в меню доставки есть еда", not menu.is_empty())
+	var food_id := ""
+	for item in menu:
+		if HouseConfig.is_portable(String(item.get("id", ""))):
+			food_id = String(item.get("id", ""))
+			break
+	var order := HouseSystem.order_food(food_id)
+	check("заказ принят", bool(order["ok"]), String(order.get("message", "")))
+	await _until(func(): return StoryState.has_flag("food_ordered"), HouseConfig.delivery_seconds() * 3.0 + 5.0,
+		"курьер привёз еду: обучение закрыто")
+	if _dead:
+		return
+	check("заданий больше нет", director._objective.is_empty(), "«%s»" % director._objective)
+	check("«Забрать» у двери доступно", HouseFood.food_at_door_count() > 0)

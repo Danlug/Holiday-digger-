@@ -328,6 +328,7 @@ static func buy_tool(tool_id: String) -> Dictionary:
 	# Купленная кирка сразу в руках: покупать её и отдельно идти надевать —
 	# лишний шаг. Выбор вручную остаётся на верстаке (верстак = экипировка).
 	GameState.set_current_tool(tool_id)
+	GameState.emit_event(&"bought", {"id": tool_id, "currency": "coins"})
 	SaveSystem.save_game()
 	return {"ok": true, "message": "%s куплена — уже в руках." % Balance.get_tool_name_ru(tool_id)}
 
@@ -347,6 +348,7 @@ static func buy_gear(gear_id: String) -> Dictionary:
 	if not GameState.spend_coins(price):
 		return {"ok": false, "message": "Не хватает монет"}
 	GameState.grant_gear(gear_id)
+	GameState.emit_event(&"bought", {"id": gear_id, "currency": "coins"})
 	SaveSystem.save_game()
 	return {"ok": true, "message": "%s куплен." % Balance.get_gear_name_ru(gear_id)}
 
@@ -385,6 +387,7 @@ static func buy_drill_upgrade() -> Dictionary:
 	if not GameState.spend_coins(price):
 		return {"ok": false, "message": "Не хватает монет"}
 	GameState.grant_drill_rig_tier(tier)
+	GameState.emit_event(&"bought", {"id": Balance.get_drill_rig_tier_id(tier), "currency": "coins"})
 	SaveSystem.save_game()
 	return {"ok": true, "message": "%s установлен — бур стал быстрее." % Balance.get_drill_rig_tier_name_ru(tier)}
 
@@ -426,12 +429,21 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 	if price <= 0:
 		return {"ok": false, "message": "Товар без цены", "effect": ""}
 
+	# Товар-предмет (data/shop.json, effect "grant_item") ложится в рюкзак:
+	# вес проверяем ДО оплаты, иначе деньги уйдут, а предмет не влезет.
+	if String(g.get("effect", "")) == "grant_item":
+		var item := String(g.get("item", ""))
+		var count := maxi(1, int(g.get("count", 1)))
+		if Balance.get_mineral_weight(item) * count > _free_weight():
+			return {"ok": false, "message": "Рюкзак не выдержит — разгрузись", "effect": ""}
+
 	var paid := GameState.spend_coins(price) if currency == "coins" else GameState.spend_dollars(price)
 	if not paid:
 		return {"ok": false, "message": "Не хватает " + ("монет" if currency == "coins" else "долларов"), "effect": ""}
 
 	var effect := String(g.get("effect", ""))
 	var message := apply_effect(g)
+	GameState.emit_event(&"bought", {"id": good_id, "currency": currency})
 	SaveSystem.save_game()
 	return {"ok": true, "message": message, "effect": effect}
 
@@ -463,6 +475,11 @@ static func apply_effect(g: Dictionary) -> String:
 			return "Все три полоски на максимуме."
 		"teleport_home":
 			return "Часы сработали — ты дома."
+		"grant_item":
+			var item := String(g.get("item", ""))
+			var count := maxi(1, int(g.get("count", 1)))
+			GameState.add_item(item, count)
+			return "%s ×%d" % [ShopCatalog.item_name(item), count]
 		_:
 			return name_ru
 

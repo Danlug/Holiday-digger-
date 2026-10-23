@@ -123,6 +123,19 @@ def icon_pencil():
     save(outline(img), "icon_pencil.png")
 
 
+def icon_flower():
+    """Гвоздика на могиле: значок кнопки, пока тетрадь ещё не найдена."""
+    img = new(24, 24)
+    lines(img, [(12, 12), (12, 21)], (60, 110, 60, 255), 2)
+    poly(img, [(12, 18), (7, 14), (9, 19)], (60, 110, 60, 255))
+    poly(img, [(12, 17), (17, 13), (15, 18)], (60, 110, 60, 255))
+    for (cx, cy) in ((12, 8), (8, 10), (16, 10), (10, 5), (14, 5)):
+        ell(img, (cx - 3, cy - 3, cx + 3, cy + 3), C("ruby_base"))
+    ell(img, (10, 6, 14, 10), C("ruby_light"))
+    px(img, 12, 8, (160, 20, 44, 255))
+    save(outline(img), "icon_flower.png")
+
+
 def grave_marker():
     """Золотой пузырёк с «!» — парит над плитой, пока есть что прочесть."""
     img = new(14, 18)
@@ -365,7 +378,7 @@ def prop_nugget():
 
 def main():
     print("art/story:")
-    icon_diary(); icon_seal(); icon_pencil(); grave_marker(); grave_jar()
+    icon_diary(); icon_seal(); icon_pencil(); icon_flower(); grave_marker(); grave_jar()
     for f in (sketch_first, sketch_peat, sketch_diamond, sketch_relic, sketch_gold, sketch_heavy,
               sketch_whisper, sketch_rig, sketch_gems, sketch_lava, sketch_monsters, sketch_bottom,
               sketch_last):

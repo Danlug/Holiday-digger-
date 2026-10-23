@@ -1,0 +1,328 @@
+{
+	"version": 1,
+	"_note": "Сцены сюжета после старта (ГДД раздел 2): режиссура без текстов, ключи — в data/story_<локаль>.json. Поля сцены: world:true — играет на живой карте; world_exit:\"actor\" — герой остаётся там, где кончила камера; depth — играет по достижении глубины; music — Sfx.music при старте. effects[].proposed — число придумано, не владельцем.",
+	"moods": {},
+	"props": {},
+	"actors": {"voice": {"dir": "", "speaker": "speaker.voice"}},
+	"scenes": [
+		{
+			"id": "grave_call",
+			"title": "grave_call.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"surface": true,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "sfx", "id": "phone"},
+				{"t": "narr", "text": "grave_call.n1"},
+				{"t": "say", "who": "boy", "text": "grave_call.s1"},
+				{"t": "say", "who": "grandma_rich", "text": "grave_call.g1"},
+				{"t": "say", "who": "grandma_rich", "text": "grave_call.g2"},
+				{"t": "say", "who": "boy", "text": "grave_call.s2"},
+				{"t": "say", "who": "grandma_rich", "text": "grave_call.g3"},
+				{"t": "say", "who": "grandma_rich", "text": "grave_call.g4"},
+				{"t": "say", "who": "boy", "text": "grave_call.s3"},
+				{"t": "say", "who": "grandma_rich", "text": "grave_call.g5"},
+				{"t": "narr", "text": "grave_call.n2"}
+			],
+			"effects": [
+				{"do": "toast", "text": "grave_call.toast", "sec": 5.0}
+			]
+		},
+		{
+			"id": "diary_first",
+			"title": "diary_first.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "world_walk", "actor": "boy", "x": 13.0, "camera": true, "sec": 0.6},
+				{"t": "world_prop", "id": "jar", "tex": "res://art/story/grave_jar.png", "x": 14.95, "y": 1.0, "scale": 3.0},
+				{"t": "sfx", "id": "pickup"},
+				{"t": "narr", "text": "diary_first.n1"},
+				{"t": "narr", "text": "diary_first.n2"},
+				{"t": "item", "icon": "res://art/story/icon_diary.png", "name": "item.diary", "text": "diary_first.item_text"},
+				{"t": "say", "who": "boy", "text": "diary_first.s1"},
+				{"t": "say", "who": "grandpa", "text": "diary_first.d1"},
+				{"t": "say", "who": "boy", "text": "diary_first.s2"},
+				{"t": "narr", "text": "diary_first.n3"},
+				{"t": "say", "who": "grandpa", "text": "diary_first.d2"},
+				{"t": "say", "who": "boy", "text": "diary_first.s3"},
+				{"t": "narr", "text": "diary_first.n4"}
+			],
+			"effects": [
+				{"do": "flag", "id": "diary_found"},
+				{"do": "sfx", "id": "reward"},
+				{"do": "toast", "text": "diary_first.toast", "sec": 5.0}
+			]
+		},
+		{
+			"id": "first_artifact",
+			"title": "first_artifact.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "sfx", "id": "pickup_rare"},
+				{"t": "narr", "text": "first_artifact.n1"},
+				{"t": "say", "who": "boy", "text": "first_artifact.s1"},
+				{"t": "narr", "text": "first_artifact.n2"},
+				{"t": "say", "who": "boy", "text": "first_artifact.s2"},
+				{"t": "narr", "text": "first_artifact.n3"}
+			],
+			"effects": [
+				{"do": "xp", "n": 150, "proposed": true}
+			]
+		},
+		{
+			"id": "depth_100",
+			"title": "depth_100.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"depth": 100,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "narr", "text": "depth_100.n1"},
+				{"t": "say", "who": "boy", "text": "depth_100.s1"},
+				{"t": "sfx", "id": "phone"},
+				{"t": "say", "who": "grandma_rich", "text": "depth_100.g1"},
+				{"t": "say", "who": "boy", "text": "depth_100.s2"},
+				{"t": "say", "who": "grandma_rich", "text": "depth_100.g2"},
+				{"t": "say", "who": "boy", "text": "depth_100.s3"},
+				{"t": "say", "who": "grandma_rich", "text": "depth_100.g3"}
+			],
+			"effects": [
+				{"do": "xp", "n": 100, "proposed": true}
+			]
+		},
+		{
+			"id": "fever_500",
+			"title": "fever_500.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"depth": 500,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "dig_pick", "camera": true},
+				{"t": "narr", "text": "fever_500.n1"},
+				{"t": "narr", "text": "fever_500.n2"},
+				{"t": "say", "who": "boy", "text": "fever_500.s1"},
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "fx", "kind": "thud"},
+				{"t": "narr", "text": "fever_500.n3"},
+				{"t": "say", "who": "boy", "text": "fever_500.s2"},
+				{"t": "narr", "text": "fever_500.n4"},
+				{"t": "say", "who": "boy", "text": "fever_500.s3"},
+				{"t": "narr", "text": "fever_500.n5"},
+				{"t": "sfx", "id": "phone"},
+				{"t": "say", "who": "grandma_rich", "text": "fever_500.g1"},
+				{"t": "say", "who": "boy", "text": "fever_500.s4"},
+				{"t": "say", "who": "grandma_rich", "text": "fever_500.g2"}
+			],
+			"effects": [
+				{"do": "hunger", "n": 40},
+				{"do": "stamina", "n": 100},
+				{"do": "xp", "n": 200, "proposed": true},
+				{"do": "flag", "id": "fever_survived"}
+			]
+		},
+		{
+			"id": "grandma_returns",
+			"title": "grandma_returns.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"surface": true,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "world_walk", "actor": "boy", "x": 13.0, "camera": true, "sec": 0.8},
+				{"t": "world_actor", "actor": "grandma_rich", "x": 21.0, "y": 0.5, "pose": "idle", "flip": true},
+				{"t": "world_prop", "id": "suitcase", "tex": "res://art/story/prop_suitcase.png", "x": 17.6, "y": 1.0, "scale": 3.0},
+				{"t": "sfx", "id": "door"},
+				{"t": "world_walk", "actor": "grandma_rich", "x": 16.2, "sec": 1.8},
+				{"t": "narr", "text": "grandma_returns.n1"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g1"},
+				{"t": "say", "who": "boy", "text": "grandma_returns.s1"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g2"},
+				{"t": "say", "who": "boy", "text": "grandma_returns.s2"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g3"},
+				{"t": "say", "who": "boy", "text": "grandma_returns.s3"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g4"},
+				{"t": "narr", "text": "grandma_returns.n2"},
+				{"t": "item", "icon": "res://art/story/prop_nugget.png", "name": "item.first_nugget", "text": "grandma_returns.item_text"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g5"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g6"},
+				{"t": "say", "who": "boy", "text": "grandma_returns.s4"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g7"},
+				{"t": "say", "who": "boy", "text": "grandma_returns.s5"},
+				{"t": "say", "who": "grandma_rich", "text": "grandma_returns.g8"},
+				{"t": "narr", "text": "grandma_returns.n3"}
+			],
+			"effects": [
+				{"do": "flag", "id": "grandma_home"},
+				{"do": "xp", "n": 300, "proposed": true},
+				{"do": "toast", "text": "grandma_returns.toast", "sec": 4.5}
+			]
+		},
+		{
+			"id": "whisper_1200",
+			"title": "whisper_1200.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"depth": 1200,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "narr", "text": "whisper_1200.n1"},
+				{"t": "say", "who": "voice", "text": "whisper_1200.v1"},
+				{"t": "say", "who": "boy", "text": "whisper_1200.s1"},
+				{"t": "say", "who": "voice", "text": "whisper_1200.v2"},
+				{"t": "say", "who": "boy", "text": "whisper_1200.s2"},
+				{"t": "shake", "sec": 0.4},
+				{"t": "narr", "text": "whisper_1200.n2"},
+				{"t": "say", "who": "boy", "text": "whisper_1200.s3"},
+				{"t": "narr", "text": "whisper_1200.n3"}
+			],
+			"effects": [
+				{"do": "xp", "n": 400, "proposed": true},
+				{"do": "flag", "id": "whisper_heard"}
+			]
+		},
+		{
+			"id": "abyss_warning",
+			"title": "abyss_warning.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"depth": 3900,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "narr", "text": "abyss_warning.n1"},
+				{"t": "sfx", "id": "quake"},
+				{"t": "shake", "sec": 0.9},
+				{"t": "fx", "kind": "thud"},
+				{"t": "say", "who": "boy", "text": "abyss_warning.s1"},
+				{"t": "sfx", "id": "phone"},
+				{"t": "say", "who": "grandma_rich", "text": "abyss_warning.g1"},
+				{"t": "say", "who": "boy", "text": "abyss_warning.s2"},
+				{"t": "say", "who": "grandma_rich", "text": "abyss_warning.g2"},
+				{"t": "say", "who": "grandma_rich", "text": "abyss_warning.g3"},
+				{"t": "say", "who": "boy", "text": "abyss_warning.s3"},
+				{"t": "say", "who": "grandma_rich", "text": "abyss_warning.g4"},
+				{"t": "narr", "text": "abyss_warning.n2"}
+			],
+			"effects": [
+				{"do": "xp", "n": 600, "proposed": true},
+				{"do": "toast", "text": "abyss_warning.toast", "sec": 5.5}
+			]
+		},
+		{
+			"id": "bottom_near",
+			"title": "bottom_near.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"depth": 9700,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "narr", "text": "bottom_near.n1"},
+				{"t": "say", "who": "boy", "text": "bottom_near.s1"},
+				{"t": "say", "who": "voice", "text": "bottom_near.v1"},
+				{"t": "say", "who": "boy", "text": "bottom_near.s2"},
+				{"t": "narr", "text": "bottom_near.n2"}
+			],
+			"effects": [
+				{"do": "xp", "n": 800, "proposed": true},
+				{"do": "toast", "text": "bottom_near.toast", "sec": 4.5}
+			]
+		},
+		{
+			"id": "ending",
+			"title": "ending.title",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "narr", "text": "ending.n1"},
+				{"t": "say", "who": "voice", "text": "ending.v1"},
+				{"t": "sfx", "id": "quake"},
+				{"t": "fx", "kind": "flash", "color": "#ffe9a0", "sec": 0.6},
+				{"t": "narr", "text": "ending.n2"},
+				{"t": "say", "who": "boy", "text": "ending.s1"},
+				{"t": "narr", "text": "ending.n3"},
+				{"t": "say", "who": "boy", "text": "ending.s2"},
+				{"t": "narr", "text": "ending.n4"},
+				{"t": "say", "who": "boy", "text": "ending.s3"},
+				{"t": "fade", "dir": "out", "sec": 0.9},
+				{"t": "clear"},
+				{"t": "world_enter", "era": "now"},
+				{"t": "clock", "hour": 19.0},
+				{"t": "world_actor", "actor": "boy", "x": 13.0, "y": 0.5, "pose": "idle", "camera": true},
+				{"t": "world_actor", "actor": "grandma_rich", "x": 15.6, "y": 0.5, "pose": "idle", "flip": true},
+				{"t": "fade", "dir": "in", "sec": 0.9},
+				{"t": "narr", "text": "ending.n5"},
+				{"t": "say", "who": "grandma_rich", "text": "ending.g1"},
+				{"t": "say", "who": "boy", "text": "ending.s4"},
+				{"t": "say", "who": "grandma_rich", "text": "ending.g2"},
+				{"t": "item", "icon": "res://art/story/prop_nugget.png", "name": "item.first_nugget", "text": "ending.item_text"},
+				{"t": "say", "who": "grandma_rich", "text": "ending.g3"},
+				{"t": "world_walk", "actor": "boy", "x": 13.7, "sec": 0.9},
+				{"t": "world_prop", "id": "nugget", "tex": "res://art/story/prop_nugget.png", "x": 14.0, "y": 1.0, "scale": 3.0},
+				{"t": "sfx", "id": "reward"},
+				{"t": "narr", "text": "ending.n6"},
+				{"t": "say", "who": "boy", "text": "ending.s5"},
+				{"t": "world_actor", "actor": "robert", "x": 17.5, "y": 0.5, "pose": "idle", "flip": true},
+				{"t": "say", "who": "grandma_rich", "text": "ending.g4"},
+				{"t": "say", "who": "robert", "text": "ending.r1"},
+				{"t": "say", "who": "grandma_rich", "text": "ending.g5"},
+				{"t": "fade", "dir": "out", "sec": 0.9},
+				{"t": "clear"},
+				{"t": "mood", "id": "dark"},
+				{"t": "card", "text": "ending.card1", "sec": 2.6},
+				{"t": "card", "text": "ending.card2", "sec": 4.2},
+				{"t": "card", "text": "ending.card3", "sec": 4.2},
+				{"t": "card", "text": "ending.card4", "sec": 4.2}
+			],
+			"effects": [
+				{"do": "flag", "id": "ending_seen"},
+				{"do": "teleport_home"},
+				{"do": "xp", "n": 1000, "proposed": true},
+				{"do": "dollars", "n": 5, "proposed": true},
+				{"do": "sfx", "id": "reward"},
+				{"do": "toast", "text": "ending.toast", "sec": 6.0}
+			]
+		},
+		{
+			"id": "credits",
+			"title": "credits.title",
+			"arc": true,
+			"music": "mus_story",
+			"beats": [
+				{"t": "mood", "id": "dark"},
+				{"t": "card", "text": "credits.c1", "sec": 3.2},
+				{"t": "card", "text": "credits.c2", "sec": 5.0},
+				{"t": "card", "text": "credits.c3", "sec": 4.0},
+				{"t": "card", "text": "credits.c4", "sec": 3.6},
+				{"t": "card", "text": "credits.c5", "sec": 4.0}
+			],
+			"effects": [
+				{"do": "flag", "id": "credits_seen"}
+			]
+		}
+	]
+}

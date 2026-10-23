@@ -246,6 +246,8 @@ func _walk_to_x(tx: float, label: String, budget: float = 40.0, tol: float = 0.1
 
 func _run() -> void:
 	print("=== test_bot_onboarding: сид %d, ускорение ×%.1f ===" % [_seed, _scale])
+	if OS.get_cmdline_user_args().has("--inject-error"):
+		push_error("bot selftest: этой строки родитель обязан испугаться")  # проверка самого сторожа
 	_wall0 = Time.get_ticks_msec()
 	_clean_slate()
 	Engine.time_scale = _scale

@@ -8,7 +8,7 @@ extends Node
 ##       --resolution 448x960 -- /каталог [снимок ...]
 ##
 ## Снимки: hero records skills skills_armed skills_deep museum museum_bottom
-## museum_tip museum_empty card_find card_branch.
+## museum_tip museum_empty first_find card_find card_branch.
 ## Состояние выставляется только в памяти — на диск (user://) тест не пишет.
 
 var _out_dir := "/tmp/hero_shots"
@@ -96,6 +96,20 @@ func _ready() -> void:
 				(c as ScrollContainer).scroll_vertical = 2000
 			await _frames(6)
 			await _shot("museum_bottom")
+		_screen.close()
+
+	if _want("first_find"):
+		# Настоящий путь находки: клетка артефакта -> карточка -> музей открывается сам.
+		GameState.collected_artifacts.clear()
+		GameState.completed_branches.clear()
+		var artifact := Balance.get_artifact("antiquity_2")
+		var cell: Vector2i = ArtifactSpawn.candidate_cells(artifact, GameState.world_seed)[0]
+		_screen.finder.claim_at(cell.x, cell.y)
+		await get_tree().create_timer(0.6).timeout
+		await _shot("first_find_card")
+		await get_tree().create_timer(3.0).timeout
+		await _shot("first_find_museum")
+		print("музей открыт после карточки: ", ProgressScreen.is_open())
 		_screen.close()
 
 	if _want("card_find"):

@@ -46,6 +46,7 @@ func _ready() -> void:
 	await _check_settings_sheet()
 	_check_toast()
 	_check_warnings()
+	await _check_real_clicks()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
@@ -368,3 +369,57 @@ func _check_warnings() -> void:
 	_hud._stamina_bar._alert = 0.0
 	GameState.exhausted_changed.emit(true)
 	check("пустая бодрость: тост «−50%»", _hud._toast_panel.visible)
+
+
+func _click(pos: Vector2) -> void:
+	for pressed in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.position = pos
+		ev.global_position = pos
+		ev.pressed = pressed
+		get_viewport().push_input(ev, true)
+		await get_tree().process_frame
+
+
+## Настоящие нажатия через вьюпорт: проверяют не сигналы, а то, что кнопки
+## действительно ловят касания (порядок слоёв, mouse_filter, тап за границей).
+func _check_real_clicks() -> void:
+	_hud._toast_panel.visible = false
+	await _click(HudAnchors.get_anchor("backpack"))
+	check("клик по кнопке рюкзака открывает шторку", _hud._inv_sheet.visible)
+	await _click(HudAnchors.get_anchor("backpack"))
+	check("повторный клик закрывает шторку", not _hud._inv_sheet.visible)
+
+	await _click(HudAnchors.get_anchor("menu"))
+	check("клик по «•••» открывает меню", _hud.is_more_menu_open())
+	await _click(Vector2(4, 120))
+	check("тап за границей закрывает меню", not _hud.is_more_menu_open())
+
+	await _click(HudAnchors.get_anchor("menu"))
+	await _click(HudAnchors.get_anchor("menu"))
+	check("клик по «•••» при открытом меню закрывает его (а не переоткрывает)", not _hud.is_more_menu_open())
+
+	var inv0: Dictionary = GameState.inventory.duplicate()
+	GameState.inventory = {"gold": 5, "iron_ore": 3}
+	_hud.open_inventory()
+	await _frames(2)
+	var slot: Button = _hud._inv_sheet._slot_buttons["gold"]
+	await _click(slot.get_global_rect().get_center())
+	check("клик по слоту выбирает стопку", _hud._inv_sheet.selected_id() == "gold")
+	var drop: Button = _hud._inv_sheet._drop_btn
+	await _click(drop.get_global_rect().get_center())
+	check("клик по корзине открывает окно «сколько»", _hud._inv_sheet.is_drop_open())
+	var card: Rect2 = _hud._inv_sheet.drop_card_rect()
+	await _click(Vector2(card.position.x + 2, card.end.y + 30))
+	check("тап за окном «сколько» закрывает окно, шторка остаётся",
+		not _hud._inv_sheet.is_drop_open() and _hud._inv_sheet.visible)
+	_hud.close_inventory()
+	GameState.inventory = inv0
+	GameState.inventory_changed.emit()
+
+	_hud.open_settings()
+	await _frames(2)
+	check("шторка настроек открыта", _hud.is_settings_open())
+	await _click(Vector2(100, 8))
+	check("тап по затемнению над настройками закрывает их", not _hud.is_settings_open())

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cd840i2iolfr2"
-path="res://.godot/imported/sk_luck_mult.png-f257d77fc33d8e892205c913ef0786c3.ctex"
+uid="uid://bnmej5b0kmi2w"
+path="res://.godot/imported/sk_luck_multiplier.png-0d22f7bbb00eba09cc779219d779f856.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/ui/hero/sk_luck_mult.png"
-dest_files=["res://.godot/imported/sk_luck_mult.png-f257d77fc33d8e892205c913ef0786c3.ctex"]
+source_file="res://art/ui/hero/sk_luck_multiplier.png"
+dest_files=["res://.godot/imported/sk_luck_multiplier.png-0d22f7bbb00eba09cc779219d779f856.ctex"]
 
 [params]
 

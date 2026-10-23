@@ -1,6 +1,8 @@
 class_name ProgressScreen
 extends Control
-## Общий экран героя: три вкладки — прокачка, музей, рекорды.
+## Общий экран героя: три вкладки с иконками — герой (портрет, характеристики,
+## рекорды), навыки (дерево прокачки) и музей. Нижняя панель вкладок лежит в зоне
+## большого пальца; названия вкладок — в подсказках.
 ##
 ## ПОЧЕМУ три экрана под одной кнопкой: нижняя полоса HUD шириной 224 точки
 ## уже занята инвентарём, инструментом, снаряжением, режимом и сбросом —
@@ -12,7 +14,8 @@ extends Control
 ##     ProgressScreen.open("museum")    — открыть витрину (например, из
 ##                                        комнаты музея, которую строит дом)
 ##     ProgressScreen.open("progress")  — экран прокачки
-##     ProgressScreen.open("records")   — рекорды
+##     ProgressScreen.open("hero")      — портрет, характеристики, рекорды
+##     ProgressScreen.open("records")   — то же, список прокручен к рекордам
 ##     ProgressScreen.new_museum_panel() — витрина отдельным узлом, если
 ##                                        комнату надо обставить своей сценой
 ##
@@ -20,9 +23,13 @@ extends Control
 ## иначе палец, нажимающий кнопку апгрейда в левом нижнем углу, попадает в
 ## джойстик под ней.
 
+const TAB_HERO := "hero"
 const TAB_PROGRESS := "progress"
 const TAB_MUSEUM := "museum"
+# Рекорды переехали внутрь вкладки героя; старое имя оставлено для вызовов извне.
 const TAB_RECORDS := "records"
+
+const TAB_BAR_H := 26
 
 static var _instance: ProgressScreen = null
 
@@ -31,7 +38,7 @@ var records: RecordsStore = null
 
 var _hud: Node = null
 var _player: Node = null
-var _tab_buttons: Dictionary = {}
+var _tab_buttons: Dictionary = {}   # вкладка -> HeroTabButton
 var _panels: Dictionary = {}
 var _current_tab: String = TAB_PROGRESS
 var _hud_button: Button = null
@@ -60,6 +67,16 @@ static func attach(host: Node) -> ProgressScreen:
 	screen.name = "ProgressScreen"
 	layer.add_child(screen)
 	screen.setup(host.get("player"), host.get("hud"))
+
+	# Карточка-вспышка находки живёт выше самого экрана (слой 96): артефакт
+	# находят под землёй, экран при этом закрыт, а при открытом — тоже виден.
+	var card_layer := CanvasLayer.new()
+	card_layer.name = "ArtifactCardLayer"
+	card_layer.layer = 96
+	host.add_child(card_layer)
+	var card := ArtifactCard.new()
+	card.name = "ArtifactCard"
+	card_layer.add_child(card)
 	return screen
 
 
@@ -144,8 +161,18 @@ func _ready() -> void:
 	if _pending_hud_button != null and is_instance_valid(_pending_hud_button):
 		_bind_hud_button(_pending_hud_button)
 		_pending_hud_button = null
-	GameState.skill_points_changed.connect(func(_p): _sync_hud_button())
-	GameState.artifact_collected.connect(func(_id): _sync_hud_button())
+	GameState.skill_points_changed.connect(_on_points_changed)
+	GameState.artifact_collected.connect(_on_artifact_collected)
+	_sync_hud_button()
+	_sync_tabs()
+
+
+func _on_points_changed(_points: int) -> void:
+	_sync_hud_button()
+	_sync_tabs()
+
+
+func _on_artifact_collected(_id: String) -> void:
 	_sync_hud_button()
 
 
@@ -167,36 +194,20 @@ func setup(player, hud) -> void:
 	effects.name = "UpgradeEffects"
 	add_child(effects)
 
-	var records_panel: RecordsPanel = _panels.get(TAB_RECORDS, null)
-	if records_panel != null:
-		records_panel.setup(records)
+	var museum: MuseumPanel = _panels.get(TAB_MUSEUM, null)
+	if museum != null:
+		museum.store = records
+	var hero_panel: HeroPanel = _panels.get(TAB_HERO, null)
+	if hero_panel != null and hero_panel.records_panel != null:
+		hero_panel.records_panel.setup(records)
 
 
 func _build() -> void:
 	var bg := ColorRect.new()
-	bg.color = ProgressUiKit.BG
+	# Непрозрачный: сквозь прежние 0.97 просвечивали тосты и мир под экраном.
+	bg.color = Color(ProgressUiKit.BG.r, ProgressUiKit.BG.g, ProgressUiKit.BG.b, 1.0)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
-
-	var tabs := HBoxContainer.new()
-	tabs.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	tabs.offset_left = 6
-	tabs.offset_right = -6
-	tabs.offset_top = 6
-	tabs.offset_bottom = 26
-	tabs.add_theme_constant_override("separation", 3)
-	add_child(tabs)
-
-	_add_tab_button(tabs, TAB_PROGRESS, "Прокачка")
-	_add_tab_button(tabs, TAB_MUSEUM, "Музей")
-	_add_tab_button(tabs, TAB_RECORDS, "Рекорды")
-
-	# «✕» (U+2715) в шрифте темы по умолчанию отсутствует и рисуется пустым
-	# квадратом — та же история, что с ↺ в нижней полосе HUD.
-	var close_button := ProgressUiKit.make_button("X", 10)
-	close_button.custom_minimum_size = Vector2(22, 20)
-	close_button.pressed.connect(close)
-	tabs.add_child(close_button)
 
 	# Именно контейнер, а не голый Control: вкладки создаются скрытыми, а
 	# невидимому Control родитель размер по якорям не проталкивает — панели
@@ -204,32 +215,68 @@ func _build() -> void:
 	# Container раскладывает детей при каждом показе.
 	var content := MarginContainer.new()
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.add_theme_constant_override("margin_left", 6)
-	content.add_theme_constant_override("margin_right", 6)
-	content.add_theme_constant_override("margin_top", 30)
-	content.add_theme_constant_override("margin_bottom", 6)
-	# Контейнер занимает весь вьюпорт, включая ряд вкладок под ним по дереву:
+	content.add_theme_constant_override("margin_left", 4)
+	content.add_theme_constant_override("margin_right", 4)
+	content.add_theme_constant_override("margin_top", 4)
+	content.add_theme_constant_override("margin_bottom", TAB_BAR_H + 6)
+	# Контейнер занимает весь вьюпорт, включая нижнюю панель вкладок по дереву:
 	# мышь выбирает самого позднего ребёнка, и без IGNORE он перехватывал
 	# нажатия по вкладкам, оставаясь при этом невидимым.
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(content)
 
+	_panels[TAB_HERO] = HeroPanel.new()
 	_panels[TAB_PROGRESS] = ProgressPanel.new()
 	_panels[TAB_MUSEUM] = MuseumPanel.new()
-	_panels[TAB_RECORDS] = RecordsPanel.new()
 	for key in _panels.keys():
 		var panel: Control = _panels[key]
 		panel.visible = false
 		content.add_child(panel)
+	(_panels[TAB_HERO] as HeroPanel).skills_requested.connect(open_tab.bind(TAB_PROGRESS))
+
+	# Нижняя панель вкладок — в зоне большого пальца. Крестик закрытия стоит
+	# в том же ряду, чтобы до него тоже тянуться не выше.
+	var bar := HBoxContainer.new()
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_left = 4
+	bar.offset_right = -4
+	bar.offset_top = -(TAB_BAR_H + 4)
+	bar.offset_bottom = -4
+	bar.add_theme_constant_override("separation", 3)
+	add_child(bar)
+	_add_tab_button(bar, TAB_HERO, "tab_hero", "Герой", "Портрет, характеристики и рекорды")
+	_add_tab_button(bar, TAB_PROGRESS, "tab_skills", "Навыки", "Дерево прокачки")
+	_add_tab_button(bar, TAB_MUSEUM, "tab_museum", "Музей", "Коллекция артефактов")
+	var close_button := HeroTabButton.new()
+	close_button.setup("tab_close", "Закрыть")
+	close_button.custom_minimum_size = Vector2(TAB_BAR_H, TAB_BAR_H)
+	close_button.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		close())
+	bar.add_child(close_button)
 
 
-func _add_tab_button(parent: Control, tab: String, title: String) -> void:
-	var b := ProgressUiKit.make_button(title, 9)
+func _add_tab_button(parent: Control, tab: String, icon_name: String, title: String, body: String) -> void:
+	var b := HeroTabButton.new()
+	b.setup(icon_name, title, body)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size = Vector2(0, 20)
-	b.pressed.connect(open_tab.bind(tab))
+	b.custom_minimum_size = Vector2(0, TAB_BAR_H)
+	b.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		open_tab(tab)
+		Sfx.play("ui_tab")
+		Haptics.tap())
 	parent.add_child(b)
 	_tab_buttons[tab] = b
+
+
+## Значок-число на вкладке «Навыки»: свободные очки.
+func _sync_tabs() -> void:
+	var skills: HeroTabButton = _tab_buttons.get(TAB_PROGRESS, null)
+	if skills != null:
+		skills.set_badge(GameState.skill_points_available)
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +284,9 @@ func _add_tab_button(parent: Control, tab: String, title: String) -> void:
 # ---------------------------------------------------------------------------
 
 func open_tab(tab: String) -> void:
+	var to_records := tab == TAB_RECORDS
+	if to_records:
+		tab = TAB_HERO
 	_current_tab = tab if _panels.has(tab) else TAB_PROGRESS
 	for key in _panels.keys():
 		var panel: Control = _panels[key]
@@ -244,17 +294,22 @@ func open_tab(tab: String) -> void:
 		if panel.visible and panel.has_method("refresh"):
 			panel.refresh()
 	for key in _tab_buttons.keys():
-		var b: Button = _tab_buttons[key]
-		b.add_theme_color_override("font_color",
-			ProgressUiKit.GOLD if key == _current_tab else ProgressUiKit.MUTED)
+		(_tab_buttons[key] as HeroTabButton).set_selected(key == _current_tab)
+	_sync_tabs()
+	Tip.hide_all()
 	if not visible:
 		_enter()
+	if to_records:
+		(_panels[TAB_HERO] as HeroPanel).scroll_to_records()
 
 
 func close() -> void:
 	if not visible:
 		return
 	visible = false
+	Tip.hide_all()
+	Sfx.play("ui_close")
+	Haptics.tap()
 	SaveSystem.save_game()
 	if records != null:
 		records.save_records()
@@ -262,6 +317,8 @@ func close() -> void:
 
 func _enter() -> void:
 	visible = true
+	Sfx.play("ui_open")
+	Haptics.tap()
 	# Экран во весь вьюпорт, а герой в это время не должен ни копать, ни идти.
 	if _player != null:
 		_player.digging = null

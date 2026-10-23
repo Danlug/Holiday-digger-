@@ -112,7 +112,7 @@ def sk_strength(S):
     S.pxs([(5, 8), (6, 7), (5, 9)], tint(STEEL_D, 0.5))
     S.pxs([(7, 11), (8, 11), (9, 11)], tint(STEEL_D, -0.3))
 
-def sk_luck_mult(S):
+def sk_luck_multiplier(S):
     # Подкова.
     S.ell(8, 8, 6, 6, STEEL)
     S.ell(8, 8, 3, 3, OUT, bevel=False)
@@ -235,7 +235,7 @@ GEM_COLORS = {
 
 ICONS = [
     tab_hero, tab_skills, tab_museum, tab_close,
-    sk_vision, sk_dig_speed, sk_hp, sk_stamina, sk_hunger, sk_strength, sk_luck_mult, sk_luck_chance,
+    sk_vision, sk_dig_speed, sk_hp, sk_stamina, sk_hunger, sk_strength, sk_luck_multiplier, sk_luck_chance,
     ui_lock, ui_check, ui_star, ui_depth, ui_gem, ui_bag, ui_coin, ui_dollar, ui_trophy, ui_chest, ui_xp, ui_pip,
 ]
 

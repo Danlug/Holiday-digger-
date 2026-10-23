@@ -42,7 +42,7 @@ static func branch_name(branch: Dictionary) -> String:
 	return pick(branch, "name")
 
 
-static func set_name() -> String:
+static func set_title() -> String:
 	return pick(Balance.artifacts.get("ultimate_set", {}), "name")
 
 

@@ -377,6 +377,10 @@ func play(id: String) -> void:
 		return
 	_playing = true
 	_sync_locale()
+	# Принудительный запуск (отладка, чужая система) поверх открытой тетради:
+	# дневник под катсценой не оставляем — после неё он бы висел забытым окном.
+	if diary_ui != null and diary_ui.is_open:
+		diary_ui.close_diary()
 	_take_control()
 	# Сцены режима "мир" (data/story.json: scenes[].world == true, сейчас
 	# только intro_grandpa) работают на живой карте — катсцене нужны ссылки

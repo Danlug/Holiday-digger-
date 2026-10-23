@@ -19,7 +19,7 @@ const INK := Color8(0x2E, 0x20, 0x14)
 const NOTE := Color8(0x3C, 0x50, 0x7A)
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
 const MARGIN_RED := Color8(0xC2, 0x5A, 0x4A)
-const PANEL_W := 204.0
+const PANEL_W := 200.0
 
 const ICON_DIARY := "res://art/story/icon_diary.png"
 const ICON_SEAL := "res://art/story/icon_seal.png"
@@ -126,7 +126,7 @@ func _build_header() -> Control:
 
 func _build_body() -> Control:
 	_body = VBoxContainer.new()
-	_body.custom_minimum_size = Vector2(0, 214)
+	_body.custom_minimum_size = Vector2(0, 200)
 	_body.add_theme_constant_override("separation", 6)
 
 	_sketch = TextureRect.new()
@@ -235,7 +235,7 @@ func _icon_button(tex: Texture2D) -> Button:
 func _arrow_button(dir: Vector2) -> Button:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(30, 28)
+	b.custom_minimum_size = Vector2(24, 28)
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(0, 0, 0, 0.08)
 	normal.set_corner_radius_all(3)
@@ -255,13 +255,13 @@ func _arrow_button(dir: Vector2) -> Button:
 	return b
 
 
-## Точка-страница: кнопка 10×26 (цель нажатия по высоте с запасом), внутри
+## Точка-страница: кнопка 9×26 (цель нажатия по высоте с запасом), внутри
 ## кружок. Отдельный класс не нужен — кружок рисует StyleBoxFlat.
 func _make_dot(i: int) -> Button:
 	var b := Button.new()
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(11, 26)
+	b.custom_minimum_size = Vector2(9, 26)
 	b.add_theme_stylebox_override("normal", _flat_style())
 	b.add_theme_stylebox_override("hover", _flat_style())
 	b.add_theme_stylebox_override("pressed", _flat_style())
@@ -272,7 +272,7 @@ func _make_dot(i: int) -> Button:
 	dot.set_anchors_preset(Control.PRESET_CENTER)
 	dot.custom_minimum_size = Vector2(7, 7)
 	dot.size = Vector2(7, 7)
-	dot.position = Vector2(2, 9.5)
+	dot.position = Vector2(1, 9.5)
 	b.add_child(dot)
 	b.pressed.connect(func() -> void: _goto(i, true))
 	return b

@@ -128,8 +128,8 @@
 				{"depth_cap": 2200, "cells_per_hour": 70, "cap_hours": 12, "cost": {"coins": 60000, "items": {"platinum": 20, "lithium": 30}}},
 				{"depth_cap": 3000, "cells_per_hour": 80, "cap_hours": 14, "cost": {"coins": 110000, "items": {"platinum": 35, "ruby": 10, "emerald": 10}}},
 				{"depth_cap": 4000, "cells_per_hour": 120, "cap_hours": 16, "cost": {"coins": 200000, "items": {"geocrystal": 12, "ancient_metal": 8}}},
-				{"depth_cap": 5200, "cells_per_hour": 145, "cap_hours": 18, "cost": {"coins": 350000, "items": {"geocrystal": 25, "obsidian": 15}}},
-				{"depth_cap": 6500, "cells_per_hour": 170, "cap_hours": 18, "cost": {"coins": 600000, "items": {"ancient_metal": 30, "obsidian": 30}}}
+				{"depth_cap": 5200, "cells_per_hour": 145, "cap_hours": 18, "cost": {"coins": 280000, "items": {"geocrystal": 25, "obsidian": 15}}},
+				{"depth_cap": 6500, "cells_per_hour": 170, "cap_hours": 18, "cost": {"coins": 400000, "items": {"ancient_metal": 30, "obsidian": 30}}}
 			],
 			"proposed": true,
 			"note": "ступени скважины. depth_cap — глубина, на которой скважина копает (min с рекордом игрока), cells_per_hour — сколько клеток породы в час скважина прокапывает (доход = клетки в час × ожидаемая выручка клетки на её глубине), cap_hours — офлайн-кап часов, cost — цена перехода НА эту ступень (материалы берутся со склада и из рюкзака). Базовая ставка и стоимость постройки — в balance.json (idle_well). Расчёт окупаемости — tools/sim_tech.py."

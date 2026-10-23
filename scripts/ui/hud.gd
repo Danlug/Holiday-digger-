@@ -70,9 +70,10 @@ var _clock_box: Control
 var _vignette: HpVignette
 var _depth_box: Control
 var _depth_label: Label
-var _toast_panel: Panel
-var _toast_label: Label
+var _toast_panel: PanelContainer
+var _toast_row: HBoxContainer
 var _toast_timer: Timer
+var _toast_tween: Tween
 var _stick: Control
 var _knob: Control
 var _hold_hint: Label
@@ -127,37 +128,19 @@ var _gear_jet: TextureRect
 var _inv_button: Button
 ## id → узел, центр которого отдаёт get_anchor() (кошелёк, рюкзак, полоски…).
 var _anchors: Dictionary = {}
-var _inv_sheet: Control
-var _inv_list: VBoxContainer
-var _inv_load_label: Label
-var _inv_total_label: Label
-var _drop_panel: Control
-var _drop_title: Label
-var _drop_slider: HSlider
-var _drop_field: LineEdit
-var _drop_id: String = ""
-var _drop_max: int = 0
+## Шторка рюкзака (scripts/ui/backpack_sheet.gd): сетка слотов и окно «сколько».
+var _inv_sheet: BackpackSheet
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — НЕ для релиза
 ## игрокам, см. её собственный файл. Живёт отдельным классом, а не куском
 ## кода здесь, — не завязана на раскладку остального HUD, добавляется в
 ## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего.
 var _debug_panel: DebugPanel
 
-## Панель настроек (Settings — scripts/core/settings.gd): звук/музыка,
-## управление, радиус обзора, язык. Тот же приём full-screen шторки, что у
-## инвентаря (_inv_sheet), — регуляторам (ползунки громкости) нужна ширина
-## экрана, узкая popup-панель «⋯» для них тесна.
-var _settings_sheet: Control
-var _sound_slider: HSlider
-var _sound_mute_btn: Button
-var _music_slider: HSlider
-var _music_mute_btn: Button
-var _vision_toggle_btn: Button
-var _control_mode_buttons: Dictionary = {}   # mode:String -> Button
-var _language_buttons: Dictionary = {}       # code:String -> Button
-
-## Точка входа в покупки (scripts/core/iap_manager.gd) — см. _build_settings_iap_row.
-var _restore_purchases_btn: Button
+## Шторка настроек (scripts/ui/settings_sheet.gd): звук/музыка, вибро, управление,
+## радиус обзора, язык, восстановление покупок. Тот же приём full-screen шторки,
+## что у рюкзака, — регуляторам (ползунки громкости) нужна ширина экрана, узкая
+## popup-панель «•••» для них тесна.
+var _settings_sheet: SettingsSheet
 
 
 func _ready() -> void:
@@ -504,52 +487,42 @@ func _build_depth(parent: Control) -> void:
 	_depth_box.visible = false
 
 
-## Высота панели раньше была двумя фиксированными числами (top=-160,
-## bottom=-132 → ровно 28px всегда), а текст внутри переносился по словам
-## без ограничения по высоте — двух-трёхстрочный тост обрезался снизу или
-## вылезал за рамку (задание владельца: «фон контекстного окна не
-## соответствует по высоте реальному размеру текста»). Низ панели остаётся
-## фиксированным (offset_bottom), а верх toast() пересчитывает под
-## фактическую обёрнутую высоту текста при каждом вызове — см. ниже.
+## Тост — «таблетка» над полосой по центру: иконка + число/слово, ширина по
+## содержимому, выезжает и гаснет. Длинные фразы чужих систем (сюжет, дом) по-
+## прежнему переносятся по словам, но панель всегда по размеру текста: раньше
+## высота была двумя фиксированными числами, и многострочный тост обрезался
+## снизу или вылезал за рамку (задание владельца: «фон контекстного окна не
+## соответствует по высоте реальному размеру текста»). Низ панели стоит на месте
+## (TOAST_BOTTOM_OFFSET), верх считается по фактической высоте — см. _place_toast.
 const TOAST_BOTTOM_OFFSET := -132.0
-const TOAST_PAD_V := 12.0       # запас сверху+снизу вокруг текста
-const TOAST_MIN_H := 28.0       # короткая строка не сжимается в полоску
-const TOAST_MAX_H := 200.0      # запас на случай очень длинного текста
+const TOAST_MAX_W := 200.0      # шире не бывает: длинный текст переносится
+const TOAST_PAD := Vector2(9, 5)
+const TOAST_FONT := 12
+const TOAST_COLORS := {
+	"info": Color8(0xE0, 0xA9, 0x3B),
+	"good": Color8(0x7F, 0xB8, 0x6B),
+	"bad": Color8(0xD9, 0x4F, 0x4A),
+	"rare": Color8(0xFF, 0xD0, 0x5A),
+}
 
 
 func _build_toast(parent: Control) -> void:
-	_toast_panel = Panel.new()
+	_toast_panel = PanelContainer.new()
 	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Подстраховка сверх TOAST_MAX_H: если когда-нибудь текст тоста всё равно
-	# не влезет (перевод длиннее оригинала, склеенный текст и т.п.), лишние
-	# строки обрежутся по границе панели, а не повиснут поверх игрового мира
-	# без фона — так и было до этой правки на очень длинной строке (см. отчёт
-	# QA-прохода).
-	_toast_panel.clip_contents = true
-	_toast_panel.anchor_left = 0.0; _toast_panel.anchor_right = 1.0
+	_toast_panel.anchor_left = 0.5; _toast_panel.anchor_right = 0.5
 	_toast_panel.anchor_top = 1.0; _toast_panel.anchor_bottom = 1.0
-	_toast_panel.offset_left = 8; _toast_panel.offset_right = -8
-	_toast_panel.offset_bottom = TOAST_BOTTOM_OFFSET
-	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - TOAST_MIN_H
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.93)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.border_width_left = 3
-	_toast_panel.add_theme_stylebox_override("panel", sb)
 	_toast_panel.visible = false
 	parent.add_child(_toast_panel)
 
-	_toast_label = Label.new()
-	_toast_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_toast_label.offset_left = 10; _toast_label.offset_top = 6
-	_toast_label.offset_right = -8
-	_toast_label.add_theme_font_size_override("font_size", 12)
-	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_toast_panel.add_child(_toast_label)
+	_toast_row = HBoxContainer.new()
+	_toast_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_row.add_theme_constant_override("separation", 5)
+	_toast_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_toast_panel.add_child(_toast_row)
 
 	_toast_timer = Timer.new()
 	_toast_timer.one_shot = true
-	_toast_timer.timeout.connect(func(): _toast_panel.visible = false)
+	_toast_timer.timeout.connect(_hide_toast)
 	add_child(_toast_timer)
 
 
@@ -709,486 +682,63 @@ func _apply_arrows() -> void:
 
 
 func _build_inventory_sheet(parent: Control) -> void:
-	_inv_sheet = Control.new()
-	_inv_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_inv_sheet.visible = false
-	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.95)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_inv_sheet.add_child(bg)
+	_inv_sheet = BackpackSheet.new()
+	_inv_sheet.name = "Backpack"
+	_inv_sheet.eat_pressed.connect(_eat_from_inventory)
+	_inv_sheet.drop_confirmed.connect(_on_drop_confirmed)
+	_inv_sheet.closed.connect(func(): _inv_button.button_pressed = false)
 	parent.add_child(_inv_sheet)
-
-	var head := HBoxContainer.new()
-	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	head.offset_left = 10; head.offset_right = -10
-	head.offset_top = 8; head.offset_bottom = 30
-	_inv_sheet.add_child(head)
-
-	var title := Label.new()
-	title.text = "Инвентарь"
-	title.add_theme_font_size_override("font_size", 12)
-	head.add_child(title)
-
-	_inv_load_label = Label.new()
-	_inv_load_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inv_load_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_inv_load_label.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
-	_inv_load_label.add_theme_font_size_override("font_size", 10)
-	head.add_child(_inv_load_label)
-
-	var close_btn := Button.new()
-	# Именно × (U+00D7), а не ✕ (U+2715): последнего в шрифте темы по
-	# умолчанию нет, и он рисуется пустым квадратом (та же ловушка, что со
-	# стрелкой ↺ на кнопке сброса).
-	close_btn.text = "×"
-	close_btn.add_theme_font_size_override("font_size", 10)
-	close_btn.custom_minimum_size = Vector2(20, 20)
-	close_btn.pressed.connect(close_inventory)
-	head.add_child(close_btn)
-
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 10; scroll.offset_right = -10
-	scroll.offset_top = 36; scroll.offset_bottom = -30
-	_inv_sheet.add_child(scroll)
-	# Прокрутка перетаскиванием списка, а не только ползунком (решение владельца).
-	DragScroll.attach(scroll)
-
-	_inv_list = VBoxContainer.new()
-	_inv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_inv_list)
-
-	var foot := HBoxContainer.new()
-	foot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	foot.offset_left = 10; foot.offset_right = -10
-	foot.offset_top = -26; foot.offset_bottom = -6
-	_inv_sheet.add_child(foot)
-	var foot_label := Label.new()
-	foot_label.text = "К продаже:"
-	foot_label.add_theme_font_size_override("font_size", 11)
-	foot.add_child(foot_label)
-	_inv_total_label = Label.new()
-	_inv_total_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_inv_total_label.add_theme_font_size_override("font_size", 11)
-	foot.add_child(_inv_total_label)
-
-	_build_drop_panel(_inv_sheet)
 
 
 # ---------------------------------------------------------------------------
-# Настройки (Settings — scripts/core/settings.gd): звук/музыка, управление,
-# радиус обзора, язык.
+# Настройки (Settings — scripts/core/settings.gd): шторка SettingsSheet
+# (scripts/ui/settings_sheet.gd) — звук, музыка, вибро, управление, язык.
 # ---------------------------------------------------------------------------
 
 func _build_settings_sheet(parent: Control) -> void:
-	_settings_sheet = Control.new()
-	_settings_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_settings_sheet.visible = false
-	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.95)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_settings_sheet.add_child(bg)
+	_settings_sheet = SettingsSheet.new()
+	_settings_sheet.name = "Settings"
+	_settings_sheet.mode_chosen.connect(_set_mode)
+	_settings_sheet.restore_pressed.connect(func():
+		toast_icon("restore", "Покупок нет", 2.2))
 	parent.add_child(_settings_sheet)
 
-	var head := HBoxContainer.new()
-	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	head.offset_left = 10; head.offset_right = -10
-	head.offset_top = 8; head.offset_bottom = 30
-	_settings_sheet.add_child(head)
 
-	var title := Label.new()
-	title.text = "Настройки"
-	title.add_theme_font_size_override("font_size", 12)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-
-	var close_btn := Button.new()
-	# × (U+00D7), не ✕ (U+2715) — та же ловушка шрифта темы, что у остальных
-	# закрывающих крестиков в этом файле (см. _build_inventory_sheet).
-	close_btn.text = "×"
-	close_btn.add_theme_font_size_override("font_size", 10)
-	close_btn.custom_minimum_size = Vector2(20, 20)
-	close_btn.pressed.connect(close_settings)
-	head.add_child(close_btn)
-
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 10; scroll.offset_right = -10
-	scroll.offset_top = 36; scroll.offset_bottom = -6
-	# Без этого ScrollContainer по умолчанию разрешает содержимому расти и
-	# ВПРАВО (SCROLL_MODE_AUTO), а не только вниз — строка из трёх кнопок
-	# «Джойстик/Нажатия/Стрелки» вместо равного деления ширины считала себя
-	# свободной шириться, и третья кнопка уезжала за край экрана.
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_settings_sheet.add_child(scroll)
-	DragScroll.attach(scroll)
-
-	var body := VBoxContainer.new()
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 14)
-	scroll.add_child(body)
-
-	_build_settings_sound_row(body)
-	_build_settings_music_row(body)
-	_build_settings_control_row(body)
-	_build_settings_vision_row(body)
-	_build_settings_language_row(body)
-	_build_settings_iap_row(body)
-
-
-func _settings_section_label(parent: Control, text: String) -> void:
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	parent.add_child(lbl)
-
-
-func _build_settings_sound_row(parent: Control) -> void:
-	_settings_section_label(parent, "ЗВУК")
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	parent.add_child(row)
-
-	var icon := Label.new()
-	icon.text = "🔊"
-	icon.add_theme_font_size_override("font_size", 16)
-	icon.custom_minimum_size = Vector2(24, 0)
-	row.add_child(icon)
-
-	_sound_slider = HSlider.new()
-	_sound_slider.min_value = 0.0
-	_sound_slider.max_value = 100.0
-	_sound_slider.step = 1.0
-	_sound_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_sound_slider.value_changed.connect(func(v: float): Settings.set_sound_volume(v / 100.0))
-	row.add_child(_sound_slider)
-
-	_sound_mute_btn = Button.new()
-	_sound_mute_btn.custom_minimum_size = Vector2(28, 24)
-	_sound_mute_btn.add_theme_font_size_override("font_size", 14)
-	_sound_mute_btn.focus_mode = Control.FOCUS_NONE
-	_sound_mute_btn.pressed.connect(func(): Settings.set_sound_muted(not Settings.sound_muted); _refresh_settings_panel())
-	row.add_child(_sound_mute_btn)
-
-
-func _build_settings_music_row(parent: Control) -> void:
-	_settings_section_label(parent, "МУЗЫКА")
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	parent.add_child(row)
-
-	var icon := Label.new()
-	icon.text = "🎵"
-	icon.add_theme_font_size_override("font_size", 16)
-	icon.custom_minimum_size = Vector2(24, 0)
-	row.add_child(icon)
-
-	_music_slider = HSlider.new()
-	_music_slider.min_value = 0.0
-	_music_slider.max_value = 100.0
-	_music_slider.step = 1.0
-	_music_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_music_slider.value_changed.connect(func(v: float): Settings.set_music_volume(v / 100.0))
-	row.add_child(_music_slider)
-
-	_music_mute_btn = Button.new()
-	_music_mute_btn.custom_minimum_size = Vector2(28, 24)
-	_music_mute_btn.add_theme_font_size_override("font_size", 14)
-	_music_mute_btn.focus_mode = Control.FOCUS_NONE
-	_music_mute_btn.pressed.connect(func(): Settings.set_music_muted(not Settings.music_muted); _refresh_settings_panel())
-	row.add_child(_music_mute_btn)
-
-
-## Джойстик / стрелки / удержание — те же три режима, что кнопка «⋯ →
-## Управление» (_set_mode), тремя явными кнопками вместо цикла по кругу:
-## в настройках понятнее видеть все варианты сразу, чем гадать, что будет
-## следующим нажатием.
-const _CONTROL_MODE_LABELS := {
-	"stick": "Джойстик",
-	"arrows": "Стрелки",
-	"hold": "Нажатия",
-}
-
-
-func _build_settings_control_row(parent: Control) -> void:
-	_settings_section_label(parent, "УПРАВЛЕНИЕ")
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	parent.add_child(row)
-	for m in MODES:
-		var btn := Button.new()
-		btn.text = String(_CONTROL_MODE_LABELS.get(m, m))
-		btn.add_theme_font_size_override("font_size", 10)
-		btn.custom_minimum_size = Vector2(0, 26)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.pressed.connect(_set_mode.bind(m))
-		row.add_child(btn)
-		_control_mode_buttons[m] = btn
-
-
-func _build_settings_vision_row(parent: Control) -> void:
-	_settings_section_label(parent, "ОТОБРАЖЕНИЕ")
-	_vision_toggle_btn = Button.new()
-	_vision_toggle_btn.add_theme_font_size_override("font_size", 10)
-	_vision_toggle_btn.custom_minimum_size = Vector2(0, 26)
-	_vision_toggle_btn.focus_mode = Control.FOCUS_NONE
-	_vision_toggle_btn.pressed.connect(func():
-		Settings.set_show_vision_radius(not Settings.show_vision_radius)
-		_refresh_settings_panel())
-	parent.add_child(_vision_toggle_btn)
-
-
-func _build_settings_language_row(parent: Control) -> void:
-	_settings_section_label(parent, "ЯЗЫК")
-	# HFlowContainer, не HBoxContainer: шесть языковых чипов в один ряд не
-	# помещаются на портретных 224px — этот контейнер сам переносит лишние
-	# на следующую строку, а не сжимает всех до нечитаемой ширины и не
-	# уезжает вбок (тем более что горизонтальная прокрутка шторки настроек
-	# выключена — см. scroll.horizontal_scroll_mode выше).
-	var row := HFlowContainer.new()
-	row.add_theme_constant_override("h_separation", 6)
-	row.add_theme_constant_override("v_separation", 6)
-	parent.add_child(row)
-	for entry in Settings.LANGUAGES:
-		var code := String(entry.get("code", ""))
-		var available := bool(entry.get("available", false))
-		var btn := Button.new()
-		btn.text = String(entry.get("name", code))
-		btn.add_theme_font_size_override("font_size", 10)
-		btn.custom_minimum_size = Vector2(0, 24)
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.disabled = not available
-		if not available:
-			# Языки ждут перевода (задание владельца: "дальше, после моего
-			# разрешения, будет...") — видны сразу, но серые и некликабельные,
-			# а не появляются позже с нуля собранной панелью.
-			btn.tooltip_text = "Скоро"
-			btn.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
-		else:
-			btn.pressed.connect(func(): Settings.set_language(code); _refresh_settings_panel())
-		row.add_child(btn)
-		_language_buttons[code] = btn
-
-
-## Единственная точка входа в покупки, подключённая к IAPManager (см.
-## scripts/core/iap_manager.gd) — решение владельца держать её в «Настройках»,
-## а не заводить отдельный полноэкранный магазин косметики прямо сейчас:
-## каталог (data/monetization.json) ещё черновой и ждёт утверждения, а
-## кнопка «Восстановить покупки» всё равно обязана быть где-то в игре для
-## будущей публикации в App Store (Apple отклоняет сборки с покупками без
-## неё). IAPManager.request_purchase()/restore_purchases() — честные
-## заглушки: они не покупают и не восстанавливают ничего по-настоящему, а
-## сразу сообщают об этом тостом — ту же фразу уже показывает премиум-магазин
-## для долларов (см. shop_ui.gd:_render_premium_screen). Когда появится
-## платёжный SDK, эта кнопка не изменится — изменится только тело
-## IAPManager.request_purchase().
-func _build_settings_iap_row(parent: Control) -> void:
-	_settings_section_label(parent, "ПОКУПКИ")
-	var hint := Label.new()
-	hint.text = "Платежи не подключены в этой сборке."
-	hint.add_theme_font_size_override("font_size", 8)
-	hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	parent.add_child(hint)
-
-	_restore_purchases_btn = Button.new()
-	_restore_purchases_btn.text = "Восстановить покупки"
-	_restore_purchases_btn.add_theme_font_size_override("font_size", 10)
-	_restore_purchases_btn.custom_minimum_size = Vector2(0, 26)
-	_restore_purchases_btn.focus_mode = Control.FOCUS_NONE
-	_restore_purchases_btn.pressed.connect(func():
-		IAPManager.restore_purchases()
-		toast("Покупок для восстановления нет — платежи не подключены."))
-	parent.add_child(_restore_purchases_btn)
-
-
-## Перечитывает Settings и красит все контролы панели — вызывается при
-## открытии и после любого изменения (мьют/режим/язык/радиус), чтобы кнопки
-## сразу отражали новое состояние, а не только реальный эффект в игре.
+## Перечитывает Settings и красит все контролы шторки.
 func _refresh_settings_panel() -> void:
-	if _sound_slider == null:
-		return
-	_sound_slider.value = Settings.sound_volume * 100.0
-	_sound_mute_btn.text = "🔇" if Settings.sound_muted else "🔊"
-	_music_slider.value = Settings.music_volume * 100.0
-	_music_mute_btn.text = "🔇" if Settings.music_muted else "🎵"
-	_vision_toggle_btn.text = "Радиус обзора: показан" if Settings.show_vision_radius \
-		else "Радиус обзора: скрыт"
-
-	for m in _control_mode_buttons.keys():
-		var btn: Button = _control_mode_buttons[m]
-		var on: bool = m == mode
-		btn.add_theme_color_override("font_color",
-			Color8(0xE0, 0xA9, 0x3B) if on else Color8(0x9D, 0x8B, 0x73))
-		btn.disabled = on
-
-	for code in _language_buttons.keys():
-		var lbtn: Button = _language_buttons[code]
-		if not lbtn.disabled:
-			var lon: bool = code == Settings.language
-			lbtn.add_theme_color_override("font_color",
-				Color8(0xE0, 0xA9, 0x3B) if lon else Color8(0x9D, 0x8B, 0x73))
+	if _settings_sheet != null:
+		_settings_sheet.refresh()
 
 
 func open_settings() -> void:
 	close_more_menu()
-	_refresh_settings_panel()
-	_settings_sheet.visible = true
+	_settings_sheet.open()
 
 
 func close_settings() -> void:
-	_settings_sheet.visible = false
+	_settings_sheet.close()
 
 
 func is_settings_open() -> bool:
 	return _settings_sheet != null and _settings_sheet.visible
 
 
-## Окно «выбросить N штук»: ползунок и то же число полем ввода — на телефоне
-## ползунком трудно попасть в «ровно 7 из 240», а руками неудобно набирать
-## «120». Поле открывает цифровую клавиатуру, буквы в нём не принимаются.
-func _build_drop_panel(parent: Control) -> void:
-	_drop_panel = Control.new()
-	_drop_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_drop_panel.visible = false
-	parent.add_child(_drop_panel)
-
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_drop_panel.add_child(dim)
-
-	var card := PanelContainer.new()
-	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card.custom_minimum_size = Vector2(196, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
-	sb.set_border_width_all(1)
-	sb.set_content_margin_all(8)
-	card.add_theme_stylebox_override("panel", sb)
-	_drop_panel.add_child(card)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	card.add_child(box)
-
-	_drop_title = Label.new()
-	_drop_title.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_drop_title.add_theme_font_size_override("font_size", 11)
-	box.add_child(_drop_title)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	box.add_child(row)
-
-	_drop_slider = HSlider.new()
-	_drop_slider.min_value = 1
-	_drop_slider.step = 1
-	_drop_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_drop_slider.value_changed.connect(_on_drop_slider_changed)
-	row.add_child(_drop_slider)
-
-	_drop_field = LineEdit.new()
-	_drop_field.custom_minimum_size = Vector2(46, 0)
-	_drop_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_drop_field.max_length = 6
-	# Только цифровая клавиатура: количество — всегда целое, буквам тут
-	# делать нечего (то же, что inputmode="numeric" в web-демо).
-	_drop_field.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
-	_drop_field.text_changed.connect(_on_drop_field_changed)
-	_drop_field.text_submitted.connect(func(_t): _apply_drop())
-	row.add_child(_drop_field)
-
-	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 6)
-	box.add_child(buttons)
-
-	var all_btn := Button.new()
-	all_btn.text = "Всё"
-	all_btn.add_theme_font_size_override("font_size", 10)
-	all_btn.pressed.connect(func(): _drop_slider.value = _drop_max)
-	buttons.add_child(all_btn)
-
-	var cancel_btn := Button.new()
-	cancel_btn.text = "Отмена"
-	cancel_btn.add_theme_font_size_override("font_size", 10)
-	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cancel_btn.pressed.connect(_close_drop)
-	buttons.add_child(cancel_btn)
-
-	var ok_btn := Button.new()
-	ok_btn.text = "Выбросить"
-	ok_btn.add_theme_font_size_override("font_size", 10)
-	ok_btn.add_theme_color_override("font_color", Color8(0xC4, 0x70, 0x6A))
-	ok_btn.pressed.connect(_apply_drop)
-	buttons.add_child(ok_btn)
-
-
+## Окно «выбросить N штук» живёт в BackpackSheet; здесь — его прежние имена.
 func _open_drop(id: String, count: int) -> void:
-	if count <= 0:
-		return
-	_drop_id = id
-	_drop_max = count
-	_drop_title.text = "Выбросить «%s» (в рюкзаке %d)" % [
-		String(Balance.get_mineral(id).get("name_ru", id)), count]
-	_drop_slider.max_value = count
-	_drop_slider.value = count
-	_drop_field.text = str(count)
-	_drop_panel.visible = true
+	_inv_sheet.open_drop(id, count)
 
 
 func _close_drop() -> void:
-	_drop_panel.visible = false
-	_drop_id = ""
+	_inv_sheet.close_drop()
 
 
-func _drop_amount() -> int:
-	return clampi(int(_drop_slider.value), 1, maxi(1, _drop_max))
-
-
-func _on_drop_slider_changed(v: float) -> void:
-	var n := clampi(int(v), 1, maxi(1, _drop_max))
-	if _drop_field.text != str(n):
-		_drop_field.text = str(n)
-
-
-func _on_drop_field_changed(t: String) -> void:
-	# Чистим ввод на месте: на телефоне цифровая клавиатура всё равно может
-	# отдать минус или запятую, а каретку при этом терять нельзя.
-	var digits := ""
-	for ch in t:
-		if ch >= "0" and ch <= "9":
-			digits += ch
-	if digits != t:
-		var caret := _drop_field.caret_column - (t.length() - digits.length())
-		_drop_field.text = digits
-		_drop_field.caret_column = maxi(0, caret)
-	if digits.is_empty():
-		return
-	var n := clampi(int(digits), 1, maxi(1, _drop_max))
-	if int(_drop_slider.value) != n:
-		_drop_slider.set_value_no_signal(n)
-	if str(n) != digits:
-		_drop_field.text = str(n)
-		_drop_field.caret_column = _drop_field.text.length()
-
-
-func _apply_drop() -> void:
-	if _drop_id.is_empty():
-		return
-	var n := _drop_amount()
-	var id := _drop_id
+func _on_drop_confirmed(id: String, n: int) -> void:
 	GameState.remove_item(id, n)
-	_close_drop()
-	_render_inventory()
+	_inv_sheet.refresh()
 	_sync_purse()
-	toast("Выброшено: %s ×%d" % [
-		String(Balance.get_mineral(id).get("name_ru", id)), n], 2.0)
+	toast_parts([
+		{"icon_tex": UiIcons.item(id), "text": "−%d" % n, "color": Color8(0xE8, 0x8C, 0x80)},
+	], 1.6)
 
 
 var _more_panel: PanelContainer
@@ -1445,10 +995,34 @@ func _make_menu_button(e: Dictionary) -> Button:
 	return b
 
 
-## Всплывающая надпись над выкопанной клеткой: «Золото +1». Живёт секунду,
-## поднимается и тает. Это не тост: тост занимает всю ширину и перебивает
-## экран, а тут нужна отметка ровно там, где копнули, — иначе на каждую
-## клетку земли экран мигал бы полосой.
+## Всплывающая отметка над выкопанной клеткой: иконка предмета и «+1». Живёт
+## секунду, поднимается и тает. Это не тост: тост — «таблетка» у полосы, а тут
+## нужна отметка ровно там, где копнули, — иначе на каждую клетку земли экран
+## мигал бы плашкой.
+func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 2)
+	var icon := TextureRect.new()
+	icon.texture = UiIcons.item(mineral_id)
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+	var label := Label.new()
+	label.text = "+%d" % count
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color8(0xF5, 0xD0, 0x6B))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("outline_size", 3)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(label)
+	add_child(row)
+	_float_away(row, cell_x, cell_y, Vector2(row.get_combined_minimum_size().x * 0.5, 0.0))
+
+
+## То же, но текстом — для тех, кто зовёт старое имя float_pickup.
 func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	var label := Label.new()
 	label.text = text
@@ -1458,19 +1032,24 @@ func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(label)
-
-	var from := Vector2(
-		(float(cell_x) + 0.5 - current_cam.x) * TILE - 40.0,
-		(float(cell_y) - current_cam.y) * TILE - 6.0)
 	label.size = Vector2(80, 14)
-	label.position = from
+	add_child(label)
+	_float_away(label, cell_x, cell_y, Vector2(40.0, 0.0))
 
+
+func _float_away(node: Control, cell_x: int, cell_y: int, half: Vector2) -> void:
+	var from := Vector2(
+		(float(cell_x) + 0.5 - current_cam.x) * TILE - half.x,
+		(float(cell_y) - current_cam.y) * TILE - 6.0)
+	node.position = from
+	if Settings.reduce_motion:
+		get_tree().create_timer(0.6).timeout.connect(node.queue_free)
+		return
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(label, "position:y", from.y - 18.0, 0.9)
-	tween.tween_property(label, "modulate:a", 0.0, 0.9).set_delay(0.25)
-	tween.chain().tween_callback(label.queue_free)
+	tween.tween_property(node, "position:y", from.y - 18.0, 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(node, "modulate:a", 0.0, 0.9).set_delay(0.25)
+	tween.chain().tween_callback(node.queue_free)
 
 
 ## Отчёт скважины при возвращении в игру (решение владельца): показать, что
@@ -1817,7 +1396,12 @@ func _connect_game_state() -> void:
 	# current_tool, поэтому GameState.tool_changed не сработает — своя точка.
 	GameState.drill_rig_tier_changed.connect(func(_tier): _sync_tool())
 	GameState.rig_dismount_blocked.connect(func(_id):
-		toast("Бурмобиль под землёй не бросить — сначала наверх или домой."))
+		# Бурмобиль под землёй не бросить — сначала наверх: машина и стрелка вверх.
+		toast_parts([
+			{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24},
+			{"icon": "arrow_up"},
+		], 2.4, "bad")
+		Sfx.play("ui_deny"))
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
 	GameState.leveled_up.connect(func(_lvl, _pts): _sync_xp())
 	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
@@ -2033,62 +1617,180 @@ func _update_depth() -> void:
 # Тосты
 # ---------------------------------------------------------------------------
 
+## Текстовый тост. Совместим со старым API: текст, секунды. Короткие тосты
+## лучше делать через toast_icon/toast_parts — иконка и число вместо фразы.
 func toast(text: String, seconds: float = 2.6) -> void:
-	_toast_label.text = text
-	_resize_toast_panel()
-	_toast_panel.visible = true
-	_toast_timer.start(seconds)
+	_show_toast([{"text": text, "wrap": true}], seconds, "info")
 
 
-## Меряет фактическую (обёрнутую по словам) высоту текста тем же шрифтом,
-## что рисует сам Label, и растягивает панель под неё снизу вверх — низ
-## (offset_bottom) не трогаем, чтобы тост не прыгал по вертикали при смене
-## текста. Считаем ширину от вьюпорта, а не от _toast_panel.size: та не
-## гарантированно свежая при первом же вызове toast() (см. hud.gd:
-## _update_layout — панель, как и весь HUD, отзывается на резайз вьюпорта
-## реактивно, а не мгновенно в конструкторе).
-func _resize_toast_panel() -> void:
-	var font := _toast_label.get_theme_font("font")
-	var font_size := _toast_label.get_theme_font_size("font_size")
-	if font == null:
+## Иконка (имя из art/ui) + короткое слово или число.
+func toast_icon(icon_name: String, text: String = "", seconds: float = 2.4,
+		color: Color = Color.WHITE, kind: String = "info") -> void:
+	_show_toast([{"icon": icon_name, "text": text, "color": color}], seconds, kind)
+
+
+## Несколько пар «иконка + текст» в одной таблетке. Часть — словарь:
+## icon (имя в art/ui) или icon_tex (Texture2D), text, color, icon_px.
+func toast_parts(parts: Array, seconds: float = 2.4, kind: String = "info") -> void:
+	_show_toast(parts, seconds, kind)
+
+
+func _show_toast(parts: Array, seconds: float, kind: String) -> void:
+	if _toast_panel == null:
 		return
-	var margins: float = _toast_panel.offset_left - _toast_panel.offset_right \
-		+ _toast_label.offset_left - _toast_label.offset_right
-	var wrap_width: float = maxf(40.0, get_viewport_rect().size.x - margins)
-	var text_h: float = font.get_multiline_string_size(
-		_toast_label.text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size).y
-	var panel_h: float = clampf(text_h + TOAST_PAD_V, TOAST_MIN_H, TOAST_MAX_H)
-	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - panel_h
+	for c in _toast_row.get_children():
+		_toast_row.remove_child(c)
+		c.queue_free()
+	var border: Color = TOAST_COLORS.get(kind, TOAST_COLORS["info"])
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
+	sb.border_color = border
+	sb.set_border_width_all(2 if kind == "rare" else 1)
+	sb.set_corner_radius_all(9)
+	sb.content_margin_left = TOAST_PAD.x
+	sb.content_margin_right = TOAST_PAD.x
+	sb.content_margin_top = TOAST_PAD.y
+	sb.content_margin_bottom = TOAST_PAD.y
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 3
+	_toast_panel.add_theme_stylebox_override("panel", sb)
+
+	var font: Font = ThemeDB.fallback_font
+	var max_text_w := TOAST_MAX_W - TOAST_PAD.x * 2.0
+	for part: Dictionary in parts:
+		var tex: Texture2D = part.get("icon_tex", null)
+		if tex == null and part.has("icon"):
+			tex = UiIcons.tex(String(part["icon"]))
+		if tex != null:
+			var px := float(part.get("icon_px", 16))
+			var r := TextureRect.new()
+			r.texture = tex
+			r.custom_minimum_size = Vector2(px, px)
+			r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_toast_row.add_child(r)
+		var text := String(part.get("text", ""))
+		if text.is_empty():
+			continue
+		var wrap: bool = bool(part.get("wrap", false))
+		var l := Label.new()
+		l.text = text
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		l.add_theme_font_size_override("font_size", TOAST_FONT if wrap else TOAST_FONT + 1)
+		l.add_theme_color_override("font_color", part.get("color", Color.WHITE))
+		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		l.add_theme_constant_override("outline_size", 2)
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var fs := l.get_theme_font_size("font_size")
+		# Размер считаем сами, шрифтовыми метриками: у Label с переносом высота
+		# узнаётся только после раскладки, а панель нужна по размеру уже сейчас.
+		var one_line := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		if wrap and one_line > max_text_w:
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD
+			var h := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, max_text_w, fs).y
+			l.custom_minimum_size = Vector2(max_text_w, h)
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		else:
+			l.custom_minimum_size = Vector2(one_line + 1.0, 0)
+		_toast_row.add_child(l)
+
+	_toast_panel.modulate.a = 1.0
+	_toast_panel.visible = true
+	_place_toast()
+	_toast_timer.start(seconds)
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	UiAnim.appear(_toast_panel, 0.88, 0.16)
+	if kind == "rare" and not Settings.reduce_motion:
+		UiAnim.pulse(_toast_panel, 0.1, 0.5)
 
 
-func _on_fell(damage: float, speed: float) -> void:
+## Низ панели стоит на месте, верх и бока — по фактическому размеру. reset_size()
+## сбивает смещения у якорей, поэтому считаем их сами.
+func _place_toast() -> void:
+	var sz := _toast_panel.get_combined_minimum_size()
+	_toast_panel.offset_left = -sz.x * 0.5
+	_toast_panel.offset_right = sz.x * 0.5
+	_toast_panel.offset_bottom = TOAST_BOTTOM_OFFSET
+	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - sz.y
+	_toast_panel.pivot_offset = sz * 0.5
+
+
+func _hide_toast() -> void:
+	if _toast_panel == null or not _toast_panel.visible:
+		return
+	if Settings.reduce_motion or not _toast_panel.is_inside_tree():
+		_toast_panel.visible = false
+		return
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.2)
+	_toast_tween.tween_callback(func() -> void:
+		_toast_panel.visible = false
+		_toast_panel.modulate.a = 1.0)
+
+
+## Короткие тосты событий: иконка + слово или число, фразы убраны (текст только
+## по наведению, заказ владельца). Что именно произошло, видно по иконкам.
+func _on_fell(damage: float, _speed: float) -> void:
 	if damage > 0.0:
-		toast("Удар на скорости %.1f кл/с — минус %d HP" % [speed, int(damage)])
+		toast_icon("hp", "−%d" % int(damage), 1.6, Color8(0xE8, 0x8C, 0x80), "bad")
 
 
 func _on_dig_blocked(tile_type: int) -> void:
+	# «Инструмент звенит о породу, стан от вибрации»: кирка, порода, «Звон!».
 	var mineral_id := MineralMap.mineral_id_for(tile_type)
-	var name_ru: String = "породу"
+	var parts: Array = []
+	var tool_path := _tool_icon_path(GameState.current_tool)
+	if not tool_path.is_empty() and ResourceLoader.exists(tool_path):
+		parts.append({"icon_tex": load(tool_path)})
 	if not mineral_id.is_empty():
-		name_ru = String(Balance.get_mineral(mineral_id).get("name_ru", "породу"))
-	toast(Balance.get_tool_name_ru(GameState.current_tool) + " звенит о " + name_ru.to_lower() + ". Стан от вибрации.")
+		parts.append({"icon_tex": UiIcons.item(mineral_id)})
+	parts.append({"text": "Звон!", "color": Color8(0xE8, 0x8C, 0x80)})
+	toast_parts(parts, 2.0, "bad")
+	Sfx.play("ui_deny")
 
 
 func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_loot: bool, coins: int) -> void:
 	if was_loot and coins == 0 and not mineral_id.is_empty():
-		toast(Balance.get_mineral(mineral_id).get("name_ru", "Находка") + " — рюкзак полон, пришлось оставить.")
+		# Рюкзак полон, находку пришлось оставить: предмет, рюкзак, «Полно».
+		toast_parts([
+			{"icon_tex": UiIcons.item(mineral_id)},
+			{"icon": "weight"},
+			{"text": "Полно", "color": Color8(0xE8, 0x8C, 0x80)},
+		], 2.2, "bad")
+		Sfx.play("ui_deny")
+		UiAnim.shake(_load_pill, 3.0, 0.3)
 	elif was_loot and not mineral_id.is_empty():
-		var name_ru := String(Balance.get_mineral(mineral_id).get("name_ru", ""))
-		float_pickup(x, y, "%s +1" % name_ru)
+		float_item(x, y, mineral_id)
+		UiAnim.pulse(_inv_button, 0.12, 0.2)
 		# Крупная находка отмечается тостом — но БЕЗ суммы в монетах: монет
 		# за копку не дают вовсе, их дают при продаже, а «+100 монет» читается
 		# как «уже на счету» (решение владельца). И не больше нескольких раз
 		# за игру: на десятый раз это уже не событие, а помеха.
 		if coins >= RARE_FIND_COINS and GameState.rare_find_toasts_shown < RARE_FIND_TOAST_LIMIT:
 			GameState.rare_find_toasts_shown += 1
-			toast("%s! Редкая находка." % name_ru)
+			show_rare_find(mineral_id)
 	if y == 80 and tile_type == TileTypes.Type.DIAMOND:
-		toast("Алмаз замурован в камне. Дедова кирка трескается — минус 25% скорости.", 4.0)
+		# Алмаз замурован в камне, дедова кирка трескается (−25% скорости).
+		toast_parts([
+			{"icon_tex": UiIcons.item("diamond")},
+			{"icon_tex": load("res://art/items/pickaxe_rusty_cracked.png")},
+			{"text": "−25%", "color": Color8(0xE8, 0x8C, 0x80)},
+		], 4.0, "bad")
+
+
+## Тост редкой находки: звезда, предмет покрупнее и название золотом, золотая
+## рамка, «подпрыгивает». Название — единственное слово: что нашёл, важно знать.
+func show_rare_find(mineral_id: String) -> void:
+	var name_ru := String(Balance.get_mineral(mineral_id).get("name_ru", ""))
+	toast_parts([
+		{"icon": "star"},
+		{"icon_tex": UiIcons.item(mineral_id), "icon_px": 24},
+		{"text": name_ru, "color": TOAST_COLORS["rare"]},
+	], 2.8, "rare")
+	Sfx.play("pickup_rare")
 
 
 func _on_gear_unlocked(gear_id: String) -> void:
@@ -2101,32 +1803,49 @@ func _on_gear_unlocked(gear_id: String) -> void:
 	# или покупка в магазине, — и до сих пор ни тот, ни другой путь ни разу
 	# не объяснял игроку, что ранец вообще поднимает в воздух. Задание
 	# владельца (новый сюжет ранца): "покажи, что удержание ВВЕРХ теперь даёт
-	# полёт" — тот же toast(), которым HUD уже объявляет любую другую находку.
+	# полёт" — теперь без слов: ранец с винтом и стрелка вверх.
 	if gear_id == "backpack":
-		toast("Ранец на плечах. Держи ВВЕРХ в прыжке — и полетишь.", 4.0)
+		toast_parts([
+			{"icon_tex": load("res://art/items/backpack_propeller.png")},
+			{"icon": "arrow_up"},
+			{"text": "Полёт", "color": Color8(0xF2, 0xD9, 0x9B)},
+		], 4.0, "good")
 	if gear_id == "drill_rig":
-		toast("Глубина 1000. Собран бурмобиль — копает вдвое быстрее бура.", 5.0)
+		# Глубина 1000, собран бурмобиль: копает вдвое быстрее бура.
+		toast_parts([
+			{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24},
+			{"text": "×2", "color": Color8(0xF2, 0xD9, 0x9B)},
+		], 4.0, "good")
 
 
 func _on_tool_switched(tool_id: String) -> void:
 	_sync_tool()
 	_show_tool_name()
 	if tool_id == "rusty_pickaxe":
-		toast("Лопата упёрлась в старый фундамент. В мастерской нашлась дедова кирка.", 3.6)
+		# Лопата упёрлась в старый фундамент, нашлась дедова кирка.
+		toast_parts([
+			{"icon_tex": load("res://art/items/pickaxe_rusty.png"), "icon_px": 24},
+			{"text": "Дедова кирка", "color": Color8(0xF2, 0xD9, 0x9B)},
+		], 3.4, "info")
 
 
 ## Герой сам сел за руль, войдя в тоннель с машиной в собственности, но не в
 ## руках (решение владельца: «спускаясь под землю он должен быть только в
 ## нём»). tool_changed уже пересинхронизировал иконку — здесь только тост.
 func _on_entered_rig() -> void:
-	toast("Ты сел в бурмобиль.", 2.6)
+	toast_parts([{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24}], 1.8, "good")
 
 
 ## Бурмобиль без топлива: либо не пускает в тоннель с поверхности, либо
-## глохнет прямо под землёй. Текст сообщения решает player.gd — здесь он
-## просто показывается (см. player.gd:_move_y и :_start_dig).
+## глохнет прямо под землёй. Текст сообщения решает player.gd (см. player.gd:
+## _move_y и :_start_dig); на экране — топливо «0», а если надо идти на
+## верстак — ещё и значок верстака.
 func _on_rig_fuel_warning(message: String) -> void:
-	toast(message)
+	var parts: Array = [{"icon": "fuel", "text": "0", "color": Color8(0xE8, 0x8C, 0x80)}]
+	if message.contains("верстак"):
+		parts.append({"icon": "workshop"})
+	toast_parts(parts, 2.8, "bad")
+	Sfx.play("ui_deny")
 
 
 # ---------------------------------------------------------------------------
@@ -2146,103 +1865,30 @@ func open_inventory() -> void:
 	if player != null:
 		player.digging = null
 		player.release_control()
-	_render_inventory()
-	_inv_sheet.visible = true
+	_inv_sheet.open()
 	_inv_button.button_pressed = true
 
 
 func close_inventory() -> void:
-	_close_drop()
-	_inv_sheet.visible = false
+	_inv_sheet.close()
 	_inv_button.button_pressed = false
 
 
 func _render_inventory() -> void:
-	for c in _inv_list.get_children():
-		c.queue_free()
-	var rows: Array = []
-	for id in GameState.inventory.keys():
-		var count: int = int(GameState.inventory[id])
-		if count <= 0:
-			continue
-		var price := Balance.get_mineral_price(id)
-		rows.append({"id": id, "count": count, "sum": price * count})
-	rows.sort_custom(func(a, b): return a.sum > b.sum)
-
-	if rows.is_empty():
-		var empty := Label.new()
-		empty.text = "Рюкзак пуст.\nЗемля и камень в него не кладутся — только руда и находки."
-		empty.add_theme_font_size_override("font_size", 10)
-		empty.autowrap_mode = TextServer.AUTOWRAP_WORD
-		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_inv_list.add_child(empty)
-		_inv_total_label.text = "0"
-	else:
-		var total := 0
-		for row in rows:
-			total += row.sum
-			var line := HBoxContainer.new()
-			var icon := TextureRect.new()
-			icon.custom_minimum_size = Vector2(16, 16)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			var tex := TileArt.texture_for(MineralMap.tile_type_for(row.id), 0, 0)
-			if tex != null:
-				icon.texture = tex
-			line.add_child(icon)
-			var name_label := Label.new()
-			name_label.text = String(Balance.get_mineral(row.id).get("name_ru", row.id))
-			name_label.add_theme_font_size_override("font_size", 10)
-			name_label.clip_text = true
-			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			line.add_child(name_label)
-			var count_label := Label.new()
-			count_label.text = "×%d" % row.count
-			count_label.add_theme_font_size_override("font_size", 10)
-			line.add_child(count_label)
-			var sum_label := Label.new()
-			sum_label.text = str(row.sum)
-			sum_label.add_theme_font_size_override("font_size", 10)
-			sum_label.custom_minimum_size = Vector2(34, 0)
-			sum_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			sum_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-			line.add_child(sum_label)
-			# Съесть прямо из рюкзака: кнопку «Еда» с нижней полосы убрали, и
-			# голод в шахте закрывается там, где еда лежит.
-			if HouseConfig.is_food(row.id):
-				var eat_btn := Button.new()
-				eat_btn.text = "Съесть"
-				eat_btn.add_theme_font_size_override("font_size", 9)
-				eat_btn.custom_minimum_size = Vector2(38, 20)
-				var fid: String = row.id
-				eat_btn.pressed.connect(func(): _eat_from_inventory(fid))
-				line.add_child(eat_btn)
-			# Выбросить: рюкзак заполняется задолго до подъёма, и без этого
-			# единственный способ освободить место под алмаз — идти домой.
-			var drop_btn := Button.new()
-			drop_btn.text = "×"  # ✕ (U+2715) в шрифте темы отсутствует, см. выше
-			drop_btn.tooltip_text = "Выбросить"
-			drop_btn.add_theme_font_size_override("font_size", 10)
-			drop_btn.custom_minimum_size = Vector2(22, 20)
-			var rid: String = row.id
-			var rcount: int = row.count
-			drop_btn.pressed.connect(func(): _open_drop(rid, rcount))
-			line.add_child(drop_btn)
-			_inv_list.add_child(line)
-		_inv_total_label.text = str(total)
-
-	var load_kg := GameState.get_total_weight()
-	var max_kg := GameState.get_max_carry_kg()
-	_inv_load_label.text = "%.1f / %.0f кг" % [load_kg, max_kg]
+	_inv_sheet.refresh()
 
 
 func _eat_from_inventory(id: String) -> void:
 	var res := HouseFood.eat(id)
 	if not bool(res.get("ok", false)):
 		toast(String(res.get("reason", "")))
+		Sfx.play("ui_deny")
 		return
-	toast("%s: голод +%d%%, бодрость +%d%%" % [
-		HouseConfig.food_name(id), int(res.get("hunger", 0.0)), int(res.get("stamina", 0.0))])
+	toast_parts([
+		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": Color8(0xE8, 0x7E, 0x6E)},
+		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": Color8(0xE8, 0xC5, 0x47)},
+	], 2.0)
+	Sfx.play("eat")
 	_render_inventory()
 	_sync_all()
 
@@ -2359,8 +2005,8 @@ func _dismiss_on_outside_press(event: InputEvent) -> bool:
 			get_viewport().set_input_as_handled()
 			return true
 		return false
-	if _drop_panel != null and _drop_panel.visible:
-		if not _drop_card_rect().has_point(e.pos):
+	if _inv_sheet != null and _inv_sheet.is_drop_open():
+		if not _inv_sheet.drop_card_rect().has_point(e.pos):
 			_close_drop()
 			get_viewport().set_input_as_handled()
 			return true
@@ -2384,7 +2030,7 @@ func _panel_card_rect(panel: Control) -> Rect2:
 
 
 func _drop_card_rect() -> Rect2:
-	return _panel_card_rect(_drop_panel)
+	return _inv_sheet.drop_card_rect()
 
 
 ## Приводит мышь/тач-события к одному виду: {kind:"press"|"release"|"move",

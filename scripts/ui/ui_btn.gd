@@ -183,3 +183,45 @@ static func set_badge(b: Control, n: int) -> void:
 	if grew or not badge.has_meta(&"_shown"):
 		badge.set_meta(&"_shown", true)
 		UiAnim.pulse(badge, 0.35, 0.26)
+
+
+## Ползунок в общем стиле: тёмная канавка, заливка цветом, золотая круглая ручка.
+static func style_slider(s: HSlider, fill: Color = GOLD_DIM) -> void:
+	var groove := StyleBoxFlat.new()
+	groove.bg_color = Color(0.06, 0.05, 0.04)
+	groove.border_color = BORDER
+	groove.set_border_width_all(1)
+	groove.set_corner_radius_all(3)
+	groove.content_margin_top = 3
+	groove.content_margin_bottom = 3
+	s.add_theme_stylebox_override("slider", groove)
+	var filled := StyleBoxFlat.new()
+	filled.bg_color = fill
+	filled.set_corner_radius_all(3)
+	filled.content_margin_top = 3
+	filled.content_margin_bottom = 3
+	s.add_theme_stylebox_override("grabber_area", filled)
+	s.add_theme_stylebox_override("grabber_area_highlight", filled)
+	var knob := knob_texture(GOLD)
+	s.add_theme_icon_override("grabber", knob)
+	s.add_theme_icon_override("grabber_highlight", knob_texture(GOLD.lightened(0.3)))
+	s.add_theme_icon_override("grabber_disabled", knob)
+	s.custom_minimum_size.y = maxf(s.custom_minimum_size.y, 22.0)
+
+
+## Ручка ползунка — золотой кружок с тёмной обводкой, рисуется из кода (16×16).
+static func knob_texture(col: Color) -> Texture2D:
+	var n := 16
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := (n - 1) * 0.5
+	for y in n:
+		for x in n:
+			var d := Vector2(x - c, y - c).length()
+			if d <= 7.5:
+				var shade := col
+				if d >= 6.2:
+					shade = Color8(0x1A, 0x13, 0x0D)
+				elif (x + y) < n - 3 and d < 4.5:
+					shade = col.lightened(0.35)
+				img.set_pixel(x, y, shade)
+	return ImageTexture.create_from_image(img)

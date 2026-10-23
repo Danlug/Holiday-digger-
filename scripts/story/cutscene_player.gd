@@ -23,15 +23,9 @@ signal finished(scene_id: String)
 const LAYER := 100
 const STAGE_TOP := 0.06        # доля высоты, где начинается "небо" сцены
 const GROUND_LINE := 0.56      # доля высоты, на которой проходит линия земли
-const BOX_H := 108.0           # высота реплики по умолчанию/минимум — см. _box_height_for_text()
-## Реплика длиннее шести строк при переносе по словам (напр. intro_boy.n3,
-## 146 символов) не помещалась в фиксированные BOX_H=108 — последняя строка
-## обрезалась по нижнему краю рамки, местами у самого края экрана (см. отчёт
-## QA-прохода). Растягиваем рамку под фактическую высоту текста тем же
-## приёмом, что и тост (hud.gd:_resize_toast_panel) — верх растёт, низ стоит
-## на месте.
-const BOX_MAX_H := 190.0
-const BOX_TEXT_CHROME := 34.0  # запас под подпись говорящего сверху и "дальше" снизу
+## Вид реплик, карточек, «Пропустить» и кинополос вынесен в DialogueUI, SceneCard,
+## ItemCard, SkipButton и CinematicBars (scripts/story/): здесь остаются только ход
+## сцены, тайминги и условия.
 ## Лист персонажа режется в ART_SCALE раз крупнее логических координат (см.
 ## tools/import_art.py:ART_SCALE и scripts/player/character_view.gd:CHAR_W) —
 ## реальный кадр 48×48 ЛОГИЧЕСКИХ пикселей занимает на диске 144×144.
@@ -44,7 +38,6 @@ const BOX_TEXT_CHROME := 34.0  # запас под подпись говорящ
 const ART_SCALE := 3.0
 const TILE := 32.0     # клетка мира в логических px — см. player.gd/world_actor.gd
 const CHAR_FRAME := int(48 * ART_SCALE)
-const TYPE_CHARS_PER_SEC := 42.0
 const ANIM_FPS := 7.0
 
 var scene_id: String = ""
@@ -82,8 +75,17 @@ var _house_npc_hide_on_arrive: bool = false
 var _beats: Array = []
 var _index: int = 0
 var _beat_timer: float = 0.0     # сколько ещё держать кадр с автопереходом
+var _last_tap_ms: int = -100000
+const TAP_DEBOUNCE_MS := 90
 var _waiting_tap: bool = false
-var _typing: bool = false
+## Печать реплики ведёт DialogueUI; поле осталось, чтобы ход сцены (и тесты) читали
+## и гасили её так же, как раньше.
+var _typing: bool:
+	get:
+		return _dlg != null and _dlg.typing
+	set(v):
+		if _dlg != null:
+			_dlg.typing = v
 var _anim_time: float = 0.0
 
 # --- узлы ---
@@ -92,17 +94,18 @@ var _sky: ColorRect
 var _ground: TextureRect
 var _backdrop_fence: TextureRect = null  # см. set_backdrop_era() — создаётся лениво
 var _stage: Control
-var _card: Label
-var _box: Panel
-var _speaker: Label
-var _line: Label
-var _next_hint: Label
-var _skip_btn: Button
+var _card: SceneCard
+var _dlg: DialogueUI
+var _bars: CinematicBars
+var _vignette: TextureRect
+var _skip_btn: SkipButton
 var _fade: ColorRect
-var _item_card: Control
-var _item_icon: TextureRect
-var _item_name: Label
-var _item_text: Label
+var _item_card: ItemCard
+## Текущая строка реплики (Label внутри DialogueUI): на неё смотрят тесты и скриншоты.
+var _line: Label:
+	get:
+		return _dlg.line
+var _card_total: float = 0.0
 var _tap_target: Control
 
 var _actors: Dictionary = {}     # actor_id -> {node: TextureRect, frames:int, pose:String}
@@ -248,18 +251,28 @@ func _build() -> void:
 	# ровно на линии земли, ниже в кадре только прозрачный запас.
 	_root.move_child(_ground, _stage.get_index() + 1)
 
-	_card = Label.new()
-	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_card.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_card.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_card.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_card.add_theme_font_size_override("font_size", 15)
-	_card.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
-	_card.visible = false
+	# Лёгкая виньетка по краям кадра — собирает внимание к центру и подкладывает
+	# тень под плашку реплики; на живой карте работает так же.
+	_vignette = TextureRect.new()
+	_vignette.name = "Vignette"
+	_vignette.texture = _make_vignette(0.5)
+	_vignette.stretch_mode = TextureRect.STRETCH_SCALE
+	_vignette.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_vignette)
+
+	_item_card = ItemCard.new()
+	_item_card.name = "ItemCard"
+	_root.add_child(_item_card)
+
+	_dlg = DialogueUI.new()
+	_dlg.name = "Dialogue"
+	_root.add_child(_dlg)
+
+	_card = SceneCard.new()
+	_card.name = "SceneCard"
 	_root.add_child(_card)
 
-	_build_item_card()
-	_build_box()
 	_build_tap_target()
 
 	_fade = ColorRect.new()
@@ -268,97 +281,32 @@ func _build() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_fade)
 
-	_skip_btn = Button.new()
-	_skip_btn.text = StoryText.get_text("ui.skip")
-	_skip_btn.add_theme_font_size_override("font_size", 9)
-	_skip_btn.pressed.connect(skip)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0, 0, 0, 0.55)
-	sb.border_color = Color8(0x9D, 0x8B, 0x73)
-	sb.set_border_width_all(1)
-	sb.content_margin_left = 7
-	sb.content_margin_right = 7
-	sb.content_margin_top = 3
-	sb.content_margin_bottom = 3
-	for state in ["normal", "hover", "pressed", "focus"]:
-		_skip_btn.add_theme_stylebox_override(state, sb)
-	_skip_btn.add_theme_color_override("font_color", Color8(0xC8, 0xB8, 0x9A))
-	_root.add_child(_skip_btn)
+	# Полосы и «Пропустить» — прямые дети слоя, а не корня сцены: корень гасится
+	# мгновенно, а полосы должны уехать плавно (см. CinematicBars).
+	_bars = CinematicBars.new()
+	_bars.name = "Letterbox"
+	add_child(_bars)
+
+	_skip_btn = SkipButton.new()
+	_skip_btn.name = "Skip"
+	_skip_btn.visible = false
+	_skip_btn.confirmed.connect(skip)
+	add_child(_skip_btn)
 
 
-func _build_box() -> void:
-	_box = Panel.new()
-	_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.043, 0.035, 0.027, 0.94)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.border_width_left = 3
-	sb.border_width_top = 1
-	sb.border_width_bottom = 1
-	sb.border_width_right = 1
-	_box.add_theme_stylebox_override("panel", sb)
-	_root.add_child(_box)
-
-	_speaker = Label.new()
-	_speaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_speaker.position = Vector2(9, 4)
-	_speaker.add_theme_font_size_override("font_size", 10)
-	_speaker.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_box.add_child(_speaker)
-
-	_line = Label.new()
-	_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_line.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_line.add_theme_font_size_override("font_size", 11)
-	_line.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
-	_box.add_child(_line)
-
-	_next_hint = Label.new()
-	_next_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_next_hint.text = StoryText.get_text("ui.tap_to_continue")
-	_next_hint.add_theme_font_size_override("font_size", 8)
-	_next_hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	_next_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_box.add_child(_next_hint)
-
-
-func _build_item_card() -> void:
-	_item_card = Control.new()
-	_item_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_item_card.visible = false
-	_root.add_child(_item_card)
-
-	var panel := Panel.new()
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.09, 0.07, 0.05, 0.96)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.set_border_width_all(2)
-	panel.add_theme_stylebox_override("panel", sb)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_item_card.add_child(panel)
-
-	_item_icon = TextureRect.new()
-	_item_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_item_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_item_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_item_card.add_child(_item_icon)
-
-	_item_name = Label.new()
-	_item_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_item_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_item_name.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_item_name.add_theme_font_size_override("font_size", 13)
-	_item_name.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_item_card.add_child(_item_name)
-
-	_item_text = Label.new()
-	_item_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_item_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_item_text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_item_text.add_theme_font_size_override("font_size", 10)
-	_item_text.add_theme_color_override("font_color", Color8(0xC8, 0xB8, 0x9A))
-	_item_card.add_child(_item_text)
+## Радиальная виньетка: прозрачный центр, тёмные края (strength — прозрачность на краю).
+static func _make_vignette(strength: float) -> GradientTexture2D:
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	grad.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, strength)])
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 64
+	gt.height = 128
+	return gt
 
 
 ## Подсветка цели обязательного тапа (кровать, батончик). Обучение действием:
@@ -367,11 +315,16 @@ func _build_tap_target() -> void:
 	_tap_target = Control.new()
 	_tap_target.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tap_target.visible = false
+	var tap_sb := StyleBoxFlat.new()
+	tap_sb.set_corner_radius_all(8)
+	tap_sb.set_border_width_all(2)
+	tap_sb.anti_aliasing = true
 	_tap_target.draw.connect(func():
 		var r := Rect2(Vector2.ZERO, _tap_target.size)
 		var pulse: float = 0.45 + 0.35 * sin(float(Time.get_ticks_msec()) / 180.0)
-		_tap_target.draw_rect(r, Color(0.88, 0.66, 0.23, 0.12 * pulse), true)
-		_tap_target.draw_rect(r, Color(0.88, 0.66, 0.23, pulse), false, 2.0)
+		tap_sb.bg_color = Color(0.88, 0.66, 0.23, 0.12 * pulse)
+		tap_sb.border_color = Color(0.88, 0.66, 0.23, pulse)
+		_tap_target.draw_style_box(tap_sb, r)
 	)
 	_root.add_child(_tap_target)
 
@@ -405,23 +358,6 @@ func _relayout_if_resized() -> void:
 		_layout()
 
 
-## Мерит фактическую (обёрнутую по словам) высоту текущей реплики тем же
-## шрифтом, что рисует сам Label _line, — приём один в один с
-## hud.gd:_resize_toast_panel. До того, как _line получит текст (первый вызов
-## _layout из _build()), возвращает минимум.
-func _box_height_for_text(vp_x: float) -> float:
-	if _line == null:
-		return BOX_H
-	var font := _line.get_theme_font("font")
-	var font_size := _line.get_theme_font_size("font_size")
-	if font == null or _line.text.is_empty():
-		return BOX_H
-	var wrap_width: float = maxf(40.0, (vp_x - 12.0) - 18.0)
-	var text_h: float = font.get_multiline_string_size(
-		_line.text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size).y
-	return clampf(text_h + BOX_TEXT_CHROME, BOX_H, BOX_MAX_H)
-
-
 func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_last_vp = vp
@@ -446,28 +382,15 @@ func _layout() -> void:
 		_backdrop_fence.position = Vector2(0, ground_y - band_h)
 		_backdrop_fence.size = Vector2(vp.x, band_h)
 
-	var box_h: float = _box_height_for_text(vp.x)
-	_box.position = Vector2(6, vp.y - box_h - 6)
-	_box.size = Vector2(vp.x - 12, box_h)
-	_line.position = Vector2(9, 21)
-	_line.size = Vector2(_box.size.x - 18, box_h - 34)
-	_next_hint.position = Vector2(_box.size.x - 52, box_h - 15)
-	_next_hint.size = Vector2(44, 12)
-
-	_card.position = Vector2(18, vp.y * 0.28)
-	_card.size = Vector2(vp.x - 36, vp.y * 0.34)
-
-	_item_card.position = Vector2(16, vp.y * 0.20)
-	_item_card.size = Vector2(vp.x - 32, vp.y * 0.48)
-	_item_icon.position = Vector2(_item_card.size.x / 2.0 - 24, 14)
-	_item_icon.size = Vector2(48, 48)
-	_item_name.position = Vector2(8, 68)
-	_item_name.size = Vector2(_item_card.size.x - 16, 34)
-	_item_text.position = Vector2(8, 104)
-	_item_text.size = Vector2(_item_card.size.x - 16, _item_card.size.y - 112)
-
-	_skip_btn.position = Vector2(vp.x - 72, 8)
-	_skip_btn.size = Vector2(64, 20)
+	_vignette.position = Vector2.ZERO
+	_vignette.size = vp
+	# Полосы держат нижнюю границу плашки: реплика стоит над ними, а не на них.
+	var bar_h := CinematicBars.bar_height_for(vp.y)
+	_bars.fit(vp)
+	_dlg.relayout(vp, bar_h + 4.0)
+	_card.layout(vp)
+	_item_card.layout(vp)
+	_skip_btn.position = Vector2(vp.x - SkipButton.SIZE_PX.x - 8.0, maxf(2.0, (bar_h - SkipButton.SIZE_PX.y) * 0.5))
 
 	_place_all()
 
@@ -528,9 +451,14 @@ func play(id: String, opts: Dictionary = {}) -> void:
 		_exit_house_mode()
 	_kill_fade_tween()
 	_fade.color = Color(0, 0, 0, 0)
-	_skip_btn.text = StoryText.get_text("ui.skip")
+	_skip_btn.refresh_texts()
+	_skip_btn.reset_state()
+	_dlg.hide_all()
+	_card.hide_card()
+	_item_card.hide_item()
 	is_playing = true
 	_root.visible = true
+	_skip_btn.visible = true
 
 	# Опциональное поле сцены "era" (data/story.json) — те же подложки забора,
 	# что и в живом мире (scripts/world/backdrop.gd), позади актёров вместо
@@ -549,6 +477,7 @@ func play(id: String, opts: Dictionary = {}) -> void:
 		set_backdrop_era("")
 
 	_layout()
+	_bars.open(_last_vp, true)
 	_world_exit = String(scene_data.get("world_exit", ""))
 	if bool(opts.get("world", false)):
 		_enter_world_mode(String(scene_data.get("era", "now")))
@@ -615,12 +544,18 @@ func skip() -> void:
 func abort() -> void:
 	is_playing = false
 	_root.visible = false
+	_skip_btn.visible = false
+	_bars.close(false)
+	_hide_text()
 	_clear_stage()
 
 
 func _finish() -> void:
 	is_playing = false
 	_root.visible = false
+	_skip_btn.visible = false
+	_hide_text()
+	_bars.close(true)
 	_clear_stage()
 	finished.emit(scene_id)
 
@@ -646,12 +581,14 @@ func _process(dt: float) -> void:
 	# В самом конце — иначе mood/daynight, отработавшие чуть выше, перезапишут
 	# цвет неба обратно и часы DayCycle не будет видно.
 	_apply_day_cycle_sky()
-	_next_hint.visible = _waiting_tap and not _typing and int(_anim_time * 2.0) % 2 == 0
+	_dlg.set_waiting(_waiting_tap)
+	if _card.visible:
+		_card.set_progress(_card_total - _beat_timer, _card_total)
+	if _tap_target.visible:
+		_tap_target.queue_redraw()
 
+	# Печатью реплики занимается сам DialogueUI (его _process); ход сцены ждёт её конца.
 	if _typing:
-		_line.visible_ratio = min(1.0, _line.visible_ratio + (TYPE_CHARS_PER_SEC * dt) / maxf(1.0, float(_line.text.length())))
-		if _line.visible_ratio >= 1.0:
-			_typing = false
 		return
 
 	if _waiting_tap:
@@ -686,9 +623,15 @@ func _input(event: InputEvent) -> void:
 		return  # кнопку обрабатывает сама кнопка
 	get_viewport().set_input_as_handled()
 
+	# Касание пальцем приходит дважды (ScreenTouch и эмулированная мышь): второе
+	# событие не должно сразу «пролистать» реплику, которую первое только дописало.
+	var now := Time.get_ticks_msec()
+	if now - _last_tap_ms < TAP_DEBOUNCE_MS:
+		return
+	_last_tap_ms = now
+
 	if _typing:
-		_line.visible_ratio = 1.0
-		_typing = false
+		_dlg.finish_typing()
 		return
 	if _tap_target.visible:
 		# Обязательный тап засчитывается только по подсвеченной цели.
@@ -715,8 +658,8 @@ func _advance() -> void:
 func _run_beat(beat: Dictionary) -> bool:
 	match String(beat.get("t", "")):
 		"card":
-			_show_card(StoryText.get_text(String(beat.get("text", ""))))
 			_beat_timer = float(beat.get("sec", 3.0))
+			_show_card(StoryText.get_text(String(beat.get("text", ""))), _beat_timer)
 			return true
 		"narr":
 			_show_line("", StoryText.get_text(String(beat.get("text", ""))))
@@ -724,7 +667,7 @@ func _run_beat(beat: Dictionary) -> bool:
 		"say":
 			var who := String(beat.get("who", ""))
 			_show_line(StoryText.get_text(StoryData.actor_speaker_key(who)),
-				StoryText.get_text(String(beat.get("text", ""))))
+				StoryText.get_text(String(beat.get("text", ""))), who, String(beat.get("text", "")))
 			return true
 		"show":
 			_show_actor(beat)
@@ -833,60 +776,63 @@ func _run_beat(beat: Dictionary) -> bool:
 # Кадры
 # ---------------------------------------------------------------------------
 
-func _show_card(text: String) -> void:
-	_card.text = text
-	_card.visible = true
-	_box.visible = false
-	_item_card.visible = false
+func _show_card(text: String, total: float = 3.0) -> void:
+	_dlg.hide_all()
+	_item_card.hide_item()
+	_card_total = total
+	_card.show_text(text, total)
 
 
-func _show_line(speaker: String, text: String) -> void:
-	_card.visible = false
-	_item_card.visible = false
-	_box.visible = true
-	_speaker.text = speaker
-	_speaker.visible = not speaker.is_empty()
-	_line.position.y = 21.0 if not speaker.is_empty() else 10.0
-	_line.text = text
-	_line.visible_ratio = 0.0
-	_typing = true
+## who — id говорящего (пусто для закадрового текста), key — ключ реплики в таблице
+## текстов: по ним DialogueUI выбирает портрет и выражение лица.
+func _show_line(speaker: String, text: String, who: String = "", key: String = "") -> void:
+	_card.hide_card()
+	_item_card.hide_item()
+	_dlg.show_line(who, speaker, text, {"stage": _stage_actor_ids(), "key": key})
 	_waiting_tap = true
-	# Рамка меряется по НОВОМУ тексту и может вырасти выше шести строк — см.
-	# _box_height_for_text().
-	_layout()
+
+
+## Кто сейчас на сцене (иллюстрированной или живой карты): от этого зависит,
+## какой портрет говорящего показать, например внука в экипировке.
+func _stage_actor_ids() -> Array:
+	var ids: Array = _actors.keys()
+	ids.append_array(_world_actors.keys())
+	return ids
 
 
 func _hide_text() -> void:
-	_card.visible = false
-	_box.visible = false
-	_item_card.visible = false
+	_card.hide_card()
+	_dlg.hide_all()
+	_item_card.hide_item()
 
 
 func _show_item(beat: Dictionary) -> void:
-	_card.visible = false
+	_card.hide_card()
 	var icon_path := String(beat.get("icon", ""))
-	_item_icon.texture = load(icon_path) if ResourceLoader.exists(icon_path) else null
-	_item_name.text = StoryText.get_text(String(beat.get("name", "")))
-	_item_text.text = StoryText.get_text(String(beat.get("text", "")))
-	_item_card.visible = true
-	_box.visible = false
+	var icon: Texture2D = load(icon_path) if ResourceLoader.exists(icon_path) else null
+	_dlg.hide_all()
+	_item_card.show_item(icon, StoryText.get_text(String(beat.get("name", ""))),
+		StoryText.get_text(String(beat.get("text", ""))))
 	_waiting_tap = true
 
 
 func _show_tap_target(beat: Dictionary) -> void:
 	var prop_id := String(beat.get("prop", ""))
 	var rect := Rect2(_root.size.x / 2.0 - 40, _root.size.y * 0.30, 80, 80)
+	var keep_item := false
 	if _props.has(prop_id):
 		var node: TextureRect = _props[prop_id]
 		rect = Rect2(node.position + _stage.position - Vector2(6, 6), node.size + Vector2(12, 12))
 	elif _item_card.visible:
 		rect = Rect2(_item_card.position, _item_card.size)
+		keep_item = true
 	_tap_target.position = rect.position
 	_tap_target.size = rect.size
 	_tap_target.visible = true
 	_show_line("", StoryText.get_text(String(beat.get("text", ""))))
-	_typing = false
-	_line.visible_ratio = 1.0
+	if keep_item:
+		_item_card.reshow()  # подсвеченная цель — сама карточка, прятать её нельзя
+	_dlg.finish_typing()
 	_waiting_tap = true
 
 

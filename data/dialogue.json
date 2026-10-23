@@ -1,0 +1,28 @@
+{
+	"version": 1,
+	"_note": "Оформление диалогов (scripts/story/dialogue_*.gd): кто с какой стороны стоит, как «говорит» (высота блипа), цвет ленточки с именем. Текстов здесь нет — имена берутся из StoryText по speaker.<id>. Все числа — предложения разработчика (proposed), владелец их не задавал.",
+	"proposed": true,
+	"speakers": {
+		"boy": {"portrait": "boy", "side": "left", "pitch": 1.5, "accent": "#4F7FC0", "variants": {"boy_gear": "boy_gear"}},
+		"grandma_rich": {"portrait": "grandma_rich", "side": "right", "pitch": 1.15, "accent": "#3F5190"},
+		"grandma_poor": {"portrait": "grandma_poor", "side": "right", "pitch": 1.2, "accent": "#6E8A5A"},
+		"grandpa": {"portrait": "grandpa", "side": "right", "pitch": 0.8, "accent": "#A8946E", "variants": {"grandpa_gear": "grandpa_gear"}},
+		"robert": {"portrait": "robert", "side": "right", "pitch": 0.68, "accent": "#5C86A0"},
+		"parents": {"portrait": "parents", "side": "right", "pitch": 1.0, "accent": "#8A5A6A"},
+		"voice": {"portrait": "voice", "side": "right", "pitch": 0.5, "accent": "#6A4FA8", "blip_db": -13.0}
+	},
+	"typing": {
+		"cps": 42.0,
+		"cps_long": 70.0,
+		"blip_every": 3,
+		"blip_db": -10.0,
+		"pause_comma": 0.09,
+		"pause_stop": 0.2,
+		"pause_ellipsis": 0.07
+	},
+	"faces": {
+		"intro_boy.s2": "surprise",
+		"ending.s5": "happy",
+		"depth_100.s3": "happy"
+	}
+}

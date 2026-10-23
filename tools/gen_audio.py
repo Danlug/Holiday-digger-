@@ -57,8 +57,11 @@ def read_wav(path):
 def write_ogg(path, x, sr, quality=3):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     pcm = D.to_int16(x).tobytes()
+    # bitexact: без случайного серийного номера потока — повторная сборка даёт
+    # те же байты, и история репозитория не пухнет от пересборок.
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "s16le", "-ar", str(sr), "-ac", "1",
-           "-i", "pipe:0", "-c:a", "libvorbis", "-q:a", str(quality), path]
+           "-i", "pipe:0", "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact",
+           "-c:a", "libvorbis", "-q:a", str(quality), path]
     subprocess.run(cmd, input=pcm, check=True)
 
 

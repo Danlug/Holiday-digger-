@@ -532,6 +532,16 @@ func _test_director() -> void:
 	GameState.hp_changed.emit(100.0, 100.0)
 	check("respawned → respawn, возврат HP не считается лечением", rec.has_play("respawn") and not rec.has_play("heal"))
 
+	# после смерти музыка возвращается не сразу
+	rec.clear()
+	rec.music_id = ""
+	dir._tick_music()
+	check("после смерти музыка ждёт, пока звучит die", rec.music_id == "")
+	dir._clock += 4.0
+	dir._tick_music()
+	check("а потом возвращается", rec.music_id != "")
+	rec.music_id = ""
+
 	# --- музыка по контексту ---
 	GameState.house_is_indoors = false
 	GameState.player_depth = 0

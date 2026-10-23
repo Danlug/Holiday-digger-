@@ -15,13 +15,13 @@ from audio_dsp import (MSR, mtof, fft_filter, place_wrap, reverb_send, echo_circ
 SR = MSR
 
 TRACKS = {
-    "mus_surface": dict(bpm=92, bars=24, db=-5.0, quality=3),
-    "mus_mine_1": dict(bpm=78, bars=24, db=-5.0, quality=3),
-    "mus_mine_2": dict(bpm=66, bars=20, db=-5.0, quality=3),
-    "mus_deep": dict(bpm=50, bars=16, db=-4.0, quality=3),
-    "mus_boss": dict(bpm=132, bars=28, db=-5.0, quality=3),
-    "mus_story": dict(bpm=72, bars=20, db=-5.0, quality=3),
-    "mus_shop": dict(bpm=108, bars=24, db=-6.0, quality=3),
+    "mus_surface": dict(bpm=92, bars=24, db=-2.0, quality=3),
+    "mus_mine_1": dict(bpm=78, bars=24, db=-2.0, quality=3),
+    "mus_mine_2": dict(bpm=66, bars=20, db=-2.0, quality=3),
+    "mus_deep": dict(bpm=50, bars=16, db=-1.0, quality=3),
+    "mus_boss": dict(bpm=132, bars=28, db=-3.0, quality=3),
+    "mus_story": dict(bpm=72, bars=20, db=-2.0, quality=3),
+    "mus_shop": dict(bpm=108, bars=24, db=-3.0, quality=3),
 }
 # Меню и магазин — одна дорожка: короткая, добрая, не раздражающая.
 ALIASES = {"mus_menu": "mus_shop"}

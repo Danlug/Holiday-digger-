@@ -2,12 +2,12 @@
  "music": {
   "mus_boss": {
    "bpm": 132,
-   "db": -5.0,
+   "db": -3.0,
    "file": "music/mus_boss.ogg"
   },
   "mus_deep": {
    "bpm": 50,
-   "db": -4.0,
+   "db": -1.0,
    "file": "music/mus_deep.ogg"
   },
   "mus_menu": {
@@ -15,27 +15,27 @@
   },
   "mus_mine_1": {
    "bpm": 78,
-   "db": -5.0,
+   "db": -2.0,
    "file": "music/mus_mine_1.ogg"
   },
   "mus_mine_2": {
    "bpm": 66,
-   "db": -5.0,
+   "db": -2.0,
    "file": "music/mus_mine_2.ogg"
   },
   "mus_shop": {
    "bpm": 108,
-   "db": -6.0,
+   "db": -3.0,
    "file": "music/mus_shop.ogg"
   },
   "mus_story": {
    "bpm": 72,
-   "db": -5.0,
+   "db": -2.0,
    "file": "music/mus_story.ogg"
   },
   "mus_surface": {
    "bpm": 92,
-   "db": -5.0,
+   "db": -2.0,
    "file": "music/mus_surface.ogg"
   }
  },

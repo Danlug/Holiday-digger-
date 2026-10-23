@@ -53,6 +53,7 @@ var _sold_msec: int = -100000
 
 var _boss_active: bool = false
 var _music_timer: float = 0.0
+var _music_hold_until: float = 0.0
 var _music_want: String = ""
 var _music_want_since: float = 0.0
 var _clock: float = 0.0
@@ -452,6 +453,8 @@ func _on_died() -> void:
 	Haptics.buzz(200)
 	Sfx.stop_music(0.8)
 	_music_want = ""
+	# музыка не возвращается, пока звучит «die» (катсцена сюжета не ждёт)
+	_music_hold_until = _clock + 3.0
 
 
 func _on_respawned() -> void:
@@ -523,6 +526,8 @@ func _tick_music() -> void:
 	var want := music_for_context()
 	if want == "":
 		return  # тишину после смерти ведёт died, возрождение вернёт трек
+	if _clock < _music_hold_until and want != "mus_story" and want != "mus_boss":
+		return
 	if want != _music_want:
 		_music_want = want
 		_music_want_since = _clock

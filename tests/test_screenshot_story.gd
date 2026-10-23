@@ -9,7 +9,7 @@ extends Node
 ## Спец-имена: grave (могила во дворе), diary (экран дневника).
 ## Снимок делается на каждой реплике/карточке сцены, но не больше SHOTS_PER_SCENE.
 
-const SHOTS_PER_SCENE := 6
+const SHOTS_PER_SCENE := 40
 
 var _out_dir := "/tmp/story_shots"
 var _ids: Array = []

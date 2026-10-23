@@ -117,8 +117,15 @@ func _ready() -> void:
 	player.x = 20.5
 	player.y = 120.5
 	main.world.dig_cell(20, 120)
-	GameState.max_depth_reached = 130
 	director.arc_calm_wait_ms = 0
+	ShopUI.open_shop()
+	await _frames(2)
+	GameState.max_depth_reached = 130
+	await _frames(20)
+	check("пока открыт магазин, катсцена поверх него не начинается",
+		ShopUI.instance != null and ShopUI.instance.is_open() and not director.cutscene.is_playing
+		and GameState.story_queue.has("depth_100"))
+	ShopUI.instance.close()
 	guard = 0
 	while not director.cutscene.is_playing and guard < 120:
 		await _frames(1)

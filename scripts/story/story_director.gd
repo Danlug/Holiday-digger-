@@ -552,7 +552,7 @@ func _next_playable() -> String:
 
 
 func _arc_ready(id: String) -> bool:
-	if GameState.house_is_indoors or not GameState.is_alive:
+	if GameState.house_is_indoors or not GameState.is_alive or _modal_open():
 		return false
 	var data := StoryData.scene(id)
 	if bool(data.get("surface", false)) and player != null and player.cell_y() > 0:
@@ -567,6 +567,16 @@ func _arc_ready(id: String) -> bool:
 		_arc_wait_since.erase(id)
 		return true
 	return false
+
+
+## Открыт ли какой-то экран поверх игры (магазин, прокачка, меню «•••»):
+## катсцена, начавшаяся под ним, оставила бы его висеть после себя.
+func _modal_open() -> bool:
+	if ShopUI.instance != null and ShopUI.instance.is_open():
+		return true
+	if ProgressScreen.is_open():
+		return true
+	return hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open()
 
 
 func _hero_calm() -> bool:

@@ -194,6 +194,10 @@ var current_clock_hour: float = -1.0
 var _world_exit: String = ""
 var _world_entry_pos: Vector2 = Vector2.ZERO
 var _last_camera_pos: Vector2 = Vector2.INF
+## Твин затемнения. Тап посреди «fade» переключает кадр, не дожидаясь конца
+## твина, а тот дотягивал бы чёрный до конца и закрывал бы всё последующее
+## (в «ending» после затемнения идут титры) — поэтому смена кадра/настроения его гасит.
+var _fade_tween: Tween = null
 var _view_root: Node = null
 var _flash: ColorRect = null
 
@@ -522,6 +526,7 @@ func play(id: String, opts: Dictionary = {}) -> void:
 	# как world_mode уже давно не наследуется (_clear_stage() выше).
 	if house_mode:
 		_exit_house_mode()
+	_kill_fade_tween()
 	_fade.color = Color(0, 0, 0, 0)
 	_skip_btn.text = StoryText.get_text("ui.skip")
 	is_playing = true
@@ -888,10 +893,18 @@ func _show_tap_target(beat: Dictionary) -> void:
 func _start_fade(dir: String, sec: float) -> void:
 	_hide_text()
 	var to_black := dir == "out"
+	_kill_fade_tween()
 	var tween := create_tween()
+	_fade_tween = tween
 	_fade.color = Color(0, 0, 0, 0.0 if to_black else 1.0)
 	tween.tween_property(_fade, "color", Color(0, 0, 0, 1.0 if to_black else 0.0), sec)
 	_beat_timer = sec
+
+
+func _kill_fade_tween() -> void:
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = null
 
 
 func _start_move(beat: Dictionary) -> void:
@@ -1329,6 +1342,7 @@ func _set_mood(id: String) -> void:
 	_apply_mood_colors(id)
 	# Смена обстановки — это новая сцена, а затемнение от предыдущей на ней
 	# уже не нужно: иначе титр после "fade out" рисовался бы под чёрным.
+	_kill_fade_tween()
 	_fade.color = Color(0, 0, 0, 0)
 
 

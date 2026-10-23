@@ -99,6 +99,7 @@ func _run() -> void:
 	_test_diary()
 	_test_grave_site()
 	await _test_playthrough_never_soft_locks()
+	await _test_fade_tween_does_not_outlive_scene_change()
 	await _test_reset_clears_arc()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -501,6 +502,24 @@ func _test_playthrough_never_soft_locks() -> void:
 		cs.finished.disconnect(on_done)
 	player.x = 15.5
 	player.y = 0.5
+
+
+## Тап посреди «fade» листает кадр, не дожидаясь твина; тот дотянул бы чёрный
+## до конца и закрыл бы титры концовки. Смена настроения должна гасить твин.
+func _test_fade_tween_does_not_outlive_scene_change() -> void:
+	var cs := director.cutscene
+	cs._root.visible = true
+	cs._start_fade("out", 0.3)
+	cs._set_mood("dark")
+	await _frames(40)
+	check("затемнение, прерванное сменой кадра, не закрывает экран", cs._fade.color.a < 0.01,
+		"alpha=%.2f" % cs._fade.color.a)
+	cs._start_fade("out", 0.2)
+	cs._kill_fade_tween()
+	cs._fade.color = Color(0, 0, 0, 0)
+	await _frames(30)
+	check("убитый твин больше не двигает затемнение", cs._fade.color.a < 0.01)
+	cs._root.visible = false
 
 
 func _test_reset_clears_arc() -> void:

@@ -21,6 +21,8 @@ extends Node
 ##                     после железной кирки)
 ##   --fill=0.9        доля грузоподъёмности, при которой поднимаемся продавать
 ##   --smart=1|0       1: подниматься раньше, если проданного хватит на следующую ступень
+##   --artifacts=1|0   1 (по умолчанию): находки артефактов платят монетами и опытом, как в игре
+##                     (позиции — из ArtifactSpawn по сиду мира); 0 — чистая добыча руды
 ##   --json=путь       сохранить результат (потом сверять до/после правок баланса)
 ##
 ## Модель (всё, что она НЕ учитывает, перечислено — числа это ориентир, не истина):
@@ -33,7 +35,7 @@ extends Node
 ##  * материалы под ручной бур (железо, металлолом→бронза, серебро) откладываются на верстак
 ##    (invest) и вес не занимают — как в магазине;
 ##  * НЕ учтено: топливо бура, перегрев, голод/сон (заложен фиксированный накладной расход),
-##    артефакты, квесты и их XP, обвалы, лава, ходьба по горизонтали сверх бокового забора.
+##    квесты и мета-награды, обвалы, лава, ходьба по горизонтали сверх бокового забора.
 
 const START_COINS := 550            # 500 за пять самородков + 50 за никчёмный клад (бот онбординга, ГДД §9)
 const START_TIME_S := 100.0         # онбординг по боту: интро, автокопка, кирка, золото, смерть (игровые секунды)
@@ -45,7 +47,7 @@ const UPKEEP_COST_S := 30.0
 const SIDE_TURN_S := 0.4            # тап в сторону
 
 var _opt := {"seeds": 6, "policy": "shaft", "hours": 48.0, "skills": "dig_speed,strength,vision",
-	"bank": "iron", "fill": 0.9, "smart": "1", "json": ""}
+	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": ""}
 
 
 func _ready() -> void:
@@ -76,6 +78,7 @@ func _simulate(seed_value: int) -> Dictionary:
 		"tool": "rusty_pickaxe", "gear": "", "stages": {}, "xp": 0, "level": 1, "points": 0,
 		"pickaxes": ["rusty_pickaxe"], "next_upkeep": UPKEEP_EVERY_S, "cells": 0, "trips": 0,
 		"drill": false, "mile": {}, "max_depth_milestone": 0,
+		"artifacts": [], "dollars": 0, "seed": seed_value, "artifact_coins": 0,
 	}
 	# Ступени, которые покупает добытчик, — по стоимости, кирки строго по порядку.
 	var ladder: Array = _build_ladder()
@@ -187,6 +190,32 @@ func _dig_cell(s: Dictionary, world: WorldGen, x: int, y: int, in_shaft: bool) -
 		s["xp"] += int(round(float(price) / 5.0))
 	if MineralMap.is_loot(tile):
 		s["items"][mid] = int(s["items"].get(mid, 0)) + 1
+	if String(_opt["artifacts"]) == "1":
+		_artifact_find(s, x, y)
+
+
+## Находка артефакта в выкопанной клетке: монеты, опыт и награда за закрытую ветку — теми же
+## числами, что GameState.collect_artifact.
+func _artifact_find(s: Dictionary, x: int, y: int) -> void:
+	var id := ArtifactSpawn.artifact_id_at(x, y, int(s["seed"]), Balance.artifacts.get("artifacts", []), s["artifacts"])
+	if id.is_empty():
+		return
+	s["artifacts"].append(id)
+	var coins := Balance.get_artifact_find_coins(id)
+	s["coins"] += coins
+	s["artifact_coins"] += coins
+	s["xp"] += Balance.get_artifact_find_xp(id)
+	var branch := int(Balance.get_artifact(id).get("branch", -1))
+	if branch > 0 and Balance.is_branch_complete(branch, s["artifacts"]):
+		for b in Balance.artifacts.get("branches", []):
+			if int(b.get("branch", -1)) == branch:
+				var reward: Dictionary = b.get("completion_reward", {})
+				var rc := int(Balance.unwrap(reward.get("coins", 0)))
+				s["coins"] += rc
+				s["artifact_coins"] += rc
+				s["dollars"] += int(Balance.unwrap(reward.get("premium_currency", 0)))
+	if s["artifacts"].size() == 5 and not s["mile"].has("5 артефактов"):
+		s["mile"]["5 артефактов"] = s["t"]
 
 
 ## Руда рядом с шахтой: на радиусе обзора. Соседняя клетка берётся «через плечо»
@@ -364,6 +393,15 @@ func _report(results: Array) -> void:
 		cells += float(r["cells"])
 		trips += float(r["trips"])
 	print("клеток за прогон в среднем: %.0f, подъёмов: %.0f" % [cells / results.size(), trips / results.size()])
+	var art_coins := 0.0
+	var art_n := 0.0
+	var dollars := 0.0
+	for r in results:
+		art_coins += float(r["artifact_coins"])
+		art_n += float(r["artifacts"].size())
+		dollars += float(r["dollars"])
+	print("артефакты: в среднем найдено %.1f, монет с них %.0f, премиума %.0f" % [
+		art_n / results.size(), art_coins / results.size(), dollars / results.size()])
 	var r0: Dictionary = results[0]
 	print("конец первого сида: глубина %d, монеты %d, на верстаке %s, прокачка %s, уровень %d, время %s" % [
 		r0["depth"], r0["coins"], str(r0["bank"]), str(r0["stages"]), r0["level"], _fmt(float(r0["t"]))])

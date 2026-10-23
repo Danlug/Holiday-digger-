@@ -65,6 +65,8 @@ godot --headless --path . --quit-after 30
 
 ## Сборка веб-версии (проверено, собирается)
 
+Всё ниже одной командой: `tools/build_web.sh` (каталог, `.gdignore`, метка, экспорт, штамп кэша, размеры файлов; не коммитит и не выкладывает; `KEEP_BUILD_INFO=0` возвращает `data/build_info.json`). Проверка готовой сборки в Chromium — `node tools/smoke_web.js` (см. ГДД §19).
+
 ```bash
 mkdir -p build/web && touch build/.gdignore                       # иначе Godot реимпортирует свой же экспорт и пакует его в pck
 python3 tools/make_build_info.py                                   # метка сборки

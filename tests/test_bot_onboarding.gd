@@ -37,6 +37,15 @@ var director: StoryDirector
 var house: HouseSystem
 
 var _seed := DEFAULT_SEED
+## --soak=N: после онбординга бот N игровых минут «живёт»: копает шахту, поднимается на
+## ранце, продаёт, покупает ступени, ест и спит. 0 — не играть (так идёт run_tests.sh).
+var _soak_minutes := 0.0
+var _soak_log: Array = []
+## Игрок возвращается не только с полным рюкзаком: через TRIP_SECONDS копки бот идёт наверх сам,
+## иначе подъём (самое хрупкое место: ранец, ствол тоннеля, выход на поверхность) не проверялся бы.
+const TRIP_SECONDS := 150.0
+var _soak_force_up := false
+var _modals_dismissed := 0
 var _scale := DEFAULT_SCALE
 var _sim := 0.0
 var _frames := 0
@@ -56,6 +65,8 @@ func _ready() -> void:
 			_seed = int(a.substr(7))
 		elif a.begins_with("--scale="):
 			_scale = float(a.substr(8))
+		elif a.begins_with("--soak="):
+			_soak_minutes = float(a.substr(7))
 	if OS.get_environment("RASKOPKI_BOT_CHILD") != "1" and not args.has("--inproc") \
 			and OS.get_name() == "Linux":
 		_run_isolated(args)
@@ -138,6 +149,7 @@ func _frames_n(n: int) -> void:
 ## кадр, обязательный тап — по подсвеченной цели. Кнопку «Пропустить» не трогаем:
 ## сцены должны доигрываться ПО-НАСТОЯЩЕМУ (мировые кадры, таймеры, эффекты).
 func _auto_story() -> void:
+	_dismiss_modals()
 	if director == null or director.cutscene == null:
 		return
 	var cs: CutscenePlayer = director.cutscene
@@ -153,6 +165,29 @@ func _auto_story() -> void:
 		bot.tap(cs._tap_target.get_global_rect().get_center())
 	else:
 		bot.tap(Vector2(112.0, 300.0))
+
+
+## Окна, которые сами всплывают в «спокойный момент» и замораживают героя (ежедневная награда
+## мета-слоя): человек жмёт «Забрать», бот тоже. Проверяем, что окно закрывается и отпускает героя.
+func _dismiss_modals() -> void:
+	# Первая настоящая находка открывает витрину музея (ГДД п.9); пока она открыта, HUD не читает ввод.
+	if ProgressScreen.is_open():
+		ProgressScreen.close_screen()
+		_soak_log.append("окно прогресса закрыто на %.0f с" % _sim)
+	var meta := MetaService.instance
+	if meta == null or not is_instance_valid(meta) or meta.popup == null:
+		return
+	if meta.popup.is_open():
+		var before := GameState.coins
+		var btn: Button = meta.popup._claim_btn
+		if btn != null and btn.visible and not btn.disabled:
+			btn.pressed.emit()
+		if meta.popup.is_open():
+			meta.popup.close()
+		_soak_log.append("окно дня: забрано %d монет на %.0f с" % [GameState.coins - before, _sim])
+		_modals_dismissed += 1
+	if meta.hub != null and meta.hub.is_open():
+		meta.hub.close()
 
 
 ## Ждёт условие не дольше budget секунд ИГРОВОГО времени. Таймаут — провал с
@@ -277,6 +312,8 @@ func _run() -> void:
 	await _phase_gold()
 	await _phase_foundation_and_death()
 	await _phase_sell_and_food()
+	if _soak_minutes > 0.0:
+		await _phase_soak(_soak_minutes)
 	_finish()
 
 
@@ -567,3 +604,284 @@ func _phase_sell_and_food() -> void:
 		return
 	check("заданий больше нет", director._objective.is_empty(), "«%s»" % director._objective)
 	check("«Забрать» у двери доступно", HouseFood.food_at_door_count() > 0)
+
+
+# ---------------------------------------------------------------------------
+# «Первые полчаса»: шахта, подъём на ранце, продажа, покупки, еда, сон
+# ---------------------------------------------------------------------------
+
+## Бот ведёт себя как аккуратный игрок: копает вниз, подбирает руду, видимую вплотную (радиус
+## обзора 1), поднимается при 80% рюкзака, дома продаёт, покупает следующую ступень, ест и спит.
+## Состояние решается заново каждый круг по миру, а не по сценарию: сцена сна у героя посреди
+## шахты (бодрость ≤ 8%) телепортирует его домой, и бот обязан это пережить.
+func _phase_soak(minutes: float) -> void:
+	if _dead:
+		return
+	var end := _sim + minutes * 60.0
+	var start_sim := _sim
+	var coins0 := GameState.coins
+	var circles := 0
+	print("--- «первые %.0f минут» после онбординга ---" % minutes)
+	# Все крупные приходы монет — с глубиной и временем: так видно, откуда в «чистой» копке деньги.
+	var last_coins := [GameState.coins]
+	GameState.coins_changed.connect(func(c: int):
+		if c - int(last_coins[0]) >= 100:
+			_soak_log.append("монеты +%d на %.0f с, глубина %d" % [c - int(last_coins[0]), _sim, player.cell_y()])
+		last_coins[0] = c)
+	while _sim < end and not _dead and circles < 400:
+		circles += 1
+		if director.cutscene.is_playing or director.auto_dig.running:
+			await _step()
+			continue
+		if GameState.house_is_indoors:
+			await _soak_home(end)
+		elif player.cell_y() <= 1:
+			await _soak_to_tunnel_and_descend()
+		elif _soak_should_go_up():
+			await _soak_ascend()
+		else:
+			await _soak_mine(end)
+	bot.release_all()
+	if _dead:
+		return
+	check("бот прожил заданное время без застреваний (%d кругов)" % circles, circles < 400)
+	check("всплывающие окна не оставили героя замороженным", not player.frozen or GameState.house_is_indoors)
+	check("за это время он что-то заработал", GameState.coins > coins0 or GameState.max_depth_reached > 10,
+		"монеты %d → %d, глубина %d" % [coins0, GameState.coins, GameState.max_depth_reached])
+	print("итог: монеты %d, глубина %d, ступени: инструмент %s, ранец '%s', уровень %d, клеток выкопано %d, подъёмов %d" % [
+		GameState.coins, GameState.max_depth_reached, GameState.current_tool, GameState.current_gear,
+		GameState.level, _digs.size(), _soak_log.count("подъём")])
+	for e in _soak_log:
+		if String(e).begins_with("куплено") or String(e).begins_with("монеты") or String(e).begins_with("окно"):
+			print("  ", e)
+	_timeline.append(["первые %.0f минут: игровых секунд" % minutes, _sim - start_sim])
+
+
+func _soak_should_go_up() -> bool:
+	if _soak_force_up:
+		return true
+	if GameState.get_total_weight() >= GameState.get_max_carry_kg() * 0.8:
+		return true
+	# голодный бот поднимается поесть, пока HP не просело
+	return GameState.hunger < 25.0 or GameState.stamina < 12.0
+
+
+## Дом: продать, купить, поесть, поспать, выйти.
+func _soak_home(end: float) -> void:
+	_soak_force_up = false
+	# Игрок сразу после смерти/Роберта может стоять в мастерской: идём в салон.
+	var room := String(_view().room_id())
+	if room == "workshop":
+		if not await _house_press("goto:hall", "из мастерской в салон"):
+			return
+	elif room == "bedroom":
+		if not await _house_press("goto:hall", "из спальни в салон"):
+			return
+
+	var sold := ShopService.sell_all()
+	if bool(sold["ok"]):
+		_soak_log.append("продано на %d" % int(sold["coins"]))
+	# Ступени по порядку цены: первый ранец, кирки, улучшенный ранец.
+	for tool_id in Balance.get_tools_in_line("pickaxe"):
+		if not GameState.owns_tool(tool_id) and not Balance.tool_needs_materials(tool_id) \
+				and Balance.get_tool_cost_coins(tool_id) > 0 and GameState.coins >= Balance.get_tool_cost_coins(tool_id):
+			if bool(ShopService.buy_tool(tool_id)["ok"]):
+				_soak_log.append("куплено %s на %.0f с" % [tool_id, _sim])
+				check("покупка %s прошла и кирка надета" % tool_id, GameState.current_tool == tool_id)
+	for gear_id in Balance.get_gear_ids():
+		if not GameState.has_gear(gear_id) and GameState.coins >= Balance.get_gear_cost_coins(gear_id) \
+				and Balance.get_gear_fly_multiplier(gear_id) > Balance.get_gear_fly_multiplier(GameState.current_gear):
+			if bool(ShopService.buy_gear(gear_id)["ok"]):
+				_soak_log.append("куплено %s на %.0f с" % [gear_id, _sim])
+				check("покупка %s прошла и она надета" % gear_id, GameState.current_gear == gear_id)
+	if not player.has_backpack() and GameState.coins >= Balance.get_gear_cost_coins("backpack"):
+		check("ранец куплен", bool(ShopService.buy_gear("backpack")["ok"]))
+
+	# Еда: порция из рюкзака, иначе заказ к двери и «Забрать».
+	if GameState.hunger < 60.0 or GameState.stamina < 40.0:
+		await _soak_eat()
+	if GameState.stamina < 35.0:
+		await _soak_sleep()
+	if _dead:
+		return
+	if String(_view().room_id()) != "hall":
+		if not await _house_press("goto:hall", "в салон перед выходом"):
+			return
+	if not await _house_press("exit_door", "выйти на улицу"):
+		return
+	await _frames_n(2)
+
+
+func _soak_eat() -> void:
+	var food := HouseFood.best_food_for_now()
+	if food.is_empty():
+		var menu: Array = HouseConfig.delivery_menu()
+		var pick := ""
+		for item in menu:
+			if HouseConfig.is_portable(String(item.get("id", ""))):
+				pick = String(item.get("id", ""))
+				break
+		if pick.is_empty():
+			return
+		var order := HouseSystem.order_food(pick)
+		if not bool(order["ok"]):
+			return
+		var t0 := _sim
+		while HouseFood.food_at_door_count() == 0 and _sim - t0 < HouseConfig.delivery_seconds() * 3.0 + 5.0:
+			await _step()
+		if String(_view().room_id()) == "hall" and not await _house_press("take_delivery", "забрать еду у двери"):
+			return
+		food = HouseFood.best_food_for_now()
+	if not food.is_empty():
+		var before := GameState.hunger
+		var eaten := HouseFood.eat(food)
+		check("поел: голод вырос", bool(eaten["ok"]) and GameState.hunger >= before)
+		_soak_log.append("поел %s" % food)
+
+
+func _soak_sleep() -> void:
+	if not await _house_press("goto:bedroom", "в спальню"):
+		return
+	var before := GameState.stamina
+	if not await _house_press("sleep", "лечь спать"):
+		return
+	var t0 := _sim
+	while String(_view().room_id()) == "bedroom" and _view().is_sleeping() and _sim - t0 < 40.0:
+		await _step()
+	await _frames_n(3)
+	check("после сна бодрости больше", GameState.stamina > before, "%.0f → %.0f" % [before, GameState.stamina])
+	_soak_log.append("поспал")
+
+
+func _soak_to_tunnel_and_descend() -> void:
+	var mouth := world.tunnel_mouth()
+	if mouth.x < 0:
+		check("тоннель Роберта построен (вход в шахту)", false)
+		_dead = true
+		return
+	# Колодец в одну клетку: тело героя 0.76, и он падает, лишь когда левый край съехал с
+	# бетонной кромки (x ≥ 17.38). Поэтому, как человек, подходим и ДЕРЖИМ вправо, пока не провалимся.
+	if not await _walk_to_x(float(mouth.x) - 0.6, "дойти до устья тоннеля", 60.0, 0.3):
+		return
+	bot.hold([KEY_D])
+	await _until(func(): return player.y > 1.6, 8.0, "герой падает в устье тоннеля")
+	bot.release_all()
+	# Дальше — ствол, прорытый прошлым заходом: падение с него убивает (урон ~ высота^2.16), поэтому
+	# тормозим тягой ранца, как игрок, который держит «вверх», пока скорость падения не упала.
+	var hp_before: float = GameState.hp
+	var t0 := _sim
+	while _sim - t0 < 90.0 and not _dead:
+		if player.on_ground and player.cell_y() >= 5:
+			break
+		bot.hold([KEY_W] if (player.vy > 6.0 and player.has_backpack()) else [])
+		await _step()
+	bot.release_all()
+	# Дно ствола может оказаться и на фундаменте: обвал (раз в ~90 с, ГДД §8) пересыпает прорытое ниже.
+	check("спуск по стволу до дна без смерти и без потери здоровья", player.on_ground and player.cell_y() >= 5
+		and GameState.is_alive and GameState.hp >= hp_before - 15.0,
+		"глубина %d, hp %.0f → %.0f, жив=%s\n%s" % [player.cell_y(), hp_before, GameState.hp, GameState.is_alive, _dump()])
+
+
+## Копаем вниз; руда вплотную слева/справа — берём «через плечо».
+func _soak_mine(end: float) -> void:
+	var t0 := _sim
+	var last_progress := _sim
+	var last_depth: int = player.cell_y()
+	var last_weight: float = GameState.get_total_weight()
+	var last_digs: int = _digs.size()
+	while _sim < end and not _dead:
+		if _sim - t0 >= TRIP_SECONDS:
+			_soak_force_up = true
+		if director.cutscene.is_playing or GameState.house_is_indoors or player.cell_y() <= 1 or _soak_should_go_up():
+			bot.release_all()
+			return
+		if not player.on_ground:
+			bot.release_all()
+		else:
+			bot.hold(_mine_keys())
+		await _step()
+		if player.cell_y() != last_depth or GameState.get_total_weight() != last_weight or _digs.size() != last_digs:
+			last_progress = _sim
+			last_depth = player.cell_y()
+			last_weight = GameState.get_total_weight()
+			last_digs = _digs.size()
+		elif _sim - last_progress > 60.0:
+			bot.release_all()
+			check("не застряли: копка в шахте", false, "60 с без единой выкопанной клетки\n" + _dump())
+			_dead = true
+			return
+	bot.release_all()
+
+
+func _mine_keys() -> Array:
+	var cx: int = player.cell_x()
+	var cy: int = player.cell_y()
+	for dir in [-1, 1]:
+		var x: int = cx + dir
+		if x < 0 or x >= WorldGen.WIDTH:
+			continue
+		var t := world.get_tile(x, cy)
+		if TileTypes.is_ore(t) and MineralMap.is_loot(t):
+			return [KEY_D if dir > 0 else KEY_A]
+	return [KEY_S]
+
+
+## Вверх по стволу на ранце, на поверхности — в сторону от шахты и к двери.
+func _soak_ascend() -> void:
+	await _soak_ascend_inner()
+	Engine.time_scale = _scale
+
+
+func _soak_ascend_inner() -> void:
+	_soak_log.append("подъём")
+	if not player.has_backpack():
+		check("у бота есть ранец для подъёма", false)
+		_dead = true
+		return
+	var door_x := float(HouseConfig.door_cell().x) + 0.5
+	var t0 := _sim
+	var best_y: float = player.y
+	var best_t := _sim
+	var trace: Array = []
+	while _sim - t0 < 180.0 and not _dead:
+		# Тяга включается через JUMP_TO_FLY_MS по РЕАЛЬНОМУ времени (Time.get_ticks_msec), а ускоренная
+		# игра успевает приземлиться раньше: на ×4-5 герой бесконечно «прыгает» у дна. Пока тяга не
+		# включилась, идём в реальном времени, потом снова ускоряемся.
+		Engine.time_scale = _scale if player.thrust != "" or player.cell_y() <= 1 else 1.0
+		if player.y < best_y - 0.5:
+			best_y = player.y
+			best_t = _sim
+		elif _sim - best_t > 25.0 and player.cell_y() > 1:
+			bot.release_all()
+			check("не застряли: подъём на ранце (25 с без высоты)", false, "след: %s\nгаз=%s тяга='%s' предмет=%s\n%s" % [
+				str(trace), GameState.current_gear, player.thrust, str(GameState.get_total_weight()), _dump()])
+			_dead = true
+			return
+		if int(_sim * 2.0) % 4 == 0 and (trace.is_empty() or absf(float(trace[-1][0]) - _sim) > 1.5):
+			trace.append([snappedf(_sim, 0.1), snappedf(player.x, 0.01), snappedf(player.y, 0.01), snappedf(player.vy, 0.1), player.thrust])
+			if trace.size() > 8:
+				trace.pop_front()
+		if GameState.house_is_indoors or director.cutscene.is_playing:
+			bot.release_all()
+			return
+		var keys: Array = []
+		if player.cell_y() > 1:
+			keys = [KEY_W]
+			# уйти из колонки, если вылезли выше устья
+		else:
+			var dx: float = door_x - player.x
+			if absf(dx) <= 0.3 and player.on_ground:
+				bot.release_all()
+				await _until(func(): return house.near_door() and house._outdoor_button.visible, 5.0, "у двери после подъёма")
+				if not _dead:
+					house._outdoor_button.pressed.emit()
+					await _frames_n(3)
+				return
+			keys = [KEY_D if dx > 0.0 else KEY_A]
+			if player.x > 15.0 and not player.on_ground:
+				keys.append(KEY_W)  # не упасть обратно в устье
+		bot.hold(keys)
+		await _step()
+	bot.release_all()
+	check("не застряли: подъём на ранце", false, "180 с\n" + _dump())
+	_dead = true

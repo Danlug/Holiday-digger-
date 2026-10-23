@@ -352,18 +352,32 @@ static func save_game() -> bool:
 		return false
 	f.store_string(json_text)
 	f.close()
-	# Записанное должно читаться: пустой или обрезанный файл (полный диск) не заменяет живой сейв.
-	if _read_dict(TMP_PATH) == null:
-		push_error("SaveSystem: запись во временный файл не прочиталась — старый сейв оставлен как есть")
+	# Записано всё? Полный диск оставляет обрубок: сверяем размер, не разбирая JSON заново
+	# (на сейве с десятками тысяч клеток разбор — десятки миллисекунд, а пишем часто).
+	if FileAccess.open(TMP_PATH, FileAccess.READ).get_length() != json_text.to_utf8_buffer().size():
+		push_error("SaveSystem: запись во временный файл неполная — старый сейв оставлен как есть")
 		DirAccess.remove_absolute(TMP_PATH)
 		return false
-	# Прежний годный сейв уходит в копию; битый — нет, чтобы не затереть хорошую копию плохой.
-	if has_save() and _read_dict(SAVE_PATH) != null:
+	# Прежний сейв уходит в копию, если он выглядит целым: битый не должен затереть хорошую копию.
+	if has_save() and _looks_complete(SAVE_PATH):
 		DirAccess.copy_absolute(SAVE_PATH, BACKUP_PATH)
 	if DirAccess.rename_absolute(TMP_PATH, SAVE_PATH) != OK:
 		push_error("SaveSystem: не удалось подменить %s" % SAVE_PATH)
 		return false
 	return true
+
+
+## Дёшево: файл начинается с «{» и кончается «}» (обрыв записи так не выглядит).
+static func _looks_complete(path: String) -> bool:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null or f.get_length() < 2:
+		return false
+	var head := f.get_buffer(1)
+	var tail_len: int = mini(16, int(f.get_length()))
+	f.seek(f.get_length() - tail_len)
+	var tail := f.get_buffer(tail_len).get_string_from_utf8().strip_edges()
+	f.close()
+	return head.size() == 1 and head[0] == 0x7B and tail.ends_with("}")
 
 
 ## Читает файл как JSON-объект. null — нет файла, мусор, обрыв или не объект.

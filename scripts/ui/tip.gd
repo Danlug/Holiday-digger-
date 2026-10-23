@@ -246,8 +246,13 @@ static func _fill(ctrl: Control) -> void:
 			widest = maxf(widest, l.get_theme_font("font").get_string_size(
 				l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, l.get_theme_font_size("font_size")).x)
 	var w := clampf(widest + 1.0, 28.0, MAX_WIDTH)
+	# Размер ярлыка задаём целиком, вместе с высотой: при повторном показе поверх
+	# уже показанной подсказки высота оставалась от ширины 0 (автоперенос по
+	# букве), и панель раздувалась на весь экран.
 	for l: Label in [_title, _body, _extra]:
 		l.custom_minimum_size.x = w
+		l.size = Vector2(w, 0.0)
+		l.get_line_count()   # заставляет ярлык переразбить текст по новой ширине сразу
 	_panel.reset_size()
 
 

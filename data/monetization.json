@@ -142,7 +142,9 @@
    {"id": "skip_sleep_at_home", "trigger": "кровать в спальне (house_sleep.gd) — кнопка 'Уснуть мгновенно за ролик'", "implemented": false, "note": "лимит уже задан (5/день), UI-точка и reward-запись в shop.json ещё не сделаны — см. docs/MONETIZATION.md чек-лист интеграции"},
    {"id": "restore_stamina_hunger_in_mine", "trigger": "второе истощение в шахте (см. GDD п.9, энергетический батончик) — предложить ролик перед платным батончиком", "implemented": false},
    {"id": "cancel_loot_loss_on_death", "trigger": "экран смерти/возрождения — до подтверждения потери лута", "implemented": false},
-   {"id": "remote_dump_loot_for_sale", "trigger": "полный рюкзак в шахте — рядом с обычной продажей на месте", "implemented": false}
+   {"id": "remote_dump_loot_for_sale", "trigger": "полный рюкзак в шахте — рядом с обычной продажей на месте", "implemented": false},
+   {"id": "daily_reward_double", "trigger": "окно ежедневной награды — кнопка «×2» (монеты и опыт; доллары не удваиваются)", "implemented": true, "reward_source": "data/daily_rewards.json -> ad_double", "note": "ПРЕДЛОЖЕНО веткой meta, в ГДД раздел 15 такой точки нет; лимит 1/сутки лежит в daily_rewards.json, пока владелец не внесёт строку в balance.json -> ads.daily_limits"},
+   {"id": "quest_reward_double", "trigger": "готовое ежедневное/недельное задание — кнопка «×2»", "implemented": true, "reward_source": "data/quests.json -> ad_double", "note": "ПРЕДЛОЖЕНО веткой meta; лимит 3/сутки лежит в quests.json, пока владелец не внесёт строку в balance.json -> ads.daily_limits"}
   ]
  }
 }

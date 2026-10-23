@@ -1628,7 +1628,8 @@ func _update_depth() -> void:
 	# см. placeDepth в web-демо: метка стоит на уровне героя на экране.
 	var screen_y: float = (player.y - current_cam.y) * TILE
 	var h := _depth_box.size.y
-	_depth_box.position.y = clampf(screen_y - h * 0.5, 0.0, stage_rect.size.y - h)
+	# Плашка на две клетки выше героя: на его уровне она закрывала монстров, подходящих справа.
+	_depth_box.position.y = clampf(screen_y - h * 0.5 - 2.0 * TILE, 116.0, stage_rect.size.y - h)
 
 
 # ---------------------------------------------------------------------------

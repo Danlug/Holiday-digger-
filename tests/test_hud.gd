@@ -45,6 +45,7 @@ func _ready() -> void:
 	await _check_backpack()
 	await _check_settings_sheet()
 	_check_toast()
+	_check_warnings()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
@@ -353,3 +354,17 @@ func _check_toast() -> void:
 	check("длинный тост переносится, панель выше (%.0f > %.0f)" % [long_h, short_h], long_h > short_h + 10.0)
 	check("тост не шире TOAST_MAX_W", _hud._toast_panel.get_combined_minimum_size().x <= _hud.TOAST_MAX_W + 1.0)
 	check("низ тоста стоит на месте", is_equal_approx(_hud._toast_panel.offset_bottom, _hud.TOAST_BOTTOM_OFFSET))
+
+
+func _check_warnings() -> void:
+	_hud._toast_panel.visible = false
+	GameState.survival_warning.emit("hunger", true)
+	check("предупреждение 10%: тост с иконкой голода и «!!»", _hud._toast_panel.visible
+		and _hud._toast_row.get_child_count() == 2)
+	Settings.reduce_motion = false
+	GameState.survival_warning.emit("stamina", true)
+	check("серьёзное предупреждение мигает красным ~2 с", _hud._stamina_bar._alert > 1.5)
+	Settings.reduce_motion = true
+	_hud._stamina_bar._alert = 0.0
+	GameState.exhausted_changed.emit(true)
+	check("пустая бодрость: тост «−50%»", _hud._toast_panel.visible)

@@ -14,6 +14,7 @@ extends Node
 var _out_dir := "/tmp/hud_shots"
 var _only: Array[String] = []
 var _hud: Control
+var _main: Node2D
 
 
 func _ready() -> void:
@@ -30,6 +31,7 @@ func _ready() -> void:
 	var main: Node2D = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames(3)
+	_main = main
 	_hud = main.hud
 	# Полоски жизни режиссура прячет до сцены смерти. Запуск — с отдельным
 	# каталогом пользователя (XDG_DATA_HOME), поэтому флаг на диск безопасен.
@@ -124,6 +126,29 @@ func _ready() -> void:
 		await _frames(3)
 		await _shot("well")
 		_hud.close_well_report()
+
+	if _want("strip"):
+		# Бурмобиль с топливом и надетый ранец: все значки в нижней полосе сразу.
+		if not GameState.owned_tools.has("drill_rig"):
+			GameState.owned_tools.append("drill_rig")
+		GameState.grant_gear("backpack")
+		GameState.inventory["fuel_block"] = 3
+		GameState.current_tool = "drill_rig"
+		GameState.tool_changed.emit("drill_rig")
+		GameState.gear_changed.emit(GameState.current_gear)
+		await _frames(4)
+		await _shot("strip")
+		_hud._show_tool_name()
+		await _frames(30)
+		await _shot("strip_tip")
+		GameState.current_tool = "shovel"
+		GameState.tool_changed.emit("shovel")
+		GameState.inventory.erase("fuel_block")
+
+	if _want("depth"):
+		_main.player.y = 24.5
+		await _frames(6)
+		await _shot("depth")
 
 	if _want("hold"):
 		_hud._set_mode("hold")

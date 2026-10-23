@@ -41,7 +41,7 @@ func _draw() -> void:
 	var beat := 1.0 if Settings.reduce_motion else 0.65 + 0.35 * sin(_t * 7.0)
 	for i in LAYERS:
 		var fade := 1.0 - float(i) / float(LAYERS)
-		var a := 0.22 * danger * beat * fade
+		var a := 0.32 * danger * beat * fade
 		var inset := STEP * i
 		var r := Rect2(Vector2.ONE * inset, size - Vector2.ONE * inset * 2.0)
 		draw_rect(r, Color(0.85, 0.12, 0.1, a), false, STEP)

@@ -52,6 +52,7 @@ var _value: float = 1.0     # то, что нарисовано заливкой
 var _ghost: float = 1.0     # светлый «хвост» потери
 var _hold: float = 0.0
 var _flash: float = 0.0
+var _alert: float = 0.0      # секунд красного мигания (серьёзное предупреждение)
 var _shake: float = 0.0
 var _t: float = 0.0
 var _track_box: StyleBoxFlat
@@ -105,6 +106,17 @@ func set_fraction(f: float, instant: bool = false) -> void:
 	queue_redraw()
 
 
+## Красное мигание на duration секунд — «серьёзное предупреждение» (ГДД п.7).
+## При «меньше движения» — одна вспышка вместо мигания.
+func alert(duration: float = 2.0) -> void:
+	_flash = 1.0
+	_shake = 1.0
+	if Settings.reduce_motion:
+		return
+	_alert = duration
+	set_process(true)
+
+
 func fraction() -> float:
 	return _target
 
@@ -135,6 +147,9 @@ func _process(dt: float) -> void:
 	if _shake > 0.0:
 		_shake = maxf(0.0, _shake - dt * 3.5)
 		busy = true
+	if _alert > 0.0:
+		_alert = maxf(0.0, _alert - dt)
+		busy = true
 	if is_alarm() and not Settings.reduce_motion:
 		busy = true
 	queue_redraw()
@@ -145,8 +160,8 @@ func _process(dt: float) -> void:
 func _draw() -> void:
 	var h := size.y
 	var pulse := 0.0
-	if is_alarm() and not Settings.reduce_motion:
-		pulse = 0.5 + 0.5 * sin(_t * 7.0)
+	if (is_alarm() or _alert > 0.0) and not Settings.reduce_motion:
+		pulse = 0.5 + 0.5 * sin(_t * (14.0 if _alert > 0.0 else 7.0))
 	# --- иконка ---
 	if icon != null:
 		var s := ICON_PX * (1.0 + 0.14 * pulse)
@@ -167,6 +182,8 @@ func _draw() -> void:
 	var fw := inner.size.x * _value
 	if fw >= 1.0:
 		var col := fill_color.lerp(Color.WHITE, 0.25 * pulse + 0.7 * _flash)
+		if _alert > 0.0:
+			col = fill_color.lerp(Color(1.0, 0.2, 0.15), 0.4 + 0.5 * pulse)
 		_fill_box.bg_color = col
 		draw_style_box(_fill_box, Rect2(inner.position, Vector2(fw, inner.size.y)))
 		# блик сверху и тень снизу — «объём» без градиента

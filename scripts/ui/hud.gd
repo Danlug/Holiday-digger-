@@ -533,8 +533,14 @@ func _build_stick(parent: Control) -> void:
 	_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
 	_stick.draw.connect(func():
-		_stick.draw_circle(Vector2(stick_r, stick_r), stick_r, Color(0.11, 0.09, 0.07, 0.68))
-		_stick.draw_arc(Vector2(stick_r, stick_r), stick_r, 0, TAU, 40, Color(0.42, 0.34, 0.25, 0.6), 1.0)
+		# Плоское «стекло» с золотистым ободком и засечками по сторонам света:
+		# видно, где центр и куда тянуть.
+		var c := Vector2(stick_r, stick_r)
+		_stick.draw_circle(c, stick_r, Color(0.09, 0.07, 0.05, 0.5))
+		_stick.draw_arc(c, stick_r - 1.0, 0, TAU, 48, Color(0.82, 0.66, 0.38, 0.55), 2.0)
+		_stick.draw_arc(c, stick_r * 0.5, 0, TAU, 32, Color(0.82, 0.66, 0.38, 0.16), 1.0)
+		for dir in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+			_stick.draw_circle(c + dir * (stick_r - 6.0), 1.4, Color(0.82, 0.66, 0.38, 0.55))
 	)
 	parent.add_child(_stick)
 
@@ -554,9 +560,13 @@ func _build_stick(parent: Control) -> void:
 	_knob.position = Vector2(stick_r - knob_r, stick_r - knob_r)
 	_knob.draw.connect(func():
 		var live: bool = hold_active()
-		_knob.draw_circle(Vector2(knob_r, knob_r), knob_r, Color8(0x3A, 0x2C, 0x20))
-		_knob.draw_arc(Vector2(knob_r, knob_r), knob_r - 1, 0, TAU, 32,
-			Color8(0xE0, 0xA9, 0x3B) if live else Color8(0x9D, 0x8B, 0x73), 2.0)
+		var c := Vector2(knob_r, knob_r)
+		var rim := Color8(0xE0, 0xA9, 0x3B) if live else Color8(0xB8, 0xA3, 0x84)
+		_knob.draw_circle(c + Vector2(0, 1.5), knob_r, Color(0, 0, 0, 0.4))
+		_knob.draw_circle(c, knob_r, Color8(0x3A, 0x2C, 0x20))
+		_knob.draw_circle(c, knob_r - 2.5, rim.darkened(0.35))
+		_knob.draw_arc(c, knob_r - 1.0, 0, TAU, 32, rim, 2.0)
+		_knob.draw_arc(c, knob_r * 0.55, PI * 1.1, PI * 1.6, 8, Color(1, 1, 1, 0.45), 1.5)
 	)
 	_stick.add_child(_knob)
 
@@ -1486,7 +1496,17 @@ func _connect_game_state() -> void:
 		], 2.4, "bad")
 		Sfx.play("ui_deny"))
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
-	GameState.leveled_up.connect(func(_lvl, _pts): _sync_xp())
+	GameState.leveled_up.connect(func(lvl, pts):
+		_sync_xp()
+		toast_parts([
+			{"icon": "star"}, {"text": str(lvl), "color": TOAST_COLORS["rare"]},
+			{"icon": "plus"}, {"text": "+%d" % pts, "color": Color8(0xB4, 0xE0, 0x9C)},
+		], 2.6, "rare"))
+	GameState.survival_warning.connect(_on_survival_warning)
+	GameState.respawned.connect(func(): _sync_all())
+	GameState.exhausted_changed.connect(func(on: bool):
+		if on:
+			toast_parts([{"icon": "stamina"}, {"text": "−50%", "color": Color8(0xE8, 0x8C, 0x80)}], 2.4, "bad"))
 	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
 
 
@@ -1816,6 +1836,25 @@ func _hide_toast() -> void:
 
 ## Короткие тосты событий: иконка + слово или число, фразы убраны (текст только
 ## по наведению, заказ владельца). Что именно произошло, видно по иконкам.
+## Предупреждение о голоде/бодрости (ГДД п.7): на 25% — значок и вспышка полоски,
+## на 10% — ещё и встряска экрана и две секунды красного мигания. Раньше сигнал
+## никто не слушал, и «предупреждение на экране» из ГДД не показывалось.
+func _on_survival_warning(bar_name: String, severe: bool) -> void:
+	var bar: HudBar = _hunger_bar if bar_name == "hunger" else _stamina_bar
+	if bar == null:
+		return
+	toast_parts([{"icon": bar_name}, {"text": "!!" if severe else "!", "color": Color8(0xE8, 0x8C, 0x80)}],
+		2.0, "bad")
+	Sfx.play("warn_low")
+	if severe:
+		bar.alert(2.0)
+		Fx.shake(3.0, 0.3)
+		Haptics.buzz(80)
+	else:
+		bar.alert(0.6)
+		Haptics.tap()
+
+
 func _on_fell(damage: float, _speed: float) -> void:
 	if damage > 0.0:
 		toast_icon("hp", "−%d" % int(damage), 1.6, Color8(0xE8, 0x8C, 0x80), "bad")

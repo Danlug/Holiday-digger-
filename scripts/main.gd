@@ -150,6 +150,7 @@ func _ready() -> void:
 	add_child(story)
 	# --- конец блока сюжета ---
 	MetaService.attach(self)  # мета-слой: ежедневная награда, задания, достижения, дорога трофеев
+	HintDirector.attach(self)  # подсказки «знакомство с системами»: кольцо, палец, метки «new» (scripts/hints/)
 
 	# --- бой глубже 4000: монстры, удар, снаряжение, рейдбосс на дне (ветка combat) ---
 	CombatService.attach(self)

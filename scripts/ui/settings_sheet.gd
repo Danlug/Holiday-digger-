@@ -38,6 +38,7 @@ var _motion_btn: Button
 var _mode_btns: Dictionary = {}
 var _lang_btns: Dictionary = {}
 var _last_tick_ms: int = 0
+var _hints_row: HintSettingsRow = null
 
 
 func _init() -> void:
@@ -88,6 +89,8 @@ func refresh() -> void:
 	_motion_btn.icon = UiIcons.tex("motion" if not Settings.reduce_motion else "motion_off")
 	Tip.bind(_motion_btn, "Движение интерфейса", "Включено" if not Settings.reduce_motion else "Меньше движения: выключено")
 
+	if _hints_row != null:
+		_hints_row.refresh()
 	for m in _mode_btns.keys():
 		_mark(_mode_btns[m], m == Settings.control_mode)
 	for code in _lang_btns.keys():
@@ -166,6 +169,7 @@ func _build() -> void:
 
 	_build_volume_rows(body)
 	_build_toggle_row(body)
+	_hints_row = HintSettingsRow.build(body)   # «подсказки»: лампочка и «показать заново» (scripts/hints/)
 	_build_mode_row(body)
 	_build_language_row(body)
 	_build_restore_row(body)

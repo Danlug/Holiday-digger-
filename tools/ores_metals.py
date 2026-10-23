@@ -338,7 +338,7 @@ class Pic:
 
 # ══ материалы ═══════════════════════════════════════════════════════════════
 
-R_SILVER = ramp(262, 4, [52, 74, 85, 92, 96, 98, 100, 100], dh_dark=-10, dh_light=10, spec=(255, 255, 255))
+R_SILVER = ramp(262, 5, [46, 66, 79, 90, 95, 98, 100, 100], dh_dark=-10, dh_light=10, spec=(255, 255, 255))
 R_ALU = ramp(268, 18, [41, 57, 67, 75, 81, 86, 90, 95], dh_dark=-6, dh_light=0)
 R_PLAT = ramp(332, 42, [52, 66, 76, 84, 90, 94, 97, 100], dh_dark=-14, dh_light=6, spec=(255, 255, 255))
 R_MERC = ramp(208, 28, [14, 27, 38, 48, 56, 66, 82, 100], dh_dark=-10, dh_light=6, spec=(255, 255, 255))
@@ -349,7 +349,7 @@ R_NICK = ramp(126, 34, [24, 38, 49, 57, 64, 72, 82, 93], dh_dark=-6, dh_light=14
 
 def _chrome(cx, cy):
     """Полосы отражения: светлая над серединой куска, тёмная под ней (диагональ x+y)."""
-    return ((cx + cy - 4.5, 1.6, 0.30), (cx + cy + 3.5, 1.6, -0.30))
+    return ((cx + cy - 4.5, 1.6, 0.30), (cx + cy + 3.0, 2.0, -0.55))
 
 
 def _speck(p, mask, rp, seed, n, tone):
@@ -436,7 +436,7 @@ def _shard(p, cx, cy, length, width, rot, rp, skew=0.34):
 
 def silver_tile():
     p = Pic()
-    k = dict(lo=-2.3, hi=1.3)
+    k = dict(lo=-2.0, hi=1.3)
     p.dome(blob(20.5, 8.8, 3.5, 2.9, 0.3, 0.14, 11), R_SILVER, streaks=_chrome(20.5, 8.8), **k)
     p.dome(blob(13.0, 17.5, 6.8, 5.6, -0.35, 0.15, 12), R_SILVER, streaks=_chrome(13, 17.5), **k)
     p.dome(blob(22.8, 21.0, 4.4, 3.7, 0.2, 0.14, 13), R_SILVER, streaks=_chrome(22.8, 21), **k)
@@ -558,15 +558,15 @@ def nickel_tile():
     return p.sprite()
 
 
-R_IRON = ramp(36, 50, [16, 25, 35, 43, 50, 57, 65, 76], dh_dark=-14, dh_light=22)
-R_COPPER = ramp(52, 96, [17, 29, 41, 51, 59, 67, 77, 89], dh_dark=-24, dh_light=12)
+R_IRON = ramp(48, 46, [16, 25, 35, 44, 52, 59, 67, 77], dh_dark=-16, dh_light=16)
+R_COPPER = ramp(55, 84, [22, 33, 44, 54, 62, 70, 80, 92], dh_dark=-24, dh_light=12)
 R_PATINA = ramp(172, 30, [20, 34, 46, 56, 64, 72, 82, 92], dh_dark=-10, dh_light=14)
 R_GOLD = ramp(90, 98, [32, 46, 58, 67, 74, 81, 88, 95], dh_dark=-34, dh_light=4, c_dark=0.75, c_light=0.95)
 R_SCRAP = ramp(92, 8, [18, 30, 40, 48, 55, 62, 70, 80], dh_dark=-6, dh_light=6)
 R_RUST = ramp(52, 42, [14, 24, 33, 41, 48, 55, 63, 72], dh_dark=-14, dh_light=14)
-R_PEAT = ramp(62, 60, [4, 9, 15, 22, 29, 37, 47, 60], dh_dark=-10, dh_light=14, c_dark=0.95, c_light=0.8)
-R_FIBER = ramp(72, 28, [14, 26, 38, 48, 56, 64, 72, 80], dh_dark=-10, dh_light=10)
-R_MOSS = ramp(118, 70, [12, 22, 32, 40, 48, 56, 66, 78], dh_dark=-8, dh_light=22)
+R_PEAT = ramp(66, 58, [10, 19, 30, 41, 51, 59, 68, 80], dh_dark=-10, dh_light=14, c_dark=0.95, c_light=0.75)
+R_FIBER = ramp(70, 34, [16, 28, 40, 50, 58, 66, 74, 84], dh_dark=-8, dh_light=10)
+R_MOSS = ramp(124, 80, [10, 18, 28, 37, 46, 55, 66, 78], dh_dark=-6, dh_light=20, c_dark=0.9, c_light=0.85)
 R_COAL = [lch(1.5, 4, 105), lch(2.5, 5, 108), lch(4, 8, 118), lch(6.5, 8, 118), lch(9, 5, 255), lch(20, 6, 250),
           lch(46, 8, 245), lch(74, 8, 240)]
 R_URAN = ramp(126, 92, [26, 44, 58, 69, 79, 87, 94, 99], dh_dark=22, dh_light=-8, c_dark=0.9, c_light=0.8)
@@ -744,19 +744,11 @@ def _fibers(p, mask, n, seed, rp, length=7, out=False):
 
 
 def peat_tile():
+    """Торф: комья спрессованных волокон: светлые и тёмные нити, пятна мха, торчащие корешки."""
     p = Pic()
-    clods = [(19.5, 8.5, 4.8, 3.8, 0.3, 111), (11.0, 16.0, 7.8, 6.4, -0.25, 112), (23.0, 21.5, 5.8, 4.8, 0.2, 113),
-             (6.5, 26.5, 3.6, 2.8, 0.0, 114)]
-    for cx, cy, rx, ry, rot, sd in clods:
-        m = blob(cx, cy, rx, ry, rot, 0.20, sd, 6, 2.2)
-        n = vnoise(sd + 7, 2.6) + (vnoise(sd + 9, 1.4) - 0.5) * 0.3
-        moss = erode(m) & (n > 0.62) & (_YY < cy + 2)
-        p.dome(m, R_PEAT, spec=False, lo=-0.5, hi=1.5, alt=(moss, R_MOSS), rim=R_PEAT[7],
-               tex=(vnoise(sd + 13, 2.0) - 0.5) * 0.25)
-        area = int(m.sum())
-        _strands(p, m, area // 11, sd + 21, R_PEAT[1], 8)
-        _strands(p, m, area // 9, sd + 25, R_PEAT[7], 6)
-        _fibers(p, m, 3 + int(rx / 2), sd + 31, R_PEAT, out=True)
+    for cx, cy, rx, ry, rot, sd in ((19.5, 8.5, 4.8, 3.8, 0.3, 111), (11.0, 16.0, 7.8, 6.4, -0.25, 112),
+                                    (23.0, 21.5, 5.8, 4.8, 0.2, 113), (6.5, 26.5, 3.6, 2.8, 0.0, 114)):
+        _peat_clod(p, cx, cy, rx, ry, rot, sd)
     return p.sprite()
 
 
@@ -938,21 +930,21 @@ def _diag_strata(x0, x1, step=4.0, w=1.0):
 
 
 def iron_icon():
+    """Значок железа — те же слоистые жилы, что на тайле, только крупнее."""
     p = Pic()
     glint = lch(72, 7, 250)
-    st = _diag_strata(14, 54, 4.2)
-    tx = (vnoise(201, 2.0) - 0.5) * 0.25
-    big = blob(15.0, 16.5, 11.5, 9.5, -0.3, 0.10, 202, 4, 2.3)
-    p.dome(big, R_IRON, streaks=st, lo=-1.0, hi=1.3, spec=False, tex=tx)
-    small = blob(25.0, 24.5, 5.2, 4.2, 0.3, 0.12, 203, 4, 2.3)
-    p.dome(small, R_IRON, streaks=_diag_strata(30, 58, 3.6), lo=-1.0, hi=1.3, spec=False)
-    rng = np.random.default_rng(9)
-    for m in (big, small):
-        ys, xs = np.nonzero(erode(m) & (np.roll(m, 2, 0)))
-        for k in rng.choice(len(ys), 9, replace=False):
+    glint2 = lch(58, 8, 252)
+    rng = np.random.default_rng(15)
+    for p0, p1, th, sd in (((2.5, 21.0), (15.5, 6.5), 6.4, 71), ((6.5, 29.0), (28.5, 8.0), 7.6, 72), ((18.0, 30.0), (30.0, 17.0), 5.2, 73)):
+        m, v = _vein(p, p0, p1, th, R_IRON, sd)
+        inner = erode(m)
+        ys, xs = np.nonzero(inner & (v > 0.6))
+        for k in rng.choice(len(ys), min(6, len(ys)), replace=False):
+            p.px(xs[k], ys[k], glint)
+            p.px(xs[k] + 1, ys[k] - 1, glint2)
+        ys, xs = np.nonzero(inner & (v < 0.5))
+        for k in rng.choice(len(ys), min(12, len(ys)), replace=False):
             p.px(xs[k], ys[k], R_RUST[6] if rng.random() < 0.5 else R_IRON[1])
-    for (x, y) in ((8, 9), (9, 8), (15, 6)):
-        p.px_in(big, x, y, glint)
     return p.sprite(shadow=False)
 
 
@@ -969,7 +961,7 @@ def lead_icon():
 
 def silver_icon():
     p = Pic()
-    k = dict(lo=-2.3, hi=1.3)
+    k = dict(lo=-2.0, hi=1.3)
     p.dome(blob(22.5, 10.5, 4.6, 3.8, 0.3, 0.12, 221), R_SILVER, streaks=_chrome(22.5, 10.5), **k)
     p.dome(blob(14.0, 18.5, 10.0, 8.2, -0.3, 0.12, 222), R_SILVER, streaks=_chrome(14, 18.5), **k)
     p.dome(blob(25.5, 24.5, 5.0, 4.0, 0.2, 0.12, 223), R_SILVER, streaks=_chrome(25.5, 24.5), **k)
@@ -991,9 +983,10 @@ def copper_icon():
 
 def aluminium_icon():
     p = Pic()
-    _plate(p, 16.0, 21.5, 11.5, -0.1, R_ALU, 3, squash=0.62, crease=((8, 23), (20, 18)))
-    _plate(p, 16.5, 16.0, 9.5, 0.12, R_ALU, 3, squash=0.62, crease=((12, 17), (22, 13)))
-    _plate(p, 16.0, 10.5, 7.0, -0.08, R_ALU, 2, squash=0.62)
+    _plate(p, 20.5, 13.5, 8.0, 0.25, R_ALU, 3, squash=0.66, crease=((16, 14), (24, 10)))
+    _plate(p, 13.0, 20.0, 10.5, -0.15, R_ALU, 3, squash=0.66, crease=((7, 22), (18, 17)))
+    _plate(p, 21.5, 24.5, 6.0, 0.35, R_ALU, 2, squash=0.66)
+    _plate(p, 9.5, 9.5, 4.8, -0.4, R_ALU, 2, squash=0.66)
     return p.sprite(shadow=False)
 
 
@@ -1069,17 +1062,9 @@ def scrap_icon():
 
 def peat_icon():
     p = Pic()
-    clods = [(20.0, 9.5, 5.4, 4.2, 0.3, 291), (14.0, 18.5, 10.6, 8.2, -0.2, 292), (25.5, 24.0, 5.0, 4.0, 0.2, 293)]
-    for cx, cy, rx, ry, rot, sd in clods:
-        m = blob(cx, cy, rx, ry, rot, 0.18, sd, 6, 2.2)
-        n = vnoise(sd + 7, 2.6) + (vnoise(sd + 9, 1.4) - 0.5) * 0.3
-        moss = erode(m) & (n > 0.62) & (_YY < cy + 2)
-        p.dome(m, R_PEAT, spec=False, lo=-0.5, hi=1.5, alt=(moss, R_MOSS), rim=R_PEAT[7],
-               tex=(vnoise(sd + 13, 2.0) - 0.5) * 0.25)
-        area = int(m.sum())
-        _strands(p, m, area // 11, sd + 21, R_PEAT[1], 8)
-        _strands(p, m, area // 9, sd + 25, R_PEAT[7], 6)
-        _fibers(p, m, 3 + int(rx / 2), sd + 31, R_PEAT, out=True)
+    for cx, cy, rx, ry, rot, sd in ((20.0, 9.5, 5.4, 4.2, 0.3, 291), (14.0, 18.5, 10.6, 8.2, -0.2, 292),
+                                    (25.5, 24.0, 5.0, 4.0, 0.2, 293)):
+        _peat_clod(p, cx, cy, rx, ry, rot, sd)
     return p.sprite(shadow=False)
 
 
@@ -1218,6 +1203,19 @@ def fuel_block_coal_icon():
     fr = _block(p, 4, 6, 18, 15, 6, rp, fx)
     _flame(p, 13, 25, 11)
     return p.sprite(shadow=False)
+
+
+def _peat_clod(p, cx, cy, rx, ry, rot, sd, moss_thr=0.68):
+    m = blob(cx, cy, rx, ry, rot, 0.26, sd, 8, 2.2)
+    n = vnoise(sd + 7, 2.6) + (vnoise(sd + 9, 1.4) - 0.5) * 0.3
+    moss = erode(m) & (n > moss_thr) & (_YY < cy + 2)
+    p.dome(m, R_PEAT, spec=False, lo=-0.75, hi=1.4, alt=(moss, R_MOSS), rim=R_PEAT[7],
+           tex=(vnoise(sd + 13, 2.0) - 0.5) * 0.3)
+    area = int(m.sum())
+    _strands(p, m, area // 10, sd + 21, R_PEAT[1], 9, curl=0.5)
+    _strands(p, m, area // 14, sd + 25, R_PEAT[7], 7, curl=0.5)
+    _fibers(p, m, 4 + int(rx / 1.5), sd + 31, R_PEAT, out=True)
+    return m
 
 
 TILES = {

@@ -704,7 +704,8 @@ func _refresh_header() -> void:
 	var minute := int((hour_f - floor(hour_f)) * 60.0)
 	_day.text = str(day)
 	_clock.text = "%02d:%02d" % [hour, minute]
-	if _room_icon != null:
+	if _room_icon != null and String(_room_icon.get_meta("_room", "")) != _room_id:
+		_room_icon.set_meta("_room", _room_id)
 		Tip.bind(_room_icon, String(ROOM_NAMES.get(_room_id, "Дом")))
 
 	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
@@ -1172,14 +1173,16 @@ func _update_door_props(cam_x: float) -> void:
 	if not knocking:
 		return
 	var t := _knock_t
-	var dx := -50.0
+	# Курьер стоит прямо у двери (дверь бывает у самого края экрана — левее он
+	# уехал бы за кадр) и приезжает/уезжает слева.
+	var dx := -18.0
 	var alpha := 1.0
 	var leave_at: float = KNOCK_BEATS[2] + 0.25
 	if t < 0.4:
-		dx = lerpf(-120.0, -50.0, 1.0 - pow(1.0 - t / 0.4, 2.0))
+		dx = lerpf(-110.0, -18.0, 1.0 - pow(1.0 - t / 0.4, 2.0))
 	elif t > leave_at:
 		var k := clampf((t - leave_at) / (KNOCK_TOTAL - leave_at), 0.0, 1.0)
-		dx = lerpf(-50.0, -120.0, k * k)
+		dx = lerpf(-18.0, -110.0, k * k)
 		alpha = 1.0 - k
 	_courier.position = Vector2(base_x + dx, _floor_y_px - 62.0)
 	_courier.modulate.a = alpha
@@ -1193,7 +1196,7 @@ func _update_door_props(cam_x: float) -> void:
 			_knock_beats = i + 1
 			Sfx.play("door")
 			Haptics.thud()
-	_knock_icon.position = Vector2(base_x - 6.0, _floor_y_px - 112.0)
+	_knock_icon.position = Vector2(base_x + 8.0, _floor_y_px - 112.0)
 	_knock_icon.scale = Vector2.ONE * (1.0 + 0.4 * pop)
 	_knock_icon.modulate.a = alpha if t > 0.3 else 0.0
 

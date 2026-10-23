@@ -15,11 +15,25 @@ var world: WorldGen
 var fog: FogOfWar
 var player
 var house: HouseSystem
+var _events: Array = []   # [{id, data}] — что дом выложил на шину событий
+
+
+func _on_event(id: StringName, data: Dictionary) -> void:
+	_events.append({"id": String(id), "data": data})
+
+
+func _event_count(id: String) -> int:
+	var n := 0
+	for e in _events:
+		if e["id"] == id:
+			n += 1
+	return n
 
 
 func _ready() -> void:
 	print("=== test_house_ui ===")
 	Settings.reduce_motion = true
+	GameState.game_event.connect(_on_event)
 	world = WorldGen.new(4242)
 	fog = FogOfWar.new()
 	GameState.world_ref = world
@@ -48,6 +62,7 @@ func _ready() -> void:
 	_test_storage_view_at_workshop()
 	_test_qty_card_outside_tap()
 	_test_sleep_clock_and_skip()
+	await _test_sleep_fade_race()
 	_test_delivery_flow()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -336,6 +351,7 @@ func _test_storage_view_at_workshop() -> void:
 
 	# Положить всё и забрать всё — кнопками внизу.
 	view._put_btn.pressed.emit()
+	check("склад выкладывает события «stored» на шину", _event_count("stored") >= 2)
 	check("«сложить рюкзак» опустошил рюкзак", GameState.inventory.is_empty() and HouseStorage.count("iron_ore") == 10)
 	view._take_btn.pressed.emit()
 	check("«забрать всё» вернул, что влезло", GameState.get_item_count("lead") == 5 and HouseStorage.count("lead") == 0)
@@ -404,7 +420,10 @@ func _test_sleep_clock_and_skip() -> void:
 	var want := "%02d:%02d" % [int(end_hour), int((end_hour - floor(end_hour)) * 60.0)]
 	check("в конце ролика часы показывают час пробуждения", fx._time.text == want)
 
+	_events.clear()
 	house._skip_sleep_for_ad()
+	check("сон выкладывает событие «slept» с пометкой пропуска",
+		_event_count("slept") == 1 and bool(_events.filter(func(e): return e["id"] == "slept")[0]["data"]["skipped"]))
 	check("пропуск закончил сон сразу", not house._sleeping and not house._view.is_sleeping())
 	check("пропуск потратил один ролик", GameState.get_ad_uses_today(HouseSystem.SKIP_SLEEP_AD) == 1
 		and HouseSleepFx.skips_left() == 4)
@@ -429,6 +448,25 @@ func _test_sleep_clock_and_skip() -> void:
 	_leave()
 
 
+## Сон закончили и сразу легли снова, пока старый ролик ещё гас: затухание
+## старого не должно спрятать новый (был такой баг: наложенные твины).
+func _test_sleep_fade_race() -> void:
+	Settings.reduce_motion = false
+	var fx := HouseSleepFx.new()
+	add_child(fx)
+	fx.play(5.0, 4.0, false)
+	fx.stop()
+	fx.stop()
+	fx.play(5.0, 4.0, false)
+	await get_tree().create_timer(0.45).timeout
+	check("новый ролик сна не спрятан затуханием старого", fx.visible and fx.modulate.a > 0.99)
+	fx.stop()
+	await get_tree().create_timer(0.45).timeout
+	check("после остановки ролик гаснет и прячется", not fx.visible)
+	fx.queue_free()
+	Settings.reduce_motion = true
+
+
 # ---------------------------------------------------------------------------
 # Доставка
 # ---------------------------------------------------------------------------
@@ -451,6 +489,7 @@ func _test_delivery_flow() -> void:
 
 	house.debug_deliver_now()
 	check("курьер доехал: порция у двери", HouseFood.food_at_door_count() == 1)
+	check("заказ и приезд — события на шине", _event_count("food_ordered") >= 1 and _event_count("food_delivered") == 1)
 	check("значок стучит у двери", badge.state() == "knock" and badge.orders_in_flight() == 0)
 
 	# Пакет у двери: снаружи — спрайт мира, в салоне — реквизит комнаты.

@@ -37,6 +37,7 @@ var _take_lock: TextureRect
 var _put_lock: TextureRect
 var _qty: HouseQtyCard
 var _signature: String = ""
+var _head_sig: String = ""
 var _tiles: Dictionary = {}
 var _qty_target: Dictionary = {}
 var _take_ok := false
@@ -182,6 +183,7 @@ func _build_actions() -> void:
 func open() -> void:
 	visible = true
 	_signature = ""
+	_head_sig = ""
 	_qty.visible = false
 	_drag.set_process_input(true)
 	_scroll.scroll_vertical = 0
@@ -223,16 +225,21 @@ func refresh() -> void:
 	var carried := GameState.get_total_weight()
 	var cap := GameState.get_max_carry_kg()
 
-	(_chip_items["label"] as Label).text = ShopArt.compact(HouseStorage.total_items())
-	Tip.bind(_chip_items["root"], "Склад", "Что лежит в мастерской. Верстак берёт материалы прямо отсюда.",
-		"%s шт · %s кг" % [ShopArt.full(HouseStorage.total_items()), ShopArt.full(int(round(HouseStorage.total_weight())))])
-	var load_label := _chip_load["label"] as Label
-	load_label.text = "%s/%s" % [ShopArt.compact(int(round(carried))), ShopArt.compact(int(round(cap)))]
-	load_label.label_settings.font_color = ShopArt.COL_BAD if carried >= cap - 0.001 else Color.WHITE
-	Tip.bind(_chip_load["root"], "Рюкзак", "Сколько несёшь из скольки можно унести.",
-		"%s из %s кг" % [ShopArt.full(int(round(carried))), ShopArt.full(int(round(cap)))])
-
-	_update_actions(accessible, rows)
+	# Фишки и кнопки обновляем, только когда поменялись числа: refresh() зовут
+	# каждый кадр, а Tip.bind перерисовывает показанную подсказку при каждом вызове.
+	var head_sig := "%d|%d|%d|%d|%s|%d|%d" % [HouseStorage.total_items(), int(round(HouseStorage.total_weight())),
+		int(round(carried)), int(round(cap)), accessible, rows.size(), GameState.inventory.size()]
+	if head_sig != str(_head_sig):
+		_head_sig = head_sig
+		(_chip_items["label"] as Label).text = ShopArt.compact(HouseStorage.total_items())
+		Tip.bind(_chip_items["root"], "Склад", "Что лежит в мастерской. Верстак берёт материалы прямо отсюда.",
+			"%s шт · %s кг" % [ShopArt.full(HouseStorage.total_items()), ShopArt.full(int(round(HouseStorage.total_weight())))])
+		var load_label := _chip_load["label"] as Label
+		load_label.text = "%s/%s" % [ShopArt.compact(int(round(carried))), ShopArt.compact(int(round(cap)))]
+		load_label.label_settings.font_color = ShopArt.COL_BAD if carried >= cap - 0.001 else Color.WHITE
+		Tip.bind(_chip_load["root"], "Рюкзак", "Сколько несёшь из скольки можно унести.",
+			"%s из %s кг" % [ShopArt.full(int(round(carried))), ShopArt.full(int(round(cap)))])
+		_update_actions(accessible, rows)
 
 	# Список пересобирается только при изменениях: плитка, удалённая и созданная
 	# заново между нажатием и отпусканием пальца, не срабатывает.
@@ -480,6 +487,7 @@ func _move(store: bool, id: String, amount: int, tile: Control) -> void:
 	HouseArt.float_number(_root, center + Vector2(-8, -18), ("+%s" if store else "−%s") % ShopArt.compact(moved),
 		ShopArt.COL_GOOD if store else ShopArt.COL_GOLD)
 	_signature = ""
+	_head_sig = ""
 	refresh()
 
 
@@ -493,6 +501,7 @@ func _after_move(moved: int, button: Control, sound: String) -> void:
 	ShopFx.sparkles(_root, center, ShopArt.COL_GOLD, 16, 34.0)
 	HouseArt.float_number(_root, center + Vector2(-10, -26), "×%s" % ShopArt.compact(moved), ShopArt.COL_GOOD)
 	_signature = ""
+	_head_sig = ""
 	refresh()
 
 

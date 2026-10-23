@@ -102,6 +102,8 @@ var _sleeping: bool = false
 ## Номер ролика сна: таймер отменённого (пропущенного) ролика не должен
 ## закончить следующий.
 var _sleep_seq: int = 0
+## Текущий сон закончен пропуском за ролик (для события «slept»).
+var _skipped_sleep: bool = false
 
 ## Устье тоннеля втягивает в дом при касании (решение владельца), но только
 ## после того, как от него отошли. Без этой защёлки спуск превращается в
@@ -699,6 +701,8 @@ func _sleep() -> void:
 	if not bool(result["ok"]):
 		_toast(String(result["reason"]), 3.4)
 		return
+	GameState.emit_event(&"slept", {"hours": float(result["hours"]),
+		"stamina": int(round(GameState.stamina - stamina_before)), "skipped": _skipped_sleep})
 	# Итог сна — вспышками на полосках шапки, а не строкой текста.
 	if _view != null and _view.has_method("flash_bars"):
 		_view.flash_bars({"stamina": GameState.stamina - stamina_before,
@@ -752,7 +756,9 @@ func _skip_sleep_for_ad() -> void:
 		if _view != null:
 			_view.refresh_skip_counter()
 		return
+	_skipped_sleep = true
 	_finish_sleep_sequence()
+	_skipped_sleep = false
 
 
 ## Мастерская (верстак и «Заказать» в салоне открывают одну и ту же витрину —
@@ -811,9 +817,11 @@ func take_starting_pickaxe() -> void:
 ## Непереносимую еду (стейк, пельмени — решение владельца) нести некуда,
 ## поэтому её не доставляют, а съедают сразу: игрок и так стоит у своей двери.
 static func order_food(id: String) -> Dictionary:
+	var price_was_free := bool(HouseFood.can_order(id).get("free", false))
 	if not HouseFood.pay_for_order(id):
 		return {"ok": false, "message": String(HouseFood.can_order(id).get("reason", "Заказать нельзя."))}
 	var name := HouseConfig.food_name(id)
+	GameState.emit_event(&"food_ordered", {"id": id, "free": price_was_free})
 	if not HouseConfig.is_portable(id):
 		var eaten := HouseFood.eat_now(id)
 		return {"ok": true, "message": "%s — съедено на месте: голод +%d%%." % [
@@ -845,6 +853,7 @@ func _complete_delivery(seq: int) -> void:
 	var id := String(_pending[seq])
 	_pending.erase(seq)
 	HouseFood.deliver(id)
+	GameState.emit_event(&"food_delivered", {"id": id})
 	if _delivery_badge != null:
 		_delivery_badge.arrive(id)
 	# Курьер стучит. В салоне ролик у двери сам играет три удара; в других

@@ -73,6 +73,7 @@ static func put(id: String, amount: int) -> int:
 		return 0
 	GameState.remove_item(id, moved)
 	GameState.house_storage[id] = count(id) + moved
+	GameState.emit_event(&"stored", {"item": id, "count": moved, "dir": "put"})
 	return moved
 
 
@@ -99,6 +100,7 @@ static func take(id: String, amount: int) -> int:
 		taken += 1
 	if taken > 0:
 		_remove(id, taken)
+		GameState.emit_event(&"stored", {"item": id, "count": taken, "dir": "take"})
 	return taken
 
 

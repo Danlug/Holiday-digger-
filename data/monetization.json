@@ -139,7 +139,7 @@
    {"id": "small_coins", "trigger": "магазин еды, кнопка \"Немного монет\"", "implemented": true, "reward_source": "shop.json -> ad_rewards"},
    {"id": "small_premium_currency", "trigger": "премиум-магазин, блок \"Доллары\"", "implemented": true, "reward_source": "shop.json -> ad_rewards"},
    {"id": "double_income_on_sale", "trigger": "магазин еды, кнопка \"Удвоить доход с продажи\"", "implemented": true, "reward_source": "shop.json -> ad_rewards"},
-   {"id": "skip_sleep_at_home", "trigger": "кровать в спальне (house_sleep.gd) — кнопка 'Уснуть мгновенно за ролик'", "implemented": false, "note": "лимит уже задан (5/день), UI-точка и reward-запись в shop.json ещё не сделаны — см. docs/MONETIZATION.md чек-лист интеграции"},
+   {"id": "skip_sleep_at_home", "trigger": "кровать в спальне — кнопка «проснуться сразу» поверх ролика сна (scripts/house/house_sleep_fx.gd)", "implemented": true, "note": "лимит 5/день (balance.json -> ads.daily_limits) считает HouseSystem._skip_sleep_for_ad через GameState.try_use_ad_reward; как награды магазина, засчитывается без показа видео, пока нет рекламной сети (см. GDD §16, «Дом»)"},
    {"id": "restore_stamina_hunger_in_mine", "trigger": "второе истощение в шахте (см. GDD п.9, энергетический батончик) — предложить ролик перед платным батончиком", "implemented": false},
    {"id": "cancel_loot_loss_on_death", "trigger": "экран смерти/возрождения — до подтверждения потери лута", "implemented": false},
    {"id": "remote_dump_loot_for_sale", "trigger": "полный рюкзак в шахте — рядом с обычной продажей на месте", "implemented": false},

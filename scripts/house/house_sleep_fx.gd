@@ -198,11 +198,15 @@ func stop() -> void:
 		return
 	# Затемнение уходит за четверть секунды, а не обрывается: эффект сна на
 	# комнате уже применён, и игрок видит, как она «просыпается».
+	if _fade != null:
+		_fade.kill()
 	_fade = create_tween()
 	_fade.tween_property(self, "modulate:a", 0.0, 0.25)
 	_fade.tween_callback(func() -> void:
-		visible = false
-		modulate.a = 1.0)
+		# Новый ролик мог начаться, пока старый гас: тогда не трогаем.
+		if not _playing:
+			visible = false
+			modulate.a = 1.0)
 
 
 func is_playing() -> bool:

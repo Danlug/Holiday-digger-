@@ -13,7 +13,7 @@ extends Node
 ## outdoor outdoor_rig forced_sleep forced_bar sleep_1 sleep_2 sleep_3 sleep_wake
 ## delivery_ring delivery_knock storage_empty storage_full storage_remote
 ## storage_qty storage_qty_limit storage_bignum storage_poor_bag header_low
-## delivery_hall_pack door_package delivery_far.
+## delivery_hall_pack door_package delivery_far knock_anim forced_tip.
 ## Состояние выставляется только в памяти — на диск (user://) тест не пишет.
 
 var _out_dir := "/tmp/house_shots"
@@ -30,8 +30,6 @@ func _ready() -> void:
 		_only.append(args[i])
 	if not DirAccess.dir_exists_absolute(_out_dir):
 		DirAccess.make_dir_recursive_absolute(_out_dir)
-	Settings.reduce_motion = true
-
 	_main = load("res://scenes/main.tscn").instantiate()
 	add_child(_main)
 	await _frames(2)
@@ -52,6 +50,8 @@ func _ready() -> void:
 		if director.cutscene != null and director.cutscene.is_playing:
 			director.cutscene.skip()
 		await _wait(0.3)
+	# После main: HUD при старте перечитывает настройки и сбрасывает флаг.
+	Settings.reduce_motion = true
 	_house = HouseSystem.instance
 	_house.player = _main.player
 	_house.hud = _main.hud
@@ -74,6 +74,8 @@ func _ready() -> void:
 	await _scene("delivery_knock", _s_delivery_knock)
 	await _scene("delivery_hall_pack", _s_delivery_hall_pack)
 	await _scene("door_package", _s_door_package)
+	await _scene("knock_anim", _s_knock_anim)
+	await _scene("forced_tip", _s_forced_tip)
 	await _scene("delivery_far", _s_delivery_far)
 	await _scene("storage_empty", _s_storage_empty)
 	await _scene("storage_full", _s_storage_full)
@@ -215,6 +217,7 @@ func _s_sleep_1() -> void:
 func _s_sleep_2() -> void:
 	await _s_sleep_1()
 
+
 	_house._view.call("debug_sleep_progress", 0.5)
 
 
@@ -250,6 +253,27 @@ func _s_delivery_hall_pack() -> void:
 	HouseFood.deliver("food_buldak")
 	_house._view.set_hero_x_fraction(_px("hall", "front_door") + 0.1)
 	await _frames(3)
+
+
+func _s_knock_anim() -> void:
+	# Единственный снимок с движением: курьер у двери и удар (флаг «меньше движения» снят).
+	Settings.reduce_motion = false
+	_enter("hall", "front_door")
+	_house._view.set_hero_x_fraction(_px("hall", "front_door") + 0.1)
+	HouseSystem.order_food("food_buldak")
+	await _frames(2)
+	_house.call("debug_deliver_now")
+	await _wait(0.75)
+	_shot("knock_anim_a")
+	await _wait(0.9)
+	Settings.reduce_motion = true
+
+
+func _s_forced_tip() -> void:
+	GameState.house_tutorial_stage = 0
+	GameState.set_stamina(0.0)
+	_house._start_forced_sleep()
+	await _wait(0.9)
 
 
 func _s_door_package() -> void:

@@ -7,7 +7,8 @@
   * цвет залежи — средний Lab по телу (без контура и краевых пикселей), расстояние ΔE между парами;
   * форма — IoU силуэтов на сетке 16x16 после центрирования + расстояние гистограмм направлений
     градиента яркости (полоски против пятен против граней);
-  * видимость — ΔE тела залежи до грунта каждого пояса (должно быть >= MIN_CONTRAST).
+  * видимость — ΔE тела залежи до грунта поясов, где руда встречается заметно (от depth_min до depth_min+1500),
+    должно быть >= MIN_CONTRAST.
 Пара «слишком похожа» (see too_similar): цвета далеки (ΔE >= 20) — всегда нормально; ΔE 12..20 — нормально,
 только если силуэты заметно разные (shape >= 0.9); ΔE < 12 — одна и та же краска: допустимо лишь при совсем разных
 силуэтах (shape >= 1.3), на практике — нужно менять цвет.
@@ -125,8 +126,35 @@ def pair_metrics(a, b):
     return de, shape, iou
 
 
-def contrast(r, soils):
-    return min(float(np.linalg.norm(r["mean_lab"] - s)) for s in soils)
+_TILE_TO_ID = {"ore_iron": "iron_ore", "ore_universalium": "universum"}
+_BIOMES = None
+_MINERALS = None
+
+
+def relevant_belts(name):
+    """Пояса, где руда встречается заметно: от depth_min до min(depth_max, depth_min + 1500).
+    Торф живёт только у поверхности, уголь — с 1000: требовать видимость на поясах, где их нет, нет смысла."""
+    global _BIOMES, _MINERALS
+    if _BIOMES is None:
+        _BIOMES = json.load(open(os.path.join(ROOT, "data", "world_layers.json"), encoding="utf-8"))["biomes"]["list"]
+        raw = json.load(open(os.path.join(ROOT, "data", "minerals.json"), encoding="utf-8"))
+        ms = raw.get("minerals", raw)
+        _MINERALS = ms if isinstance(ms, dict) else {m["id"]: m for m in ms}
+
+    def val(x, default):
+        x = x.get("value") if isinstance(x, dict) else x
+        return default if x is None else float(x)
+
+    m = _MINERALS.get(_TILE_TO_ID.get(name, name[4:]), {})
+    lo = val(m.get("depth_min"), 1.0)
+    hi = min(val(m.get("depth_max"), 10000.0), lo + 1500.0)
+    belts = [i for i, b in enumerate(_BIOMES) if b["y_from"] <= hi and b["y_to"] >= lo]
+    return belts or list(range(len(_BIOMES)))
+
+
+def contrast(r, soils, name=None):
+    belts = relevant_belts(name) if name else range(len(soils))
+    return min(float(np.linalg.norm(r["mean_lab"] - soils[i])) for i in belts)
 
 
 def sheet(data, soils, path):
@@ -172,7 +200,7 @@ def main():
     for n in names:
         if only and n not in only:
             continue
-        c = contrast(data[n], soils)
+        c = contrast(data[n], soils, n)
         if c < MIN_CONTRAST:
             invisible.append((n, c))
     legacy = [n for n in names if data[n]["src"] != "спрайт"]

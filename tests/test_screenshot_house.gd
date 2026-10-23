@@ -13,7 +13,7 @@ extends Node
 ## outdoor outdoor_rig forced_sleep forced_bar sleep_1 sleep_2 sleep_3 sleep_wake
 ## delivery_ring delivery_knock storage_empty storage_full storage_remote
 ## storage_qty storage_qty_limit storage_bignum storage_poor_bag header_low
-## delivery_hall_pack door_package delivery_far knock_anim forced_tip.
+## delivery_hall_pack door_package delivery_far knock_anim forced_tip bubble_tip storage_tip.
 ## Состояние выставляется только в памяти — на диск (user://) тест не пишет.
 
 var _out_dir := "/tmp/house_shots"
@@ -76,6 +76,8 @@ func _ready() -> void:
 	await _scene("door_package", _s_door_package)
 	await _scene("knock_anim", _s_knock_anim)
 	await _scene("forced_tip", _s_forced_tip)
+	await _scene("bubble_tip", _s_bubble_tip)
+	await _scene("storage_tip", _s_storage_tip)
 	await _scene("delivery_far", _s_delivery_far)
 	await _scene("storage_empty", _s_storage_empty)
 	await _scene("storage_full", _s_storage_full)
@@ -267,6 +269,21 @@ func _s_knock_anim() -> void:
 	_shot("knock_anim_a")
 	await _wait(0.9)
 	Settings.reduce_motion = true
+
+
+func _s_bubble_tip() -> void:
+	GameState.set_stamina(30.0)
+	_enter("bedroom", "bed")
+	await _frames(3)
+	Tip.show_now(_house._view._hotspot_buttons[0])
+
+
+func _s_storage_tip() -> void:
+	_fill_storage()
+	_enter("workshop", "chest")
+	_house.open_storage()
+	await _frames(3)
+	Tip.show_now(_house._storage_view._tiles["store:iron_ore"])
 
 
 func _s_forced_tip() -> void:

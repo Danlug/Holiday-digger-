@@ -168,6 +168,23 @@ def g_gems(img):
 
 
 @icon
+def g_bag(img):
+    body = C("rust_tool")
+    line(img, [(12, 7), (12, 4), (20, 4), (20, 7)], shade(body, 0.6), 2)
+    rect(img, 4, 11, 8, 26, C("iron_tool"))
+    rect(img, 24, 11, 28, 26, C("iron_tool"))
+    rect(img, 7, 7, 25, 28, body)
+    rect(img, 7, 7, 25, 9, shade(body, 1.3))
+    rect(img, 7, 7, 10, 28, shade(body, 1.12))
+    rect(img, 7, 17, 25, 17, shade(body, 0.6))
+    rect(img, 13, 14, 19, 19, C("iron_tool"))
+    rect(img, 15, 16, 17, 18, shade(C("iron_tool"), 0.6))
+    rect(img, 10, 21, 22, 27, shade(body, 0.85))
+    rect(img, 10, 21, 22, 21, shade(body, 0.6))
+    return img
+
+
+@icon
 def g_uranium(img):
     rect(img, 9, 9, 23, 26, C("uranium_core"))
     ell(img, 16, 9, 7, 3, C("uranium_glow"))

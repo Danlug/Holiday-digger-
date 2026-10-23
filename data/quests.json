@@ -30,6 +30,11 @@
   },
   "points": 3
  },
+ "ad_double": {
+  "placement": "quest_reward_double",
+  "daily_limit": 3,
+  "_note": "«×2» за rewarded-ролик на готовом задании: удваивает монеты и опыт (доллары и очки дороги — нет). Лимит 3 в сутки — в пределах лимитов ГДД раздел 15 (там у самых щедрых точек 3–5); считается в GameState.ad_daily_counts и сбрасывается по UTC-суткам."
+ },
  "templates": [
   {"id": "dig_any", "kinds": ["daily", "weekly"], "group": "dig", "event": "dug", "glyph": "dig",
    "targets": [30, 55, 90, 150, 240, 380],

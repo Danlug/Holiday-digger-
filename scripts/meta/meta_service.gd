@@ -210,8 +210,10 @@ func _calm() -> bool:
 		return false
 	var tree := get_tree()
 	var player := tree.root.find_child("Player", true, false)
-	if player != null and bool(player.get("frozen")):
-		return false
+	if player != null:
+		# Не в прыжке, не в падении и не в полёте: окно замораживает героя на месте.
+		if bool(player.get("frozen")) or not bool(player.get("on_ground")) or absf(float(player.get("vy"))) > 1.0:
+			return false
 	var director := tree.root.find_child("StoryDirector", true, false)
 	if director != null:
 		var cs = director.get("cutscene")

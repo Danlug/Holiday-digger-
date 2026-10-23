@@ -22,6 +22,7 @@ extends RefCounted
 
 const KEY := "meta"
 const VERSION := 1
+const _FRESH_KEYS := ["v", "hw", "unlocked", "daily", "quests", "c", "minerals", "ach", "seen", "pts", "road", "wk_dollars", "events"]
 
 
 static func _fresh() -> Dictionary:
@@ -40,7 +41,16 @@ static func root() -> Dictionary:
 		s = _fresh()
 		GameState.ext[KEY] = s
 		return s
-	# Сейв старой/частичной схемы: недостающие ветки доливаем, чужое не трогаем.
+	# Горячий путь (зовётся десятки раз на каждую выкопанную клетку): только
+	# проверка, что все ветки на месте. Сейв старой/частичной схемы доливается,
+	# чужое не трогается.
+	for k in _FRESH_KEYS:
+		if not s.has(k):
+			return _heal(s)
+	return s
+
+
+static func _heal(s: Dictionary) -> Dictionary:
 	var f := _fresh()
 	for k in f.keys():
 		if not s.has(k) or typeof(s[k]) != typeof(f[k]):

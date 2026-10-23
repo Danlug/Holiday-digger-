@@ -24,8 +24,11 @@ static func touch() -> void:
 
 
 static func tank(tool_id: String) -> Dictionary:
-	var tanks: Dictionary = root().get("tanks", {})
-	if not root().has("tanks"):
+	# Сейв с чужой/битой формой («tanks» не словарь) лечится на месте: присвоение числа
+	# в типизированную переменную роняло скрипт при каждом чтении бака.
+	var tanks = root().get("tanks", null)
+	if typeof(tanks) != TYPE_DICTIONARY:
+		tanks = {}
 		root()["tanks"] = tanks
 	var t = tanks.get(tool_id, null)
 	if typeof(t) != TYPE_DICTIONARY:
@@ -35,7 +38,8 @@ static func tank(tool_id: String) -> Dictionary:
 
 
 static func suit() -> int:
-	return int(root().get("suit", 0))
+	var v = root().get("suit", 0)
+	return int(v) if typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT else 0
 
 
 static func set_suit(tier: int) -> void:

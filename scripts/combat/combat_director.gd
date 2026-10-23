@@ -65,6 +65,12 @@ func _ready() -> void:
 	set_process(true)
 
 
+## Ворота арены — статика и живут дольше сцены: «Сброс» и перезагрузка посреди боя оставляли
+## их закрытыми, и в новой игре на дне арена не пускала внутрь.
+func _exit_tree() -> void:
+	BossArena.sealed = false
+
+
 ## Подключение к живой игре: host — Main с полями world/fog/player/hud/view_root.
 func setup(p_host: Node) -> void:
 	host = p_host
@@ -73,6 +79,7 @@ func setup(p_host: Node) -> void:
 	player = host.get("player")
 	hud = host.get("hud")
 	view_root = host.get("view_root")
+	BossArena.sealed = false
 	cw = CombatWorld.new(world)
 	spawner = MonsterSpawner.new(cw)
 	if world != null:

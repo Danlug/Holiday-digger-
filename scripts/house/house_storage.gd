@@ -102,6 +102,33 @@ static func take(id: String, amount: int) -> int:
 	return taken
 
 
+## Сколько единиц id реально влезет в рюкзак прямо сейчас (стопка и вес — те
+## же правила, что у GameState.add_item). Нужно окну «сколько»: ползунок не
+## должен обещать больше, чем take() сможет взять.
+static func max_takeable(id: String) -> int:
+	var want := count(id)
+	if want <= 0:
+		return 0
+	var room_by_stack: int = maxi(0, Balance.get_mineral_max_stack(id) - GameState.get_item_count(id))
+	var weight_each := Balance.get_mineral_weight(id)
+	var room_by_weight := want
+	if weight_each > 0.0:
+		var free_weight: float = GameState.get_max_carry_kg() - GameState.get_total_weight()
+		room_by_weight = int(floor(free_weight / weight_each)) if free_weight > 0.0 else 0
+	return mini(want, mini(room_by_stack, room_by_weight))
+
+
+## Забрать всё, что влезет: по позициям от тяжёлых к лёгким (порядок rows()).
+## Возвращает, сколько единиц переложено.
+static func take_all() -> int:
+	if not can_access():
+		return 0
+	var moved := 0
+	for row in rows():
+		moved += take(String(row["id"]), int(row["count"]))
+	return moved
+
+
 ## Списать со склада напрямую, без рюкзака — этим верстак берёт материалы при
 ## сборке (ГДД п.14: склад стоит рядом, перекладывать руду в рюкзак ради
 ## крафта бессмысленно). Возвращает, сколько списано.

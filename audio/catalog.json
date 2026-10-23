@@ -207,6 +207,18 @@
    "pv": 0.06,
    "voices": 2
   },
+  "explosion": {
+   "cd": 300,
+   "db": 0.0,
+   "duck": 6.0,
+   "files": [
+    "sfx/explosion_1.wav",
+    "sfx/explosion_2.wav"
+   ],
+   "prio": 4,
+   "pv": 0.05,
+   "voices": 1
+  },
   "fly_loop": {
    "cd": 0,
    "db": 0.0,

@@ -518,6 +518,19 @@ def _collapse(rng, v):
     return mix(dur, parts)
 
 
+@sfx("explosion", peak=0.95, pv=0.05, prio=4, voices=1, cd=300, duck=6.0, variants=2)
+def _explosion(rng, v):
+    dur = 1.3
+    n = int(dur * SR)
+    boom = body(130, 32, 0.7, 0.22, 3.0)
+    burst = fft_filter(rng.standard_normal(n), SR, lo=60, hi=2200 - 400 * v) * env_exp(n, SR, 0.2, 0.002)
+    burst /= np.max(np.abs(burst)) + 1e-9
+    crack = nburst(0.05, rng, lo=1500, hi=8000, decay=0.012)
+    debris = grit(1.0, rng, 28, hi=3000, decay=0.006)
+    return reverb_tail(mix(dur, [(0, boom, 1.0), (0, burst, 0.8), (0, crack, 0.6), (0.05, debris, 0.45)]),
+                       SR, rt60=0.5, wet=0.12)
+
+
 @sfx("lava_hiss", peak=0.8, db=-2.0, pv=0.05, prio=1, voices=1, cd=600)
 def _lava_hiss(rng, v):
     dur = 1.1

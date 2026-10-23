@@ -108,6 +108,7 @@ func _ready() -> void:
 	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
 	ProgressScreen.attach(self)  # прокачка, музей, артефакты, рекорды
 	view_root.add_child(HouseSystem.new())  # дом: сон, еда, переходы дом↔огород↔шахта
+	Juice.attach(self)  # «сок»: звук, музыка, частицы, тряска, вибро (scripts/fx/)
 	# --- конец блока подключения ---
 
 	# --- сюжет --- подключение одной строкой: режиссёр сам находит игрока,

@@ -16,12 +16,18 @@ ore_platinum, ore_titanium, ore_lithium, ore_mercury, ore_gold, ore_scrap, ore_p
 Соответствие имя тайла -> id минерала: ore_iron -> iron_ore, ore_universalium -> universum, остальные — без префикса ore_.
 
 Как нарисовано. Каждый материал — лесенка из 8 тонов (контур, глубокая тень, тень, тёмная база, база, свет,
-яркий свет, блик), цвет задан оттенком HSL и светлотой Lab (см. col). Куски — маски на сетке 32x32; «купол»
+яркий свет, блик), цвет задан в Lab: светлота, хрома, оттенок (см. lch). Куски — маски на сетке 32x32; «купол»
 (dome) освещает кусок как полусферу светом сверху-слева с упорядоченным дизерингом, отражённым светом на тёмной
 стороне и бликом; плиты, призмы, грани и жилы красятся плоскими тонами по нормали грани. Куски перекрываются, у
 каждого свой контур оттенка материала (не чёрный); под залежью — мягкая тень на грунт. Кисть своя: общие
 tools/sprite_kit.py и tools/gen_tiles_deep.py не правятся. Замена-заглушка уровня «программист нарисовал
 аккуратно», не работа художника владельца.
+
+Цветовая карта (средний Lab тела залежи: L a b — то, на что настроены лесенки; check_ores требует ΔE >= 20 между
+соседями и >= 20 до грунта каждого пояса, поэтому цвета брифа сдвинуты там, где иначе не пройти):
+  серебро 87 0 -2 | платина 79 20 -15 | алюминий 71 -2 -15 | ртуть 58 -17 -9 | свинец 50 4 -16 | титан 49 20 -38
+  никель 60 -17 21 | железо 41 26 25 | медь 60 31 40 | золото 72 12 61 | металлолом 51 1 8 | торф 50 11 40
+  уголь 6 -2 4 | уран 66 -41 47 | литий 65 35 -20
 """
 
 import math
@@ -425,11 +431,10 @@ def _shard(p, cx, cy, length, width, rot, rp, skew=0.34):
     p.paint(poly([t, r, c]), rp[5])
     p.paint(poly([l, c, b]), rp[4])
     p.paint(poly([r, c, b]), rp[2])
-    p.paint(mask & ~erode(mask) & ~poly([t, l, c]) & ~poly([t, r, c]) & shifted(~mask, 1, 1) & False, rp[0])
     # ребро-блик по верхнему левому краю и по центральной оси
     p.line(t, l, rp[7], clip=mask)
     p.line(l, b, rp[6], clip=mask)
-    p.line(t, c, rp[7] if False else rp[5], clip=mask)
+    p.line(t, c, rp[5], clip=mask)
     p.px(int(round((t[0] + l[0]) / 2 + 0.4)), int(round((t[1] + l[1]) / 2 + 0.4)), rp[7])
     return mask
 
@@ -522,8 +527,6 @@ def _prism(p, cx, ty, r, h, rp):
             idx = int(np.clip(np.floor(base + 0.9 - f * 1.6 + _BAYER[y, x] * 0.6), 1, 6))
             p.px(x, y, rp[idx])
     # вертикальные рёбра — блик
-    for x in (int(cx - r / 2), int(cx - r / 2) + 1):
-        pass
     p.line((cx - r / 2, ty + a + 1), (cx - r / 2, ty + a + h - 1), rp[6], clip=body & ~topm)
     p.line((cx + r / 2, ty + a + 1), (cx + r / 2, ty + a + h - 1), rp[3], clip=body & ~topm)
     # верхняя грань: светлая, кромка анодирована в золото
@@ -919,16 +922,6 @@ R_BRONZE = ramp(66, 46, [14, 24, 34, 43, 51, 59, 69, 82], dh_dark=-12, dh_light=
 R_BRICK = ramp(58, 44, [8, 16, 25, 33, 41, 49, 59, 72], dh_dark=-10, dh_light=14)
 
 
-def _diag_strata(x0, x1, step=4.0, w=1.0):
-    st = []
-    off = x0
-    while off < x1:
-        st.append((off, w, -0.45))
-        st.append((off + step * 0.38, w, 0.22))
-        off += step
-    return tuple(st)
-
-
 def iron_icon():
     """Значок железа — те же слоистые жилы, что на тайле, только крупнее."""
     p = Pic()
@@ -1070,7 +1063,7 @@ def peat_icon():
 
 def coal_icon():
     p = Pic()
-    rim = R_COAL[6]
+    rim = lch(62, 10, 245)  # на тёмных плитках рюкзака ободок должен держать силуэт
     chunks = [
         ([(4, 20), (7, 12), (14, 8), (21, 11), (23, 19), (17, 25), (8, 25)], (14, 17.5)),
         ([(21, 22), (24, 17), (30, 19), (31, 26), (27, 30), (21, 29)], (26, 24)),
@@ -1078,7 +1071,7 @@ def coal_icon():
     ]
     masks = []
     for pts, c in chunks[::-1]:
-        masks.append((_rim_poly(p, pts, R_COAL, rim, c, base=1.05, gain=2.0, lo=1, hi=4), pts))
+        masks.append((_rim_poly(p, pts, R_COAL, rim, c, base=2.0, gain=3.0, lo=1, hi=5), pts))
     _coal_glints(p, masks)
     return p.sprite(shadow=False)
 

@@ -319,6 +319,17 @@ func _test_boss(p, w: WorldGen) -> void:
 	check("смерть в арене: бой сброшен, ворота открыты", director.boss == null and not BossArena.sealed)
 	GameState.respawn()
 
+	# ушёл с арены (телепорт) — бой прерван, ворота открыты
+	p.x = 16.5
+	p.y = float(floor_y) - 1.5
+	director.iframes = 0.0
+	_step(3)
+	check("снова вошёл — бой идёт", director.boss != null and BossArena.sealed)
+	p.y = 100.0
+	_step(3)
+	check("герой ушёл с арены: бой прерван, ворота открыты", director.boss == null and not BossArena.sealed)
+	check("прерванный бой сообщает boss_failed", _count("boss_failed") >= 1)
+
 	# победа
 	events.clear()
 	p.x = 16.5

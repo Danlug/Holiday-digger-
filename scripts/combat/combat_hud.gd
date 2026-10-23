@@ -61,7 +61,7 @@ func _ready() -> void:
 func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_attack.position = Vector2(MARGIN, vp.y - STRIP_H - BOTTOM_PAD - BTN)
-	_bar.position = Vector2((vp.x - _bar.size.x) / 2.0, 76.0)
+	_bar.position = Vector2((vp.x - _bar.size.x) / 2.0, 110.0)
 
 
 func _process(dt: float) -> void:

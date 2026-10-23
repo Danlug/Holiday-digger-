@@ -485,6 +485,10 @@ func _tick_boss(dt: float) -> void:
 				and player.y < a.position.y + a.size.y:
 			start_boss_fight()
 		return
+	# ушёл с арены (часы-телепорт и т. п.) — бой прерван, ворота открываются
+	if boss.is_active() and not BossArena.interior().grow(2.0).has_point(Vector2(player.x, player.y)):
+		abort_boss_fight()
+		return
 	for e in boss.tick(dt, hero_info()):
 		_on_boss_event(e)
 
@@ -502,6 +506,21 @@ func start_boss_fight(seed_value: int = 0) -> void:
 	# рёв, тряска, вибро и музыка арены — у JuiceDirector по событию
 	GameState.emit_event(&"boss_started", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
 	boss_started.emit()
+
+
+## Бой прерван без победы и без смерти (герой покинул арену): босс
+## возвращается в исходное состояние при следующем входе.
+func abort_boss_fight() -> void:
+	if boss == null:
+		return
+	boss = null
+	boss_death_t = -1.0
+	BossArena.sealed = false
+	cw.invalidate()
+	for m: Monster in monsters:
+		m.take_hit(1e9, 1)
+	GameState.emit_event(&"boss_failed", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
+	boss_finished.emit(false)
 
 
 func _on_boss_event(e: Dictionary) -> void:

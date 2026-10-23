@@ -336,7 +336,10 @@ func _build_gear_tab() -> void:
 	_body.add_child(_build_socket_row())
 
 	# --- что есть ---
-	var owned := CombatService.owned_ids()
+	var owned: Array = []
+	for oid in CombatService.owned_ids():
+		if String(CombatData.gear(String(oid)).get("set", "")) == "":
+			owned.append(oid)   # части ультимативного сета уже в своём ряду выше
 	var inv := GridContainer.new()
 	inv.columns = 5
 	inv.add_theme_constant_override("h_separation", 4)

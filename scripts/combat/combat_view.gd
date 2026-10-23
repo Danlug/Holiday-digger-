@@ -15,6 +15,7 @@ var _sprites: Dictionary = {}
 var _boss_sprite: Sprite2D = null
 var _slash_tex: Texture2D = null
 var _slash_checked := false
+var _was_drawing := false
 
 const COL_WARN := Color(0.95, 0.22, 0.18)
 const COL_STRIKE := Color(1.0, 0.86, 0.5)
@@ -29,7 +30,10 @@ func _process(_dt: float) -> void:
 		return
 	_sync_monsters()
 	_sync_boss()
-	queue_redraw()
+	var drawing: bool = not director.slashes.is_empty() or director.boss != null
+	if drawing or _was_drawing:
+		queue_redraw()
+	_was_drawing = drawing
 
 
 func _fog_visible(cx: int, cy: int) -> bool:
@@ -72,7 +76,7 @@ func _sync_monsters() -> void:
 		var tint := Color.WHITE
 		if m.telegraph:
 			var k := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 45.0)
-			tint = Color(1.0 + 0.7 * k, 1.0 - 0.45 * k, 1.0 - 0.45 * k)
+			tint = Color(1.0 + 0.4 * k, 1.0 - 0.28 * k, 1.0 - 0.28 * k)
 		if m.flash > 0.0:
 			tint = Color(2.2, 2.2, 2.2)
 		if m.state == "dying":

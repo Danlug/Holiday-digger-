@@ -86,6 +86,17 @@ static func garden_texture(name: String) -> Texture2D:
 	return tex
 
 
+## Лава живая: четыре кадра (tools/gen_tech_art.py), у каждой клетки своя фаза —
+## озеро переливается, а не мигает целиком. Дёшево для веба: те же спрайты пула.
+const LAVA_FRAMES := 4
+const LAVA_FRAME_MS := 260
+
+
+static func lava_file(wx: int, wy: int) -> String:
+	var phase: int = ((wx * 73856093) ^ (wy * 19349663)) & 0xFF
+	return "lava_%d" % (1 + (int(Time.get_ticks_msec() / LAVA_FRAME_MS) + phase) % LAVA_FRAMES)
+
+
 ## Текстура клетки по типу и мировым координатам (для варианта земли).
 ## Возвращает null, если графики для этого типа нет — рендерер должен
 ## нарисовать плейсхолдер-заливку.
@@ -93,6 +104,8 @@ static func texture_for(type: int, wx: int, wy: int) -> Texture2D:
 	var file: String
 	if type == TileTypes.Type.DIRT:
 		file = DIRT_FILES[dirt_variant(wx, wy)]
+	elif type == TileTypes.Type.LAVA:
+		file = lava_file(wx, wy)
 	else:
 		file = String(_tile_to_file.get(type, ""))
 	if file.is_empty():

@@ -1097,98 +1097,18 @@ func _float_away(node: Control, cell_x: int, cell_y: int, half: Vector2) -> void
 
 
 ## Отчёт скважины при возвращении в игру (решение владельца): показать, что
-## накопала за время отсутствия. Карточка со списком и одной кнопкой —
-## закрывается ею же и тапом мимо, как остальные меню.
+## накопала за время отсутствия. Окно рисует ветка «Техника»
+## (scripts/tech/well_report.gd): плитки-иконки, ссыпание на склад, «×2».
 func show_well_report(report: Dictionary) -> void:
-	if report.is_empty() or _well_panel != null:
-		return
-	_well_panel = Control.new()
-	_well_panel.name = "WellReport"
-	_well_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_well_panel)
-
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_well_panel.add_child(dim)
-
-	var card := PanelContainer.new()
-	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card.custom_minimum_size = Vector2(198, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(10)
-	sb.shadow_color = Color(0, 0, 0, 0.55)
-	sb.shadow_size = 6
-	card.add_theme_stylebox_override("panel", sb)
-	_well_panel.add_child(card)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	card.add_child(box)
-
-	# Шапка без слов: бур, часы с «сколько прошло», сундук (всё лежит на складе).
-	# «Скважина работала без тебя… Всё сложено на склад в мастерской» — в Tip.
-	var head := HBoxContainer.new()
-	head.alignment = BoxContainer.ALIGNMENT_CENTER
-	head.add_theme_constant_override("separation", 8)
-	box.add_child(head)
-	var well := TextureRect.new()
-	well.texture = load("res://art/items/hand_drill.png")
-	well.custom_minimum_size = Vector2(28, 28)
-	well.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	well.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	well.mouse_filter = Control.MOUSE_FILTER_PASS
-	Tip.bind(well, "Скважина работала без тебя", "Накопала за время отсутствия")
-	head.add_child(well)
-	var seconds := float(report.get("seconds", 0.0))
-	var clock := HudPill.new().setup(UiIcons.tex("clock"), Color8(0xF2, 0xE6, 0xC8))
-	clock.count.text = _humanize_short(seconds)
-	clock.count.custom_minimum_size = Vector2(0, 0)
-	Tip.bind(clock, "Прошло", _humanize_seconds(seconds))
-	head.add_child(clock)
-	var chest := TextureRect.new()
-	chest.texture = UiIcons.tex("inventory")
-	chest.custom_minimum_size = Vector2(24, 24)
-	chest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	chest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	chest.mouse_filter = Control.MOUSE_FILTER_PASS
-	Tip.bind(chest, "Склад", "Всё сложено на склад в мастерской")
-	head.add_child(chest)
-
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	var center := CenterContainer.new()
-	center.add_child(grid)
-	box.add_child(center)
-	for id in report.get("items", {}).keys():
-		var tile := BackpackSheet.make_tile(String(id), int(report["items"][id]))
-		tile.focus_mode = Control.FOCUS_NONE
-		grid.add_child(tile)
-
-	var ok := UiBtn.icon_button(UiIcons.tex("check"), Vector2(0, 30), UiBtn.Kind.ACCENT)
-	Tip.bind(ok, "Хорошо")
-	ok.pressed.connect(func():
-		if Tip.swallowed():
-			return
-		close_well_report())
-	box.add_child(ok)
-	Sfx.play("ui_open")
-	UiAnim.appear(card, 0.9, 0.18)
+	var w := get_tree().get_first_node_in_group("well_report")
+	if w != null and not report.is_empty():
+		w.call("show_report", report)
 
 
 func close_well_report() -> void:
-	if _well_panel == null:
-		return
-	_well_panel.queue_free()
-	_well_panel = null
+	var w := get_tree().get_first_node_in_group("well_report")
+	if w != null:
+		w.call("close")
 
 
 ## «45 мин», «2 ч» — коротко, для плашки отчёта.
@@ -1644,14 +1564,9 @@ func _sync_tool() -> void:
 func _sync_fuel() -> void:
 	if _fuel_label == null:
 		return
-	var in_rig := GameState.current_tool == "drill_rig"
-	_fuel_box.visible = in_rig
-	if not in_rig:
-		return
-	var n := GameState.get_item_count("fuel_block")
-	_fuel_label.text = str(n)
-	_fuel_label.add_theme_color_override("font_color",
-		Color8(0xD9, 0x4F, 0x4A) if n <= 0 else Color8(0xF2, 0xE6, 0xC8))
+	# Топливо теперь в баке и показывает его значок ветки «Техника» (TechHud);
+	# число блоков в рюкзаке — не то, чем копает бур.
+	_fuel_box.visible = false
 
 
 ## На полосе — один значок: то, что надето. Тёмная иконка недоступного
@@ -2088,7 +2003,7 @@ func _input(event: InputEvent) -> void:
 	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
 	if _dismiss_on_outside_press(event):
 		return
-	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
 		return
 
 	# Тестовая панель (debug_panel.gd) плавает НАД нижней полосой, то есть
@@ -2255,7 +2170,7 @@ func _handle_hold_input(event: InputEvent) -> void:
 ## клавиатура, потом палец: клавиша главнее, иначе лежащий на стекле палец
 ## перебивал бы её каждый кадр.
 func update_input_intent() -> void:
-	if player == null or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
 		return
 	if _apply_keyboard():
 		return

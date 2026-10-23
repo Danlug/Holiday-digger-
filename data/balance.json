@@ -576,9 +576,9 @@
   },
   "blocks_per_cell": {
    "hand_drill": {
-    "value": 0.05,
+    "value": 0.03,
     "proposed": true,
-    "note": "20 клеток на блок"
+    "note": "33 клетки на блок. Было 0.05 (20 клеток); ветка «Техника» снизила по расчёту tools/sim_tech.py: торф даёт ~0.032 блока на клетку на глубинах 450–1000, и при 0.05 добор топлива съедал бы больше половины копки — а владелец требует, чтобы топливо не становилось основным занятием."
    },
    "drill_rig": {
     "value": 0.1,
@@ -589,27 +589,7 @@
   "uranium_upgrade_depth": 1500
  },
  "idle_well": {
-  "base_income_coins_per_hour": {
-   "value": 50,
-   "proposed": true,
-   "note": "формула дохода не задана в GDD (п.18: 'доход idle-скважины: f(глубина, уровень)')"
-  },
-  "depth_factor_formula": {
-   "value": "1 + max_depth_reached / 100",
-   "proposed": true,
-   "note": "не задано в GDD; линейный рост с максимальной достигнутой глубиной, без потолка кроме офлайн-капа времени"
-  },
-  "level_multiplier_formula": {
-   "value": "1 + 0.1 * well_level",
-   "proposed": true,
-   "note": "не задано в GDD; +10% за уровень скважины"
-  },
-  "offline_cap_hours": {
-   "value": 8,
-   "proposed": true,
-   "note": "офлайн-кап не задан в GDD; выбран равным игровому дню (8 игровых часов = 1 реальный час, см. game_time), чтобы соответствовать общему ритму суток"
-  },
-  "formula_full": "income(t_hours) = min(t_hours, offline_cap_hours) * base_income * (1 + max_depth_reached/100) * (1 + 0.1*well_level)",
+  "_moved": "формула дохода, ступени, офлайн-кап и цена ступеней скважины переехали в data/tech.json -> well (ветка «Техника»): доход = клеток в час ступени × выручка клетки на глубине скважины. Здесь остались решения владельца (что платит скважина, окно отчёта) и состав постройки.",
   "ad_double_income_applies": true,
   "pays": {
    "coins": true,

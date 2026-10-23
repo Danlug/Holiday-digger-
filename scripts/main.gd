@@ -14,6 +14,8 @@ var backdrop: Backdrop
 var clouds_view: CloudsView
 var deep_backdrop: DeepBackdrop   # подземная стена пояса, видна сквозь пустоту (ветка «world»)
 var ambient_fx: AmbientFx         # капли, пыль, светлячки, блики по поясам (ветка «world»)
+var surface_life: SurfaceLife     # трава, бабочки, птицы, светлячки на поверхности (ветка «world»)
+var collapse_fx: CollapseFx       # предупреждение и пыль обвала/землетрясения (ветка «world»)
 var hud: Control
 var view_root: Node2D
 
@@ -77,6 +79,10 @@ func _ready() -> void:
 	view_root.add_child(world_view)
 	sky_view.sky_color_source = world_view
 
+	surface_life = SurfaceLife.new()
+	surface_life.name = "SurfaceLife"
+	view_root.add_child(surface_life)
+
 	player = preload("res://scripts/player/player.gd").new()
 	player.name = "Player"
 	player.world = world
@@ -92,6 +98,9 @@ func _ready() -> void:
 	# Образования не вырывают воздух из клеток-кандидатов артефактов: артефакт
 	# выдаётся при раскопке клетки, а в каверне копать нечего.
 	world.set_protect_cell(_is_artifact_candidate)
+	collapse_fx = CollapseFx.new()
+	collapse_fx.name = "CollapseFx"
+	view_root.add_child(collapse_fx)
 
 	var char_holder := preload("res://scripts/player/character_view.gd").new()
 	char_holder.name = "CharacterView"
@@ -225,6 +234,9 @@ func _process(delta: float) -> void:
 	world_view.render(cam)
 	deep_backdrop.update(cam, _view_w(), _view_h())
 	ambient_fx.update(cam, _view_w(), _view_h(), dt)
+	surface_life.update(cam, _view_w(), _view_h(), dt)
+	collapse_fx.update(cam, _view_w(), _view_h(), dt)
+	_tick_planned_collapse(dt)
 	# Солнце/месяц — экранно-относительные (DayCycle.sun_t()/moon_t() отдают
 	# долю ШИРИНЫ ЭКРАНА, не всей карты, см. sky_view.gd) — без этого вызова
 	# они почти всегда стояли бы за пределами узкого 7-клеточного окна камеры.
@@ -286,15 +298,49 @@ func _on_collapse_tick() -> void:
 		# Обвал случается только НИЖЕ героя (решение владельца), поэтому тик
 		# отдаёт его клетку. Если под ним места не нашлось, обвала не было —
 		# и тоста тоже: пугать сообщением о том, чего не произошло, нечестно.
-		var rect := CollapseEvents.trigger_chunk_collapse(world, fog, null, player.cell_y())
-		if not rect.is_empty():
-			hud.toast("Где-то в шахте прогремел обвал.", 3.0)
+		# Зону выбираем сразу, а бьём через COLLAPSE_WARN_SECONDS: дрожь, звук и
+		# пыль в зоне — предупреждение (правила и частота те же).
+		if _planned_collapse.is_empty():
+			var plan := CollapseEvents.plan_chunk_collapse(world, null, player.cell_y())
+			if not plan.is_empty():
+				_planned_collapse = plan
+				_planned_left = COLLAPSE_WARN_SECONDS
+				collapse_fx.warn(plan, COLLAPSE_WARN_SECONDS)
+				Fx.shake(1.6, COLLAPSE_WARN_SECONDS)
+				Sfx.play("quake")
 	elif randf() < 0.03:
 		# Полный ресет не может застать героя в земле (решение владельца):
 		# запоминаем событие и применяем, когда он выберется. Тост — в момент
 		# РЕАЛЬНОГО применения, иначе игрок услышит грохот, которого не было.
 		GameState.pending_earthquake = true
 		_apply_pending_earthquake_if_safe()
+
+
+const COLLAPSE_WARN_SECONDS := 1.6   # ПРЕДЛОЖЕНО: сколько дрожит земля до удара
+var _planned_collapse: Dictionary = {}
+var _planned_left := 0.0
+
+
+## Предупреждение отыграло — бьём по зоне, если герой не оказался в ней или ниже
+## её верха (правило «обвал не бывает выше или на уровне героя» держится и тут).
+func _tick_planned_collapse(dt: float) -> void:
+	if _planned_collapse.is_empty():
+		return
+	_planned_left -= dt
+	if _planned_left > 0.0:
+		return
+	var plan := _planned_collapse
+	_planned_collapse = {}
+	if player.cell_y() >= int(plan.y0):
+		collapse_fx.cancel_warning()
+		return
+	var rect := CollapseEvents.apply_planned(world, fog, plan)
+	collapse_fx.impact(rect)
+	Fx.shake(5.0, 0.45)
+	Fx.burst("poof", Vector2((rect.x0 + rect.w * 0.5) * TILE, (rect.y0 + rect.h * 0.5) * TILE), 2.0)
+	Sfx.play("collapse")
+	GameState.emit_event(&"collapse", {"rect": rect})
+	hud.toast("Где-то в шахте прогремел обвал.", 3.0)
 
 
 ## Отложенное землетрясение: полный ресет копальни не может случиться, пока
@@ -307,6 +353,11 @@ func _apply_pending_earthquake_if_safe() -> bool:
 			player.cell_y(), GameState.house_is_indoors):
 		return false
 	GameState.pending_earthquake = false
+	var cam := _camera()
+	collapse_fx.impact({"x0": int(floor(cam.x)), "y0": 1, "w": _view_w() + 1, "h": _view_h()})
+	Fx.shake(4.0, 1.3)
+	Sfx.play("quake")
+	GameState.emit_event(&"quake", {})
 	hud.toast("Земля вздрогнула — копальню тряхнуло целиком.", 3.6)
 	return true
 

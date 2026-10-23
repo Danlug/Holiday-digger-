@@ -58,7 +58,7 @@ func _shoot(main: Node2D, kind: String, depth: int) -> void:
 	var player = main.player
 	var cx := 20
 	var cy := depth
-	if kind != "plain":
+	if Formations.NAMES.has(kind):
 		var c := _find_formation(world, kind, depth)
 		if c.x < 0:
 			print("нет образования ", kind, " глубже ", depth)
@@ -68,15 +68,21 @@ func _shoot(main: Node2D, kind: String, depth: int) -> void:
 		if kind == "ruin" or kind == "grotto" or kind == "cavern":
 			cy = c.y
 	# карман 3x4 под героем, чтобы стоял в пустоте (для plain)
-	if kind == "plain" or kind == "vein":
+	if kind == "plain" or kind == "vein" or kind == "warn" or kind == "impact":
 		for dx in range(-1, 2):
 			for dy in range(0, 4):
 				world.dig_cell(cx + dx, cy + dy)
 		for dx in range(2, 4):
 			world.dig_cell(cx + dx, cy + 3)
 			world.dig_cell(cx + dx, cy + 2)
+	var on_surface := kind == "surface" or kind == "night"
+	if on_surface:
+		cx = 22
+		cy = 0
+	if kind == "night":
+		main.surface_life.force_dark = 1.0
 	player.x = float(cx) + 0.5
-	player.y = float(cy) + 1.5
+	player.y = float(cy) + (0.5 if on_surface else 1.5)
 	player.vx = 0.0
 	player.vy = 0.0
 	main.fog.reveal_around(player.x, player.y, 8, 6)
@@ -84,7 +90,11 @@ func _shoot(main: Node2D, kind: String, depth: int) -> void:
 	for i in range(6):
 		await get_tree().process_frame
 	main.fog.reveal_around(player.x, player.y, 8, 6)
-	for i in range(40):
+	if kind == "warn":
+		main.collapse_fx.warn({"x0": cx - 3, "y0": cy + 2, "w": 8, "h": 6}, 9.0)
+	elif kind == "impact":
+		main.collapse_fx.impact({"x0": cx - 3, "y0": cy + 2, "w": 8, "h": 6})
+	for i in range(40 if kind != "impact" else 8):
 		await get_tree().process_frame
 	var img := get_viewport().get_texture().get_image()
 	var path := "%s/%s_%d.png" % [_out_dir, kind, depth]

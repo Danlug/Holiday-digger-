@@ -352,7 +352,7 @@ func _test_drill_rig_dig_time_quarter_of_obsidian_pickaxe() -> void:
 		return
 
 	GameState.owned_tools = ["shovel", "rusty_pickaxe", "obsidian_pickaxe", "drill_rig"]
-	GameState.add_item("fuel_block", 10)  # бурмобилю нужно топливо, чтобы вообще начать копать
+	FuelTank.set_fuel("drill_rig", 10.0)  # бурмобилю нужно топливо в баке, чтобы вообще начать копать
 
 	GameState.current_tool = "obsidian_pickaxe"
 	player.digging = null
@@ -710,7 +710,8 @@ func _teardown_rig_world(_locked_world: WorldGen) -> void:
 ## при этом не трогается: спустился пешком — пешком и остался.
 func _test_walks_underground_without_boarding() -> void:
 	var w := _setup_rig_world()
-	GameState.inventory.clear()  # брикетов нет
+	GameState.inventory.clear()
+	FuelTank.set_fuel("drill_rig", 0.0)  # бак пуст
 
 	var warnings: Array = []
 	var cb := func(m): warnings.append(m)
@@ -732,7 +733,8 @@ func _test_walks_underground_without_boarding() -> void:
 ## и не убирая машину с парковки.
 func _test_rig_boarding_blocked_without_fuel() -> void:
 	var w := _setup_rig_world()
-	GameState.inventory.clear()  # брикетов нет
+	GameState.inventory.clear()
+	FuelTank.set_fuel("drill_rig", 0.0)  # бак пуст
 	GameState.rig_parked_at = Vector2i(w.tunnel_mouth().x, 0)
 	player.x = float(GameState.rig_parked_at.x) + 0.5
 	player.y = 0.5
@@ -747,7 +749,7 @@ func _test_rig_boarding_blocked_without_fuel() -> void:
 	check("player.rig_transition пуст", player.rig_transition == "")
 	check("инструмент не переключился", GameState.current_tool == "shovel")
 	check("машина осталась на парковке", GameState.is_rig_parked())
-	check("тост «нет брикетов» пришёл", warnings.has("Нет брикетов — сделай на верстаке из угля"))
+	check("тост «бак пуст» пришёл", warnings.has("Бак пуст — заправься у станции"))
 
 	_teardown_rig_world(w)
 
@@ -757,7 +759,7 @@ func _test_rig_boarding_blocked_without_fuel() -> void:
 ## снята с парковки, управление разморожено.
 func _test_rig_boarding_with_fuel() -> void:
 	var w := _setup_rig_world()
-	GameState.add_item("fuel_block", 5)
+	FuelTank.set_fuel("drill_rig", 5.0)
 	GameState.rig_parked_at = Vector2i(w.tunnel_mouth().x, 0)
 	player.x = float(GameState.rig_parked_at.x) + 0.5
 	player.y = 0.5
@@ -790,7 +792,7 @@ func _test_rig_boarding_with_fuel() -> void:
 ## phase_frames/fps (см. art/character/rig_exit.json).
 func _test_rig_exit_plays_all_phases_in_order() -> void:
 	var w := _setup_rig_world()
-	GameState.add_item("fuel_block", 99)
+	FuelTank.set_fuel("drill_rig", 99.0)
 	# Железная кирка в собственности рядом с лопатой — чтобы проверить, что
 	# после выезда встаёт именно ЛУЧШИЙ инструмент (по множителю скорости), а
 	# не первый попавшийся или всегда лопата.
@@ -843,13 +845,12 @@ func _test_rig_parked_survives_save_load() -> void:
 	GameState.reset_progress()
 
 
-## Расход топлива копится дробно (blocks_per_cell < 1) и списывает ровно один
-## блок, когда накопится полная единица — не раньше и не позже.
+## Расход топлива дробный (blocks_per_cell < 1): бак убывает на долю блока за
+## клетку, и ровно через cells_per_block клеток уходит целый блок — не раньше и
+## не позже. Пустой бак в минус не уходит.
 func _test_rig_fuel_consumption_accumulator() -> void:
 	GameState.reset_progress()
-	GameState.inventory.clear()
-	GameState.add_item("fuel_block", 3)
-	player._rig_fuel_progress = 0.0
+	FuelTank.set_fuel("drill_rig", 3.0)
 
 	var rate := Balance.get_drill_rig_fuel_per_cell()
 	check("расход топлива на клетку задан (> 0, ПРЕДЛОЖЕНО)", rate > 0.0)
@@ -858,11 +859,15 @@ func _test_rig_fuel_consumption_accumulator() -> void:
 	for i in range(maxi(cells_per_block - 1, 0)):
 		player._consume_rig_fuel()
 	check("до полной клеточной нормы блок цел",
-		GameState.get_item_count("fuel_block") == 3)
+		FuelTank.fuel("drill_rig") > 2.0)
 
 	player._consume_rig_fuel()
-	check("на %d-й клетке блок расходуется" % cells_per_block,
-		GameState.get_item_count("fuel_block") == 2)
+	check("на %d-й клетке из бака уходит ровно блок" % cells_per_block,
+		absf(FuelTank.fuel("drill_rig") - 2.0) < 0.001)
+
+	FuelTank.set_fuel("drill_rig", 0.05)
+	player._consume_rig_fuel()
+	check("бак не уходит в минус", FuelTank.fuel("drill_rig") == 0.0)
 
 	GameState.reset_progress()
 
@@ -878,7 +883,8 @@ func _test_rig_stalls_digging_without_fuel() -> void:
 
 	GameState.owned_tools = ["shovel", "drill_rig"]
 	GameState.current_tool = "drill_rig"
-	GameState.inventory.clear()  # брикетов нет
+	GameState.inventory.clear()
+	FuelTank.set_fuel("drill_rig", 0.0)  # бак пуст
 	player.x = float(cell.x) - 1.0 + player.HW + 0.5
 	player.y = float(cell.y) + 0.5
 	player.vx = 0.0; player.vy = 0.0
@@ -903,7 +909,7 @@ func _test_rig_stalls_digging_without_fuel() -> void:
 
 	check("без топлива бурмобиль клетку не берёт", world.get_tile(cell.x, cell.y) != TileTypes.Type.EMPTY)
 	check("копка даже не начинается", player.digging == null)
-	check("тост «кончилось топливо» пришёл", warnings.has("Кончилось топливо"))
+	check("тост «бак пуст» пришёл", warnings.has("Бак пуст — заправься у станции"))
 	check("тост про копку без топлива не спамит каждый кадр (пришёл один раз, а не %d)" % warnings.size(),
 		warnings.size() == 1)
 
@@ -948,7 +954,7 @@ func _test_teleport_home_while_in_rig_parks_it() -> void:
 
 	# Раз машина снова запаркована — посадка обратно в неё должна работать
 	# (это и есть сама гарантия «не потерян навсегда», а не только флаг).
-	GameState.add_item("fuel_block", 1)
+	FuelTank.set_fuel("drill_rig", 1.0)
 	player.x = float(GameState.rig_parked_at.x) + 0.5
 	player.y = 0.5
 	var boarded: bool = player.start_rig_boarding()
@@ -1171,7 +1177,7 @@ func _test_house_never_diggable_by_any_tool() -> void:
 		GameState.current_tool = tool_id
 		GameState.owned_tools = ["shovel", "rusty_pickaxe", "drill_rig"]
 		if tool_id == "drill_rig":
-			GameState.add_item("fuel_block", 5)  # отказ должен быть про дом, не про топливо
+			FuelTank.set_fuel("drill_rig", 5.0)  # отказ должен быть про дом, не про топливо
 		var xp_before := GameState.xp
 		player.x = float(hx) + 0.5
 		player.y = float(hy) - 0.5

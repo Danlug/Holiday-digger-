@@ -27,13 +27,17 @@ static func tex(icon_name: String) -> Texture2D:
 
 
 ## Иконка предмета рюкзака: у руд — тайл из мира, у еды и топлива — свои
-## значки, остальное — общая звезда «находка».
+## значки, остальное — общий камешек.
 static func item(id: String) -> Texture2D:
 	var t := TileArt.texture_for(MineralMap.tile_type_for(id), 0, 0) if MineralMap.tile_type_for(id) >= 0 else null
 	if t != null:
 		return t
+	# материалы боя (детали монстров и руды глубже 4000, у которых нет тайла)
+	var combat_icon := CombatData.icon(id)
+	if combat_icon != null:
+		return combat_icon
 	if HouseConfig.is_food(id):
 		return tex("eat")
 	if id == "fuel_block":
 		return tex("fuel")
-	return tex("star")
+	return tex("chunk")

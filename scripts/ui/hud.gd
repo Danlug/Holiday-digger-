@@ -53,25 +53,31 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
-var _xp_fill: ColorRect
+const GAUGE_W := 62.0   # ширина полоски: правее остаётся место кошельку
+var _xp_bar: HudBar
 var _level_label: Label
 var _hero_button: Button
-var _hero_plus: Label
-var _hp_fill: ColorRect
-var _hunger_fill: ColorRect
-var _stamina_fill: ColorRect
-var _coins_label: Label
-var _dollars_label: Label
-var _load_label: Label
+var _hero_plus: TextureRect
+var _hp_bar: HudBar
+var _hunger_bar: HudBar
+var _stamina_bar: HudBar
+var _coins_pill: HudPill
+var _dollars_pill: HudPill
+var _load_pill: PanelContainer
+var _load_bar: HudBar
 var _clock_label: Label
+var _clock_box: Control
+var _purse_box: VBoxContainer
+var _vignette: HpVignette
 var _depth_box: Control
 var _depth_label: Label
-var _toast_panel: Panel
-var _toast_label: Label
+var _toast_panel: PanelContainer
+var _toast_row: HBoxContainer
 var _toast_timer: Timer
+var _toast_tween: Tween
 var _stick: Control
 var _knob: Control
-var _hold_hint: Label
+var _hold_hint: TextureRect
 
 # --- третий режим: экранные стрелки ---
 ## Четыре кнопки, разнесённые по двум бортам (решение владельца): слева пара
@@ -107,6 +113,7 @@ var _tool_button: Button
 ## владельца: «если он экипирован бурмобилем, он должен иметь на себе
 ## топливо», см. отчёт агента «Бурмобиль — транспорт»).
 var _fuel_label: Label
+var _fuel_box: Control
 var _well_panel: Control
 var _objective_panel: PanelContainer
 var _objective_label: Label
@@ -116,45 +123,25 @@ var _objective_hide_at_msec: float = 0.0
 
 ## Сколько секунд держать баннер задания, прежде чем свернуть его в кнопку.
 const OBJECTIVE_SHOW_SECONDS := 6.0
-var _tool_name_panel: PanelContainer
-var _tool_name_label: Label
-var _tool_name_timer: Timer
+var _tool_tip_token: int = 0
 var _gear_pack: TextureRect
 var _gear_jet: TextureRect
 var _inv_button: Button
 ## id → узел, центр которого отдаёт get_anchor() (кошелёк, рюкзак, полоски…).
 var _anchors: Dictionary = {}
-var _inv_sheet: Control
-var _inv_list: VBoxContainer
-var _inv_load_label: Label
-var _inv_total_label: Label
-var _drop_panel: Control
-var _drop_title: Label
-var _drop_slider: HSlider
-var _drop_field: LineEdit
-var _drop_id: String = ""
-var _drop_max: int = 0
+## Шторка рюкзака (scripts/ui/backpack_sheet.gd): сетка слотов и окно «сколько».
+var _inv_sheet: BackpackSheet
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — НЕ для релиза
 ## игрокам, см. её собственный файл. Живёт отдельным классом, а не куском
 ## кода здесь, — не завязана на раскладку остального HUD, добавляется в
 ## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего.
 var _debug_panel: DebugPanel
 
-## Панель настроек (Settings — scripts/core/settings.gd): звук/музыка,
-## управление, радиус обзора, язык. Тот же приём full-screen шторки, что у
-## инвентаря (_inv_sheet), — регуляторам (ползунки громкости) нужна ширина
-## экрана, узкая popup-панель «⋯» для них тесна.
-var _settings_sheet: Control
-var _sound_slider: HSlider
-var _sound_mute_btn: Button
-var _music_slider: HSlider
-var _music_mute_btn: Button
-var _vision_toggle_btn: Button
-var _control_mode_buttons: Dictionary = {}   # mode:String -> Button
-var _language_buttons: Dictionary = {}       # code:String -> Button
-
-## Точка входа в покупки (scripts/core/iap_manager.gd) — см. _build_settings_iap_row.
-var _restore_purchases_btn: Button
+## Шторка настроек (scripts/ui/settings_sheet.gd): звук/музыка, вибро, управление,
+## радиус обзора, язык, восстановление покупок. Тот же приём full-screen шторки,
+## что у рюкзака, — регуляторам (ползунки громкости) нужна ширина экрана, узкая
+## popup-панель «•••» для них тесна.
+var _settings_sheet: SettingsSheet
 
 
 func _ready() -> void:
@@ -239,6 +226,9 @@ func _build_ui() -> void:
 	stage.offset_bottom = -STRIP_H
 	add_child(stage)
 
+	_vignette = HpVignette.new()
+	_vignette.name = "HpVignette"
+	stage.add_child(_vignette)
 	_build_gauges(stage)
 	_build_purse(stage)
 	_build_depth(stage)
@@ -252,276 +242,289 @@ func _build_ui() -> void:
 	_build_debug_panel()
 
 
-## Левый верхний угол сверху вниз: уровень и опыт, три полоски выживания,
-## кнопка «Герой». Один столбец — потому что всё это про самого героя, и
-## глазу не приходится собирать его состояние по разным углам экрана.
+## Левый верхний угол: портрет героя (кнопка «Герой», уровень и опыт под ним)
+## и справа от него три анимированные полоски — HP, голод, бодрость. Один
+## кластер — потому что всё это про самого героя, и глазу не приходится
+## собирать его состояние по разным углам экрана. Под ним — кнопка задания.
+## Названия и числа полосок живут в подсказках (Tip), на экране — иконки.
 func _build_gauges(parent: Control) -> void:
 	var box := VBoxContainer.new()
 	box.name = "Gauges"
 	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Герой» внутри
 	box.position = Vector2(8, 8)
-	box.add_theme_constant_override("separation", 3)
+	box.add_theme_constant_override("separation", 4)
 	parent.add_child(box)
 	_gauges_box = box
 
-	_build_xp_row(box)
-	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png", "hp")
-	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png", "hunger")
-	_stamina_fill = _make_gauge_row(box, Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png", "stamina")
-	_build_hero_button(box)
+	var top := HBoxContainer.new()
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_theme_constant_override("separation", 5)
+	box.add_child(top)
+
+	_build_hero_button(top)
+
+	var bars := VBoxContainer.new()
+	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bars.add_theme_constant_override("separation", 3)
+	bars.alignment = BoxContainer.ALIGNMENT_CENTER
+	top.add_child(bars)
+
+	_hp_bar = _make_gauge(bars, Color8(0xD9, 0x4F, 0x4A), "hp", "hp")
+	_hunger_bar = _make_gauge(bars, Color8(0xE8, 0x7E, 0x6E), "hunger", "hunger")
+	_stamina_bar = _make_gauge(bars, Color8(0xE8, 0xC5, 0x47), "stamina", "stamina")
+
+	_build_quest_button(box)
 
 
-## Уровень и опыт — над полосками выживания. Полоска опыта тоньше остальных:
-## она про долгую перспективу, а те три — про «доживу ли до поверхности», и
-## путать их по важности нельзя.
-func _build_xp_row(parent: Control) -> void:
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 5)
-	parent.add_child(row)
-
-	_level_label = Label.new()
-	_level_label.add_theme_font_size_override("font_size", 10)
-	_level_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_level_label.custom_minimum_size = Vector2(13, 0)
-	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	row.add_child(_level_label)
-
-	var track := Panel.new()
-	track.custom_minimum_size = Vector2(72, 5)
-	# Без этого HBoxContainer растягивает подложку на всю высоту ряда (её
-	# задаёт иконка слева), и под заливкой висит чёрный хвост.
-	track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.043, 0.035, 0.027, 0.75)
-	sb.border_color = Color(0, 0, 0, 0.55)
-	sb.set_border_width_all(1)
-	track.add_theme_stylebox_override("panel", sb)
-	row.add_child(track)
-
-	_xp_fill = ColorRect.new()
-	_xp_fill.color = Color8(0xE0, 0xA9, 0x3B)
-	_xp_fill.position = Vector2.ZERO
-	_xp_fill.size = Vector2(72, 5)
-	track.add_child(_xp_fill)
+func _make_gauge(parent: Control, color: Color, icon_name: String, anchor_id: String) -> HudBar:
+	var bar := HudBar.new().setup(color, UiIcons.tex(icon_name))
+	bar.bar_width = GAUGE_W
+	parent.add_child(bar)
+	_anchors[anchor_id] = bar
+	return bar
 
 
-## Кнопка «Герой» переехала из меню «•••» под полоски (решение владельца): она
-## про то же, про что и они, и открывать её оттуда, где показано состояние
-## героя, естественнее, чем из общего ящика.
-##
-## Когда есть непотраченные очки — подпись золотом и зелёный плюс: иначе
-## игрок копит очки и не знает об этом.
+## Кнопка «Герой» — портрет-иконка. Уровень — значком в правом нижнем углу,
+## опыт — тонкой полоской под кнопкой, непотраченные очки — зелёный «+» в
+## правом верхнем углу, который покачивается: иначе игрок копит очки и не знает
+## об этом (экран героя сам о себе не напоминает).
 func _build_hero_button(parent: Control) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 3)
-	parent.add_child(row)
+	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_theme_constant_override("separation", 3)
+	parent.add_child(col)
 
-	_hero_button = Button.new()
-	_hero_button.text = "Герой"
-	_hero_button.add_theme_font_size_override("font_size", 9)
-	_hero_button.focus_mode = Control.FOCUS_NONE
-	_hero_button.custom_minimum_size = Vector2(44, 16)
-	_hero_button.pressed.connect(func(): ProgressScreen.open("progress"))
-	row.add_child(_hero_button)
+	_hero_button = UiBtn.icon_button(UiIcons.tex("hero"), Vector2(36, 36), UiBtn.Kind.NORMAL, 32)
+	_hero_button.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		Sfx.play("ui_open")
+		ProgressScreen.open("progress"))
+	Tip.bind(_hero_button, "Герой", "Прокачка, музей, рекорды")
+	col.add_child(_hero_button)
 
-	_hero_plus = Label.new()
-	_hero_plus.text = "+"
-	_hero_plus.add_theme_font_size_override("font_size", 13)
-	_hero_plus.add_theme_color_override("font_color", Color8(0x6E, 0xC6, 0x4B))
+	var lvl := PanelContainer.new()
+	lvl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color8(0xE0, 0xA9, 0x3B)
+	sb.border_color = Color8(0x1A, 0x10, 0x0C)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(5)
+	sb.content_margin_left = 3
+	sb.content_margin_right = 3
+	sb.content_margin_top = 0
+	sb.content_margin_bottom = 0
+	lvl.add_theme_stylebox_override("panel", sb)
+	lvl.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	lvl.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	lvl.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	lvl.offset_right = 4
+	lvl.offset_bottom = 3
+	_level_label = Label.new()
+	_level_label.add_theme_font_size_override("font_size", 9)
+	_level_label.add_theme_color_override("font_color", Color8(0x1A, 0x10, 0x0C))
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_label.custom_minimum_size = Vector2(9, 0)
+	lvl.add_child(_level_label)
+	_hero_button.add_child(lvl)
+
+	_hero_plus = TextureRect.new()
+	_hero_plus.texture = UiIcons.tex("plus")
+	_hero_plus.custom_minimum_size = Vector2(14, 14)
+	_hero_plus.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_hero_plus.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_hero_plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hero_plus.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_hero_plus.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_hero_plus.offset_right = 6
+	_hero_plus.offset_top = -6
 	_hero_plus.visible = false
-	row.add_child(_hero_plus)
+	_hero_button.add_child(_hero_plus)
 
-	_build_quest_button(parent)
+	_xp_bar = HudBar.new().setup(Color8(0xE0, 0xA9, 0x3B), null)
+	_xp_bar.bar_h = 4.0
+	_xp_bar.bar_width = 36.0
+	col.add_child(_xp_bar)
 
 
-## Кнопка «Задания» под «Героем» (решение владельца). Баннер задания висел на
+## Кнопка задания под героем (решение владельца). Баннер задания висел на
 ## экране всё время — он закрывал треть огорода и переставал читаться уже на
 ## втором взгляде. Теперь новое задание показывается ненадолго и сворачивается
 ## сюда; нажатие разворачивает его обратно.
 func _build_quest_button(parent: Control) -> void:
-	_quest_button = Button.new()
-	_quest_button.text = "Задания"
-	_quest_button.add_theme_font_size_override("font_size", 9)
-	_quest_button.focus_mode = Control.FOCUS_NONE
-	_quest_button.custom_minimum_size = Vector2(52, 16)
+	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(28, 24))
 	_quest_button.visible = false
-	_quest_button.pressed.connect(_on_quest_button_pressed)
-	parent.add_child(_quest_button)
-
-
-func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String, anchor_id: String = "") -> ColorRect:
+	Tip.bind(_quest_button, "Задание")
+	_quest_button.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		_on_quest_button_pressed())
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 5)
+	row.add_child(_quest_button)
 	parent.add_child(row)
 
-	if ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(13, 13)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture = load(icon_path)
-		row.add_child(icon)
-		if anchor_id != "":
-			_anchors[anchor_id] = icon
 
-	var track := Panel.new()
-	track.custom_minimum_size = Vector2(72, 8)
-	track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.043, 0.035, 0.027, 0.75)
-	sb.border_color = Color(0, 0, 0, 0.55)
-	sb.set_border_width_all(1)
-	track.add_theme_stylebox_override("panel", sb)
-	row.add_child(track)
-
-	var fill := ColorRect.new()
-	fill.color = fill_color
-	fill.position = Vector2.ZERO
-	fill.size = Vector2(72, 8)
-	track.add_child(fill)
-	return fill
-
-
+## Кошелёк справа сверху: часы, монеты, доллары, вес рюкзака и витрина.
+## Плашки-«таблетки» с иконкой и числом с накруткой; точные суммы и названия —
+## в подсказках. Вес — полоска, которая краснеет и пульсирует на перегрузе.
 func _build_purse(parent: Control) -> void:
 	var box := VBoxContainer.new()
+	box.name = "Purse"
 	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Магазин» внутри
 	box.anchor_left = 1.0; box.anchor_right = 1.0
-	box.offset_left = -100; box.offset_right = -8
+	box.offset_left = -110; box.offset_right = -8
 	box.offset_top = 8
-	box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
+	_purse_box = box
 
 	# Часы (решение владельца, отчёт агента про "время не течёт во дворе"):
 	# DayCycle.hour и раньше честно тикал на поверхности, но нигде не
-	# показывался — единственные часы в игре висели в доме (house_view.gd:
-	# _clock), и без них игрок не мог заметить, что время вообще идёт,
-	# только по медленному ходу неба. Формат и источник — ровно те же, что у
-	# домашних часов: "День N, ЧЧ:ММ" от /root/DayCycle.
+	# показывался — без часов игрок не мог заметить, что время вообще идёт.
+	# Источник — /root/DayCycle, тот же, что у домашних часов (house_view.gd);
+	# слово «День N» — в подсказке.
+	var clock := HBoxContainer.new()
+	clock.mouse_filter = Control.MOUSE_FILTER_PASS
+	clock.size_flags_horizontal = Control.SIZE_SHRINK_END
+	clock.add_theme_constant_override("separation", 3)
+	box.add_child(clock)
+	var clock_icon := TextureRect.new()
+	clock_icon.texture = UiIcons.tex("clock")
+	clock_icon.custom_minimum_size = Vector2(12, 12)
+	clock_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	clock_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	clock_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	clock_icon.modulate = Color(1, 1, 1, 0.75)
+	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock.add_child(clock_icon)
 	_clock_label = Label.new()
-	_clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_clock_label.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
+	_clock_label.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
+	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	_clock_label.add_theme_constant_override("outline_size", 2)
 	_clock_label.add_theme_font_size_override("font_size", 9)
-	box.add_child(_clock_label)
+	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock.add_child(_clock_label)
+	_clock_box = clock
 
-	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B), "res://art/ui/icon_coin.png", "coins")
-	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B), "res://art/ui/icon_dollar.png", "dollars")
-	_load_label = _make_purse_row(box, Color8(0x8F, 0xA3, 0x5C), "res://art/ui/icon_inventory.png")
+	_coins_pill = _make_pill(box, "coin", Color8(0xE0, 0xA9, 0x3B), "coins")
+	_dollars_pill = _make_pill(box, "dollar", Color8(0x7F, 0xB8, 0x6B), "dollars")
+	Tip.bind(_coins_pill, "Монеты")
+	Tip.bind(_dollars_pill, "Доллары", "Премиум-валюта")
+
+	_load_pill = PanelContainer.new()
+	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(Color8(0x8F, 0xA3, 0x5C)))
+	_load_pill.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_load_pill.mouse_filter = Control.MOUSE_FILTER_PASS
+	box.add_child(_load_pill)
+	_load_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
+	_load_bar.bar_width = 44.0
+	_load_bar.pulse_above = 1.0
+	_load_pill.add_child(_load_bar)
+	_load_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Tip.bind(_load_pill, "Рюкзак")
 
 	# Кнопка «Магазин» под кошельком (решение владельца): премиум-витрина
-	# открывается откуда угодно — и дома, и со дна шахты. Кладётся в тот же
-	# столбик, поэтому не спорит за место с монетами и глубиной.
-	var shop_row := HBoxContainer.new()
-	shop_row.alignment = BoxContainer.ALIGNMENT_END
-	box.add_child(shop_row)
-	var shop_btn := Button.new()
-	shop_btn.text = "Магазин"
-	shop_btn.add_theme_font_size_override("font_size", 9)
-	shop_btn.focus_mode = Control.FOCUS_NONE
-	shop_btn.custom_minimum_size = Vector2(52, 16)
-	shop_btn.pressed.connect(func(): ShopUI.open_premium())
-	shop_row.add_child(shop_btn)
+	# открывается откуда угодно — и дома, и со дна шахты. Иконка-самоцвет, слово
+	# «Магазин» — в подсказке.
+	var shop_btn := UiBtn.icon_button(UiIcons.tex("shop"), Vector2(30, 24))
+	shop_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
+	Tip.bind(shop_btn, "Магазин", "Премиум-витрина")
+	shop_btn.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		ShopUI.open_premium())
+	box.add_child(shop_btn)
 
 
-func _make_purse_row(parent: Control, color: Color, icon_path: String, anchor_id: String = "") -> Label:
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.alignment = BoxContainer.ALIGNMENT_END
-	row.add_theme_constant_override("separation", 5)
-	parent.add_child(row)
-
-	var l := Label.new()
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	l.add_theme_color_override("font_color", color)
-	l.add_theme_font_size_override("font_size", 12)
-	row.add_child(l)
-
-	if ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(14, 14)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture = load(icon_path)
-		row.add_child(icon)
-		if anchor_id != "":
-			_anchors[anchor_id] = icon
-	return l
+func _make_pill(parent: Control, icon_name: String, color: Color, anchor_id: String) -> HudPill:
+	var p := HudPill.new().setup(UiIcons.tex(icon_name), color)
+	p.size_flags_horizontal = Control.SIZE_SHRINK_END
+	parent.add_child(p)
+	_anchors[anchor_id] = p.icon_rect
+	return p
 
 
+## Индикатор глубины справа на уровне героя: «язычок» с иконкой и числом,
+## прижатый к правому краю. Над землёй не показывается (ГДД п.16).
 func _build_depth(parent: Control) -> void:
-	_depth_box = Control.new()
-	_depth_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_depth_box.anchor_left = 1.0; _depth_box.anchor_right = 1.0
-	_depth_box.custom_minimum_size = Vector2(46, 22)
-	_depth_box.offset_left = -46
-	parent.add_child(_depth_box)
-
-	var panel := Panel.new()
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var panel := PanelContainer.new()
+	_depth_box = panel
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.85)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.bg_color = Color(0.071, 0.055, 0.043, 0.82)
+	sb.border_color = Color8(0x52, 0x40, 0x2D)
 	sb.set_border_width_all(1)
 	sb.border_width_right = 0
+	sb.corner_radius_top_left = 9
+	sb.corner_radius_bottom_left = 9
+	sb.content_margin_left = 5
+	sb.content_margin_right = 4
+	sb.content_margin_top = 1
+	sb.content_margin_bottom = 1
 	panel.add_theme_stylebox_override("panel", sb)
-	_depth_box.add_child(panel)
+	panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	parent.add_child(panel)
 
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 3)
+	panel.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = UiIcons.tex("depth")
+	icon.custom_minimum_size = Vector2(12, 12)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
 	_depth_label = Label.new()
-	_depth_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_depth_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_depth_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_depth_label.add_theme_font_size_override("font_size", 13)
-	_depth_box.add_child(_depth_label)
+	_depth_label.add_theme_font_size_override("font_size", 12)
+	_depth_label.add_theme_color_override("font_color", Color8(0xF2, 0xE6, 0xC8))
+	_depth_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	_depth_label.add_theme_constant_override("outline_size", 2)
+	_depth_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_depth_label)
 	_depth_box.visible = false
 
 
-## Высота панели раньше была двумя фиксированными числами (top=-160,
-## bottom=-132 → ровно 28px всегда), а текст внутри переносился по словам
-## без ограничения по высоте — двух-трёхстрочный тост обрезался снизу или
-## вылезал за рамку (задание владельца: «фон контекстного окна не
-## соответствует по высоте реальному размеру текста»). Низ панели остаётся
-## фиксированным (offset_bottom), а верх toast() пересчитывает под
-## фактическую обёрнутую высоту текста при каждом вызове — см. ниже.
+## Тост — «таблетка» над полосой по центру: иконка + число/слово, ширина по
+## содержимому, выезжает и гаснет. Длинные фразы чужих систем (сюжет, дом) по-
+## прежнему переносятся по словам, но панель всегда по размеру текста: раньше
+## высота была двумя фиксированными числами, и многострочный тост обрезался
+## снизу или вылезал за рамку (задание владельца: «фон контекстного окна не
+## соответствует по высоте реальному размеру текста»). Низ панели стоит на месте
+## (TOAST_BOTTOM_OFFSET), верх считается по фактической высоте — см. _place_toast.
 const TOAST_BOTTOM_OFFSET := -132.0
-const TOAST_PAD_V := 12.0       # запас сверху+снизу вокруг текста
-const TOAST_MIN_H := 28.0       # короткая строка не сжимается в полоску
-const TOAST_MAX_H := 200.0      # запас на случай очень длинного текста
+const TOAST_MAX_W := 200.0      # шире не бывает: длинный текст переносится
+const TOAST_PAD := Vector2(9, 5)
+const TOAST_FONT := 12
+const TOAST_COLORS := {
+	"info": Color8(0xE0, 0xA9, 0x3B),
+	"good": Color8(0x7F, 0xB8, 0x6B),
+	"bad": Color8(0xD9, 0x4F, 0x4A),
+	"rare": Color8(0xFF, 0xD0, 0x5A),
+}
 
 
 func _build_toast(parent: Control) -> void:
-	_toast_panel = Panel.new()
+	_toast_panel = PanelContainer.new()
 	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Подстраховка сверх TOAST_MAX_H: если когда-нибудь текст тоста всё равно
-	# не влезет (перевод длиннее оригинала, склеенный текст и т.п.), лишние
-	# строки обрежутся по границе панели, а не повиснут поверх игрового мира
-	# без фона — так и было до этой правки на очень длинной строке (см. отчёт
-	# QA-прохода).
-	_toast_panel.clip_contents = true
-	_toast_panel.anchor_left = 0.0; _toast_panel.anchor_right = 1.0
+	_toast_panel.anchor_left = 0.5; _toast_panel.anchor_right = 0.5
 	_toast_panel.anchor_top = 1.0; _toast_panel.anchor_bottom = 1.0
-	_toast_panel.offset_left = 8; _toast_panel.offset_right = -8
-	_toast_panel.offset_bottom = TOAST_BOTTOM_OFFSET
-	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - TOAST_MIN_H
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.93)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.border_width_left = 3
-	_toast_panel.add_theme_stylebox_override("panel", sb)
 	_toast_panel.visible = false
 	parent.add_child(_toast_panel)
 
-	_toast_label = Label.new()
-	_toast_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_toast_label.offset_left = 10; _toast_label.offset_top = 6
-	_toast_label.offset_right = -8
-	_toast_label.add_theme_font_size_override("font_size", 12)
-	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_toast_panel.add_child(_toast_label)
+	_toast_row = HBoxContainer.new()
+	_toast_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_row.add_theme_constant_override("separation", 5)
+	_toast_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_toast_panel.add_child(_toast_row)
 
 	_toast_timer = Timer.new()
 	_toast_timer.one_shot = true
-	_toast_timer.timeout.connect(func(): _toast_panel.visible = false)
+	_toast_timer.timeout.connect(_hide_toast)
 	add_child(_toast_timer)
 
 
@@ -530,8 +533,14 @@ func _build_stick(parent: Control) -> void:
 	_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
 	_stick.draw.connect(func():
-		_stick.draw_circle(Vector2(stick_r, stick_r), stick_r, Color(0.11, 0.09, 0.07, 0.68))
-		_stick.draw_arc(Vector2(stick_r, stick_r), stick_r, 0, TAU, 40, Color(0.42, 0.34, 0.25, 0.6), 1.0)
+		# Плоское «стекло» с золотистым ободком и засечками по сторонам света:
+		# видно, где центр и куда тянуть.
+		var c := Vector2(stick_r, stick_r)
+		_stick.draw_circle(c, stick_r, Color(0.09, 0.07, 0.05, 0.5))
+		_stick.draw_arc(c, stick_r - 1.0, 0, TAU, 48, Color(0.82, 0.66, 0.38, 0.55), 2.0)
+		_stick.draw_arc(c, stick_r * 0.5, 0, TAU, 32, Color(0.82, 0.66, 0.38, 0.16), 1.0)
+		for dir in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+			_stick.draw_circle(c + dir * (stick_r - 6.0), 1.4, Color(0.82, 0.66, 0.38, 0.55))
 	)
 	parent.add_child(_stick)
 
@@ -551,9 +560,13 @@ func _build_stick(parent: Control) -> void:
 	_knob.position = Vector2(stick_r - knob_r, stick_r - knob_r)
 	_knob.draw.connect(func():
 		var live: bool = hold_active()
-		_knob.draw_circle(Vector2(knob_r, knob_r), knob_r, Color8(0x3A, 0x2C, 0x20))
-		_knob.draw_arc(Vector2(knob_r, knob_r), knob_r - 1, 0, TAU, 32,
-			Color8(0xE0, 0xA9, 0x3B) if live else Color8(0x9D, 0x8B, 0x73), 2.0)
+		var c := Vector2(knob_r, knob_r)
+		var rim := Color8(0xE0, 0xA9, 0x3B) if live else Color8(0xB8, 0xA3, 0x84)
+		_knob.draw_circle(c + Vector2(0, 1.5), knob_r, Color(0, 0, 0, 0.4))
+		_knob.draw_circle(c, knob_r, Color8(0x3A, 0x2C, 0x20))
+		_knob.draw_circle(c, knob_r - 2.5, rim.darkened(0.35))
+		_knob.draw_arc(c, knob_r - 1.0, 0, TAU, 32, rim, 2.0)
+		_knob.draw_arc(c, knob_r * 0.55, PI * 1.1, PI * 1.6, 8, Color(1, 1, 1, 0.45), 1.5)
 	)
 	_stick.add_child(_knob)
 
@@ -562,18 +575,46 @@ func hold_active() -> bool:
 	return player != null and (player.hold_dx != 0 or player.hold_up or player.hold_down)
 
 
+## Подсказка режима «нажатия»: вместо абзаца текста — иконка руки с «кругом»
+## от касания. При включении режима пульсирует несколько секунд, потом
+## остаётся бледным напоминанием; слова — в подсказке Tip. «Зажми экран в
+## нужную сторону — герой пойдёт туда и будет копать. Отпустил — остановился.»
 func _build_hold_hint(parent: Control) -> void:
-	_hold_hint = Label.new()
-	_hold_hint.text = "Зажми экран в нужную сторону — герой пойдёт туда и будет копать.\nОтпустил — остановился."
-	_hold_hint.add_theme_font_size_override("font_size", 11)
-	_hold_hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	_hold_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hold_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_hold_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_hold_hint.offset_left = 10; _hold_hint.offset_right = -10
-	_hold_hint.offset_top = -40; _hold_hint.offset_bottom = -8
+	_hold_hint = TextureRect.new()
+	_hold_hint.texture = UiIcons.tex("ctl_hold")
+	_hold_hint.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_hold_hint.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_hold_hint.mouse_filter = Control.MOUSE_FILTER_PASS
+	_hold_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_hold_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_hold_hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_hold_hint.offset_left = -16
+	_hold_hint.offset_right = 16
+	_hold_hint.offset_top = -48
+	_hold_hint.offset_bottom = -16
+	_hold_hint.pivot_offset = Vector2(16, 16)
 	_hold_hint.visible = false
+	Tip.bind(_hold_hint, "Зажми экран", "Герой идёт и копает туда, где палец. Отпустил — остановился")
 	parent.add_child(_hold_hint)
+
+
+## Показывает подсказку режима: яркий пульс, затем бледный значок.
+func _flash_hold_hint() -> void:
+	if _hold_hint == null:
+		return
+	_hold_hint.visible = true
+	_hold_hint.modulate.a = 1.0
+	_hold_hint.scale = Vector2.ONE
+	if Settings.reduce_motion or not _hold_hint.is_inside_tree():
+		_hold_hint.modulate.a = 0.5
+		return
+	var tw := _hold_hint.create_tween()
+	for i in 3:
+		tw.tween_property(_hold_hint, "scale", Vector2.ONE * 1.25, 0.35) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(_hold_hint, "scale", Vector2.ONE, 0.35) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_hold_hint, "modulate:a", 0.35, 0.6)
 
 
 ## Экранные стрелки — третий режим управления (решение владельца). Слева
@@ -594,6 +635,10 @@ func _build_arrows(parent: Control) -> void:
 	for cell in ARROW_CELLS:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
+		# Плитки в общем стиле, но без звука: стрелки держат намерение, а не
+		# «нажимают» — «ui_tap» на каждый шаг был бы шумом. Вибро — на касании.
+		UiBtn.style(b, UiBtn.Kind.NORMAL, false)
+		b.button_down.connect(Haptics.tap)
 		var dir := String(cell["dir"])
 		b.button_down.connect(func(): _on_arrow_down(dir))
 		b.button_up.connect(func(): _on_arrow_up(dir))
@@ -681,491 +726,69 @@ func _apply_arrows() -> void:
 
 
 func _build_inventory_sheet(parent: Control) -> void:
-	_inv_sheet = Control.new()
-	_inv_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_inv_sheet.visible = false
-	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.95)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_inv_sheet.add_child(bg)
+	_inv_sheet = BackpackSheet.new()
+	_inv_sheet.name = "Backpack"
+	_inv_sheet.eat_pressed.connect(_eat_from_inventory)
+	_inv_sheet.drop_confirmed.connect(_on_drop_confirmed)
+	_inv_sheet.closed.connect(func(): _inv_button.button_pressed = false)
 	parent.add_child(_inv_sheet)
-
-	var head := HBoxContainer.new()
-	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	head.offset_left = 10; head.offset_right = -10
-	head.offset_top = 8; head.offset_bottom = 30
-	_inv_sheet.add_child(head)
-
-	var title := Label.new()
-	title.text = "Инвентарь"
-	title.add_theme_font_size_override("font_size", 12)
-	head.add_child(title)
-
-	_inv_load_label = Label.new()
-	_inv_load_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inv_load_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_inv_load_label.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
-	_inv_load_label.add_theme_font_size_override("font_size", 10)
-	head.add_child(_inv_load_label)
-
-	var close_btn := Button.new()
-	# Именно × (U+00D7), а не ✕ (U+2715): последнего в шрифте темы по
-	# умолчанию нет, и он рисуется пустым квадратом (та же ловушка, что со
-	# стрелкой ↺ на кнопке сброса).
-	close_btn.text = "×"
-	close_btn.add_theme_font_size_override("font_size", 10)
-	close_btn.custom_minimum_size = Vector2(20, 20)
-	close_btn.pressed.connect(close_inventory)
-	head.add_child(close_btn)
-
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 10; scroll.offset_right = -10
-	scroll.offset_top = 36; scroll.offset_bottom = -30
-	_inv_sheet.add_child(scroll)
-	# Прокрутка перетаскиванием списка, а не только ползунком (решение владельца).
-	DragScroll.attach(scroll)
-
-	_inv_list = VBoxContainer.new()
-	_inv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_inv_list)
-
-	var foot := HBoxContainer.new()
-	foot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	foot.offset_left = 10; foot.offset_right = -10
-	foot.offset_top = -26; foot.offset_bottom = -6
-	_inv_sheet.add_child(foot)
-	var foot_label := Label.new()
-	foot_label.text = "К продаже:"
-	foot_label.add_theme_font_size_override("font_size", 11)
-	foot.add_child(foot_label)
-	_inv_total_label = Label.new()
-	_inv_total_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_inv_total_label.add_theme_font_size_override("font_size", 11)
-	foot.add_child(_inv_total_label)
-
-	_build_drop_panel(_inv_sheet)
 
 
 # ---------------------------------------------------------------------------
-# Настройки (Settings — scripts/core/settings.gd): звук/музыка, управление,
-# радиус обзора, язык.
+# Настройки (Settings — scripts/core/settings.gd): шторка SettingsSheet
+# (scripts/ui/settings_sheet.gd) — звук, музыка, вибро, управление, язык.
 # ---------------------------------------------------------------------------
 
 func _build_settings_sheet(parent: Control) -> void:
-	_settings_sheet = Control.new()
-	_settings_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_settings_sheet.visible = false
-	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.95)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_settings_sheet.add_child(bg)
+	_settings_sheet = SettingsSheet.new()
+	_settings_sheet.name = "Settings"
+	_settings_sheet.mode_chosen.connect(_set_mode)
+	_settings_sheet.restore_pressed.connect(func():
+		toast_icon("restore", "Покупок нет", 2.2))
 	parent.add_child(_settings_sheet)
 
-	var head := HBoxContainer.new()
-	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	head.offset_left = 10; head.offset_right = -10
-	head.offset_top = 8; head.offset_bottom = 30
-	_settings_sheet.add_child(head)
 
-	var title := Label.new()
-	title.text = "Настройки"
-	title.add_theme_font_size_override("font_size", 12)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-
-	var close_btn := Button.new()
-	# × (U+00D7), не ✕ (U+2715) — та же ловушка шрифта темы, что у остальных
-	# закрывающих крестиков в этом файле (см. _build_inventory_sheet).
-	close_btn.text = "×"
-	close_btn.add_theme_font_size_override("font_size", 10)
-	close_btn.custom_minimum_size = Vector2(20, 20)
-	close_btn.pressed.connect(close_settings)
-	head.add_child(close_btn)
-
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 10; scroll.offset_right = -10
-	scroll.offset_top = 36; scroll.offset_bottom = -6
-	# Без этого ScrollContainer по умолчанию разрешает содержимому расти и
-	# ВПРАВО (SCROLL_MODE_AUTO), а не только вниз — строка из трёх кнопок
-	# «Джойстик/Нажатия/Стрелки» вместо равного деления ширины считала себя
-	# свободной шириться, и третья кнопка уезжала за край экрана.
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_settings_sheet.add_child(scroll)
-	DragScroll.attach(scroll)
-
-	var body := VBoxContainer.new()
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 14)
-	scroll.add_child(body)
-
-	_build_settings_sound_row(body)
-	_build_settings_music_row(body)
-	_build_settings_control_row(body)
-	_build_settings_vision_row(body)
-	_build_settings_language_row(body)
-	_build_settings_iap_row(body)
-
-
-func _settings_section_label(parent: Control, text: String) -> void:
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	parent.add_child(lbl)
-
-
-func _build_settings_sound_row(parent: Control) -> void:
-	_settings_section_label(parent, "ЗВУК")
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	parent.add_child(row)
-
-	var icon := Label.new()
-	icon.text = "🔊"
-	icon.add_theme_font_size_override("font_size", 16)
-	icon.custom_minimum_size = Vector2(24, 0)
-	row.add_child(icon)
-
-	_sound_slider = HSlider.new()
-	_sound_slider.min_value = 0.0
-	_sound_slider.max_value = 100.0
-	_sound_slider.step = 1.0
-	_sound_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_sound_slider.value_changed.connect(func(v: float): Settings.set_sound_volume(v / 100.0))
-	row.add_child(_sound_slider)
-
-	_sound_mute_btn = Button.new()
-	_sound_mute_btn.custom_minimum_size = Vector2(28, 24)
-	_sound_mute_btn.add_theme_font_size_override("font_size", 14)
-	_sound_mute_btn.focus_mode = Control.FOCUS_NONE
-	_sound_mute_btn.pressed.connect(func(): Settings.set_sound_muted(not Settings.sound_muted); _refresh_settings_panel())
-	row.add_child(_sound_mute_btn)
-
-
-func _build_settings_music_row(parent: Control) -> void:
-	_settings_section_label(parent, "МУЗЫКА")
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	parent.add_child(row)
-
-	var icon := Label.new()
-	icon.text = "🎵"
-	icon.add_theme_font_size_override("font_size", 16)
-	icon.custom_minimum_size = Vector2(24, 0)
-	row.add_child(icon)
-
-	_music_slider = HSlider.new()
-	_music_slider.min_value = 0.0
-	_music_slider.max_value = 100.0
-	_music_slider.step = 1.0
-	_music_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_music_slider.value_changed.connect(func(v: float): Settings.set_music_volume(v / 100.0))
-	row.add_child(_music_slider)
-
-	_music_mute_btn = Button.new()
-	_music_mute_btn.custom_minimum_size = Vector2(28, 24)
-	_music_mute_btn.add_theme_font_size_override("font_size", 14)
-	_music_mute_btn.focus_mode = Control.FOCUS_NONE
-	_music_mute_btn.pressed.connect(func(): Settings.set_music_muted(not Settings.music_muted); _refresh_settings_panel())
-	row.add_child(_music_mute_btn)
-
-
-## Джойстик / стрелки / удержание — те же три режима, что кнопка «⋯ →
-## Управление» (_set_mode), тремя явными кнопками вместо цикла по кругу:
-## в настройках понятнее видеть все варианты сразу, чем гадать, что будет
-## следующим нажатием.
-const _CONTROL_MODE_LABELS := {
-	"stick": "Джойстик",
-	"arrows": "Стрелки",
-	"hold": "Нажатия",
-}
-
-
-func _build_settings_control_row(parent: Control) -> void:
-	_settings_section_label(parent, "УПРАВЛЕНИЕ")
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	parent.add_child(row)
-	for m in MODES:
-		var btn := Button.new()
-		btn.text = String(_CONTROL_MODE_LABELS.get(m, m))
-		btn.add_theme_font_size_override("font_size", 10)
-		btn.custom_minimum_size = Vector2(0, 26)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.pressed.connect(_set_mode.bind(m))
-		row.add_child(btn)
-		_control_mode_buttons[m] = btn
-
-
-func _build_settings_vision_row(parent: Control) -> void:
-	_settings_section_label(parent, "ОТОБРАЖЕНИЕ")
-	_vision_toggle_btn = Button.new()
-	_vision_toggle_btn.add_theme_font_size_override("font_size", 10)
-	_vision_toggle_btn.custom_minimum_size = Vector2(0, 26)
-	_vision_toggle_btn.focus_mode = Control.FOCUS_NONE
-	_vision_toggle_btn.pressed.connect(func():
-		Settings.set_show_vision_radius(not Settings.show_vision_radius)
-		_refresh_settings_panel())
-	parent.add_child(_vision_toggle_btn)
-
-
-func _build_settings_language_row(parent: Control) -> void:
-	_settings_section_label(parent, "ЯЗЫК")
-	# HFlowContainer, не HBoxContainer: шесть языковых чипов в один ряд не
-	# помещаются на портретных 224px — этот контейнер сам переносит лишние
-	# на следующую строку, а не сжимает всех до нечитаемой ширины и не
-	# уезжает вбок (тем более что горизонтальная прокрутка шторки настроек
-	# выключена — см. scroll.horizontal_scroll_mode выше).
-	var row := HFlowContainer.new()
-	row.add_theme_constant_override("h_separation", 6)
-	row.add_theme_constant_override("v_separation", 6)
-	parent.add_child(row)
-	for entry in Settings.LANGUAGES:
-		var code := String(entry.get("code", ""))
-		var available := bool(entry.get("available", false))
-		var btn := Button.new()
-		btn.text = String(entry.get("name", code))
-		btn.add_theme_font_size_override("font_size", 10)
-		btn.custom_minimum_size = Vector2(0, 24)
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.disabled = not available
-		if not available:
-			# Языки ждут перевода (задание владельца: "дальше, после моего
-			# разрешения, будет...") — видны сразу, но серые и некликабельные,
-			# а не появляются позже с нуля собранной панелью.
-			btn.tooltip_text = "Скоро"
-			btn.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
-		else:
-			btn.pressed.connect(func(): Settings.set_language(code); _refresh_settings_panel())
-		row.add_child(btn)
-		_language_buttons[code] = btn
-
-
-## Единственная точка входа в покупки, подключённая к IAPManager (см.
-## scripts/core/iap_manager.gd) — решение владельца держать её в «Настройках»,
-## а не заводить отдельный полноэкранный магазин косметики прямо сейчас:
-## каталог (data/monetization.json) ещё черновой и ждёт утверждения, а
-## кнопка «Восстановить покупки» всё равно обязана быть где-то в игре для
-## будущей публикации в App Store (Apple отклоняет сборки с покупками без
-## неё). IAPManager.request_purchase()/restore_purchases() — честные
-## заглушки: они не покупают и не восстанавливают ничего по-настоящему, а
-## сразу сообщают об этом тостом — ту же фразу уже показывает премиум-магазин
-## для долларов (см. shop_ui.gd:_render_premium_screen). Когда появится
-## платёжный SDK, эта кнопка не изменится — изменится только тело
-## IAPManager.request_purchase().
-func _build_settings_iap_row(parent: Control) -> void:
-	_settings_section_label(parent, "ПОКУПКИ")
-	var hint := Label.new()
-	hint.text = "Платежи не подключены в этой сборке."
-	hint.add_theme_font_size_override("font_size", 8)
-	hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	parent.add_child(hint)
-
-	_restore_purchases_btn = Button.new()
-	_restore_purchases_btn.text = "Восстановить покупки"
-	_restore_purchases_btn.add_theme_font_size_override("font_size", 10)
-	_restore_purchases_btn.custom_minimum_size = Vector2(0, 26)
-	_restore_purchases_btn.focus_mode = Control.FOCUS_NONE
-	_restore_purchases_btn.pressed.connect(func():
-		IAPManager.restore_purchases()
-		toast("Покупок для восстановления нет — платежи не подключены."))
-	parent.add_child(_restore_purchases_btn)
-
-
-## Перечитывает Settings и красит все контролы панели — вызывается при
-## открытии и после любого изменения (мьют/режим/язык/радиус), чтобы кнопки
-## сразу отражали новое состояние, а не только реальный эффект в игре.
+## Перечитывает Settings и красит все контролы шторки.
 func _refresh_settings_panel() -> void:
-	if _sound_slider == null:
-		return
-	_sound_slider.value = Settings.sound_volume * 100.0
-	_sound_mute_btn.text = "🔇" if Settings.sound_muted else "🔊"
-	_music_slider.value = Settings.music_volume * 100.0
-	_music_mute_btn.text = "🔇" if Settings.music_muted else "🎵"
-	_vision_toggle_btn.text = "Радиус обзора: показан" if Settings.show_vision_radius \
-		else "Радиус обзора: скрыт"
-
-	for m in _control_mode_buttons.keys():
-		var btn: Button = _control_mode_buttons[m]
-		var on: bool = m == mode
-		btn.add_theme_color_override("font_color",
-			Color8(0xE0, 0xA9, 0x3B) if on else Color8(0x9D, 0x8B, 0x73))
-		btn.disabled = on
-
-	for code in _language_buttons.keys():
-		var lbtn: Button = _language_buttons[code]
-		if not lbtn.disabled:
-			var lon: bool = code == Settings.language
-			lbtn.add_theme_color_override("font_color",
-				Color8(0xE0, 0xA9, 0x3B) if lon else Color8(0x9D, 0x8B, 0x73))
+	if _settings_sheet != null:
+		_settings_sheet.refresh()
 
 
 func open_settings() -> void:
 	close_more_menu()
-	_refresh_settings_panel()
-	_settings_sheet.visible = true
+	_settings_sheet.open()
 
 
 func close_settings() -> void:
-	_settings_sheet.visible = false
+	_settings_sheet.close()
 
 
 func is_settings_open() -> bool:
 	return _settings_sheet != null and _settings_sheet.visible
 
 
-## Окно «выбросить N штук»: ползунок и то же число полем ввода — на телефоне
-## ползунком трудно попасть в «ровно 7 из 240», а руками неудобно набирать
-## «120». Поле открывает цифровую клавиатуру, буквы в нём не принимаются.
-func _build_drop_panel(parent: Control) -> void:
-	_drop_panel = Control.new()
-	_drop_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_drop_panel.visible = false
-	parent.add_child(_drop_panel)
-
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_drop_panel.add_child(dim)
-
-	var card := PanelContainer.new()
-	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card.custom_minimum_size = Vector2(196, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
-	sb.set_border_width_all(1)
-	sb.set_content_margin_all(8)
-	card.add_theme_stylebox_override("panel", sb)
-	_drop_panel.add_child(card)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	card.add_child(box)
-
-	_drop_title = Label.new()
-	_drop_title.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_drop_title.add_theme_font_size_override("font_size", 11)
-	box.add_child(_drop_title)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	box.add_child(row)
-
-	_drop_slider = HSlider.new()
-	_drop_slider.min_value = 1
-	_drop_slider.step = 1
-	_drop_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_drop_slider.value_changed.connect(_on_drop_slider_changed)
-	row.add_child(_drop_slider)
-
-	_drop_field = LineEdit.new()
-	_drop_field.custom_minimum_size = Vector2(46, 0)
-	_drop_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_drop_field.max_length = 6
-	# Только цифровая клавиатура: количество — всегда целое, буквам тут
-	# делать нечего (то же, что inputmode="numeric" в web-демо).
-	_drop_field.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
-	_drop_field.text_changed.connect(_on_drop_field_changed)
-	_drop_field.text_submitted.connect(func(_t): _apply_drop())
-	row.add_child(_drop_field)
-
-	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 6)
-	box.add_child(buttons)
-
-	var all_btn := Button.new()
-	all_btn.text = "Всё"
-	all_btn.add_theme_font_size_override("font_size", 10)
-	all_btn.pressed.connect(func(): _drop_slider.value = _drop_max)
-	buttons.add_child(all_btn)
-
-	var cancel_btn := Button.new()
-	cancel_btn.text = "Отмена"
-	cancel_btn.add_theme_font_size_override("font_size", 10)
-	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cancel_btn.pressed.connect(_close_drop)
-	buttons.add_child(cancel_btn)
-
-	var ok_btn := Button.new()
-	ok_btn.text = "Выбросить"
-	ok_btn.add_theme_font_size_override("font_size", 10)
-	ok_btn.add_theme_color_override("font_color", Color8(0xC4, 0x70, 0x6A))
-	ok_btn.pressed.connect(_apply_drop)
-	buttons.add_child(ok_btn)
-
-
+## Окно «выбросить N штук» живёт в BackpackSheet; здесь — его прежние имена.
 func _open_drop(id: String, count: int) -> void:
-	if count <= 0:
-		return
-	_drop_id = id
-	_drop_max = count
-	_drop_title.text = "Выбросить «%s» (в рюкзаке %d)" % [
-		String(Balance.get_mineral(id).get("name_ru", id)), count]
-	_drop_slider.max_value = count
-	_drop_slider.value = count
-	_drop_field.text = str(count)
-	_drop_panel.visible = true
+	_inv_sheet.open_drop(id, count)
 
 
 func _close_drop() -> void:
-	_drop_panel.visible = false
-	_drop_id = ""
+	_inv_sheet.close_drop()
 
 
-func _drop_amount() -> int:
-	return clampi(int(_drop_slider.value), 1, maxi(1, _drop_max))
-
-
-func _on_drop_slider_changed(v: float) -> void:
-	var n := clampi(int(v), 1, maxi(1, _drop_max))
-	if _drop_field.text != str(n):
-		_drop_field.text = str(n)
-
-
-func _on_drop_field_changed(t: String) -> void:
-	# Чистим ввод на месте: на телефоне цифровая клавиатура всё равно может
-	# отдать минус или запятую, а каретку при этом терять нельзя.
-	var digits := ""
-	for ch in t:
-		if ch >= "0" and ch <= "9":
-			digits += ch
-	if digits != t:
-		var caret := _drop_field.caret_column - (t.length() - digits.length())
-		_drop_field.text = digits
-		_drop_field.caret_column = maxi(0, caret)
-	if digits.is_empty():
-		return
-	var n := clampi(int(digits), 1, maxi(1, _drop_max))
-	if int(_drop_slider.value) != n:
-		_drop_slider.set_value_no_signal(n)
-	if str(n) != digits:
-		_drop_field.text = str(n)
-		_drop_field.caret_column = _drop_field.text.length()
-
-
-func _apply_drop() -> void:
-	if _drop_id.is_empty():
-		return
-	var n := _drop_amount()
-	var id := _drop_id
+func _on_drop_confirmed(id: String, n: int) -> void:
 	GameState.remove_item(id, n)
-	_close_drop()
-	_render_inventory()
+	_inv_sheet.refresh()
 	_sync_purse()
-	toast("Выброшено: %s ×%d" % [
-		String(Balance.get_mineral(id).get("name_ru", id)), n], 2.0)
+	toast_parts([
+		{"icon_tex": UiIcons.item(id), "text": "−%d" % n, "color": Color8(0xE8, 0x8C, 0x80)},
+	], 1.6)
 
 
 var _more_panel: PanelContainer
 var _more_grid: GridContainer
 var _more_button: Button
+var _menu_badge_timer: float = 0.0
 var _menu_armed_id: String = ""
 var _menu_armed_until_msec: int = 0
 
@@ -1183,6 +806,8 @@ func _build_strip() -> void:
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color8(0x16, 0x12, 0x0E)
+	sb.border_color = Color8(0x4A, 0x3B, 0x2C)
+	sb.border_width_top = 2
 	var bg_panel := Panel.new()
 	bg_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg_panel.add_theme_stylebox_override("panel", sb)
@@ -1192,59 +817,70 @@ func _build_strip() -> void:
 	var strip := HBoxContainer.new()
 	strip.name = "Row"
 	strip.set_anchors_preset(Control.PRESET_FULL_RECT)
-	strip.add_theme_constant_override("separation", 5)
+	strip.offset_left = 5
+	strip.offset_right = -5
+	strip.offset_top = 3
+	strip.offset_bottom = -1
+	strip.add_theme_constant_override("separation", 3)
 	root.add_child(strip)
 
 	# Систем стало пять, и каждая честно попросила себе кнопку — в ряду
 	# шириной 224 их девять, а нужно им около 315. Ряд делится по тому,
 	# нужна ли кнопка ВО ВРЕМЯ КОПКИ: инвентарь, склад, инструмент и
-	# снаряжение остаются на виду, всё остальное уходит под «⋯». Прятать
+	# снаряжение остаются на виду, всё остальное уходит под «•••». Прятать
 	# по важности, а не по алфавиту: игрок сидит в шахте, а не в меню.
 	_build_more_menu()
-	_build_tool_name_popup()
 	_build_objective_line()
 
-	# Иконкой, а не словом: ряд шириной 224 не вмещает подпись «Инвентарь»
-	# вместе с названием инструмента, снаряжением, режимом и сбросом.
-	_inv_button = _make_chip("")
-	if ResourceLoader.exists("res://art/ui/icon_backpack.png"):
-		_inv_button.icon = load("res://art/ui/icon_backpack.png")
-		_inv_button.expand_icon = true
-		_inv_button.custom_minimum_size = Vector2(26, STRIP_H)
-	else:
-		_inv_button.text = "Инв"
-	_inv_button.tooltip_text = "Инвентарь"
+	# Только иконки: слова («Инвентарь», «Склад», название инструмента) — в
+	# подсказке Tip. Кнопка рюкзака — переключатель: при открытой шторке она
+	# «вдавлена» и подсвечена золотом.
+	_inv_button = UiBtn.icon_button(UiIcons.tex("backpack"), Vector2(34, 34), UiBtn.Kind.NORMAL, 16)
+	Tip.bind(_inv_button, "Рюкзак", "Что несёшь и сколько это стоит")
 	_inv_button.toggle_mode = true
 	_inv_button.pressed.connect(_on_inv_button_pressed)
 	strip.add_child(_inv_button)
 
-	# Инструмент — одна иконка без подписи. Название всплывает НАД полосой по
-	# нажатию (и подсказкой при наведении на компьютере): слово «Лопата»
-	# держало в ряду шириной 224 почти сорок точек, а нужно оно раз в час —
-	# когда игрок сам не помнит, чем копает.
-	_tool_button = _make_flat(_make_chip(""))
-	_tool_button.custom_minimum_size = Vector2(26, STRIP_H)
-	_tool_button.expand_icon = true
-	_tool_button.pressed.connect(_show_tool_name)
+	# Инструмент — одна иконка без подписи, чуть крупнее остальных: это то, чем
+	# копают. Название всплывает НАД полосой по нажатию (и при наведении на
+	# компьютере), и само — когда инструмент сменился (ГДД п.16).
+	_tool_button = UiBtn.icon_button(null, Vector2(38, 36), UiBtn.Kind.NORMAL, 32)
+	_tool_button.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		_show_tool_name())
 	strip.add_child(_tool_button)
 
-	# Брикеты топлива — числом, рядом с иконкой инструмента. Спрятан, пока
-	# бурмобиль не надет: у остальных инструментов топлива нет, и пустая
-	# метка на полосе шириной 224 только крала бы место зря.
+	# Брикеты топлива — иконка и число рядом с инструментом. Спрятан, пока
+	# бурмобиль не надет: у остальных инструментов топлива нет, и пустое место
+	# на полосе шириной 224 только крало бы пространство зря.
+	_fuel_box = HBoxContainer.new()
+	_fuel_box.add_theme_constant_override("separation", 1)
+	_fuel_box.visible = false
+	_fuel_box.mouse_filter = Control.MOUSE_FILTER_PASS
+	_fuel_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var fuel_icon := TextureRect.new()
+	fuel_icon.texture = UiIcons.tex("fuel")
+	fuel_icon.custom_minimum_size = Vector2(14, 14)
+	fuel_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	fuel_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	fuel_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fuel_box.add_child(fuel_icon)
 	_fuel_label = Label.new()
-	_fuel_label.add_theme_font_size_override("font_size", 9)
-	_fuel_label.visible = false
-	_fuel_label.tooltip_text = "Брикеты угля для бурмобиля"
-	_fuel_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	strip.add_child(_fuel_label)
+	_fuel_label.add_theme_font_size_override("font_size", 11)
+	_fuel_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fuel_box.add_child(_fuel_label)
+	Tip.bind(_fuel_box, "Топливо", "Брикеты угля для бурмобиля")
+	strip.add_child(_fuel_box)
 
 	var gear_box := HBoxContainer.new()
+	gear_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	gear_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_gear_pack = _make_gear_icon(gear_box, "")
 	_gear_jet = null
 	strip.add_child(gear_box)
 
-	# Пустая распорка: слева — то, чем копают, справа — куда ходят. Раньше
-	# слабину ряда забирала подпись инструмента, теперь её держит она.
+	# Пустая распорка: слева — то, чем копают, справа — куда ходят.
 	var spacer := Control.new()
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1253,39 +889,28 @@ func _build_strip() -> void:
 	# Мастерская, режим управления, настройки и сброс живут в реестре меню
 	# (scripts/ui/menu_entries.gd), а не в полосе.
 
-	# --- прокачка и музей (scripts/progress/) ---
-	# Кнопки «Герой» в «⋯» больше нет: экран героя открывается кнопкой под
-	# полосками жизни (_build_hero_button), где её видно, не раскрывая меню,
-	# и где она золотится, когда есть что прокачать.
-	# --- конец блока прокачки ---
-
 	# --- дом (scripts/house/) ---
 	# Контекстной кнопки «Дом» на полосе больше нет: дом — пространство, и
 	# «Зайти» всплывает над героем у окна веранды (HouseSystem).
 	# Склад (ГДД п.14) виден ОТКУДА УГОДНО, хоть со дна шахты, — но только
 	# на просмотр: игрок должен планировать вылазку, зная, чего не хватает до
-	# кирки. Поэтому кнопка постоянная, а не контекстная. Иконкой и без
-	# подписи: в ряду шириной 224 на восемь кнопок каждое слово на счету.
-	var storage_btn := _make_chip("")
-	if ResourceLoader.exists("res://art/ui/icon_inventory.png"):
-		storage_btn.icon = load("res://art/ui/icon_inventory.png")
-		storage_btn.expand_icon = true
-		storage_btn.custom_minimum_size = Vector2(22, STRIP_H)
-	else:
-		storage_btn.text = "Скл"
-	storage_btn.tooltip_text = "Склад в мастерской"
+	# кирки. Поэтому кнопка постоянная, а не контекстная. Нажатие подключает
+	# сама система дома по группе "house_storage_button".
+	var storage_btn := UiBtn.icon_button(UiIcons.tex("inventory"), Vector2(34, 34))
+	Tip.bind(storage_btn, "Склад", "В мастерской: можно смотреть откуда угодно")
 	storage_btn.add_to_group("house_storage_button")
 	strip.add_child(storage_btn)
 	# --- конец блока дома ---
 
 	# «•••» встаёт последним, чтобы контекстная кнопка дома, появляясь и
-	# исчезая, не сдвигала его под пальцем.
-	_more_button = _make_chip("")
-	_more_button.icon = UiIcons.tex("more")
-	_more_button.expand_icon = true
-	_more_button.custom_minimum_size = Vector2(26, STRIP_H)
+	# исчезая, не сдвигала его под пальцем. Красный бейдж — сумма бейджей
+	# пунктов меню (новые задания и т.п.).
+	_more_button = UiBtn.icon_button(UiIcons.tex("more"), Vector2(34, 34))
 	Tip.bind(_more_button, "Меню")
-	_more_button.pressed.connect(_toggle_more_menu)
+	_more_button.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		_toggle_more_menu())
 	strip.add_child(_more_button)
 
 	# Схема управления — сохранённая настройка игрока (Settings.control_mode),
@@ -1340,10 +965,6 @@ func _build_more_menu() -> void:
 	sb.shadow_size = 3
 	_more_panel.add_theme_stylebox_override("panel", sb)
 	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_more_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_more_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_more_panel.offset_bottom = -STRIP_H - 2
-	_more_panel.offset_right = -4
 	add_child(_more_panel)
 
 	var box := VBoxContainer.new()
@@ -1377,7 +998,18 @@ func _rebuild_more_menu() -> void:
 	_more_grid.columns = 3 if entries.size() <= 6 else 4
 	for e: Dictionary in entries:
 		_more_grid.add_child(_make_menu_button(e))
-	_more_panel.reset_size()
+	_place_more_panel()
+
+
+## Прижимает меню к правому нижнему углу над полосой. Смещения считаем сами по
+## минимальному размеру: reset_size() сбивает направление роста у якорей.
+func _place_more_panel() -> void:
+	var sz := _more_panel.get_combined_minimum_size()
+	_more_panel.offset_right = -4.0
+	_more_panel.offset_left = -4.0 - sz.x
+	_more_panel.offset_bottom = -STRIP_H - 2.0
+	_more_panel.offset_top = -STRIP_H - 2.0 - sz.y
+	_more_panel.pivot_offset = sz
 
 
 func _make_menu_button(e: Dictionary) -> Button:
@@ -1407,10 +1039,34 @@ func _make_menu_button(e: Dictionary) -> Button:
 	return b
 
 
-## Всплывающая надпись над выкопанной клеткой: «Золото +1». Живёт секунду,
-## поднимается и тает. Это не тост: тост занимает всю ширину и перебивает
-## экран, а тут нужна отметка ровно там, где копнули, — иначе на каждую
-## клетку земли экран мигал бы полосой.
+## Всплывающая отметка над выкопанной клеткой: иконка предмета и «+1». Живёт
+## секунду, поднимается и тает. Это не тост: тост — «таблетка» у полосы, а тут
+## нужна отметка ровно там, где копнули, — иначе на каждую клетку земли экран
+## мигал бы плашкой.
+func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 2)
+	var icon := TextureRect.new()
+	icon.texture = UiIcons.item(mineral_id)
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+	var label := Label.new()
+	label.text = "+%d" % count
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color8(0xF5, 0xD0, 0x6B))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("outline_size", 3)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(label)
+	add_child(row)
+	_float_away(row, cell_x, cell_y, Vector2(row.get_combined_minimum_size().x * 0.5, 0.0))
+
+
+## То же, но текстом — для тех, кто зовёт старое имя float_pickup.
 func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	var label := Label.new()
 	label.text = text
@@ -1420,98 +1076,49 @@ func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(label)
-
-	var from := Vector2(
-		(float(cell_x) + 0.5 - current_cam.x) * TILE - 40.0,
-		(float(cell_y) - current_cam.y) * TILE - 6.0)
 	label.size = Vector2(80, 14)
-	label.position = from
+	add_child(label)
+	_float_away(label, cell_x, cell_y, Vector2(40.0, 0.0))
 
+
+func _float_away(node: Control, cell_x: int, cell_y: int, half: Vector2) -> void:
+	var from := Vector2(
+		(float(cell_x) + 0.5 - current_cam.x) * TILE - half.x,
+		(float(cell_y) - current_cam.y) * TILE - 6.0)
+	node.position = from
+	if Settings.reduce_motion:
+		get_tree().create_timer(0.6).timeout.connect(node.queue_free)
+		return
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(label, "position:y", from.y - 18.0, 0.9)
-	tween.tween_property(label, "modulate:a", 0.0, 0.9).set_delay(0.25)
-	tween.chain().tween_callback(label.queue_free)
+	tween.tween_property(node, "position:y", from.y - 18.0, 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(node, "modulate:a", 0.0, 0.9).set_delay(0.25)
+	tween.chain().tween_callback(node.queue_free)
 
 
 ## Отчёт скважины при возвращении в игру (решение владельца): показать, что
-## накопала за время отсутствия. Карточка со списком и одной кнопкой —
-## закрывается ею же и тапом мимо, как остальные меню.
+## накопала за время отсутствия. Окно рисует ветка «Техника»
+## (scripts/tech/well_report.gd): плитки-иконки, ссыпание на склад, «×2».
 func show_well_report(report: Dictionary) -> void:
-	if report.is_empty() or _well_panel != null:
-		return
-	_well_panel = Control.new()
-	_well_panel.name = "WellReport"
-	_well_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_well_panel)
-
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_well_panel.add_child(dim)
-
-	var card := PanelContainer.new()
-	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card.custom_minimum_size = Vector2(200, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.set_border_width_all(1)
-	sb.set_content_margin_all(8)
-	card.add_theme_stylebox_override("panel", sb)
-	_well_panel.add_child(card)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 5)
-	card.add_child(box)
-
-	var title := Label.new()
-	title.text = "Скважина работала без тебя"
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	box.add_child(title)
-
-	var since := Label.new()
-	since.text = "За %s накопала:" % _humanize_seconds(float(report.get("seconds", 0.0)))
-	since.add_theme_font_size_override("font_size", 10)
-	box.add_child(since)
-
-	for id in report.get("items", {}).keys():
-		var row := HBoxContainer.new()
-		var name_label := Label.new()
-		name_label.text = String(Balance.get_mineral(String(id)).get("name_ru", id))
-		name_label.add_theme_font_size_override("font_size", 10)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_label)
-		var count_label := Label.new()
-		count_label.text = "×%d" % int(report["items"][id])
-		count_label.add_theme_font_size_override("font_size", 10)
-		count_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-		row.add_child(count_label)
-		box.add_child(row)
-
-	var note := Label.new()
-	note.text = "Всё сложено на склад в мастерской."
-	note.add_theme_font_size_override("font_size", 9)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	note.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
-	box.add_child(note)
-
-	var ok := Button.new()
-	ok.text = "Хорошо"
-	ok.add_theme_font_size_override("font_size", 10)
-	ok.pressed.connect(close_well_report)
-	box.add_child(ok)
+	var w := get_tree().get_first_node_in_group("well_report")
+	if w != null and not report.is_empty():
+		w.call("show_report", report)
 
 
 func close_well_report() -> void:
-	if _well_panel == null:
-		return
-	_well_panel.queue_free()
-	_well_panel = null
+	var w := get_tree().get_first_node_in_group("well_report")
+	if w != null:
+		w.call("close")
+
+
+## «45 мин», «2 ч» — коротко, для плашки отчёта.
+static func _humanize_short(seconds: float) -> String:
+	var total := int(seconds)
+	var h := total / 3600
+	var m := (total % 3600) / 60
+	if h > 0:
+		return "%d ч" % h if m == 0 else "%d:%02d" % [h, m]
+	return "%d мин" % maxi(m, 1)
 
 
 static func _humanize_seconds(seconds: float) -> String:
@@ -1533,10 +1140,16 @@ func _build_objective_line() -> void:
 	_objective_panel.visible = false
 	_objective_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.92)
+	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
 	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
 	sb.set_border_width_all(1)
-	sb.set_content_margin_all(5)
+	sb.set_corner_radius_all(9)
+	sb.shadow_color = Color(0, 0, 0, 0.4)
+	sb.shadow_size = 3
+	sb.content_margin_left = 7
+	sb.content_margin_right = 8
+	sb.content_margin_top = 5
+	sb.content_margin_bottom = 5
 	_objective_panel.add_theme_stylebox_override("panel", sb)
 	_objective_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_objective_panel.offset_left = 8
@@ -1544,24 +1157,40 @@ func _build_objective_line() -> void:
 	add_child(_objective_panel)
 	_place_objective()
 
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 6)
+	_objective_panel.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = UiIcons.tex("quest")
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
 	_objective_label = Label.new()
 	_objective_label.add_theme_font_size_override("font_size", 10)
-	_objective_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_objective_label.add_theme_color_override("font_color", Color8(0xF2, 0xD9, 0x9B))
+	_objective_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_objective_panel.add_child(_objective_label)
+	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_objective_label)
 
 
-## Строка задания встаёт ПОД левым столбиком (опыт, полоски, «Герой»), а не
-## на фиксированной высоте: столбик то появляется целиком, то исчезает на
-## время обучения, и жёсткая координата либо накрывала полоски, либо висела
-## в пустоте. Высоту берём минимальную — она известна до раскладки.
+## Строка задания встаёт ПОД обоими верхними кластерами (герой с полосками слева,
+## кошелёк справа), а не на фиксированной высоте: левый столбик то появляется
+## целиком, то исчезает на время обучения, и жёсткая координата либо накрывала
+## полоски, либо висела в пустоте. Высоту берём минимальную — она известна до
+## раскладки.
 func _place_objective() -> void:
 	if _objective_panel == null:
 		return
 	var top := 12.0
+	if _purse_box != null:
+		top = _purse_box.position.y + _purse_box.get_combined_minimum_size().y + 6.0
 	if _gauges_box != null and _gauges_box.visible:
-		top = _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0
+		top = maxf(top, _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0)
 	_objective_panel.offset_top = top
 
 
@@ -1579,9 +1208,9 @@ func set_objective(text: String) -> void:
 		if _quest_button != null:
 			_quest_button.visible = false
 		return
-	_show_objective_banner()
 	if _quest_button != null:
 		_quest_button.visible = true
+	_show_objective_banner()
 
 
 func _show_objective_banner() -> void:
@@ -1590,6 +1219,7 @@ func _show_objective_banner() -> void:
 	_objective_panel.visible = true
 	_objective_hide_at_msec = Time.get_ticks_msec() + OBJECTIVE_SHOW_SECONDS * 1000.0
 	_place_objective()
+	UiAnim.appear(_objective_panel, 0.96, 0.18)
 
 
 func _on_quest_button_pressed() -> void:
@@ -1601,44 +1231,18 @@ func _on_quest_button_pressed() -> void:
 	_show_objective_banner()
 
 
-## Всплывающая подпись инструмента: панелька над полосой, по центру, гаснет
-## сама через пару секунд. Отдельный узел, а не тост: тост
-## занимает всю ширину и перекрывает игровой экран, а тут нужно одно слово
-## ровно над кнопкой, по которой ткнули.
-func _build_tool_name_popup() -> void:
-	_tool_name_panel = PanelContainer.new()
-	_tool_name_panel.name = "ToolName"
-	_tool_name_panel.visible = false
-	_tool_name_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
-	sb.set_border_width_all(1)
-	sb.set_content_margin_all(4)
-	_tool_name_panel.add_theme_stylebox_override("panel", sb)
-	# По центру, а не над самой кнопкой: слева внизу лежит джойстик, и
-	# подпись садилась ему на край — ровно туда, где в этот момент палец.
-	_tool_name_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_tool_name_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_tool_name_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_tool_name_panel.offset_bottom = -STRIP_H - 4
-	add_child(_tool_name_panel)
-
-	_tool_name_label = Label.new()
-	_tool_name_label.add_theme_font_size_override("font_size", 11)
-	_tool_name_panel.add_child(_tool_name_label)
-
-	_tool_name_timer = Timer.new()
-	_tool_name_timer.one_shot = true
-	_tool_name_timer.wait_time = 2.0
-	_tool_name_timer.timeout.connect(func(): _tool_name_panel.visible = false)
-	add_child(_tool_name_timer)
-
-
+## Название инструмента — подсказкой Tip над кнопкой: по нажатию и само, когда
+## инструмент сменился. Гаснет через пару секунд. Отдельной панельки для одного
+## слова больше нет: «Лопата» — это подсказка, а не элемент экрана.
 func _show_tool_name() -> void:
-	_tool_name_label.text = Balance.get_tool_name_ru(GameState.current_tool)
-	_tool_name_panel.visible = true
-	_tool_name_timer.start()
+	if _tool_button == null or not _tool_button.is_inside_tree():
+		return
+	Tip.show_now(_tool_button)
+	_tool_tip_token += 1
+	var token := _tool_tip_token
+	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+		if token == _tool_tip_token and Tip.is_showing():
+			Tip.hide_all())
 
 
 func _toggle_more_menu() -> void:
@@ -1648,7 +1252,7 @@ func _toggle_more_menu() -> void:
 	_rebuild_more_menu()
 	_more_panel.visible = true
 	UiAnim.appear(_more_panel, 0.85, 0.14)
-	_more_panel.pivot_offset = Vector2(_more_panel.size.x, _more_panel.size.y)
+	_more_panel.pivot_offset = _more_panel.get_combined_minimum_size()
 	Sfx.play("ui_open")
 	# Иначе палец, уже «зажавший» мир, остаётся зажатым под открытым меню:
 	# в режиме стика — ручка, в режиме пальца — удержание.
@@ -1699,41 +1303,18 @@ func _make_chip(text: String) -> Button:
 	b.text = text
 	b.add_theme_font_size_override("font_size", 9)
 	b.custom_minimum_size = Vector2(0, STRIP_H)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0)
-		sb.border_color = Color8(0x3E, 0x31, 0x25)
-		sb.set_border_width_all(1)
-		sb.content_margin_top = 3
-		sb.content_margin_bottom = 3
-		sb.content_margin_left = 6
-		sb.content_margin_right = 6
-		if state == "pressed" or state == "hover":
-			sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-		b.add_theme_stylebox_override(state, sb)
-	b.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	b.add_theme_color_override("font_pressed_color", Color8(0xE0, 0xA9, 0x3B))
-	b.add_theme_color_override("font_hover_color", Color8(0xE0, 0xA9, 0x3B))
-	return b
+	return UiBtn.style(b)
 
 
 # Кнопка-иконка без рамки: рамка обещает нажатие, которое что-то переключит,
-# а инструмент по нажатию всего лишь называет себя. Отступы оставляем от
-# _make_chip — иначе иконка липнет к соседям.
+# а подпись по нажатию всего лишь называет себя.
 func _make_flat(b: Button) -> Button:
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := StyleBoxEmpty.new()
-		sb.content_margin_top = 3
-		sb.content_margin_bottom = 3
-		sb.content_margin_left = 4
-		sb.content_margin_right = 4
-		b.add_theme_stylebox_override(state, sb)
-	return b
+	return UiBtn.style(b, UiBtn.Kind.GHOST)
 
 
 func _make_gear_icon(parent: Control, path: String) -> TextureRect:
 	var t := TextureRect.new()
-	t.custom_minimum_size = Vector2(17, 17)
+	t.custom_minimum_size = Vector2(20, 20)
 	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if ResourceLoader.exists(path):
@@ -1793,12 +1374,27 @@ func _process(_dt: float) -> void:
 		_knob.queue_redraw()
 		_update_depth()
 	_update_clock()
+	_menu_badge_timer -= _dt
+	if _menu_badge_timer <= 0.0:
+		_menu_badge_timer = 0.5
+		_sync_menu_badge()
+
+
+## Красный бейдж на «•••» — сумма бейджей пунктов меню: новые задания, награды
+## и т.п. видны, не раскрывая меню.
+func _sync_menu_badge() -> void:
+	if _more_button == null:
+		return
+	var total := 0
+	for e: Dictionary in MenuRegistry.entries():
+		total += MenuRegistry.badge_of(e)
+	UiBtn.set_badge(_more_button, total)
 
 
 func _connect_game_state() -> void:
-	GameState.hp_changed.connect(func(hp, max_hp): _hp_fill.size.x = 72.0 * clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0))
-	GameState.hunger_changed.connect(func(h): _hunger_fill.size.x = 72.0 * clampf(h / 100.0, 0.0, 1.0))
-	GameState.stamina_changed.connect(func(s): _stamina_fill.size.x = 72.0 * clampf(s / 100.0, 0.0, 1.0))
+	GameState.hp_changed.connect(func(hp, max_hp): _sync_hp(hp, max_hp))
+	GameState.hunger_changed.connect(func(h): _sync_gauge(_hunger_bar, h / 100.0, "Голод", h))
+	GameState.stamina_changed.connect(func(st): _sync_gauge(_stamina_bar, st / 100.0, "Бодрость", st))
 	GameState.coins_changed.connect(func(_c): _sync_purse())
 	GameState.dollars_changed.connect(func(_d): _sync_purse())
 	GameState.gear_changed.connect(func(_g): _sync_gear_icon())
@@ -1813,47 +1409,110 @@ func _connect_game_state() -> void:
 	# current_tool, поэтому GameState.tool_changed не сработает — своя точка.
 	GameState.drill_rig_tier_changed.connect(func(_tier): _sync_tool())
 	GameState.rig_dismount_blocked.connect(func(_id):
-		toast("Бурмобиль под землёй не бросить — сначала наверх или домой."))
+		# Бурмобиль под землёй не бросить — сначала наверх: машина и стрелка вверх.
+		toast_parts([
+			{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24},
+			{"icon": "arrow_up"},
+		], 2.4, "bad")
+		Sfx.play("ui_deny"))
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
-	GameState.leveled_up.connect(func(_lvl, _pts): _sync_xp())
+	GameState.leveled_up.connect(func(lvl, pts):
+		_sync_xp()
+		toast_parts([
+			{"icon": "star"}, {"text": str(lvl), "color": TOAST_COLORS["rare"]},
+			{"icon": "plus"}, {"text": "+%d" % pts, "color": Color8(0xB4, 0xE0, 0x9C)},
+		], 2.6, "rare"))
+	GameState.survival_warning.connect(_on_survival_warning)
+	GameState.respawned.connect(func(): _sync_all())
+	GameState.exhausted_changed.connect(func(on: bool):
+		if on:
+			toast_parts([{"icon": "stamina"}, {"text": "−50%", "color": Color8(0xE8, 0x8C, 0x80)}], 2.4, "bad"))
 	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
 
 
 func _sync_all() -> void:
-	_hp_fill.size.x = 72.0
-	_hunger_fill.size.x = 72.0
-	_stamina_fill.size.x = 72.0
+	_sync_hp(GameState.hp, GameState.get_max_hp(), true)
+	_sync_gauge(_hunger_bar, GameState.hunger / 100.0, "Голод", GameState.hunger, true)
+	_sync_gauge(_stamina_bar, GameState.stamina / 100.0, "Бодрость", GameState.stamina, true)
 	_sync_xp()
 	_sync_hero_button()
-	_sync_purse()
+	_sync_purse(true)
 	_sync_fuel()
 	_sync_tool()
 
 
-func _sync_xp() -> void:
-	if _xp_fill == null:
+## Полоска + подсказка с числом. Текст подсказки обновляем только когда
+## меняется целая часть: голод и бодрость сигналят каждый тик.
+func _sync_gauge(bar: HudBar, frac: float, title: String, value: float, instant: bool = false) -> void:
+	if bar == null:
 		return
-	_level_label.text = str(GameState.level)
+	bar.set_fraction(frac, instant)
+	var iv := int(round(value))
+	if int(bar.get_meta(&"_iv", -1)) != iv:
+		bar.set_meta(&"_iv", iv)
+		Tip.bind(bar, title, "%d%%" % iv)
+
+
+func _sync_hp(hp: float, max_hp: float, instant: bool = false) -> void:
+	if _hp_bar == null:
+		return
+	var frac := clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
+	var prev := _hp_bar.fraction()
+	_hp_bar.set_fraction(frac, instant)
+	var iv := int(ceil(hp))
+	if int(_hp_bar.get_meta(&"_iv", -1)) != iv:
+		_hp_bar.set_meta(&"_iv", iv)
+		Tip.bind(_hp_bar, "Здоровье", "%d / %d" % [iv, int(max_hp)])
+	if _vignette != null:
+		_vignette.set_level(frac)
+	if not instant and frac < prev - 0.001:
+		UiAnim.shake(_gauges_box, 2.5, 0.22)
+
+
+func _sync_xp() -> void:
+	if _xp_bar == null:
+		return
 	var need: float = float(Balance.xp_required_for_level(GameState.level))
 	var frac: float = clampf(float(GameState.xp) / maxf(need, 1.0), 0.0, 1.0)
-	_xp_fill.size.x = 72.0 * frac
+	var new_level := str(GameState.level)
+	var first := _level_label.text == ""
+	var leveled := not first and _level_label.text != new_level
+	_level_label.text = new_level
+	_xp_bar.set_fraction(frac, first or leveled)
+	Tip.bind(_xp_bar, "Опыт", "Уровень %d: %d / %d" % [GameState.level, GameState.xp, int(need)])
+	if leveled:
+		UiAnim.pulse(_hero_button, 0.3, 0.4)
 	_sync_hero_button()
 
 
-## Есть непотраченные очки — подпись золотом и зелёный плюс. Без этого игрок
-## копит очки и не знает об этом: экран героя сам о себе не напоминает.
+## Есть непотраченные очки — зелёный «+» над портретом, он покачивается: без
+## этого игрок копит очки и не знает об этом.
 func _sync_hero_button() -> void:
 	if _hero_button == null:
 		return
-	var has_points := GameState.skill_points_available > 0
-	_hero_plus.visible = has_points
-	_hero_button.add_theme_color_override("font_color",
-		Color8(0xE0, 0xA9, 0x3B) if has_points else Color8(0x9D, 0x8B, 0x73))
+	var points := GameState.skill_points_available
+	var had := _hero_plus.visible
+	_hero_plus.visible = points > 0
+	Tip.bind(_hero_button, "Герой", "Уровень %d. Очков прокачки: %d" % [GameState.level, points] \
+		if points > 0 else "Уровень %d. Прокачка, музей, рекорды" % GameState.level)
+	if points > 0 and not had and not Settings.reduce_motion and _hero_plus.is_inside_tree():
+		var tw := _hero_plus.create_tween().set_loops()
+		tw.tween_property(_hero_plus, "position:y", _hero_plus.position.y - 2.0, 0.45) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(_hero_plus, "position:y", _hero_plus.position.y, 0.45) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_hero_plus.set_meta(&"_bob", tw)
+	elif points <= 0 and _hero_plus.has_meta(&"_bob"):
+		var old = _hero_plus.get_meta(&"_bob")
+		if old is Tween and (old as Tween).is_valid():
+			(old as Tween).kill()
+		_hero_plus.remove_meta(&"_bob")
 
 
 ## Единственный источник правды о часе — DayCycle (см. scripts/core/
-## day_cycle.gd и house_view.gd:_refresh_header, тот же формат и тот же
-## узел — часы снаружи и в доме обязаны показывать одно и то же время).
+## day_cycle.gd и house_view.gd:_refresh_header, тот же узел — часы снаружи и в
+## доме обязаны показывать одно и то же время). На экране «ЧЧ:ММ», «День N» —
+## в подсказке.
 func _update_clock() -> void:
 	if _clock_label == null:
 		return
@@ -1862,34 +1521,39 @@ func _update_clock() -> void:
 	var hour_f: float = day_cycle.hour if day_cycle != null else 6.0
 	var hour := int(hour_f)
 	var minute := int((hour_f - floor(hour_f)) * 60.0)
-	_clock_label.text = "День %d, %02d:%02d" % [day, hour, minute]
+	var t := "%02d:%02d" % [hour, minute]
+	if _clock_label.text != t:
+		_clock_label.text = t
+		Tip.bind(_clock_box, "День %d" % day)
 
 
-func _sync_purse() -> void:
-	_coins_label.text = str(GameState.coins)
-	_dollars_label.text = str(GameState.dollars)
+func _sync_purse(instant: bool = false) -> void:
+	_coins_pill.set_value(GameState.coins, instant)
+	_dollars_pill.set_value(GameState.dollars, instant)
+	Tip.bind(_coins_pill, "Монеты", CountLabel.group_digits(GameState.coins))
+	Tip.bind(_dollars_pill, "Доллары", CountLabel.group_digits(GameState.dollars) + " · премиум-валюта")
 	var load_kg := GameState.get_total_weight()
-	var max_kg := GameState.get_max_carry_kg()
-	_load_label.text = "%.1f / %.0f кг" % [load_kg, max_kg]
-	_load_label.add_theme_color_override("font_color",
-		Color8(0xB8, 0x5A, 0x52) if load_kg > max_kg * 0.85 else Color8(0x8F, 0xA3, 0x5C))
+	var max_kg := maxf(GameState.get_max_carry_kg(), 0.001)
+	var frac := load_kg / max_kg
+	_load_bar.set_fraction(minf(frac, 1.0), instant)
+	# Зелёный -> янтарь -> красный: тот же красный, что у перегруза в остальных экранах.
+	_load_bar.fill_color = Color8(0x7F, 0xB8, 0x6B) if frac < 0.6 \
+		else (Color8(0xE0, 0xA9, 0x3B) if frac < 0.85 else Color8(0xD9, 0x4F, 0x4A))
+	Tip.bind(_load_pill, "Рюкзак", "%.1f / %.0f кг" % [load_kg, max_kg])
 
 
 func _sync_tool() -> void:
 	var tool_id := GameState.current_tool
 	var tool_name := Balance.get_tool_name_ru(tool_id)
-	_tool_button.tooltip_text = tool_name
+	Tip.bind(_tool_button, tool_name)
 	var icon_path := _tool_icon_path(tool_id)
 	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
 		_tool_button.icon = load(icon_path)
+		_tool_button.text = ""
 	else:
 		# Без картинки кнопка была бы пустым прямоугольником — тогда пусть
 		# уж подписью, как раньше.
 		_tool_button.text = tool_name
-	# Инструмент сменился сам (упёрлись в фундамент, дошли до глубины) —
-	# показываем название, не дожидаясь, пока игрок ткнёт в иконку.
-	if _tool_name_panel != null and _tool_name_panel.visible:
-		_tool_name_label.text = tool_name
 	_sync_gear_icon()
 	_sync_fuel()
 
@@ -1900,14 +1564,9 @@ func _sync_tool() -> void:
 func _sync_fuel() -> void:
 	if _fuel_label == null:
 		return
-	var in_rig := GameState.current_tool == "drill_rig"
-	_fuel_label.visible = in_rig
-	if not in_rig:
-		return
-	var n := GameState.get_item_count("fuel_block")
-	_fuel_label.text = "Топливо %d" % n
-	_fuel_label.add_theme_color_override("font_color",
-		Color8(0xB8, 0x5A, 0x52) if n <= 0 else Color8(0x9D, 0x8B, 0x73))
+	# Топливо теперь в баке и показывает его значок ветки «Техника» (TechHud);
+	# число блоков в рюкзаке — не то, чем копает бур.
+	_fuel_box.visible = false
 
 
 ## На полосе — один значок: то, что надето. Тёмная иконка недоступного
@@ -1924,7 +1583,7 @@ func _sync_gear_icon() -> void:
 		_gear_pack.visible = false
 		return
 	_gear_pack.texture = load(path)
-	_gear_pack.tooltip_text = Balance.get_gear_name_ru(gear_id)
+	Tip.bind(_gear_pack, Balance.get_gear_name_ru(gear_id), "Снаряжение")
 	_gear_pack.visible = true
 
 
@@ -1968,69 +1627,207 @@ func _update_depth() -> void:
 	_depth_label.text = str(d)
 	# см. placeDepth в web-демо: метка стоит на уровне героя на экране.
 	var screen_y: float = (player.y - current_cam.y) * TILE
-	_depth_box.position.y = clampf(screen_y - 11.0, 0.0, stage_rect.size.y - 22.0)
+	var h := _depth_box.size.y
+	_depth_box.position.y = clampf(screen_y - h * 0.5, 0.0, stage_rect.size.y - h)
 
 
 # ---------------------------------------------------------------------------
 # Тосты
 # ---------------------------------------------------------------------------
 
+## Текстовый тост. Совместим со старым API: текст, секунды. Короткие тосты
+## лучше делать через toast_icon/toast_parts — иконка и число вместо фразы.
 func toast(text: String, seconds: float = 2.6) -> void:
-	_toast_label.text = text
-	_resize_toast_panel()
-	_toast_panel.visible = true
-	_toast_timer.start(seconds)
+	_show_toast([{"text": text, "wrap": true}], seconds, "info")
 
 
-## Меряет фактическую (обёрнутую по словам) высоту текста тем же шрифтом,
-## что рисует сам Label, и растягивает панель под неё снизу вверх — низ
-## (offset_bottom) не трогаем, чтобы тост не прыгал по вертикали при смене
-## текста. Считаем ширину от вьюпорта, а не от _toast_panel.size: та не
-## гарантированно свежая при первом же вызове toast() (см. hud.gd:
-## _update_layout — панель, как и весь HUD, отзывается на резайз вьюпорта
-## реактивно, а не мгновенно в конструкторе).
-func _resize_toast_panel() -> void:
-	var font := _toast_label.get_theme_font("font")
-	var font_size := _toast_label.get_theme_font_size("font_size")
-	if font == null:
+## Иконка (имя из art/ui) + короткое слово или число.
+func toast_icon(icon_name: String, text: String = "", seconds: float = 2.4,
+		color: Color = Color.WHITE, kind: String = "info") -> void:
+	_show_toast([{"icon": icon_name, "text": text, "color": color}], seconds, kind)
+
+
+## Несколько пар «иконка + текст» в одной таблетке. Часть — словарь:
+## icon (имя в art/ui) или icon_tex (Texture2D), text, color, icon_px.
+func toast_parts(parts: Array, seconds: float = 2.4, kind: String = "info") -> void:
+	_show_toast(parts, seconds, kind)
+
+
+func _show_toast(parts: Array, seconds: float, kind: String) -> void:
+	if _toast_panel == null:
 		return
-	var margins: float = _toast_panel.offset_left - _toast_panel.offset_right \
-		+ _toast_label.offset_left - _toast_label.offset_right
-	var wrap_width: float = maxf(40.0, get_viewport_rect().size.x - margins)
-	var text_h: float = font.get_multiline_string_size(
-		_toast_label.text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size).y
-	var panel_h: float = clampf(text_h + TOAST_PAD_V, TOAST_MIN_H, TOAST_MAX_H)
-	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - panel_h
+	for c in _toast_row.get_children():
+		_toast_row.remove_child(c)
+		c.queue_free()
+	var border: Color = TOAST_COLORS.get(kind, TOAST_COLORS["info"])
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
+	sb.border_color = border
+	sb.set_border_width_all(2 if kind == "rare" else 1)
+	sb.set_corner_radius_all(9)
+	sb.content_margin_left = TOAST_PAD.x
+	sb.content_margin_right = TOAST_PAD.x
+	sb.content_margin_top = TOAST_PAD.y
+	sb.content_margin_bottom = TOAST_PAD.y
+	sb.shadow_color = Color(0, 0, 0, 0.45)
+	sb.shadow_size = 3
+	_toast_panel.add_theme_stylebox_override("panel", sb)
+
+	var font: Font = ThemeDB.fallback_font
+	var max_text_w := TOAST_MAX_W - TOAST_PAD.x * 2.0
+	for part: Dictionary in parts:
+		var tex: Texture2D = part.get("icon_tex", null)
+		if tex == null and part.has("icon"):
+			tex = UiIcons.tex(String(part["icon"]))
+		if tex != null:
+			var px := float(part.get("icon_px", 16))
+			var r := TextureRect.new()
+			r.texture = tex
+			r.custom_minimum_size = Vector2(px, px)
+			r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_toast_row.add_child(r)
+		var text := String(part.get("text", ""))
+		if text.is_empty():
+			continue
+		var wrap: bool = bool(part.get("wrap", false))
+		var l := Label.new()
+		l.text = text
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		l.add_theme_font_size_override("font_size", TOAST_FONT if wrap else TOAST_FONT + 1)
+		l.add_theme_color_override("font_color", part.get("color", Color.WHITE))
+		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		l.add_theme_constant_override("outline_size", 2)
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var fs := l.get_theme_font_size("font_size")
+		# Размер считаем сами, шрифтовыми метриками: у Label с переносом высота
+		# узнаётся только после раскладки, а панель нужна по размеру уже сейчас.
+		var one_line := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		if wrap and one_line > max_text_w:
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD
+			var h := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, max_text_w, fs).y
+			l.custom_minimum_size = Vector2(max_text_w, h)
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		else:
+			l.custom_minimum_size = Vector2(one_line + 1.0, 0)
+		_toast_row.add_child(l)
+
+	_toast_panel.modulate.a = 1.0
+	_toast_panel.visible = true
+	_place_toast()
+	_toast_timer.start(seconds)
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	UiAnim.appear(_toast_panel, 0.88, 0.16)
+	if kind == "rare" and not Settings.reduce_motion:
+		UiAnim.pulse(_toast_panel, 0.1, 0.5)
 
 
-func _on_fell(damage: float, speed: float) -> void:
+## Низ панели стоит на месте, верх и бока — по фактическому размеру. reset_size()
+## сбивает смещения у якорей, поэтому считаем их сами.
+func _place_toast() -> void:
+	var sz := _toast_panel.get_combined_minimum_size()
+	_toast_panel.offset_left = -sz.x * 0.5
+	_toast_panel.offset_right = sz.x * 0.5
+	_toast_panel.offset_bottom = TOAST_BOTTOM_OFFSET
+	_toast_panel.offset_top = TOAST_BOTTOM_OFFSET - sz.y
+	_toast_panel.pivot_offset = sz * 0.5
+
+
+func _hide_toast() -> void:
+	if _toast_panel == null or not _toast_panel.visible:
+		return
+	if Settings.reduce_motion or not _toast_panel.is_inside_tree():
+		_toast_panel.visible = false
+		return
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.2)
+	_toast_tween.tween_callback(func() -> void:
+		_toast_panel.visible = false
+		_toast_panel.modulate.a = 1.0)
+
+
+## Короткие тосты событий: иконка + слово или число, фразы убраны (текст только
+## по наведению, заказ владельца). Что именно произошло, видно по иконкам.
+## Предупреждение о голоде/бодрости (ГДД п.7): на 25% — значок и вспышка полоски,
+## на 10% — ещё и встряска экрана и две секунды красного мигания. Раньше сигнал
+## никто не слушал, и «предупреждение на экране» из ГДД не показывалось.
+func _on_survival_warning(bar_name: String, severe: bool) -> void:
+	var bar: HudBar = _hunger_bar if bar_name == "hunger" else _stamina_bar
+	if bar == null:
+		return
+	toast_parts([{"icon": bar_name}, {"text": "!!" if severe else "!", "color": Color8(0xE8, 0x8C, 0x80)}],
+		2.0, "bad")
+	Sfx.play("warn_low")
+	if severe:
+		bar.alert(2.0)
+		Fx.shake(3.0, 0.3)
+		Haptics.buzz(80)
+	else:
+		bar.alert(0.6)
+		Haptics.tap()
+
+
+func _on_fell(damage: float, _speed: float) -> void:
 	if damage > 0.0:
-		toast("Удар на скорости %.1f кл/с — минус %d HP" % [speed, int(damage)])
+		toast_icon("hp", "−%d" % int(damage), 1.6, Color8(0xE8, 0x8C, 0x80), "bad")
 
 
 func _on_dig_blocked(tile_type: int) -> void:
+	# «Инструмент звенит о породу, стан от вибрации»: кирка, порода, «Звон!».
 	var mineral_id := MineralMap.mineral_id_for(tile_type)
-	var name_ru: String = "породу"
+	var parts: Array = []
+	var tool_path := _tool_icon_path(GameState.current_tool)
+	if not tool_path.is_empty() and ResourceLoader.exists(tool_path):
+		parts.append({"icon_tex": load(tool_path)})
 	if not mineral_id.is_empty():
-		name_ru = String(Balance.get_mineral(mineral_id).get("name_ru", "породу"))
-	toast(Balance.get_tool_name_ru(GameState.current_tool) + " звенит о " + name_ru.to_lower() + ". Стан от вибрации.")
+		parts.append({"icon_tex": UiIcons.item(mineral_id)})
+	parts.append({"text": "Звон!", "color": Color8(0xE8, 0x8C, 0x80)})
+	toast_parts(parts, 2.0, "bad")
+	Sfx.play("ui_deny")
 
 
 func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_loot: bool, coins: int) -> void:
 	if was_loot and coins == 0 and not mineral_id.is_empty():
-		toast(Balance.get_mineral(mineral_id).get("name_ru", "Находка") + " — рюкзак полон, пришлось оставить.")
+		# Рюкзак полон, находку пришлось оставить: предмет, рюкзак, «Полно».
+		toast_parts([
+			{"icon_tex": UiIcons.item(mineral_id)},
+			{"icon": "weight"},
+			{"text": "Полно", "color": Color8(0xE8, 0x8C, 0x80)},
+		], 2.2, "bad")
+		Sfx.play("ui_deny")
+		UiAnim.shake(_load_pill, 3.0, 0.3)
 	elif was_loot and not mineral_id.is_empty():
-		var name_ru := String(Balance.get_mineral(mineral_id).get("name_ru", ""))
-		float_pickup(x, y, "%s +1" % name_ru)
+		float_item(x, y, mineral_id)
+		UiAnim.pulse(_inv_button, 0.12, 0.2)
 		# Крупная находка отмечается тостом — но БЕЗ суммы в монетах: монет
 		# за копку не дают вовсе, их дают при продаже, а «+100 монет» читается
 		# как «уже на счету» (решение владельца). И не больше нескольких раз
 		# за игру: на десятый раз это уже не событие, а помеха.
 		if coins >= RARE_FIND_COINS and GameState.rare_find_toasts_shown < RARE_FIND_TOAST_LIMIT:
 			GameState.rare_find_toasts_shown += 1
-			toast("%s! Редкая находка." % name_ru)
+			show_rare_find(mineral_id)
 	if y == 80 and tile_type == TileTypes.Type.DIAMOND:
-		toast("Алмаз замурован в камне. Дедова кирка трескается — минус 25% скорости.", 4.0)
+		# Алмаз замурован в камне, дедова кирка трескается (−25% скорости).
+		toast_parts([
+			{"icon_tex": UiIcons.item("diamond")},
+			{"icon_tex": load("res://art/items/pickaxe_rusty_cracked.png")},
+			{"text": "−25%", "color": Color8(0xE8, 0x8C, 0x80)},
+		], 4.0, "bad")
+
+
+## Тост редкой находки: звезда, предмет покрупнее и название золотом, золотая
+## рамка, «подпрыгивает». Название — единственное слово: что нашёл, важно знать.
+func show_rare_find(mineral_id: String) -> void:
+	var name_ru := String(Balance.get_mineral(mineral_id).get("name_ru", ""))
+	toast_parts([
+		{"icon": "star"},
+		{"icon_tex": UiIcons.item(mineral_id), "icon_px": 24},
+		{"text": name_ru, "color": TOAST_COLORS["rare"]},
+	], 2.8, "rare")
+	Sfx.play("pickup_rare")
 
 
 func _on_gear_unlocked(gear_id: String) -> void:
@@ -2043,32 +1840,49 @@ func _on_gear_unlocked(gear_id: String) -> void:
 	# или покупка в магазине, — и до сих пор ни тот, ни другой путь ни разу
 	# не объяснял игроку, что ранец вообще поднимает в воздух. Задание
 	# владельца (новый сюжет ранца): "покажи, что удержание ВВЕРХ теперь даёт
-	# полёт" — тот же toast(), которым HUD уже объявляет любую другую находку.
+	# полёт" — теперь без слов: ранец с винтом и стрелка вверх.
 	if gear_id == "backpack":
-		toast("Ранец на плечах. Держи ВВЕРХ в прыжке — и полетишь.", 4.0)
+		toast_parts([
+			{"icon_tex": load("res://art/items/backpack_propeller.png")},
+			{"icon": "arrow_up"},
+			{"text": "Полёт", "color": Color8(0xF2, 0xD9, 0x9B)},
+		], 4.0, "good")
 	if gear_id == "drill_rig":
-		toast("Глубина 1000. Собран бурмобиль — копает вдвое быстрее бура.", 5.0)
+		# Глубина 1000, собран бурмобиль: копает вдвое быстрее бура.
+		toast_parts([
+			{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24},
+			{"text": "×2", "color": Color8(0xF2, 0xD9, 0x9B)},
+		], 4.0, "good")
 
 
 func _on_tool_switched(tool_id: String) -> void:
 	_sync_tool()
 	_show_tool_name()
 	if tool_id == "rusty_pickaxe":
-		toast("Лопата упёрлась в старый фундамент. В мастерской нашлась дедова кирка.", 3.6)
+		# Лопата упёрлась в старый фундамент, нашлась дедова кирка.
+		toast_parts([
+			{"icon_tex": load("res://art/items/pickaxe_rusty.png"), "icon_px": 24},
+			{"text": "Дедова кирка", "color": Color8(0xF2, 0xD9, 0x9B)},
+		], 3.4, "info")
 
 
 ## Герой сам сел за руль, войдя в тоннель с машиной в собственности, но не в
 ## руках (решение владельца: «спускаясь под землю он должен быть только в
 ## нём»). tool_changed уже пересинхронизировал иконку — здесь только тост.
 func _on_entered_rig() -> void:
-	toast("Ты сел в бурмобиль.", 2.6)
+	toast_parts([{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24}], 1.8, "good")
 
 
 ## Бурмобиль без топлива: либо не пускает в тоннель с поверхности, либо
-## глохнет прямо под землёй. Текст сообщения решает player.gd — здесь он
-## просто показывается (см. player.gd:_move_y и :_start_dig).
+## глохнет прямо под землёй. Текст сообщения решает player.gd (см. player.gd:
+## _move_y и :_start_dig); на экране — топливо «0», а если надо идти на
+## верстак — ещё и значок верстака.
 func _on_rig_fuel_warning(message: String) -> void:
-	toast(message)
+	var parts: Array = [{"icon": "fuel", "text": "0", "color": Color8(0xE8, 0x8C, 0x80)}]
+	if message.contains("верстак"):
+		parts.append({"icon": "workshop"})
+	toast_parts(parts, 2.8, "bad")
+	Sfx.play("ui_deny")
 
 
 # ---------------------------------------------------------------------------
@@ -2088,103 +1902,30 @@ func open_inventory() -> void:
 	if player != null:
 		player.digging = null
 		player.release_control()
-	_render_inventory()
-	_inv_sheet.visible = true
+	_inv_sheet.open()
 	_inv_button.button_pressed = true
 
 
 func close_inventory() -> void:
-	_close_drop()
-	_inv_sheet.visible = false
+	_inv_sheet.close()
 	_inv_button.button_pressed = false
 
 
 func _render_inventory() -> void:
-	for c in _inv_list.get_children():
-		c.queue_free()
-	var rows: Array = []
-	for id in GameState.inventory.keys():
-		var count: int = int(GameState.inventory[id])
-		if count <= 0:
-			continue
-		var price := Balance.get_mineral_price(id)
-		rows.append({"id": id, "count": count, "sum": price * count})
-	rows.sort_custom(func(a, b): return a.sum > b.sum)
-
-	if rows.is_empty():
-		var empty := Label.new()
-		empty.text = "Рюкзак пуст.\nЗемля и камень в него не кладутся — только руда и находки."
-		empty.add_theme_font_size_override("font_size", 10)
-		empty.autowrap_mode = TextServer.AUTOWRAP_WORD
-		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_inv_list.add_child(empty)
-		_inv_total_label.text = "0"
-	else:
-		var total := 0
-		for row in rows:
-			total += row.sum
-			var line := HBoxContainer.new()
-			var icon := TextureRect.new()
-			icon.custom_minimum_size = Vector2(16, 16)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			var tex := TileArt.texture_for(MineralMap.tile_type_for(row.id), 0, 0)
-			if tex != null:
-				icon.texture = tex
-			line.add_child(icon)
-			var name_label := Label.new()
-			name_label.text = String(Balance.get_mineral(row.id).get("name_ru", row.id))
-			name_label.add_theme_font_size_override("font_size", 10)
-			name_label.clip_text = true
-			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			line.add_child(name_label)
-			var count_label := Label.new()
-			count_label.text = "×%d" % row.count
-			count_label.add_theme_font_size_override("font_size", 10)
-			line.add_child(count_label)
-			var sum_label := Label.new()
-			sum_label.text = str(row.sum)
-			sum_label.add_theme_font_size_override("font_size", 10)
-			sum_label.custom_minimum_size = Vector2(34, 0)
-			sum_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			sum_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-			line.add_child(sum_label)
-			# Съесть прямо из рюкзака: кнопку «Еда» с нижней полосы убрали, и
-			# голод в шахте закрывается там, где еда лежит.
-			if HouseConfig.is_food(row.id):
-				var eat_btn := Button.new()
-				eat_btn.text = "Съесть"
-				eat_btn.add_theme_font_size_override("font_size", 9)
-				eat_btn.custom_minimum_size = Vector2(38, 20)
-				var fid: String = row.id
-				eat_btn.pressed.connect(func(): _eat_from_inventory(fid))
-				line.add_child(eat_btn)
-			# Выбросить: рюкзак заполняется задолго до подъёма, и без этого
-			# единственный способ освободить место под алмаз — идти домой.
-			var drop_btn := Button.new()
-			drop_btn.text = "×"  # ✕ (U+2715) в шрифте темы отсутствует, см. выше
-			drop_btn.tooltip_text = "Выбросить"
-			drop_btn.add_theme_font_size_override("font_size", 10)
-			drop_btn.custom_minimum_size = Vector2(22, 20)
-			var rid: String = row.id
-			var rcount: int = row.count
-			drop_btn.pressed.connect(func(): _open_drop(rid, rcount))
-			line.add_child(drop_btn)
-			_inv_list.add_child(line)
-		_inv_total_label.text = str(total)
-
-	var load_kg := GameState.get_total_weight()
-	var max_kg := GameState.get_max_carry_kg()
-	_inv_load_label.text = "%.1f / %.0f кг" % [load_kg, max_kg]
+	_inv_sheet.refresh()
 
 
 func _eat_from_inventory(id: String) -> void:
 	var res := HouseFood.eat(id)
 	if not bool(res.get("ok", false)):
 		toast(String(res.get("reason", "")))
+		Sfx.play("ui_deny")
 		return
-	toast("%s: голод +%d%%, бодрость +%d%%" % [
-		HouseConfig.food_name(id), int(res.get("hunger", 0.0)), int(res.get("stamina", 0.0))])
+	toast_parts([
+		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": Color8(0xE8, 0x7E, 0x6E)},
+		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": Color8(0xE8, 0xC5, 0x47)},
+	], 2.0)
+	Sfx.play("eat")
 	_render_inventory()
 	_sync_all()
 
@@ -2212,7 +1953,10 @@ func _set_mode(m: String) -> void:
 	if player != null:
 		player.release_control()
 	_stick.visible = mode == "stick"
-	_hold_hint.visible = mode == "hold"
+	if mode == "hold":
+		_flash_hold_hint()
+	else:
+		_hold_hint.visible = false
 	if _arrows_panel != null:
 		_arrows_panel.visible = mode == "arrows"
 		_layout_arrows()
@@ -2259,7 +2003,7 @@ func _input(event: InputEvent) -> void:
 	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
 	if _dismiss_on_outside_press(event):
 		return
-	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
 		return
 
 	# Тестовая панель (debug_panel.gd) плавает НАД нижней полосой, то есть
@@ -2301,8 +2045,8 @@ func _dismiss_on_outside_press(event: InputEvent) -> bool:
 			get_viewport().set_input_as_handled()
 			return true
 		return false
-	if _drop_panel != null and _drop_panel.visible:
-		if not _drop_card_rect().has_point(e.pos):
+	if _inv_sheet != null and _inv_sheet.is_drop_open():
+		if not _inv_sheet.drop_card_rect().has_point(e.pos):
 			_close_drop()
 			get_viewport().set_input_as_handled()
 			return true
@@ -2326,7 +2070,7 @@ func _panel_card_rect(panel: Control) -> Rect2:
 
 
 func _drop_card_rect() -> Rect2:
-	return _panel_card_rect(_drop_panel)
+	return _inv_sheet.drop_card_rect()
 
 
 ## Приводит мышь/тач-события к одному виду: {kind:"press"|"release"|"move",
@@ -2426,7 +2170,7 @@ func _handle_hold_input(event: InputEvent) -> void:
 ## клавиатура, потом палец: клавиша главнее, иначе лежащий на стекле палец
 ## перебивал бы её каждый кадр.
 func update_input_intent() -> void:
-	if player == null or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
 		return
 	if _apply_keyboard():
 		return

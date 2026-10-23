@@ -156,6 +156,9 @@ func get_mineral_density_percent(id: String, depth: int) -> float:
 			if width <= 0.0:
 				return maxf(peak, tail)
 			var t := float(depth - peak_depth) / width
+			# rise=zero — как в world_gen._ore_density: подъём к пику с нуля
+			if depth <= peak_depth and str(density.get("rise", "")) == "zero":
+				tail = 0.0
 			return maxf(peak * (1.0 - t * t), tail)
 		"by_depth_table":
 			for entry in density.get("entries", []):

@@ -72,6 +72,8 @@ static func make_button(text: String, font_size: int = 9) -> Button:
 	b.add_theme_color_override("font_pressed_color", GOLD)
 	b.add_theme_color_override("font_hover_color", GOLD)
 	b.add_theme_color_override("font_disabled_color", DIM)
+	# Общий отклик нажатия (звук ui_tap, вибро, «проседание») — как у кнопок HUD.
+	UiBtn.wire_feedback(b)
 	return b
 
 

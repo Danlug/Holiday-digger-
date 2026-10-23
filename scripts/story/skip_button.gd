@@ -12,6 +12,9 @@ const HOLD_SEC := 0.6
 const DOUBLE_MS := 600
 const HINT_SEC := 2.2
 
+## Куда класть подсказку: слева от кнопки (полоса кинокадра) или под ней (плашка автокопки).
+var hint_below: bool = false
+
 var _down: bool = false
 var _hover: bool = false
 var _hold: float = 0.0
@@ -93,7 +96,10 @@ func hint_visible() -> bool:
 
 
 func _place_hint() -> void:
-	_hint.position = Vector2(-_hint.size.x - 5.0, (SIZE_PX.y - _hint.size.y) * 0.5)
+	if hint_below:
+		_hint.position = Vector2(SIZE_PX.x - _hint.size.x, SIZE_PX.y + 5.0)
+	else:
+		_hint.position = Vector2(-_hint.size.x - 5.0, (SIZE_PX.y - _hint.size.y) * 0.5)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -151,6 +157,9 @@ func _show_hint() -> void:
 	Sfx.play("ui_tap", 0.9)
 	_hint_left = HINT_SEC
 	_hint.visible = true
+	# Размер плашки считается уже в дереве: до этого шрифт ещё без темы и меряет крупнее.
+	_hint_label.text = StoryText.get_text("ui.skip_hint")
+	_hint.reset_size()
 	_place_hint()
 	if not DialogueStyle.reduced() and is_inside_tree():
 		_hint.modulate.a = 0.0

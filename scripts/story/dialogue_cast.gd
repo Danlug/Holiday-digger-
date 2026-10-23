@@ -101,6 +101,14 @@ static func accent(who: String) -> Color:
 	return DEFAULT_ACCENT
 
 
+## Цвет текста реплики: у большинства общий, у «Голоса» — свой, чтобы читался чужим.
+static func text_color(who: String) -> Color:
+	var sp := speaker(who)
+	if sp.has("text"):
+		return Color.html(String(sp["text"]))
+	return DialogueStyle.TEXT
+
+
 ## Выражение лица по реплике. Сначала явная замена по ключу текста
 ## (data/dialogue.json: faces), иначе по знакам препинания — они одинаковы в
 ## любом языке, так что подбор не привязан к русскому тексту.

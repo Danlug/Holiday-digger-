@@ -9,7 +9,7 @@
 		"grandpa": {"portrait": "grandpa", "side": "right", "pitch": 0.8, "accent": "#A8946E", "variants": {"grandpa_gear": "grandpa_gear"}},
 		"robert": {"portrait": "robert", "side": "right", "pitch": 0.68, "accent": "#5C86A0"},
 		"parents": {"portrait": "parents", "side": "right", "pitch": 1.0, "accent": "#8A5A6A"},
-		"voice": {"portrait": "voice", "side": "right", "pitch": 0.5, "accent": "#6A4FA8", "blip_db": -13.0}
+		"voice": {"portrait": "voice", "side": "right", "pitch": 0.5, "accent": "#6A4FA8", "text": "#E4D6FF", "blip_db": -13.0}
 	},
 	"typing": {
 		"cps": 42.0,

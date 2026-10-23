@@ -44,7 +44,7 @@ var _from: Vector2 = Vector2.ZERO
 var _banner_layer: CanvasLayer
 var _banner: Panel
 var _banner_label: Label
-var _skip_btn: Button
+var _skip_btn: SkipButton
 
 
 func begin(player: Node, world: WorldGen) -> void:
@@ -107,10 +107,7 @@ func _build_banner() -> void:
 	_banner.offset_right = -8
 	_banner.offset_top = 8
 	_banner.offset_bottom = 34
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.043, 0.035, 0.027, 0.92)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.set_border_width_all(1)
+	var sb := DialogueStyle.panel_box(8, 1, 3)
 	_banner.add_theme_stylebox_override("panel", sb)
 	_banner_layer.add_child(_banner)
 
@@ -121,15 +118,15 @@ func _build_banner() -> void:
 	_banner_label.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
 	_banner.add_child(_banner_label)
 
-	_skip_btn = Button.new()
-	_skip_btn.text = StoryText.get_text("ui.skip")
-	_skip_btn.add_theme_font_size_override("font_size", 9)
+	# Тот же «Пропустить», что и в катсценах: иконка, подтверждение удержанием или двойным тапом.
+	_skip_btn = SkipButton.new()
+	_skip_btn.hint_below = true
 	_skip_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_skip_btn.offset_left = -62
-	_skip_btn.offset_right = -4
-	_skip_btn.offset_top = 3
-	_skip_btn.offset_bottom = 23
-	_skip_btn.pressed.connect(skip)
+	_skip_btn.offset_left = -SkipButton.SIZE_PX.x - 4.0
+	_skip_btn.offset_right = -4.0
+	_skip_btn.offset_top = 2.0
+	_skip_btn.offset_bottom = 2.0 + SkipButton.SIZE_PX.y
+	_skip_btn.confirmed.connect(skip)
 	_banner.add_child(_skip_btn)
 
 

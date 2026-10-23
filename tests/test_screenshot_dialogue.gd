@@ -76,6 +76,8 @@ func _ready() -> void:
 				await _synthetic(director)
 			"skip":
 				await _skip_states(director)
+			"autodig":
+				await _autodig(director)
 			_:
 				await _scene(director, String(id))
 	print("test_screenshot_dialogue: готово -> " + _out_dir)
@@ -204,3 +206,17 @@ func _skip_states(director: StoryDirector) -> void:
 	cs._skip_btn.release()
 	cs.abort()
 	await _settle(0.5)
+
+
+## Плашка автокопки с той же кнопкой «Пропустить».
+func _autodig(director: StoryDirector) -> void:
+	director.cutscene.abort()
+	director.auto_dig.begin(director.player, director.world)
+	await _settle(0.8)
+	_shot("autodig_banner")
+	director.auto_dig._skip_btn.press()
+	director.auto_dig._skip_btn.release()
+	await _settle(0.3)
+	_shot("autodig_hint")
+	director.auto_dig.abort()
+	await _settle(0.4)

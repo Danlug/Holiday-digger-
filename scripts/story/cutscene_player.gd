@@ -39,6 +39,7 @@ const ART_SCALE := 3.0
 const TILE := 32.0     # клетка мира в логических px — см. player.gd/world_actor.gd
 const CHAR_FRAME := int(48 * ART_SCALE)
 const ANIM_FPS := 7.0
+const TAP_DEBOUNCE_MS := 90    # ScreenTouch и эмулированная мышь — одно касание, а не два
 
 var scene_id: String = ""
 var is_playing: bool = false
@@ -76,7 +77,6 @@ var _beats: Array = []
 var _index: int = 0
 var _beat_timer: float = 0.0     # сколько ещё держать кадр с автопереходом
 var _last_tap_ms: int = -100000
-const TAP_DEBOUNCE_MS := 90
 var _waiting_tap: bool = false
 ## Печать реплики ведёт DialogueUI; поле осталось, чтобы ход сцены (и тесты) читали
 ## и гасили её так же, как раньше.

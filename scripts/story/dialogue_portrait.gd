@@ -18,6 +18,8 @@ var face: String = "neutral"
 var talking: bool = false
 var active: bool = false
 var target_pos: Vector2 = Vector2.ZERO
+## Смещение «реакции» (прыжок удивления, подскок радости, дрожь злости): плюсуется к позиции.
+var react_off: Vector2 = Vector2.ZERO
 
 var _sheet: Texture2D = null
 var _accent: Color = DialogueCast.DEFAULT_ACCENT
@@ -29,6 +31,7 @@ var _blink_left: float = 0.0
 var _frame: int = 0
 var _tween: Tween = null
 var _vis_tween: Tween = null
+var _react_tween: Tween = null
 
 
 func _init() -> void:
@@ -131,6 +134,33 @@ func vanish() -> void:
 	_vis_tween = create_tween()
 	_vis_tween.tween_property(self, "modulate:a", 0.0, 0.12)
 	_vis_tween.tween_callback(func() -> void: visible = false)
+
+
+## Короткая телодвижение по выражению: удивление — прыжок, радость — два подскока,
+## злость — дрожь, грусть — оседание. Нейтральное лицо не двигается.
+func react(f: String) -> void:
+	if _react_tween != null and _react_tween.is_valid():
+		_react_tween.kill()
+	_react_tween = null
+	react_off = Vector2.ZERO
+	if not active or f == "neutral" or DialogueStyle.reduced() or not is_inside_tree():
+		return
+	var tw := create_tween()
+	_react_tween = tw
+	match f:
+		"surprise":
+			tw.tween_property(self, "react_off", Vector2(0, -5), 0.07).set_ease(Tween.EASE_OUT)
+			tw.tween_property(self, "react_off", Vector2.ZERO, 0.18).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		"happy":
+			for _i in 2:
+				tw.tween_property(self, "react_off", Vector2(0, -3), 0.08).set_ease(Tween.EASE_OUT)
+				tw.tween_property(self, "react_off", Vector2.ZERO, 0.08).set_ease(Tween.EASE_IN)
+		"angry":
+			for dx in [2.5, -2.5, 2.0, -1.5, 0.0]:
+				tw.tween_property(self, "react_off", Vector2(dx, 0), 0.04)
+		"sad":
+			tw.tween_property(self, "react_off", Vector2(0, 3), 0.25).set_trans(Tween.TRANS_SINE)
+			tw.tween_property(self, "react_off", Vector2(0, 1), 0.4)
 
 
 func _kill_vis() -> void:

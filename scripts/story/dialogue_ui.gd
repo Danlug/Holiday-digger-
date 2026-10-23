@@ -208,7 +208,7 @@ func tick(dt: float) -> void:
 		var bob := 0.0
 		if p.active and p.talking and p.current_frame() == 1 and not DialogueStyle.reduced():
 			bob = -1.0
-		p.position = p.position.lerp(p.target_pos + Vector2(0, bob), minf(1.0, dt * 26.0)) \
+		p.position = p.position.lerp(p.target_pos + Vector2(0, bob) + p.react_off, minf(1.0, dt * 30.0)) \
 			if not DialogueStyle.reduced() else p.target_pos
 	arrow.visible = _waiting and not typing
 	if arrow.visible:
@@ -247,7 +247,10 @@ func _set_speaker(who: String, speaker_name: String, text: String, opts: Diction
 		if p.visible and not p.who.is_empty():
 			p.set_active(s == side, true)
 	_active_side = side
-	target.set_face(face, true)
+	var changed := target.face != face
+	target.set_face(face, false)
+	if fresh or changed:
+		target.react(face)
 	_place_portraits()
 	if fresh:
 		target.appear(Vector2(-14.0 if side == "left" else 14.0, 10.0))
@@ -363,7 +366,7 @@ func _apply_text_style() -> void:
 	if narration:
 		line.add_theme_color_override("font_color", DialogueStyle.TEXT_NARR)
 	else:
-		line.add_theme_color_override("font_color", DialogueStyle.TEXT)
+		line.add_theme_color_override("font_color", DialogueCast.text_color(_who))
 
 
 func _measure() -> void:

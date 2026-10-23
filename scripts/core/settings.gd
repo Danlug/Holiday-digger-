@@ -46,6 +46,10 @@ static var haptics_enabled: bool = true
 ## накрутку чисел). Первое значение берём у системы, как prefers-reduced-motion
 ## в вебе; дальше решает игрок.
 static var reduce_motion: bool = false
+## Контекстные подсказки «знакомство с системами» (scripts/hints/). Выключатель
+## «не мешать»: подсказки и метки «new» молчат, ничего не теряя — что показано, помнит
+## GameState.ext["hints"].
+static var hints_enabled: bool = true
 
 
 ## Заводит звуковые шины, если их ещё нет (первый запуск процесса — шины
@@ -135,6 +139,11 @@ static func set_reduce_motion(v: bool) -> void:
 	save()
 
 
+static func set_hints_enabled(v: bool) -> void:
+	hints_enabled = v
+	save()
+
+
 ## Системное «меньше движения»: есть только в вебе (matchMedia); в остальных
 ## сборках остаётся false, пока игрок сам не включит в настройках.
 static func detect_system_reduce_motion() -> bool:
@@ -160,6 +169,7 @@ static func save() -> bool:
 		"language": language,
 		"haptics_enabled": haptics_enabled,
 		"reduce_motion": reduce_motion,
+		"hints_enabled": hints_enabled,
 	}, "\t"))
 	f.close()
 	return true
@@ -188,5 +198,6 @@ static func load_from_disk() -> bool:
 	language = String(raw.get("language", "ru"))
 	haptics_enabled = bool(raw.get("haptics_enabled", true))
 	reduce_motion = bool(raw.get("reduce_motion", detect_system_reduce_motion()))
+	hints_enabled = bool(raw.get("hints_enabled", true))
 	Haptics.enabled = haptics_enabled
 	return true

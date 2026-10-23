@@ -16,15 +16,19 @@ extends Node
 
 func _ready() -> void:
 	_build("res://scripts/house/house_view.gd", "res://scenes/house.tscn", "House")
-	_build("res://scripts/house/house_prompt.gd", "res://scenes/house_prompt.tscn", "HousePrompt")
-	_build("res://scripts/house/house_storage_view.gd", "res://scenes/house_storage.tscn", "HouseStorageView")
+	# Окно обучения и склад строятся кодом в _ready (у них узлы со скриптами,
+	# повторно собирающие себя при загрузке): в сцену идёт голый корень.
+	_build("res://scripts/house/house_prompt.gd", "res://scenes/house_prompt.tscn", "HousePrompt", true)
+	_build("res://scripts/house/house_storage_view.gd", "res://scenes/house_storage.tscn", "HouseStorageView", true)
 	get_tree().quit(0)
 
 
-func _build(script_path: String, scene_path: String, root_name: String) -> void:
+func _build(script_path: String, scene_path: String, root_name: String, bare: bool = false) -> void:
 	var node = load(script_path).new()
 	node.name = root_name
-	if node.has_method("_ensure_structure"):
+	if bare:
+		pass
+	elif node.has_method("_ensure_structure"):
 		node._ensure_structure()
 	else:
 		node._build()

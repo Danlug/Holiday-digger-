@@ -1,0 +1,35 @@
+{
+	"frame": [
+		72,
+		64
+	],
+	"scale": 3,
+	"foot": 1,
+	"anchor": "feet",
+	"anims": {
+		"idle": {
+			"row": 0,
+			"frames": 4,
+			"fps": 4,
+			"loop": true
+		},
+		"move": {
+			"row": 1,
+			"frames": 6,
+			"fps": 8,
+			"loop": true
+		},
+		"attack": {
+			"row": 2,
+			"frames": 4,
+			"fps": 6,
+			"loop": false
+		},
+		"die": {
+			"row": 3,
+			"frames": 5,
+			"fps": 7,
+			"loop": false
+		}
+	}
+}

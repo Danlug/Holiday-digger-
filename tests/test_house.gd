@@ -441,7 +441,7 @@ func _test_tunnel_transition() -> void:
 ## входе в тоннель.
 func _test_tunnel_descent_always_works_on_foot() -> void:
 	GameState.owned_tools.append("drill_rig")
-	GameState.inventory.erase("fuel_block")
+	FuelTank.set_fuel("drill_rig", 0.0)
 	house.enter_house("workshop")
 
 	check("без брикетов спуск пешком всё равно работает", house.exit_through_tunnel())
@@ -449,12 +449,12 @@ func _test_tunnel_descent_always_works_on_foot() -> void:
 	check("инструмент не подменился машиной", GameState.current_tool != "drill_rig")
 
 	house.enter_house("workshop")
-	GameState.add_item("fuel_block", 2)
+	FuelTank.set_fuel("drill_rig", 2.0)
 	check("с брикетами спуск тоже работает", house.exit_through_tunnel())
 	check("герой вышел из дома", not GameState.house_is_indoors)
 
 	GameState.owned_tools.erase("drill_rig")
-	GameState.inventory.erase("fuel_block")
+	FuelTank.set_fuel("drill_rig", 0.0)
 
 
 ## Кнопка «В бурмобиль» (решение владельца от 2026-09-21: посадка не
@@ -465,7 +465,7 @@ func _test_rig_button_near_parked_rig() -> void:
 	var mouth := world.tunnel_mouth()
 	GameState.owned_tools.append("drill_rig")
 	GameState.rig_parked_at = Vector2i(-1, -1)
-	GameState.inventory.erase("fuel_block")
+	FuelTank.set_fuel("drill_rig", 0.0)
 	GameState.house_is_indoors = false
 	player.frozen = false
 	player.x = float(mouth.x) + 0.5
@@ -480,7 +480,7 @@ func _test_rig_button_near_parked_rig() -> void:
 	check("без брикетов посадка не началась", player.rig_transition == "")
 	check("машина осталась на парковке без топлива", GameState.is_rig_parked())
 
-	GameState.add_item("fuel_block", 3)
+	FuelTank.set_fuel("drill_rig", 3.0)
 	house._on_rig_button()
 	check("с брикетами посадка началась", player.rig_transition == "enter")
 
@@ -489,7 +489,7 @@ func _test_rig_button_near_parked_rig() -> void:
 	check("машина снята с парковки", not GameState.is_rig_parked())
 
 	GameState.owned_tools.erase("drill_rig")
-	GameState.inventory.erase("fuel_block")
+	FuelTank.set_fuel("drill_rig", 0.0)
 	GameState.current_tool = "shovel"
 	GameState.rig_parked_at = Vector2i(-1, -1)
 	player.frozen = false
@@ -694,7 +694,9 @@ func _test_outdoor_enter_hotspot() -> void:
 	player.y = 0.5
 	house._update_outdoor_hotspot()
 	check("«Зайти» видна у окна веранды", house._outdoor_button.visible)
-	check("подпись — «Зайти» (не «Дом»)", house._outdoor_button.text == "Зайти")
+	# Подписи на кнопке больше нет (пузырь-значок): «Зайти» — заголовок её подсказки Tip.
+	check("подсказка — «Зайти» (не «Дом»)",
+		String((house._outdoor_button.get_meta(Tip.META) as Dictionary).get("title", "")) == "Зайти")
 
 	player.x = door.x + 20.0
 	house._update_outdoor_hotspot()

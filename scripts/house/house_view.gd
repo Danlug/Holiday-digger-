@@ -102,12 +102,13 @@ const WALK_FPS := 8.0 * (WALK_SPEED_PX_S / 130.0)
 
 const IDLE_SHEET := "res://art/character/idle.png"
 const WALK_SHEET := "res://art/character/walk.png"
-## Спрайт-лист сна готовит другой агент (задание владельца): здесь только
-## проигрывается. Нет файла — играем статичную позу art/character/sleep.png
-## (уже есть в репозитории), нет и её — просто держим паузу без падения.
-const SLEEP_SHEET := "res://art/anim/sleep_sheet.png"
-const SLEEP_SHEET_META := "res://art/anim/sleep_sheet.json"
-const SLEEP_STATIC_POSE := "res://art/character/sleep.png"
+
+## Названия комнат — только для подсказки значка в шапке.
+## Длина ролика «курьер стучит в дверь»: въезжает, три удара, уезжает.
+const KNOCK_TOTAL := 2.1
+const KNOCK_BEATS := [0.55, 0.95, 1.35]
+
+const ROOM_NAMES := {"hall": "Салон", "bedroom": "Спальня", "workshop": "Мастерская"}
 
 const KEY_LEFT_A: Key = KEY_A
 const KEY_LEFT_ARROW: Key = KEY_LEFT
@@ -115,8 +116,8 @@ const KEY_RIGHT_D: Key = KEY_D
 const KEY_RIGHT_ARROW: Key = KEY_RIGHT
 
 var _root: Control
-var _title: Label
 var _clock: Label
+var _day: Label
 var _bars: Dictionary = {}       # "hp"|"hunger"|"stamina" -> ColorRect (заливка)
 var _notice: Label
 var _notice_until_msec: float = 0.0
@@ -129,20 +130,21 @@ var _hotspot_layer: Control
 var _walk_left_btn: Button
 var _walk_right_btn: Button
 
-var _forced: Control
-var _forced_text: Label
-var _forced_button: Button
+var _forced: HouseForcedCard
 var _forced_mode: String = ""    # "" | "sleep"
 
-var _sleep_overlay: Control
-var _sleep_sprite: TextureRect
-var _sleep_label: Label
+var _sleep_fx: HouseSleepFx
+var _door_pack: TextureRect     # пакет у входной двери (только в салоне)
+var _courier: TextureRect
+var _knock_icon: TextureRect
+var _knock_t: float = -1.0      # <0 — стука нет; иначе секунды ролика
+var _knock_beats: int = 0
+var _pack_shown: bool = false
+var _bar_icons: Dictionary = {}  # "hp"|"hunger"|"stamina" -> TextureRect
+var _room_icon: TextureRect
 
 var _idle_sheet: Texture2D
 var _walk_sheet: Texture2D
-var _sleep_sheet_tex: Texture2D
-var _sleep_meta: Dictionary = {}
-var _sleep_static_tex: Texture2D
 var _cur_frame_sheet: Texture2D = null
 var _cur_frame_idx: int = -1
 
@@ -187,8 +189,6 @@ var _npc_facing: int = 1
 var _npc_frame_t: float = 0.0
 
 var _sleeping: bool = false
-var _sleep_t: float = 0.0
-var _sleep_total: float = 10.0
 
 
 func _ready() -> void:
@@ -197,6 +197,7 @@ func _ready() -> void:
 	# поверх интерьера, а не под него.
 	layer = 9
 	_ensure_structure()
+	_build_live_overlays()
 	visible = false
 
 
@@ -220,7 +221,6 @@ func _ensure_structure() -> void:
 
 	_build_header()
 	_build_stage()
-	_build_forced()
 	_load_hero_sheets()
 
 
@@ -230,49 +230,77 @@ func _build_header() -> void:
 	header.offset_bottom = HEADER_HEIGHT
 	header.add_theme_stylebox_override("panel", _box(PANEL_BG, PANEL_BORDER))
 
-	_title = _need(header, "Title", Label) as Label
-	_title.position = Vector2(8, 2)
-	_title.add_theme_font_size_override("font_size", 10)
-	_title.add_theme_color_override("font_color", ACCENT)
-	_title.text = "ДОМ"
+	# Старое слово «ДОМ» из прежней сцены: теперь это значок.
+	var stale_title := header.get_node_or_null("Title")
+	if stale_title != null:
+		header.remove_child(stale_title)
+		stale_title.queue_free()
 
+	# Значок комнаты вместо слова «ДОМ»: название комнаты — в его подсказке.
+	_room_icon = _need(header, "RoomIcon", TextureRect) as TextureRect
+	_room_icon.texture = ShopArt.tex("glyph_house")
+	_room_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_room_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_room_icon.position = Vector2(6, 2)
+	_room_icon.size = Vector2(16, 16)
+	_room_icon.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	# Часы: календарь + номер дня, часы + «ЧЧ:ММ». Один числовой ярлык на пару.
+	var cal := _need(header, "CalIcon", TextureRect) as TextureRect
+	cal.texture = HouseArt.tex("calendar")
+	cal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cal.position = Vector2(28, 2)
+	cal.size = Vector2(16, 16)
+	cal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_day = _need(header, "Day", Label) as Label
+	_day.position = Vector2(45, 3)
+	_day.add_theme_font_size_override("font_size", 9)
+	_day.add_theme_color_override("font_color", ACCENT)
+	_day.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var clk := _need(header, "ClockIcon", TextureRect) as TextureRect
+	clk.texture = UiIcons.tex("clock")
+	clk.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	clk.position = Vector2(66, 3)
+	clk.size = Vector2(14, 14)
+	clk.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_clock = _need(header, "Clock", Label) as Label
-	_clock.anchor_left = 1.0
-	_clock.anchor_right = 1.0
-	_clock.offset_left = -122
-	_clock.offset_right = -62
-	_clock.offset_top = 3
-	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_clock.add_theme_font_size_override("font_size", 8)
+	_clock.position = Vector2(83, 3)
+	_clock.add_theme_font_size_override("font_size", 9)
 	_clock.add_theme_color_override("font_color", DIM)
+	_clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Кнопка «Магазин» есть и дома (решение владельца: «и дома и вне дома»).
+	# Кнопка магазина есть и дома (решение владельца: «и дома и вне дома»).
 	# На время дома HUD скрыт целиком, поэтому его кнопку сюда не дотянуть —
-	# в шапке комнаты стоит своя, зовущая ту же премиум-витрину.
+	# в шапке комнаты стоит своя, зовущая ту же премиум-витрину. Значком, не
+	# словом: название и что внутри — в подсказке.
 	var premium := _need(header, "Premium", Button) as Button
-	premium.text = "Магазин"
-	premium.add_theme_font_size_override("font_size", 8)
+	premium.text = ""
+	premium.icon = UiIcons.tex("shop")
+	premium.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	premium.expand_icon = false
+	premium.add_theme_constant_override("icon_max_width", 16)
 	premium.focus_mode = Control.FOCUS_NONE
 	premium.anchor_left = 1.0
 	premium.anchor_right = 1.0
 	# Верхняя строка, справа: ниже идут полоски выживания на всю ширину, и
 	# кнопка там налезала на бодрость.
-	premium.offset_left = -56
+	premium.offset_left = -34
 	premium.offset_right = -6
 	premium.offset_top = 1
-	premium.offset_bottom = 15
-	if not premium.pressed.is_connected(_on_premium_pressed):
-		premium.pressed.connect(_on_premium_pressed)
+	premium.offset_bottom = 21
 
 	# Полоски выживания дублируются здесь: HUD на время дома скрыт целиком
 	# (его джойстик и нижняя полоса иначе торчали бы поверх комнаты), а
 	# видеть, как поднимается бодрость, игрок должен именно в доме.
 	var bars := _need(header, "Bars", HBoxContainer) as HBoxContainer
-	bars.position = Vector2(8, 18)
+	bars.position = Vector2(8, 22)
 	bars.add_theme_constant_override("separation", 6)
 	_bars["hp"] = _bar_row(bars, "Hp", Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
 	_bars["hunger"] = _bar_row(bars, "Hunger", Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
 	_bars["stamina"] = _bar_row(bars, "Stamina", Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
+	for id in ["hp", "hunger", "stamina"]:
+		var row: Control = (_bars[id] as Node).get_parent().get_parent()
+		_bar_icons[id] = row.get_node_or_null("Icon")
 
 	# Уведомление — пузырь над кнопками ходьбы, на всю ширину и с переносом.
 	# В шапке справа ему доставалось ~120 px с обрезкой, и отказ «Не хочется
@@ -356,7 +384,6 @@ func _build_stage() -> void:
 	_hotspot_layer.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	_build_walk_buttons()
-	_build_sleep_overlay()
 
 
 func _build_walk_buttons() -> void:
@@ -409,87 +436,60 @@ func _arrow_icon(btn: Button, dir: Vector2) -> void:
 	icon.set_dir(dir)
 
 
-func _build_sleep_overlay() -> void:
-	# Оверлей живёт в _root, а не в _stage: _stage — это комната, она едет за
-	# камерой по x, и кадр сна, положенный туда, уезжал вместе с ней — у
-	# кровати (треть ширины комнаты) лицо оказывалось наполовину за правым
-	# краем экрана. Экранный слой стоит на месте.
-	_sleep_overlay = _need(_root, "SleepOverlay", Control) as Control
-	_sleep_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_root.move_child(_sleep_overlay, _root.get_child_count() - 1)
-	_sleep_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_sleep_overlay.visible = false
+## Узлы с собственным кодом строятся только в живом дереве (_ready), а не в
+## _ensure_structure: сцену дома снимает tools/gen_house_scenes.gd, и узлы со
+## скриптом, снятые в .tscn, при загрузке собрали бы себя ещё раз (_init).
+func _build_live_overlays() -> void:
+	_wire_header()
+	# Остатки старой сцены (текстовые «Спит...» и окно с абзацем) выбрасываем.
+	for stale in ["SleepOverlay", "Forced"]:
+		var old := _root.get_node_or_null(stale)
+		if old != null:
+			_root.remove_child(old)
+			old.queue_free()
 
-	var shade := _need(_sleep_overlay, "Shade", ColorRect) as ColorRect
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.03, 0.02, 0.02, 0.82)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Сон — экранный слой, а не часть комнаты: комната едет за камерой по x, и
+	# кадр сна, положенный в неё, уезжал бы вместе с ней.
+	_sleep_fx = HouseSleepFx.new()
+	_root.add_child(_sleep_fx)
+	_sleep_fx.skip_requested.connect(func(): action_requested.emit("sleep_skip", ""))
 
-	_sleep_sprite = _need(_sleep_overlay, "Sprite", TextureRect) as TextureRect
-	# Кадр авторской анимации — 224×258, ровно ширина экрана: коробка под
-	# него на всю ширину, по высоте с запасом; вписываем с сохранением
-	# пропорций, чтобы на другом экране он ужался, а не обрезался.
-	_sleep_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_sleep_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_sleep_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sleep_sprite.anchor_left = 0.0
-	_sleep_sprite.anchor_right = 1.0
-	_sleep_sprite.anchor_top = 0.5
-	_sleep_sprite.anchor_bottom = 0.5
-	_sleep_sprite.offset_left = 0
-	_sleep_sprite.offset_right = 0
-	_sleep_sprite.offset_top = -150
-	_sleep_sprite.offset_bottom = 110
+	# Пакет у входной двери и курьер, который его принёс (сцена доставки).
+	_door_pack = ShopArt.rect(HouseArt.tex("act_package"), Vector2.ZERO, Vector2(48, 48))
+	_door_pack.visible = false
+	_courier = ShopArt.rect(HouseArt.tex("courier"), Vector2.ZERO, Vector2(64, 64))
+	_courier.visible = false
+	_knock_icon = ShopArt.rect(HouseArt.tex("knock"), Vector2.ZERO, Vector2(40, 40))
+	_knock_icon.visible = false
+	_knock_icon.pivot_offset = Vector2(20, 20)
+	for n in [_door_pack, _courier]:
+		_stage.add_child(n)
+		_stage.move_child(n, _hero.get_index())
+	_stage.add_child(_knock_icon)
 
-	_sleep_label = _need(_sleep_overlay, "Label", Label) as Label
-	_sleep_label.text = "Спит..."
-	_sleep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sleep_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sleep_label.anchor_left = 0.0
-	_sleep_label.anchor_right = 1.0
-	_sleep_label.anchor_top = 1.0
-	_sleep_label.anchor_bottom = 1.0
-	_sleep_label.offset_top = -40
-	_sleep_label.offset_bottom = -10
-	_sleep_label.add_theme_color_override("font_color", ACCENT)
+	# Принудительный экран обучения (ГДД п.9): первое истощение ведёт героя в
+	# спальню и не отпускает, пока он не ляжет. Поведение и имена методов не
+	# менялись — house_system.gd зовёт их как раньше.
+	_forced = HouseForcedCard.new()
+	_forced.name = "Forced"
+	_root.add_child(_forced)
+	_forced.confirmed.connect(_on_forced_pressed)
 
 
-func _build_forced() -> void:
-	# Экран принудительного действия обучения (ГДД п.9): первое истощение
-	# ведёт героя в спальню и не отпускает, пока он не ляжет. Поведение и имя
-	# методов не менялись — house_system.gd зовёт их как раньше.
-	_forced = _need(_root, "Forced", Control) as Control
-	_forced.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_forced.mouse_filter = Control.MOUSE_FILTER_STOP
-	_forced.visible = false
-
-	var shade := _need(_forced, "Shade", ColorRect) as ColorRect
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.03, 0.02, 0.02, 0.88)
-
-	var panel := _need(_forced, "Panel", PanelContainer) as PanelContainer
-	panel.anchor_top = 0.5
-	panel.anchor_bottom = 0.5
-	panel.anchor_right = 1.0
-	panel.offset_left = 14
-	panel.offset_right = -14
-	panel.offset_top = -70
-	panel.offset_bottom = 70
-	panel.add_theme_stylebox_override("panel", _box(PANEL_BG, ACCENT))
-
-	var box := _need(panel, "Box", VBoxContainer) as VBoxContainer
-	box.add_theme_constant_override("separation", 8)
-
-	_forced_text = _need(box, "Text", Label) as Label
-	_forced_text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_forced_text.add_theme_font_size_override("font_size", 10)
-	_forced_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-
-	_forced_button = _need(box, "Button", Button) as Button
-	_style_button(_forced_button)
-	_forced_button.text = "Лечь спать"
-	if not _forced_button.pressed.is_connected(_on_forced_pressed):
-		_forced_button.pressed.connect(_on_forced_pressed)
+## Подсказки, звук нажатия и обработчик кнопки магазина в шапке. Это живая
+## «проводка»: метаданные Tip и UiBtn попали бы в снимок сцены, и при загрузке
+## сцены Tip.bind принял бы узел за уже подключённый.
+func _wire_header() -> void:
+	var header := _root.get_node("Header")
+	Tip.bind(_room_icon, "Дом")
+	var premium := header.get_node("Premium") as Button
+	UiBtn.style(premium)
+	Tip.bind(premium, "Магазин за доллары", "Гаджеты, обмен и ролики.")
+	if not premium.pressed.is_connected(_on_premium_pressed):
+		premium.pressed.connect(_on_premium_pressed)
+	for id in ["hp", "hunger", "stamina"]:
+		var row: Control = (_bars[id] as Node).get_parent().get_parent()
+		Tip.bind(row, {"hp": "Здоровье", "hunger": "Сытость", "stamina": "Бодрость"}[id])
 
 
 func _on_forced_pressed() -> void:
@@ -499,11 +499,6 @@ func _on_forced_pressed() -> void:
 func _load_hero_sheets() -> void:
 	_idle_sheet = load(IDLE_SHEET) if ResourceLoader.exists(IDLE_SHEET) else null
 	_walk_sheet = load(WALK_SHEET) if ResourceLoader.exists(WALK_SHEET) else null
-	if ResourceLoader.exists(SLEEP_SHEET):
-		_sleep_sheet_tex = load(SLEEP_SHEET)
-		_sleep_meta = HouseRoomsConfig.read_json(SLEEP_SHEET_META)
-	elif ResourceLoader.exists(SLEEP_STATIC_POSE):
-		_sleep_static_tex = load(SLEEP_STATIC_POSE)
 
 
 # ---------------------------------------------------------------------------
@@ -519,8 +514,8 @@ func open(room: String, enter_x: float = -1.0) -> void:
 	# пролистывал сцену мимо stop_sleep_animation(), и комната оставалась
 	# запертой навсегда (бот-прохождение, tests/test_bot_onboarding.gd).
 	_locked = false
-	if _sleep_overlay != null:
-		_sleep_overlay.visible = false
+	if _sleep_fx != null:
+		_sleep_fx.stop()
 	go_to_room(room, enter_x)
 
 
@@ -528,8 +523,9 @@ func close() -> void:
 	visible = false
 	_sleeping = false
 	_locked = false
-	if _sleep_overlay != null:
-		_sleep_overlay.visible = false
+	_knock_t = -1.0
+	if _sleep_fx != null:
+		_sleep_fx.stop()
 	hide_npc()
 
 
@@ -643,10 +639,6 @@ func _refresh_view_w() -> void:
 func _process(delta: float) -> void:
 	if not visible:
 		return
-	if _sleeping:
-		_sleep_t += delta
-		_update_sleep_frame()
-
 	if _is_locked():
 		_walk_dir = 0
 		_hold_left = false
@@ -657,6 +649,10 @@ func _process(delta: float) -> void:
 		_update_walk(delta)
 
 	_update_npc(delta)
+	if _knock_t >= 0.0:
+		_knock_t += delta
+		if _knock_t > KNOCK_TOTAL:
+			_knock_t = -1.0
 	refresh()
 
 
@@ -711,7 +707,11 @@ func _refresh_header() -> void:
 	var hour_f: float = day_cycle.hour if day_cycle != null else 6.0
 	var hour := int(hour_f)
 	var minute := int((hour_f - floor(hour_f)) * 60.0)
-	_clock.text = "День %d, %02d:%02d" % [day, hour, minute]
+	_day.text = str(day)
+	_clock.text = "%02d:%02d" % [hour, minute]
+	if _room_icon != null and String(_room_icon.get_meta("_room", "")) != _room_id:
+		_room_icon.set_meta("_room", _room_id)
+		Tip.bind(_room_icon, String(ROOM_NAMES.get(_room_id, "Дом")))
 
 	if _notice != null and Time.get_ticks_msec() > _notice_until_msec:
 		_notice.text = ""
@@ -767,6 +767,7 @@ func _update_camera_and_hero() -> void:
 		_floor_y_px - (HERO_H - FOOT_PAD) * HERO_SCALE)
 	_hero.flip_h = _facing < 0
 	_position_npc()
+	_update_door_props(cam_x)
 
 
 func _update_hero_frame() -> void:
@@ -974,45 +975,69 @@ func _clear_hotspots() -> void:
 
 
 func _make_hotspot_button(def: Dictionary) -> Button:
-	var btn := Button.new()
-	btn.text = String(def.get("label", ""))
-	_style_button(btn)
-	btn.custom_minimum_size = Vector2(0, 22)
-	btn.set_meta("action", String(def.get("action", "")))
-	btn.set_meta("label", String(def.get("label", "")))
-	btn.pressed.connect(func(): _fire(def))
+	var btn := HouseBubble.create(def, float(_hotspot_buttons.size()) * 0.25)
+	# Долгое нажатие показывает подсказку, а отпускание всё равно «нажимает»:
+	# без этой проверки Tip заодно увёл бы героя через дверь.
+	btn.pressed.connect(func():
+		if not Tip.swallowed():
+			_fire(def))
 	_hotspot_layer.add_child(btn)
 	return btn
 
 
 ## Кнопки всегда всплывают НАД ГЕРОЕМ (решение владельца), не над самой
-## точкой на фоне: несколько кнопок ложатся в ряд вокруг его макушки.
+## точкой на фоне: несколько пузырей ложатся в ряд вокруг его макушки.
 func _position_hotspot_buttons() -> void:
 	var n := _hotspot_buttons.size()
 	if n == 0:
 		return
 	var hero_center_x: float = _hero.position.x + HERO_W * HERO_SCALE / 2.0
 	# Над макушкой, а не над рамкой кадра: в кадре 48×48 у героя сверху шесть
-	# пустых пикселей, и после увеличения это уже тридцать — кнопка висела бы
-	# заметно выше головы.
-	var top_y: float = _hero.position.y + 6.0 * HERO_SCALE - 26.0
-	var gap := 4.0
-	var widths: Array = []
-	var total := 0.0
-	for b in _hotspot_buttons:
-		var w: float = maxf(56.0, b.get_minimum_size().x + 16.0)
-		widths.append(w)
-		total += w
-	total += gap * float(maxi(0, n - 1))
+	# пустых пикселей, и после увеличения это уже тридцать — пузырь висел бы
+	# заметно выше головы. Кончик хвостика — в паре точек над макушкой.
+	var top_y: float = _hero.position.y + 6.0 * HERO_SCALE - HouseBubble.H - 2.0
+	var gap := 6.0
+	var total := float(n) * HouseBubble.W + gap * float(n - 1)
 	var hi: float = maxf(4.0, _view_w - total - 4.0)
 	var start_x: float = clampf(hero_center_x - total / 2.0, 4.0, hi)
-	var x := start_x
 	for i in range(n):
 		var b: Button = _hotspot_buttons[i]
-		var w: float = widths[i]
-		b.position = Vector2(x, top_y)
-		b.size = Vector2(w, 22)
-		x += w + gap
+		b.position = Vector2(start_x + float(i) * (HouseBubble.W + gap), maxf(top_y, 2.0))
+	_update_bubble_dynamic()
+
+
+## Живые числа на пузырях: сколько порций ждёт у двери, что даст сон.
+## Подсказку и цифру трогаем, только когда они поменялись — Tip перерисовывается
+## при каждом bind, а кадров в секунду много.
+func _update_bubble_dynamic() -> void:
+	for b in _hotspot_buttons:
+		var bubble := b as HouseBubble
+		if bubble == null or not is_instance_valid(bubble):
+			continue
+		var action := String(bubble.get_meta("action", ""))
+		var extra := ""
+		var dim := false
+		if action == "take_delivery":
+			var n := HouseFood.food_at_door_count()
+			extra = "Порций у двери: %d" % n
+			bubble.set_count(n)
+		elif action == "sleep":
+			var plan := HouseSleep.plan(GameState.stamina, GameState.hunger)
+			if bool(plan["ok"]):
+				extra = "%d ч · бодрость +%d%% · сытость −%d%%" % [
+					int(round(float(plan["hours"]))), int(round(float(plan["stamina_gain"]))),
+					int(round(float(plan["hunger_cost"])))]
+			else:
+				extra = String(plan["reason"])
+				dim = true
+		else:
+			continue
+		var sig := "%s|%s" % [extra, dim]
+		if String(bubble.get_meta("_dyn", "")) == sig:
+			continue
+		bubble.set_meta("_dyn", sig)
+		bubble.set_tip_extra(extra)
+		bubble.set_state("dim" if dim else "normal")
 
 
 ## Нажатие кнопки хотспота. "goto:<room>" дом решает сам (это чисто вид —
@@ -1030,6 +1055,7 @@ func _fire(def: Dictionary) -> void:
 			var target_points: Dictionary = HouseRoomsConfig.points(parts[1])
 			if target_points.has(enter_at):
 				enter_x = float(target_points[enter_at].get("x", enter_x))
+		Sfx.play("door")
 		go_to_room(parts[1], enter_x)
 		action_requested.emit("goto", parts[1])
 		return
@@ -1095,41 +1121,131 @@ func set_locked(value: bool) -> void:
 
 ## house_system.gd отсчитывает реальные ~10 секунд отдельным таймером и в
 ## это время держит комнату «на паузе» (see set_locked); здесь только
-## визуальная часть — оверлей и проигрывание кадров.
-func play_sleep_animation(seconds: float) -> void:
+## визуальная часть. hours — длина сна в игровых часах (для бегущих часов),
+## skippable — показать кнопку «пропустить за ролик» (из сюжета её нет).
+func play_sleep_animation(seconds: float, hours: float = 0.0, skippable: bool = false) -> void:
 	_sleeping = true
-	_sleep_t = 0.0
-	_sleep_total = maxf(0.1, seconds)
-	if _sleep_overlay != null:
-		_sleep_overlay.visible = true
+	if _sleep_fx != null:
+		_sleep_fx.play(seconds, hours, skippable)
 	_hotspot_signature = "@sleeping"
 	_clear_hotspots()
-	_update_sleep_frame()
 
 
 func stop_sleep_animation() -> void:
 	_sleeping = false
-	if _sleep_overlay != null:
-		_sleep_overlay.visible = false
+	if _sleep_fx != null:
+		_sleep_fx.stop()
 
 
-func _update_sleep_frame() -> void:
-	if _sleep_sprite == null:
+## Курьер стучит у входной двери салона. Возвращает true, если ролик пошёл
+## (мы в салоне и движения не урезаны): тогда звук ударов дом играет сам, по
+## ходу ролика; иначе вызывающему остаётся один глухой стук.
+func play_knock() -> bool:
+	if not visible or _room_id != "hall" or Settings.reduce_motion:
+		return false
+	_knock_t = 0.0
+	_knock_beats = 0
+	return true
+
+
+func is_knocking() -> bool:
+	return _knock_t >= 0.0
+
+
+func door_package_visible() -> bool:
+	return _door_pack != null and _door_pack.visible
+
+
+## Реквизит у двери: пакет с едой (пока она лежит) и курьер на время стука.
+func _update_door_props(cam_x: float) -> void:
+	if _door_pack == null:
 		return
-	if _sleep_sheet_tex != null:
-		var fw: int = int(_sleep_meta.get("frame_width", 48))
-		var fh: int = int(_sleep_meta.get("frame_height", 48))
-		var frames: int = maxi(1, int(_sleep_meta.get("frames", 1)))
-		var fps: float = maxf(0.1, float(_sleep_meta.get("fps", 4.0)))
-		var idx: int = int(_sleep_t * fps) % frames
-		var atlas := AtlasTexture.new()
-		atlas.atlas = _sleep_sheet_tex
-		atlas.region = Rect2(idx * fw, 0, fw, fh)
-		_sleep_sprite.texture = atlas
-	elif _sleep_static_tex != null:
-		_sleep_sprite.texture = _sleep_static_tex
-	else:
-		_sleep_sprite.texture = null
+	var in_hall := _room_id == "hall"
+	var door_px := float(HouseRoomsConfig.points("hall").get("front_door", {}).get("x", 0.09)) * _room_width_px
+	var base_x := door_px - cam_x
+	var waiting := HouseFood.food_at_door_count() > 0
+	# Пока курьер не ушёл, пакета «ещё нет»: он появляется, когда курьер отходит.
+	var show_pack := in_hall and waiting and (_knock_t < 0.0 or _knock_t >= KNOCK_BEATS[2] + 0.2)
+	if show_pack and not _pack_shown:
+		UiAnim.appear(_door_pack, 0.5, 0.2)
+	_pack_shown = show_pack
+	_door_pack.visible = show_pack
+	_door_pack.position = Vector2(base_x + 24.0, _floor_y_px - 40.0)
+
+	var knocking := in_hall and _knock_t >= 0.0
+	_courier.visible = knocking
+	_knock_icon.visible = knocking
+	if not knocking:
+		return
+	var t := _knock_t
+	# Курьер стоит прямо у двери (дверь бывает у самого края экрана — левее он
+	# уехал бы за кадр) и приезжает/уезжает слева.
+	var dx := -18.0
+	var alpha := 1.0
+	var leave_at: float = KNOCK_BEATS[2] + 0.25
+	if t < 0.4:
+		dx = lerpf(-110.0, -18.0, 1.0 - pow(1.0 - t / 0.4, 2.0))
+	elif t > leave_at:
+		var k := clampf((t - leave_at) / (KNOCK_TOTAL - leave_at), 0.0, 1.0)
+		dx = lerpf(-18.0, -110.0, k * k)
+		alpha = 1.0 - k
+	_courier.position = Vector2(base_x + dx, _floor_y_px - 62.0)
+	_courier.modulate.a = alpha
+	# Удары: значок вспыхивает и звучит на каждый.
+	var pop := 0.0
+	for i in KNOCK_BEATS.size():
+		var b: float = KNOCK_BEATS[i]
+		if t >= b and t < b + 0.18:
+			pop = 1.0 - (t - b) / 0.18
+		if t >= b and _knock_beats == i:
+			_knock_beats = i + 1
+			Sfx.play("door")
+			Haptics.thud()
+	_knock_icon.position = Vector2(base_x + 8.0, _floor_y_px - 112.0)
+	_knock_icon.scale = Vector2.ONE * (1.0 + 0.4 * pop)
+	_knock_icon.modulate.a = alpha if t > 0.3 else 0.0
+
+
+## Всплывающее число над макушкой героя («+2» после «Забрать»).
+func float_at_hero(text: String, color: Color) -> void:
+	if _hero == null:
+		return
+	var head := _hero.position + Vector2(HERO_W * HERO_SCALE * 0.5 - 10.0, 6.0 * HERO_SCALE - 56.0)
+	HouseArt.float_number(_stage, head, text, color)
+
+
+func refresh_skip_counter() -> void:
+	if _sleep_fx != null:
+		_sleep_fx.refresh_skip()
+
+
+## Для снимков экрана: поставить ролик сна на долю p.
+func debug_sleep_progress(p: float) -> void:
+	if _sleep_fx != null:
+		_sleep_fx.debug_progress(p)
+
+
+## Вспышки на полосках шапки после сна или еды: значок подпрыгивает, число
+## всплывает. deltas — {"stamina": +62, "hunger": -30, "hp": +10} в процентах.
+func flash_bars(deltas: Dictionary) -> void:
+	var any_gain := false
+	for id in deltas.keys():
+		var icon := _bar_icons.get(id) as Control
+		var amount := int(round(float(deltas[id])))
+		if icon == null or amount == 0:
+			continue
+		var gain := amount > 0
+		any_gain = any_gain or gain
+		UiAnim.pulse(icon, 0.9, 0.5)
+		var at := icon.get_global_rect().position + Vector2(-2, 12)
+		HouseArt.float_number(_root, at - _root.get_global_rect().position,
+			("+%d" if gain else "%d") % amount,
+			ShopArt.COL_GOOD if gain else ShopArt.COL_BAD)
+		if gain:
+			ShopFx.sparkles(_root, icon.get_global_rect().get_center() - _root.get_global_rect().position,
+				Color(1, 0.88, 0.4), 8, 16.0)
+	if any_gain:
+		Sfx.play("heal")
 
 
 # ---------------------------------------------------------------------------
@@ -1160,13 +1276,15 @@ func forced_mode() -> String:
 
 ## Принудительный режим обучения: mode="" — обычный дом, mode="sleep" —
 ## экран поверх интерьера, который отпускает только после сна.
-func set_forced(mode: String, text: String = "", button_text: String = "") -> void:
+func set_forced(mode: String, text: String = "", button_text: String = "",
+		title: String = "", icon_name: String = "") -> void:
 	_forced_mode = mode
 	if _forced != null:
-		_forced.visible = mode != ""
-	if mode != "":
-		_forced_text.text = text
-		_forced_button.text = button_text
+		if mode != "":
+			_forced.setup(HouseArt.tex(icon_name), 48.0, title if title != "" else button_text, text, button_text)
+			_forced.open()
+		else:
+			_forced.close()
 	refresh()
 
 

@@ -410,7 +410,7 @@ def _universalium(mode):
     cv.put(cx + 1.2 * k, cy + 1.8 * k, lch(90, 50, 340))
     cv.put(cx + 2.2 * k, cy + 0.3 * k, lch(92, 55, 95))
     cv.ring(core, lch(40, 44, 298))
-    cv.halo(lch(90, 40, 215), 1.5, 0.42)
+    cv.halo(lch(88, 52, 215), 1.3, 0.36)
     for (x, y, n) in ((4, 5, 1), (27, 26, 1), (28, 7, 0), (5, 26, 0)):
         if cv.a[y, x, 3] < 100:
             cv.spark(x, y, (255, 255, 255), (235, 250, 255), n)
@@ -935,13 +935,13 @@ def _divine_heart(mode):
     for i, (y, x) in enumerate(zip(*np.nonzero(inner))):
         if (x + y) % 2 == 0:
             cv.put(x, y, P["gold"])
-    c0 = (cx, cy - 2.0 * k)
-    cv.line(c0, (cx, cy + 8 * k), P["gold2"])
-    for dy, dx in ((-2, -3), (-2, 3), (1, -3), (1, 3)):
-        cv.put(cx + dx * k, cy + dy * k, P["gold"])
-    cv.put(cx - 1, cy - 4 * k, P["gold"])
-    cv.put(cx + 1, cy - 4 * k, P["gold"])
-    cv.put(cx, cy - 5 * k, P["goldhi"])
+    jx, jy = round(cx), round(cy - 3.5 * k)
+    cv.line((jx, jy + 2), (jx, cy + 8 * k), P["gold2"])
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        cv.put(jx + dx, jy + dy, P["gold"])
+    cv.put(jx, jy, P["goldhi"])
+    for dy, dx in ((1, -3), (1, 3), (4, -2), (4, 2)):
+        cv.put(jx + dx * k, jy + 2 + dy * k, P["gold"])
     # глянец на левой доле
     gx, gy = cx - 6 * k, cy - 7 * k
     cv.put(gx, gy, P["spec"])

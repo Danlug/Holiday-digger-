@@ -163,12 +163,29 @@ func _find_pill(n: Node) -> HudPill:
 
 
 func _check_well() -> void:
+	# Окно отчёта рисует ветка «Техника» (scripts/tech/well_report.gd), HUD лишь
+	# передаёт ей отчёт через группу "well_report": проверяем это делегирование.
+	var stub := _WellStub.new()
+	stub.add_to_group("well_report")
+	add_child(stub)
 	_hud.show_well_report({"seconds": 5400.0, "items": {"iron_ore": 24, "gold": 1}})
-	await _frames(2)
-	var pill := _find_pill(_hud._well_panel)
-	check("отчёт скважины: время на плашке «1:30» (было «%s»)" % (pill.count.text if pill != null else "-"), pill != null and pill.count.text == "1:30")
+	check("отчёт скважины: HUD передаёт отчёт окну «Техники»", float(stub.got.get("seconds", 0.0)) == 5400.0)
+	_hud.show_well_report({})
+	check("отчёт скважины: пустой отчёт не показывается", float(stub.got.get("seconds", 0.0)) == 5400.0)
 	_hud.close_well_report()
-	check("отчёт скважины закрывается", _hud._well_panel == null)
+	check("отчёт скважины: HUD закрывает окно «Техники»", stub.closed)
+	stub.queue_free()
+
+
+class _WellStub extends Node:
+	var got: Dictionary = {}
+	var closed := false
+
+	func show_report(report: Dictionary) -> void:
+		got = report
+
+	func close() -> void:
+		closed = true
 
 
 func _check_count_format() -> void:

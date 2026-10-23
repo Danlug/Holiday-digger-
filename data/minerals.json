@@ -918,6 +918,166 @@
 			}
 		},
 		{
+			"id": "cinder_ash",
+			"name_ru": "Пепел угольного червя",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 0.3,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "угольный червь (4000+); сырьё брони и оружия Пепла; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "moth_dust",
+			"name_ru": "Пыльца мотылька Тени",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 0.1,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "мотылёк Тени (4200+); сырьё брони и оружия Тени; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "hopper_fang",
+			"name_ru": "Клык прыгунца",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 0.4,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "щёлк-прыгунец (4600+); сырьё брони и оружия Звёзд; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "mimic_geode",
+			"name_ru": "Жеода камнееда",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 0.8,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "камнеед-засадник (5000+); сырьё брони и оружия Света; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "spark_core",
+			"name_ru": "Сердцевина искорки",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 0.1,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "искорки (5400+); пока без рецептов, про запас; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "warden_plate",
+			"name_ru": "Пластина Стража",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 1.5,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "Страж Бездны (7000+); сырьё брони и оружия Сердца; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "abyss_core",
+			"name_ru": "Ядро Бездны",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "награда за рейдбосса на 10 000; клинок Бездны; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
+			"id": "idol_shard",
+			"name_ru": "Осколок Идола",
+			"category": "monster_part",
+			"price_coins": null,
+			"depth_min": null,
+			"depth_max": null,
+			"density": null,
+			"weight_kg": {
+				"value": 0.5,
+				"proposed": true,
+				"note": "вес не задан в GDD; деталь монстра — лёгкая, чтобы бой не забивал рюкзак"
+			},
+			"max_stack": 99,
+			"tool_required": null,
+			"hazard": [],
+			"obtained_by": "monster_drop",
+			"notes": "награда за рейдбосса на 10 000; клинок Бездны; не продаётся: материал для брони и оружия (data/combat.json)",
+			"sellable": false
+		},
+		{
 			"id": "food_soup",
 			"name_ru": "Суп в банке",
 			"category": "food",

@@ -1,0 +1,1065 @@
+{
+	"version": 1,
+	"_note": "Бой, монстры и снаряжение глубже 4000 (GDD раздел «Бой и монстры»). Все числа в этом файле придуманы агентом (в ГДД их нет) и помечены proposed на уровне раздела или записи; единицы — клетки и секунды. Править баланс здесь, не в коде.",
+	"start_depth": 4000,
+	"player": {
+		"proposed": true,
+		"iframes_sec": 0.5,
+		"stun_sec": 0.25,
+		"knockback_cells": 0.9,
+		"regen_delay_sec": 6.0,
+		"regen_base_per_sec": 1.0,
+		"auto_attack": true,
+		"base_weapon": {
+			"dmg": 14,
+			"cd": 0.7,
+			"reach": 1.3,
+			"name": "Кирка"
+		},
+		"swing_height": 1.0,
+		"tap_enemy_radius_px": 26
+	},
+	"formula": {
+		"proposed": true,
+		"armor_k": 100,
+		"res_cap_pct": 75,
+		"min_damage": 1.0,
+		"note": "урон = сырой × (1 − защита/(защита+K)); у огненного и теневого ещё × (1 − сопротивление%)"
+	},
+	"scaling": {
+		"proposed": true,
+		"hp_per_1000": 0.1,
+		"dmg_per_1000": 0.06
+	},
+	"spawn": {
+		"proposed": true,
+		"first_delay_sec": 5.0,
+		"min_dist": 4.0,
+		"max_dist": 13.0,
+		"active_dist": 15.0,
+		"despawn_dist": 20.0,
+		"max_alive": [
+			3,
+			8
+		],
+		"interval_sec": [
+			9.0,
+			3.5
+		],
+		"bfs_limit": 320,
+		"rampup": 300,
+		"depth_full": 10000,
+		"view_half": [
+			4.5,
+			8.5
+		]
+	},
+	"monsters": {
+		"cinder_grub": {
+			"name": "Угольный червь",
+			"icon": "cinder_grub",
+			"desc": "Тлеет изнутри. Ползёт на тепло — то есть на тебя.",
+			"behavior": "crawler",
+			"kind": "fire",
+			"hp": 70,
+			"damage": 16,
+			"speed": 1.3,
+			"chase_speed": 1.9,
+			"size": [
+				0.9,
+				0.55
+			],
+			"sight": 6.0,
+			"attack": {
+				"windup": 0.3,
+				"reach": 0.55,
+				"recover": 0.55
+			},
+			"depth": [
+				4000,
+				6000
+			],
+			"weight": 10,
+			"xp": 120,
+			"drops": [
+				{
+					"id": "cinder_ash",
+					"chance": 0.75,
+					"min": 1,
+					"max": 2
+				},
+				{
+					"id": "hellstone",
+					"chance": 0.15,
+					"min": 1,
+					"max": 1
+				}
+			],
+			"proposed": true
+		},
+		"gloom_moth": {
+			"name": "Мотылёк Тени",
+			"icon": "gloom_moth",
+			"desc": "Летит на свет шахтёрской лампы и пикирует.",
+			"behavior": "flyer",
+			"kind": "void",
+			"hp": 45,
+			"damage": 14,
+			"speed": 2.0,
+			"chase_speed": 2.6,
+			"size": [
+				0.8,
+				0.6
+			],
+			"sight": 7.0,
+			"attack": {
+				"windup": 0.45,
+				"dash_speed": 6.0,
+				"dash_time": 0.45,
+				"recover": 1.1
+			},
+			"depth": [
+				4200,
+				7000
+			],
+			"weight": 9,
+			"xp": 110,
+			"drops": [
+				{
+					"id": "moth_dust",
+					"chance": 0.65,
+					"min": 1,
+					"max": 2
+				},
+				{
+					"id": "dark_matter",
+					"chance": 0.12,
+					"min": 1,
+					"max": 1
+				}
+			],
+			"proposed": true
+		},
+		"rift_hopper": {
+			"name": "Щёлк-прыгунец",
+			"icon": "rift_hopper",
+			"desc": "Приседает — значит, сейчас прыгнет. Прыжок не отменить.",
+			"behavior": "jumper",
+			"kind": "phys",
+			"hp": 110,
+			"damage": 24,
+			"speed": 1.0,
+			"chase_speed": 1.0,
+			"size": [
+				0.8,
+				0.7
+			],
+			"sight": 7.0,
+			"attack": {
+				"windup": 0.5,
+				"leap_vx": 5.5,
+				"leap_vy": 9.0,
+				"recover": 0.9
+			},
+			"depth": [
+				4600,
+				8000
+			],
+			"weight": 8,
+			"xp": 170,
+			"drops": [
+				{
+					"id": "hopper_fang",
+					"chance": 0.65,
+					"min": 1,
+					"max": 2
+				},
+				{
+					"id": "universum",
+					"chance": 0.1,
+					"min": 1,
+					"max": 1
+				}
+			],
+			"proposed": true
+		},
+		"rock_mimic": {
+			"name": "Камнеед-засадник",
+			"icon": "rock_mimic",
+			"desc": "Сидит в породе и ждёт. Выдаёт его только блеск глаз.",
+			"behavior": "ambusher",
+			"kind": "phys",
+			"hp": 190,
+			"damage": 38,
+			"speed": 1.4,
+			"chase_speed": 3.0,
+			"size": [
+				1.0,
+				0.85
+			],
+			"sight": 6.0,
+			"wake_radius": 1.9,
+			"attack": {
+				"windup": 0.35,
+				"reach": 0.7,
+				"recover": 0.8
+			},
+			"depth": [
+				5000,
+				9000
+			],
+			"weight": 6,
+			"xp": 260,
+			"drops": [
+				{
+					"id": "mimic_geode",
+					"chance": 0.85,
+					"min": 1,
+					"max": 2
+				},
+				{
+					"id": "angelstone",
+					"chance": 0.12,
+					"min": 1,
+					"max": 1
+				}
+			],
+			"proposed": true
+		},
+		"spark_swarm": {
+			"name": "Искорка",
+			"icon": "spark_swarm",
+			"desc": "Одна — смешная. Пять — уже нет.",
+			"behavior": "swarm",
+			"kind": "fire",
+			"hp": 14,
+			"damage": 7,
+			"speed": 2.6,
+			"chase_speed": 2.8,
+			"size": [
+				0.4,
+				0.4
+			],
+			"sight": 8.0,
+			"attack": {
+				"cooldown": 0.8
+			},
+			"group": [
+				3,
+				5
+			],
+			"depth": [
+				5400,
+				10000
+			],
+			"weight": 7,
+			"xp": 25,
+			"drops": [
+				{
+					"id": "spark_core",
+					"chance": 0.3,
+					"min": 1,
+					"max": 1
+				}
+			],
+			"proposed": true
+		},
+		"abyss_warden": {
+			"name": "Страж Бездны",
+			"icon": "abyss_warden",
+			"desc": "Медленный, огромный и очень серьёзный. Бей после замаха.",
+			"behavior": "crawler",
+			"kind": "phys",
+			"hp": 650,
+			"damage": 62,
+			"speed": 0.9,
+			"chase_speed": 1.3,
+			"size": [
+				1.4,
+				1.8
+			],
+			"sight": 7.0,
+			"attack": {
+				"windup": 0.9,
+				"reach": 1.1,
+				"recover": 1.0
+			},
+			"knock_resist": 0.7,
+			"depth": [
+				7000,
+				10000
+			],
+			"weight": 3,
+			"xp": 900,
+			"drops": [
+				{
+					"id": "warden_plate",
+					"chance": 1.0,
+					"min": 1,
+					"max": 2
+				},
+				{
+					"id": "angelstone",
+					"chance": 0.25,
+					"min": 1,
+					"max": 2
+				},
+				{
+					"id": "divine_heart",
+					"chance": 0.08,
+					"min": 1,
+					"max": 1
+				}
+			],
+			"proposed": true
+		}
+	},
+	"slots": [
+		"helmet",
+		"armor",
+		"weapon",
+		"shield",
+		"acc1",
+		"acc2"
+	],
+	"gear": {
+		"helm_t1": {
+			"slot": "helmet",
+			"tier": 1,
+			"name": "Шлем Пепла",
+			"icon": "helm_t1",
+			"stats": {
+				"def": 10
+			},
+			"recipe": {
+				"inputs": {
+					"hellstone": 8,
+					"cinder_ash": 4
+				},
+				"coins": 1500
+			},
+			"proposed": true
+		},
+		"armor_t1": {
+			"slot": "armor",
+			"tier": 1,
+			"name": "Броня Пепла",
+			"icon": "armor_t1",
+			"stats": {
+				"def": 18
+			},
+			"recipe": {
+				"inputs": {
+					"hellstone": 14,
+					"cinder_ash": 8
+				},
+				"coins": 3000
+			},
+			"proposed": true
+		},
+		"blade_t1": {
+			"slot": "weapon",
+			"tier": 1,
+			"name": "Клинок Пепла",
+			"icon": "blade_t1",
+			"stats": {
+				"dmg": 26,
+				"cd": 0.6,
+				"reach": 1.45
+			},
+			"recipe": {
+				"inputs": {
+					"hellstone": 12,
+					"cinder_ash": 6
+				},
+				"coins": 2500
+			},
+			"proposed": true
+		},
+		"shield_t1": {
+			"slot": "shield",
+			"tier": 1,
+			"name": "Щит Пепла",
+			"icon": "shield_t1",
+			"stats": {
+				"def": 8
+			},
+			"recipe": {
+				"inputs": {
+					"hellstone": 10,
+					"cinder_ash": 5
+				},
+				"coins": 2000
+			},
+			"proposed": true
+		},
+		"charm_t1": {
+			"slot": "accessory",
+			"tier": 1,
+			"name": "Талисман Пепла",
+			"icon": "charm_t1",
+			"stats": {
+				"res_pct": 6
+			},
+			"recipe": {
+				"inputs": {
+					"hellstone": 4,
+					"cinder_ash": 10
+				},
+				"coins": 1500
+			},
+			"proposed": true
+		},
+		"helm_t2": {
+			"slot": "helmet",
+			"tier": 2,
+			"name": "Шлем Тени",
+			"icon": "helm_t2",
+			"stats": {
+				"def": 18
+			},
+			"recipe": {
+				"inputs": {
+					"dark_matter": 8,
+					"moth_dust": 4
+				},
+				"coins": 5000
+			},
+			"proposed": true
+		},
+		"armor_t2": {
+			"slot": "armor",
+			"tier": 2,
+			"name": "Броня Тени",
+			"icon": "armor_t2",
+			"stats": {
+				"def": 32
+			},
+			"recipe": {
+				"inputs": {
+					"dark_matter": 14,
+					"moth_dust": 8
+				},
+				"coins": 9000
+			},
+			"proposed": true
+		},
+		"blade_t2": {
+			"slot": "weapon",
+			"tier": 2,
+			"name": "Клинок Тени",
+			"icon": "blade_t2",
+			"stats": {
+				"dmg": 42,
+				"cd": 0.55,
+				"reach": 1.5
+			},
+			"recipe": {
+				"inputs": {
+					"dark_matter": 12,
+					"moth_dust": 6
+				},
+				"coins": 7500
+			},
+			"proposed": true
+		},
+		"shield_t2": {
+			"slot": "shield",
+			"tier": 2,
+			"name": "Щит Тени",
+			"icon": "shield_t2",
+			"stats": {
+				"def": 14
+			},
+			"recipe": {
+				"inputs": {
+					"dark_matter": 10,
+					"moth_dust": 5
+				},
+				"coins": 6000
+			},
+			"proposed": true
+		},
+		"charm_t2": {
+			"slot": "accessory",
+			"tier": 2,
+			"name": "Талисман Тени",
+			"icon": "charm_t2",
+			"stats": {
+				"res_pct": 9,
+				"dmg_pct": 5
+			},
+			"recipe": {
+				"inputs": {
+					"dark_matter": 5,
+					"moth_dust": 10
+				},
+				"coins": 5000
+			},
+			"proposed": true
+		},
+		"helm_t3": {
+			"slot": "helmet",
+			"tier": 3,
+			"name": "Шлем Звёзд",
+			"icon": "helm_t3",
+			"stats": {
+				"def": 28
+			},
+			"recipe": {
+				"inputs": {
+					"universum": 7,
+					"hopper_fang": 4
+				},
+				"coins": 14000
+			},
+			"proposed": true
+		},
+		"armor_t3": {
+			"slot": "armor",
+			"tier": 3,
+			"name": "Броня Звёзд",
+			"icon": "armor_t3",
+			"stats": {
+				"def": 50
+			},
+			"recipe": {
+				"inputs": {
+					"universum": 12,
+					"hopper_fang": 8
+				},
+				"coins": 26000
+			},
+			"proposed": true
+		},
+		"blade_t3": {
+			"slot": "weapon",
+			"tier": 3,
+			"name": "Клинок Звёзд",
+			"icon": "blade_t3",
+			"stats": {
+				"dmg": 64,
+				"cd": 0.5,
+				"reach": 1.55
+			},
+			"recipe": {
+				"inputs": {
+					"universum": 10,
+					"hopper_fang": 6
+				},
+				"coins": 21000
+			},
+			"proposed": true
+		},
+		"shield_t3": {
+			"slot": "shield",
+			"tier": 3,
+			"name": "Щит Звёзд",
+			"icon": "shield_t3",
+			"stats": {
+				"def": 22
+			},
+			"recipe": {
+				"inputs": {
+					"universum": 8,
+					"hopper_fang": 5
+				},
+				"coins": 17000
+			},
+			"proposed": true
+		},
+		"charm_t3": {
+			"slot": "accessory",
+			"tier": 3,
+			"name": "Талисман Звёзд",
+			"icon": "charm_t3",
+			"stats": {
+				"dmg_pct": 8,
+				"spd_pct": 6
+			},
+			"recipe": {
+				"inputs": {
+					"universum": 4,
+					"hopper_fang": 8
+				},
+				"coins": 14000
+			},
+			"proposed": true
+		},
+		"helm_t4": {
+			"slot": "helmet",
+			"tier": 4,
+			"name": "Шлем Света",
+			"icon": "helm_t4",
+			"stats": {
+				"def": 40
+			},
+			"recipe": {
+				"inputs": {
+					"angelstone": 6,
+					"mimic_geode": 4
+				},
+				"coins": 36000
+			},
+			"proposed": true
+		},
+		"armor_t4": {
+			"slot": "armor",
+			"tier": 4,
+			"name": "Броня Света",
+			"icon": "armor_t4",
+			"stats": {
+				"def": 72
+			},
+			"recipe": {
+				"inputs": {
+					"angelstone": 11,
+					"mimic_geode": 7
+				},
+				"coins": 66000
+			},
+			"proposed": true
+		},
+		"blade_t4": {
+			"slot": "weapon",
+			"tier": 4,
+			"name": "Клинок Света",
+			"icon": "blade_t4",
+			"stats": {
+				"dmg": 92,
+				"cd": 0.46,
+				"reach": 1.6
+			},
+			"recipe": {
+				"inputs": {
+					"angelstone": 9,
+					"mimic_geode": 5
+				},
+				"coins": 54000
+			},
+			"proposed": true
+		},
+		"shield_t4": {
+			"slot": "shield",
+			"tier": 4,
+			"name": "Щит Света",
+			"icon": "shield_t4",
+			"stats": {
+				"def": 32
+			},
+			"recipe": {
+				"inputs": {
+					"angelstone": 7,
+					"mimic_geode": 4
+				},
+				"coins": 44000
+			},
+			"proposed": true
+		},
+		"charm_t4": {
+			"slot": "accessory",
+			"tier": 4,
+			"name": "Талисман Света",
+			"icon": "charm_t4",
+			"stats": {
+				"dmg_pct": 10,
+				"res_pct": 8,
+				"regen": 0.5
+			},
+			"recipe": {
+				"inputs": {
+					"angelstone": 3,
+					"mimic_geode": 8
+				},
+				"coins": 36000
+			},
+			"proposed": true
+		},
+		"helm_t5": {
+			"slot": "helmet",
+			"tier": 5,
+			"name": "Шлем Сердца",
+			"icon": "helm_t5",
+			"stats": {
+				"def": 55
+			},
+			"recipe": {
+				"inputs": {
+					"divine_heart": 5,
+					"warden_plate": 2
+				},
+				"coins": 80000
+			},
+			"proposed": true
+		},
+		"armor_t5": {
+			"slot": "armor",
+			"tier": 5,
+			"name": "Броня Сердца",
+			"icon": "armor_t5",
+			"stats": {
+				"def": 100
+			},
+			"recipe": {
+				"inputs": {
+					"divine_heart": 9,
+					"warden_plate": 4
+				},
+				"coins": 150000
+			},
+			"proposed": true
+		},
+		"blade_t5": {
+			"slot": "weapon",
+			"tier": 5,
+			"name": "Клинок Сердца",
+			"icon": "blade_t5",
+			"stats": {
+				"dmg": 130,
+				"cd": 0.42,
+				"reach": 1.65
+			},
+			"recipe": {
+				"inputs": {
+					"divine_heart": 8,
+					"warden_plate": 3
+				},
+				"coins": 120000
+			},
+			"proposed": true
+		},
+		"shield_t5": {
+			"slot": "shield",
+			"tier": 5,
+			"name": "Щит Сердца",
+			"icon": "shield_t5",
+			"stats": {
+				"def": 44
+			},
+			"recipe": {
+				"inputs": {
+					"divine_heart": 6,
+					"warden_plate": 2
+				},
+				"coins": 100000
+			},
+			"proposed": true
+		},
+		"charm_t5": {
+			"slot": "accessory",
+			"tier": 5,
+			"name": "Талисман Сердца",
+			"icon": "charm_t5",
+			"stats": {
+				"dmg_pct": 14,
+				"spd_pct": 8,
+				"regen": 1.0
+			},
+			"recipe": {
+				"inputs": {
+					"divine_heart": 3,
+					"warden_plate": 2
+				},
+				"coins": 80000
+			},
+			"proposed": true
+		},
+		"blade_abyss": {
+			"slot": "weapon",
+			"tier": 6,
+			"name": "Клинок Бездны",
+			"icon": "blade_abyss",
+			"stats": {
+				"dmg": 175,
+				"cd": 0.4,
+				"reach": 1.7
+			},
+			"recipe": {
+				"inputs": {
+					"abyss_core": 1,
+					"idol_shard": 4,
+					"divine_heart": 8
+				},
+				"coins": 0
+			},
+			"proposed": true
+		},
+		"idol_crown": {
+			"slot": "accessory",
+			"tier": 6,
+			"name": "Венец Идола",
+			"icon": "idol_crown",
+			"stats": {
+				"dmg_pct": 12,
+				"res_pct": 10,
+				"regen": 1.0
+			},
+			"trophy": "abyss_idol",
+			"proposed": true
+		},
+		"ult_helmet": {
+			"slot": "helmet",
+			"tier": 0,
+			"name": "Шлем безымянного зодчего",
+			"icon": "ult_helmet",
+			"stats": {
+				"def": 40,
+				"res_pct": 8
+			},
+			"artifact": "forgotten_civilizations_5",
+			"set": "ultimate",
+			"proposed": true
+		},
+		"ult_armor": {
+			"slot": "armor",
+			"tier": 0,
+			"name": "Зерцало",
+			"icon": "ult_armor",
+			"stats": {
+				"def": 72,
+				"res_pct": 6
+			},
+			"artifact": "mysticism_5",
+			"set": "ultimate",
+			"proposed": true
+		},
+		"ult_shield": {
+			"slot": "shield",
+			"tier": 0,
+			"name": "Золотой щит спартанского полководца",
+			"icon": "ult_shield",
+			"stats": {
+				"def": 36
+			},
+			"artifact": "antiquity_5",
+			"set": "ultimate",
+			"proposed": true
+		},
+		"ult_amulet": {
+			"slot": "accessory",
+			"tier": 0,
+			"name": "Сердце идола, которое ещё бьётся",
+			"icon": "ult_amulet",
+			"stats": {
+				"regen": 1.5,
+				"res_pct": 5
+			},
+			"artifact": "occult_5",
+			"set": "ultimate",
+			"proposed": true
+		},
+		"ult_glove": {
+			"slot": "accessory",
+			"tier": 0,
+			"name": "Перчатка Мироздания",
+			"icon": "ult_glove",
+			"stats": {
+				"dmg_pct": 10
+			},
+			"artifact": "legends_5",
+			"set": "ultimate",
+			"proposed": true
+		}
+	},
+	"sets": {
+		"ultimate": {
+			"proposed": true,
+			"pieces": [
+				"ult_helmet",
+				"ult_armor",
+				"ult_shield",
+				"ult_amulet",
+				"ult_glove"
+			],
+			"bonuses": [
+				{
+					"count": 2,
+					"res_pct": 6
+				},
+				{
+					"count": 3,
+					"def": 15
+				},
+				{
+					"count": 4,
+					"dmg_pct": 10
+				},
+				{
+					"count": 5,
+					"def": 25,
+					"dmg_pct": 15,
+					"res_pct": 10,
+					"regen": 1.0
+				}
+			]
+		}
+	},
+	"sockets": {
+		"proposed": true,
+		"gear": "ult_glove",
+		"cost_each": 3,
+		"slots": [
+			{
+				"id": "hellstone",
+				"dmg_pct": 6
+			},
+			{
+				"id": "dark_matter",
+				"spd_pct": 6
+			},
+			{
+				"id": "universum",
+				"def": 8
+			},
+			{
+				"id": "angelstone",
+				"res_pct": 6
+			},
+			{
+				"id": "divine_heart",
+				"dmg_pct": 12,
+				"regen": 0.5
+			}
+		]
+	},
+	"materials": {
+		"cinder_ash": {
+			"name": "Пепел угольного червя"
+		},
+		"moth_dust": {
+			"name": "Пыльца мотылька Тени"
+		},
+		"hopper_fang": {
+			"name": "Клык прыгунца"
+		},
+		"mimic_geode": {
+			"name": "Жеода камнееда"
+		},
+		"spark_core": {
+			"name": "Сердцевина искорки"
+		},
+		"warden_plate": {
+			"name": "Пластина Стража"
+		},
+		"abyss_core": {
+			"name": "Ядро Бездны"
+		},
+		"idol_shard": {
+			"name": "Осколок Идола"
+		}
+	},
+	"boss": {
+		"proposed": true,
+		"id": "abyss_idol",
+		"name": "Идол Бездны",
+		"arena": {
+			"floor_y": 10000,
+			"height": 8,
+			"x0": 10,
+			"x1": 22,
+			"gate": [
+				15,
+				17
+			]
+		},
+		"hp": 9000,
+		"armor_mult": 0.2,
+		"intro_sec": 2.5,
+		"phase_hp": [
+			0.66,
+			0.33
+		],
+		"transition_sec": 3.0,
+		"phase_heal_pct": 0.25,
+		"telegraph_sec": [
+			1.0,
+			1.0,
+			0.9
+		],
+		"recover_sec": [
+			2.4,
+			2.0,
+			1.7
+		],
+		"gap_sec": 0.5,
+		"pattern": [
+			[
+				"slam",
+				"slam",
+				"wave"
+			],
+			[
+				"rain",
+				"slam",
+				"summon",
+				"wave"
+			],
+			[
+				"slam_wave",
+				"rain",
+				"summon",
+				"slam",
+				"wave"
+			]
+		],
+		"attacks": {
+			"slam": {
+				"damage": 90,
+				"kind": "phys",
+				"width": 1.7,
+				"strike_sec": 0.3,
+				"lock_before": 0.35
+			},
+			"rain": {
+				"damage": 48,
+				"kind": "phys",
+				"width": 1.0,
+				"strike_sec": 0.25,
+				"count": [
+					4,
+					6,
+					8
+				]
+			},
+			"wave": {
+				"damage": 66,
+				"kind": "void",
+				"speed": 7.0,
+				"height": 0.9
+			},
+			"summon": {
+				"count": [
+					0,
+					2,
+					3
+				],
+				"monster": "spark_swarm"
+			}
+		},
+		"size": [
+			3.4,
+			3.3
+		],
+		"reach_pad": 0.3,
+		"rewards": {
+			"materials": {
+				"abyss_core": 1,
+				"idol_shard": 4
+			},
+			"xp": 25000,
+			"gear": [
+				"idol_crown"
+			]
+		},
+		"hero_model": {
+			"note": "модель героя для симуляции в tests/test_combat_boss.gd",
+			"dodge": {
+				"slam": 0.92,
+				"rain": 0.86,
+				"wave": 0.86
+			},
+			"uptime": 0.75,
+			"hp": 240
+		}
+	}
+}

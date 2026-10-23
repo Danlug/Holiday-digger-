@@ -56,6 +56,12 @@ var max_depth: int = 6500
 var diffs: Dictionary = {}      # int key -> true (клетка выкопана)
 var events: Array = []          # [{x0:int, y0:int, w:int, h:int, salt:int}, ...]
 
+## Хук «структура поверх мира» (арена рейдбосса на дне, ветка combat): ниже
+## overlay_y_min get_tile сперва спрашивает overlay(x, y) -> int; -1 — клетка
+## обычная. Пока хук не задан, мир не меняется ни на байт.
+var overlay: Callable = Callable()
+var overlay_y_min: int = 1 << 30
+
 # ---- кэш разобранного world_layers.json, чтобы не парсить JSON на каждый tile ----
 var _shallow_layers: Array = []
 var _deep: Dictionary = {}
@@ -215,6 +221,11 @@ func _apply_layers() -> void:
 func get_tile(x: int, y: int) -> int:
 	if x < 0 or x >= WIDTH or y < 1:
 		return TileTypes.Type.EMPTY
+
+	if y >= overlay_y_min and overlay.is_valid():
+		var over: int = overlay.call(x, y)
+		if over != -1:
+			return over
 
 	var fixed_type := _permanent_feature_type(x, y)
 	if fixed_type != -1:

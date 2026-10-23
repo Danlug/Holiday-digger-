@@ -246,8 +246,6 @@ func _on_monster_event(m: Monster, e: Dictionary) -> void:
 
 func _on_monster_died(m: Monster) -> void:
 	var pos := Vector2(m.x, m.y) * TILE
-	Fx.burst("enemy_die", pos)
-	Sfx.play("enemy_die")
 	CombatService.note_kill(m.id)
 	GameState.add_xp(int(m.def.get("xp", 0)))
 	GameState.emit_event(&"monster_killed", {"id": m.id, "depth": int(floor(m.y)), "pos": pos})
@@ -361,25 +359,27 @@ func _do_swing(dir: int, st: Dictionary) -> void:
 		if dealt <= 0.0:
 			continue
 		hits += 1
-		var pos := Vector2(m.x, m.y) * TILE
-		Fx.burst("hit_enemy", pos)
-		Sfx.play("hit_enemy", randf_range(0.92, 1.08))
-		Fx.float_text(pos + Vector2(0, -12), str(int(round(dealt))), Color8(0xFF, 0xE0, 0x66))
+		# звук, частицы и число урона — у JuiceDirector по этому событию
+		GameState.emit_event(&"monster_hit", {"id": m.id, "pos": Vector2(m.x, m.y) * TILE, "damage": dealt})
 		Haptics.tap()
 	if boss != null and boss.is_active() and boss.in_reach(rect):
 		var bd := boss.take_hit(float(st["damage"]) * randf_range(0.92, 1.08))
 		var hb := boss.hurtbox()
 		var bpos := Vector2(hb.get_center().x, hb.position.y + hb.size.y * 0.4) * TILE
-		if boss.vulnerable() or bd > 0.0:
+		if bd > 0.0:
 			hits += 1
 			boss_flash = 0.1
-			Fx.burst("hit_enemy", bpos + Vector2(float(-dir) * 20.0, 0.0), 1.4)
-			Sfx.play("hit_enemy" if boss.vulnerable() else "hurt_armor", randf_range(0.85, 1.0))
-			Fx.float_text(bpos + Vector2(0, -20), str(int(round(bd))),
-				Color8(0xFF, 0xE0, 0x66) if boss.vulnerable() else Color8(0x9D, 0x8B, 0x73))
+			var boss_id := String(CombatData.section("boss").get("id", "abyss_idol"))
+			if boss.vulnerable():
+				GameState.emit_event(&"monster_hit", {"id": boss_id, "pos": bpos + Vector2(float(-dir) * 20.0, 0.0), "damage": bd})
+			else:
+				# ядро закрыто: удар глухо бьёт по камню, число серое
+				Sfx.play("hurt_armor", randf_range(0.8, 0.95))
+				Fx.burst("spark", bpos + Vector2(float(-dir) * 20.0, 0.0), 0.6)
+				Fx.float_text(bpos + Vector2(0, -20), str(int(round(bd))), Color8(0x9D, 0x8B, 0x73))
 			Haptics.tap()
 		else:
-			Sfx.play("hurt_armor", 0.8)
+			Sfx.play("hurt_armor", 0.7)
 	if hits > 0:
 		Fx.shake(1.4, 0.06)
 	swung.emit(dir, hits)
@@ -499,10 +499,8 @@ func start_boss_fight(seed_value: int = 0) -> void:
 	CombatService.boss_note_attempt()
 	if fog != null:
 		fog.reveal_around(BossArena.center_x(), float(BossArena.floor_y() - BossArena.height() / 2), 10, 10)
-	Sfx.play("boss_roar")
-	Sfx.music("mus_boss")
-	Fx.shake(6.0, 0.6)
-	Haptics.buzz(160)
+	# рёв, тряска, вибро и музыка арены — у JuiceDirector по событию
+	GameState.emit_event(&"boss_started", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
 	boss_started.emit()
 
 
@@ -564,12 +562,7 @@ func _boss_defeated() -> void:
 	for m: Monster in monsters:
 		if m.alive:
 			m.take_hit(1e9, 1)
-	Fx.burst("enemy_die", pos, 3.0)
-	Fx.shake(10.0, 1.0)
-	Fx.flash(Color(1, 1, 1, 0.6), 0.5)
-	Sfx.play("enemy_die", 0.6)
 	Sfx.play("quest_done")
-	Sfx.music("mus_deep")
 	if hud != null and hud.has_method("toast"):
 		hud.toast("%s повержен. Награда ждёт на складе в мастерской." % String(CombatData.section("boss").get("name", "Босс")), 5.0)
 	boss_finished.emit(true)
@@ -594,7 +587,7 @@ func _on_hero_died() -> void:
 		BossArena.sealed = false
 		if cw != null:
 			cw.invalidate()
-		Sfx.music("mus_deep")
+		GameState.emit_event(&"boss_failed", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
 		boss_finished.emit(false)
 	if spawner != null:
 		spawner.reset()

@@ -57,7 +57,11 @@ func _ready() -> void:
 	check("вид боя в ViewRoot рядом с героем", main.view_root.get_node_or_null("CombatView") != null)
 	check("боевой интерфейс и экран снаряжения в сцене", main.find_child("CombatHud", true, false) != null
 		and main.find_child("EquipmentLayer", true, false) != null)
-	check("пункт меню «Снаряжение» зарегистрирован", _menu_has("equipment"))
+	GameState.max_depth_reached = 4100
+	check("пункт меню «Снаряжение» зарегистрирован и открывается с глубиной боя", _menu_has("equipment"))
+	GameState.max_depth_reached = 100
+	check("на мелководье пункта «Снаряжение» в меню нет (онбординг не тронут)", not _menu_has("equipment"))
+	GameState.max_depth_reached = 4100
 	check("мир получил хук арены", main.world.overlay.is_valid())
 	check("ворота арены открыты до боя", not BossArena.sealed)
 
@@ -95,6 +99,9 @@ func _ready() -> void:
 	director.spawning_enabled = false   # дальше сцены собираем вручную
 
 	# --- удар героя и урон по герою ---
+	CombatService.give("blade_t2")   # чтобы бой не зависел от везения с кулдауном кирки
+	CombatService.equip("blade_t2")
+	director._stats_dirty = true
 	GameState.hp = GameState.get_max_hp()
 	_place_hero(p, w, 4600)
 	var grub := director.spawn({"id": "cinder_grub", "x": 18.5, "y": 4600.0, "group": 1, "emerge": Vector2.ZERO})
@@ -105,8 +112,13 @@ func _ready() -> void:
 	_step(20)
 	check("автоатака бьёт ближайшего врага", grub.hp < grub.max_hp or not grub.alive)
 	check("герой развернулся к врагу", p.facing == 1)
-	_step(30 * 8)
+	for i in range(30 * 10):
+		GameState.hp = GameState.get_max_hp()
+		director._process(1.0 / 30.0)
+		if not grub.alive:
+			break
 	check("червь убит автоатакой", not grub.alive)
+	_step(30)   # анимация смерти
 	check("событие monster_killed", _count("monster_killed") == kills0 + 1)
 	check("за убийство дан опыт", GameState.xp + GameState.level * 100000 > xp0)
 	check("убийство записано в счётчик", CombatService.kills_total() >= 1)

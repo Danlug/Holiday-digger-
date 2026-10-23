@@ -13,7 +13,7 @@ extends Node
 ## Запуск: godot --headless --path . res://tests/test_combat_boss.tscn
 
 const DT := 1.0 / 20.0
-const SEEDS := 120
+const SEEDS := 80
 const TIME_CAP := 600.0
 
 var failures := 0

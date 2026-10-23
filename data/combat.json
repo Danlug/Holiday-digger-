@@ -964,7 +964,7 @@
 				17
 			]
 		},
-		"hp": 9000,
+		"hp": 11000,
 		"armor_mult": 0.2,
 		"intro_sec": 2.5,
 		"phase_hp": [
@@ -1006,14 +1006,14 @@
 		],
 		"attacks": {
 			"slam": {
-				"damage": 90,
+				"damage": 135,
 				"kind": "phys",
 				"width": 1.7,
 				"strike_sec": 0.3,
 				"lock_before": 0.35
 			},
 			"rain": {
-				"damage": 48,
+				"damage": 70,
 				"kind": "phys",
 				"width": 1.0,
 				"strike_sec": 0.25,
@@ -1024,7 +1024,7 @@
 				]
 			},
 			"wave": {
-				"damage": 66,
+				"damage": 100,
 				"kind": "void",
 				"speed": 7.0,
 				"height": 0.9

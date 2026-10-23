@@ -58,14 +58,10 @@ func _init() -> void:
 	_lock.visible = false
 	add_child(_lock)
 
-	_count = Label.new()
+	_count = ShopArt.label("", 9, Color.WHITE, Color(0.05, 0.04, 0.08), 3)
 	_count.position = Vector2(2, 27)
 	_count.size = Vector2(W - 5, 12)
 	_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_count.add_theme_font_size_override("font_size", 9)
-	_count.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
-	_count.add_theme_constant_override("outline_size", 3)
-	_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_count.visible = false
 	add_child(_count)
 
@@ -221,40 +217,34 @@ func _set_pill(p: Dictionary) -> void:
 		return
 	_pill.visible = true
 	var col: Color = p.get("color", Color.WHITE)
-	var x := 0.0
+	# Части бейджа: [узел, ширина].
 	var parts: Array = []
 	if icon != null:
-		parts.append(ShopArt.rect(icon, Vector2.ZERO, Vector2(11, 11)))
-	if not pips.is_empty():
-		for ok in pips:
-			var d := ColorRect.new()
-			d.size = Vector2(5, 5)
-			d.color = ShopArt.COL_GOOD if bool(ok) else ShopArt.COL_BAD
-			d.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			parts.append(d)
+		parts.append([ShopArt.rect(icon, Vector2.ZERO, Vector2(11, 11)), 11.0])
+	for ok in pips:
+		var d := ColorRect.new()
+		d.size = Vector2(5, 5)
+		d.color = ShopArt.COL_GOOD if bool(ok) else ShopArt.COL_BAD
+		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parts.append([d, 5.0])
 	if text != "":
-		var l := Label.new()
-		l.text = text
-		l.add_theme_font_size_override("font_size", 9)
-		l.add_theme_color_override("font_color", col)
-		l.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
-		l.add_theme_constant_override("outline_size", 2)
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		l.size = l.get_minimum_size()
-		parts.append(l)
-	var total := 0.0
+		var l := ShopArt.label(text, 9, col, Color(0.05, 0.04, 0.08), 2)
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var tw := l.get_minimum_size().x
+		l.size = Vector2(tw, 15.0)
+		parts.append([l, tw])
+	var total := -2.0
 	for pt in parts:
-		total += (pt as Control).size.x + 2.0
-	total -= 2.0
+		total += float(pt[1]) + 2.0
 	var pill_w := clampf(total + 10.0, 22.0, W - 8.0)
 	_pill.size.x = pill_w
 	_pill.position.x = (W - pill_w) * 0.5
-	x = (pill_w - total) * 0.5
+	var x := (pill_w - total) * 0.5
 	for pt in parts:
-		var c := pt as Control
-		c.position = Vector2(x, (15.0 - c.size.y) * 0.5 - (1.0 if c is Label else 0.0))
+		var c: Control = pt[0]
+		c.position = Vector2(x, (15.0 - c.size.y) * 0.5)
 		_pill_box.add_child(c)
-		x += c.size.x + 2.0
+		x += float(pt[1]) + 2.0
 
 
 ## Плитка «не получилось»: качнуться и мигнуть красным бейджем.

@@ -10,7 +10,7 @@ extends Node
 ##       --resolution 448x960 -- /каталог [сцена ...]
 ##
 ## Сцены: food picks tech sell sell_empty sell_remote premium equip equip_away
-## card card_poor card_recipe bignum scroll sale_anim many.
+## card card_poor card_recipe bignum scroll sale_anim many new tip tech_locked drill.
 
 var _out_dir := "/tmp/shop_shots"
 var _only: Array[String] = []
@@ -51,6 +51,10 @@ func _ready() -> void:
 	await _scene("scroll", _s_scroll)
 	await _scene("many", _s_many)
 	await _scene("sale_anim", _s_sale_anim)
+	await _scene("new", _s_new)
+	await _scene("tip", _s_tip)
+	await _scene("tech_locked", _s_tech_locked)
+	await _scene("drill", _s_drill)
 	print("test_screenshot_shop: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -217,6 +221,36 @@ func _s_sale_anim() -> void:
 	_ui._on_sell_pressed()
 	await get_tree().create_timer(0.42).timeout
 	Settings.reduce_motion = true
+
+
+func _s_new() -> void:
+	ShopItems.seed_seen()
+	GameState.max_depth_reached = 150
+	_ui.open(ShopUI.TAB_TECH)
+	await _frames(2)
+	_ui._set_tab(ShopUI.TAB_FOOD, false)
+	GameState.max_depth_reached = 150
+	_ui._render()
+
+
+func _s_tip() -> void:
+	GameState.coins = 1200
+	_ui.open(ShopUI.TAB_PICKS)
+	await _frames(2)
+	Tip.show_now(_ui._tiles["tool:iron_pickaxe"])
+	await _frames(2)
+
+
+func _s_tech_locked() -> void:
+	_ui.open(ShopUI.TAB_TECH)
+
+
+func _s_drill() -> void:
+	GameState.grant_tool("drill_rig")
+	GameState.drill_rig_tier = 1
+	GameState.coins = 60000
+	GameState.max_depth_reached = 2000
+	_ui.open(ShopUI.TAB_TECH)
 
 
 func _frames(n: int) -> void:

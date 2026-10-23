@@ -71,6 +71,23 @@ static func rect(texture: Texture2D, pos: Vector2, sz: Vector2) -> TextureRect:
 	return t
 
 
+## Подпись с обводкой. Кегль и цвет — через LabelSettings, а не через
+## add_theme_*_override: вне дерева Label запоминает минимальный размер по
+## кеглю темы (16) и выходит вдвое выше и шире, чем нарисован.
+static func label(text: String, font_size: int, color: Color = Color.WHITE,
+		outline: Color = Color(0.05, 0.04, 0.08), outline_size: int = 3) -> Label:
+	var ls := LabelSettings.new()
+	ls.font_size = font_size
+	ls.font_color = color
+	ls.outline_color = outline
+	ls.outline_size = outline_size
+	var l := Label.new()
+	l.label_settings = ls
+	l.text = text
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
 static func tier_color(tier: int) -> Color:
 	return TIER_COLORS[clampi(tier, 0, TIER_COLORS.size() - 1)]
 

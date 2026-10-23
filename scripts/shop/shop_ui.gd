@@ -151,7 +151,10 @@ func is_open() -> bool:
 
 func open(tab: String = TAB_FOOD) -> void:
 	_resolve_refs()
-	_freeze_world(true)
+	# Повторное open() при открытой шторке (из вкладки в экипировку) мир второй
+	# раз не замораживает: иначе «как было» запомнилось бы уже замороженным.
+	if not is_open():
+		_freeze_world(true)
 	ShopItems.seed_seen()
 	_selected.clear()
 	# По умолчанию отмечено всё: типовой сценарий — поднялся с полным рюкзаком
@@ -322,14 +325,10 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	root.add_child(bg)
 	var ic := ShopArt.rect(icon, Vector2(3, 3), Vector2(14, 14))
 	root.add_child(ic)
-	var lb := Label.new()
+	var lb := ShopArt.label("", 10)
 	lb.position = Vector2(20, 1)
 	lb.size = Vector2(w - 24.0, 18)
 	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lb.add_theme_font_size_override("font_size", 10)
-	lb.add_theme_color_override("font_outline_color", INK)
-	lb.add_theme_constant_override("outline_size", 3)
-	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lb.clip_text = true
 	root.add_child(lb)
 	_root.add_child(root)
@@ -478,14 +477,10 @@ func _build_action_bar() -> void:
 	_ad_btn.position = Vector2(6, 5)
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_video"), Vector2(4, 3), Vector2(14, 14)))
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(14, 8), Vector2(30, 24)))
-	_ad_label = Label.new()
+	_ad_label = ShopArt.label("", 9)
 	_ad_label.position = Vector2(2, 20)
 	_ad_label.size = Vector2(44, 14)
 	_ad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_ad_label.add_theme_font_size_override("font_size", 8)
-	_ad_label.add_theme_color_override("font_outline_color", INK)
-	_ad_label.add_theme_constant_override("outline_size", 3)
-	_ad_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ad_btn.add_child(_ad_label)
 	_ad_btn.pressed.connect(_on_ad_x2_pressed)
 	_action.add_child(_ad_btn)
@@ -495,29 +490,20 @@ func _build_action_bar() -> void:
 	_sell_lead = ShopArt.rect(ShopArt.ui("icon_inventory"), Vector2(8, 5), Vector2(28, 28))
 	_sell_btn.add_child(_sell_lead)
 	_sell_btn.add_child(ShopArt.rect(ShopArt.ui("icon_coin"), Vector2(42, 11), Vector2(18, 18)))
-	_sell_label = Label.new()
+	_sell_label = ShopArt.label("0", 14, Color.WHITE, Color8(0x6A, 0x3E, 0x0A), 4)
 	_sell_label.position = Vector2(62, 6)
 	_sell_label.size = Vector2(70, 26)
 	_sell_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_sell_label.add_theme_font_size_override("font_size", 14)
-	_sell_label.add_theme_color_override("font_color", Color.WHITE)
-	_sell_label.add_theme_color_override("font_outline_color", Color8(0x6A, 0x3E, 0x0A))
-	_sell_label.add_theme_constant_override("outline_size", 4)
-	_sell_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_sell_label.clip_text = true
 	_sell_btn.add_child(_sell_label)
 	_sell_x2 = ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(134, 8), Vector2(22, 22))
 	_sell_x2.visible = false
 	_sell_btn.add_child(_sell_x2)
-	_sell_uses = Label.new()
+	_sell_uses = ShopArt.label("", 9, Color.WHITE, Color(0.2, 0.12, 0.02), 4)
 	_sell_uses.position = Vector2(2, 20)
 	_sell_uses.size = Vector2(36, 16)
 	_sell_uses.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_sell_uses.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_sell_uses.add_theme_font_size_override("font_size", 9)
-	_sell_uses.add_theme_color_override("font_outline_color", Color(0.2, 0.12, 0.02))
-	_sell_uses.add_theme_constant_override("outline_size", 4)
-	_sell_uses.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_sell_uses.visible = false
 	_sell_btn.add_child(_sell_uses)
 	_sell_btn.pressed.connect(_on_sell_pressed)
@@ -768,13 +754,7 @@ func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
 		gift.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		gift.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(gift)
-		var l := Label.new()
-		l.text = badge_text
-		l.add_theme_font_size_override("font_size", 10)
-		l.add_theme_color_override("font_color", ShopArt.COL_GOOD)
-		l.add_theme_color_override("font_outline_color", INK)
-		l.add_theme_constant_override("outline_size", 3)
-		row.add_child(l)
+		row.add_child(ShopArt.label(badge_text, 10, ShopArt.COL_GOOD))
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(row, "Бесплатные заказы", "Бабка оставила денег: сегодня еда даром", "Осталось: " + badge_text)
 	return row
@@ -1059,13 +1039,7 @@ func _make_chip_row(icon: Texture2D, text: String, color: Color) -> Control:
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(ic)
 	if text != "":
-		var l := Label.new()
-		l.text = text
-		l.add_theme_font_size_override("font_size", 12)
-		l.add_theme_color_override("font_color", color)
-		l.add_theme_color_override("font_outline_color", INK)
-		l.add_theme_constant_override("outline_size", 3)
-		row.add_child(l)
+		row.add_child(ShopArt.label(text, 12, color))
 	return row
 
 
@@ -1080,13 +1054,7 @@ func _make_compare_row(cmp: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	var from_l := Label.new()
-	from_l.text = String(cmp["from"])
-	from_l.add_theme_font_size_override("font_size", 11)
-	from_l.add_theme_color_override("font_color", Color(0.7, 0.7, 0.76))
-	from_l.add_theme_color_override("font_outline_color", INK)
-	from_l.add_theme_constant_override("outline_size", 3)
-	row.add_child(from_l)
+	row.add_child(ShopArt.label(String(cmp["from"]), 11, Color(0.7, 0.7, 0.76)))
 	var arrow := TextureRect.new()
 	arrow.texture = ShopArt.tex("glyph_arrow")
 	arrow.custom_minimum_size = Vector2(14, 14)
@@ -1094,13 +1062,7 @@ func _make_compare_row(cmp: Dictionary) -> Control:
 	arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(arrow)
-	var to_l := Label.new()
-	to_l.text = String(cmp["to"])
-	to_l.add_theme_font_size_override("font_size", 13)
-	to_l.add_theme_color_override("font_color", ShopArt.COL_GOOD)
-	to_l.add_theme_color_override("font_outline_color", INK)
-	to_l.add_theme_constant_override("outline_size", 3)
-	row.add_child(to_l)
+	row.add_child(ShopArt.label(String(cmp["to"]), 13, ShopArt.COL_GOOD))
 	return row
 
 
@@ -1118,13 +1080,8 @@ func _make_price_row(offer: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	var l := Label.new()
-	l.text = "0" if bool(offer.get("free", false)) else ShopArt.full(price)
-	l.add_theme_font_size_override("font_size", 15)
-	l.add_theme_color_override("font_color", Color.WHITE if ok else ShopArt.COL_BAD)
-	l.add_theme_color_override("font_outline_color", INK)
-	l.add_theme_constant_override("outline_size", 4)
-	row.add_child(l)
+	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else ShopArt.full(price), 15,
+		Color.WHITE if ok else ShopArt.COL_BAD, INK, 4))
 	return row
 
 

@@ -64,6 +64,9 @@ func _ready() -> void:
 		print("  main._process по частям (мкс): ", res.main_segments)
 		if real:
 			print("  draw calls / объектов рендера, которые даёт поддерево (разность при скрытии): ", res.draw_by_subtree)
+	var hidden := _hidden_but_processing(main)
+	_out["скрыты, но обрабатываются"] = hidden
+	print("Скрытые узлы, у которых включён _process (зря тратят кадр): ", hidden)
 	if not json_path.is_empty():
 		var f := FileAccess.open(json_path, FileAccess.WRITE)
 		f.store_string(JSON.stringify(_out, "\t"))
@@ -163,6 +166,9 @@ func _main_segments(main: Node) -> Dictionary:
 		"collapse_fx": func(): main.collapse_fx.update(cam, vw, vh, 0.016),
 		"sky_set_camera": func(): main.sky_view.set_camera(cam, vw),
 	}
+	var tw: Node = main.view_root.get_node_or_null("TechWorld")
+	if tw != null and tw.has_method("_rebuild_lava"):
+		calls["tech_world.lava_rebuild (раз в 0,2 с)"] = func(): tw._rebuild_lava()
 	for k in calls:
 		var fn: Callable = calls[k]
 		var t0 := Time.get_ticks_usec()
@@ -171,6 +177,20 @@ func _main_segments(main: Node) -> Dictionary:
 		acc[k] = snappedf(float(Time.get_ticks_usec() - t0) / float(FRAMES), 1.0)
 	main.set_process(true)
 	return acc
+
+
+## Узлы интерфейса, которые скрыты, но у которых _process включён: скрипт -> число узлов.
+func _hidden_but_processing(root: Node) -> Dictionary:
+	var res := {}
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n is CanvasItem and n.is_processing() and not (n as CanvasItem).is_visible_in_tree() \
+				and n.get_script() != null and n.has_method("_process"):
+			var key: String = String(n.get_script().resource_path).trim_prefix("res://scripts/")
+			res[key] = int(res.get(key, 0)) + 1
+	return res
 
 
 func _collect(root: Node, into: Array) -> void:

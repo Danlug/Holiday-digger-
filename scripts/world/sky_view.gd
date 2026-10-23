@@ -373,7 +373,9 @@ var _underground: bool = false
 func _process(delta: float) -> void:
 	if _underground:
 		return
-	_tick_stars(delta)
+	# Днём звёзд не видно (alpha 0): тикать 420 звёзд впустую незачем, к вечеру их таймеры и так случайны.
+	if _day_cycle == null or _day_cycle.stars_alpha() > 0.0:
+		_tick_stars(delta)
 	queue_redraw()
 	if _celestial != null:
 		_celestial.queue_redraw()

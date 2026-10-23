@@ -149,6 +149,7 @@ func _rebuild_pool() -> void:
 	_slot_wy.fill(-1073741824)
 	_slot_lava.resize(_pool.size())
 	_slot_lava.fill(0)
+	_lava_list_dirty = true
 	_win_ok = false
 
 
@@ -300,12 +301,32 @@ func _paint_rect(rx: int, ry: int, rw: int, rh: int) -> void:
 				_slot_wx[si] = wx
 				_slot_wy[si] = wy
 				s.position = Vector2(wx * TILE, wy * TILE)
-			_slot_lava[si] = 1 if _paint_cell(s, wx, wy) else 0
+			var lava: int = 1 if _paint_cell(s, wx, wy) else 0
+			if _slot_lava[si] != lava:
+				_slot_lava[si] = lava
+				_lava_list_dirty = true
 	stat_cells_painted += rw * rh
 
 
 func _paint_at(wx: int, wy: int) -> void:
 	_paint_rect(wx, wy, 1, 1)
+
+
+var _lava_list: Array = []
+var _lava_list_dirty: bool = true
+
+
+## Клетки разведанной лавы в окне (Vector2i): ровно те, что нарисованы анимированной лавой. Список
+## пересобирается только когда состав изменился; TechWorld берёт его для свечения вместо того, чтобы
+## заново спрашивать get_tile и туман у каждой клетки экрана раз в 0,2 с.
+func lava_cells() -> Array:
+	if _lava_list_dirty:
+		_lava_list_dirty = false
+		_lava_list = []
+		for si in range(_slot_lava.size()):
+			if _slot_lava[si] != 0:
+				_lava_list.append(Vector2i(_slot_wx[si], _slot_wy[si]))
+	return _lava_list
 
 
 ## Смена кадра лавы: трогаем только спрайты, где сейчас лава (их единицы), и только раз в такт.
@@ -384,6 +405,9 @@ func _build_sky_colors() -> void:
 ## отдельный полноэкранный оверлей, который просвечивал бы сквозь
 ## непрозрачные тайлы земли/шахты, нарисованные этим же пулом спрайтов ниже
 ## горизонта.
+var _day_cycle: Node = null
+
+
 func _sky_color(wy: int) -> Color:
 	var base: Color
 	if _sky_colors.is_empty():
@@ -392,9 +416,11 @@ func _sky_color(wy: int) -> Color:
 		base = _sky_colors[clampi(-wy - 1, 0, _sky_colors.size() - 1)]
 	# sky_dark() идёт 0..0.9 (окна 18–20 и 4–6, см. day_cycle.gd); в самой
 	# тёмной точке небо — ровно COLOR_SKY_NIGHT, а не «чёрное на 90 %».
-	var day_cycle := get_node_or_null("/root/DayCycle")
-	if day_cycle != null:
-		var k: float = clampf(day_cycle.sky_dark() / 0.9, 0.0, 1.0)
+	# Узел цикла дня ищем один раз: эту функцию SkyView зовёт на каждую из 24 строк неба каждый кадр.
+	if _day_cycle == null:
+		_day_cycle = get_node_or_null("/root/DayCycle")
+	if _day_cycle != null:
+		var k: float = clampf(_day_cycle.sky_dark() / 0.9, 0.0, 1.0)
 		base = base.lerp(COLOR_SKY_NIGHT, k)
 	return base
 

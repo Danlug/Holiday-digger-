@@ -52,6 +52,10 @@ func _init() -> void:
 	visibility_changed.connect(_sync_process)
 
 
+func _ready() -> void:
+	_sync_process()   # движок включает _process при входе в дерево, даже если плитка скрыта и ничего не нашла
+
+
 func setup(a: Dictionary) -> void:
 	artifact = a
 	artifact_id = String(a.get("id", ""))

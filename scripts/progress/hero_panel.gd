@@ -36,6 +36,8 @@ func _ready() -> void:
 	GameState.coins_changed.connect(_on_int_changed)
 	GameState.dollars_changed.connect(_on_int_changed)
 	visibility_changed.connect(func() -> void: set_process(is_visible_in_tree()))
+	# Движок включает _process при READY, даже если скрыт с самого начала: сигнал видимости до первого показа молчит.
+	set_process(is_visible_in_tree())
 	refresh()
 
 

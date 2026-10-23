@@ -438,6 +438,16 @@ func test_lava_animation() -> void:
 	for i in range(v._slot_lava.size()):
 		lava_slots += int(v._slot_lava[i])
 	check("в окне есть анимированные клетки лавы (%d)" % lava_slots, lava_slots > 0)
+	# список для свечения TechWorld == прежний обход окна «get_tile + туман»
+	var want := {}
+	for wy in range(int(cam.y) - 1, int(cam.y) + v._pool_rows - 1):
+		for wx in range(int(cam.x) - 1, int(cam.x) + v._pool_cols - 1):
+			if w.get_tile(wx, wy) == TileTypes.Type.LAVA and f.get_state(wx, wy) == FogOfWar.State.FULL:
+				want[Vector2i(wx, wy)] = true
+	var got := {}
+	for c: Vector2i in v.lava_cells():
+		got[c] = true
+	check("lava_cells() == клетки лавы, открытые туманом (%d)" % want.size(), got == want and not want.is_empty())
 	var painted: int = v.stat_cells_painted
 	v.render(cam)
 	check("тот же такт: ни одна клетка не перекрашена (кроме страховки — она выключена)", v.stat_cells_painted == painted)

@@ -31,6 +31,8 @@ func _ready() -> void:
 		_tex = load(SHEET)
 		_frames = maxi(int(_tex.get_width() / FRAME), 1)
 	visibility_changed.connect(func() -> void: set_process(is_visible_in_tree()))
+	# Движок включает _process при READY, даже если скрыт с самого начала: сигнал видимости до первого показа молчит.
+	set_process(is_visible_in_tree())
 
 
 func _process(delta: float) -> void:

@@ -66,8 +66,12 @@ func _ready() -> void:
 		if "_clock_label" in hud and hud._clock_label != null:
 			DayCycle.set_hour(15.0)
 			await get_tree().process_frame
-			check("часы во дворе показывают то же время, что и DayCycle (\"День N, ЧЧ:ММ\")",
-				hud._clock_label.text == "День %d, 15:00" % DayCycle.day)
+			# Слово «День N» с экрана ушло в подсказку (текст только по наведению,
+			# заказ владельца): на экране остаётся «ЧЧ:ММ», номер дня — в Tip.
+			check("часы во дворе показывают то же время, что и DayCycle (\"ЧЧ:ММ\")",
+				hud._clock_label.text == "15:00")
+			check("номер дня — в подсказке часов",
+				String((hud._clock_box.get_meta(Tip.META) as Dictionary)["title"]) == "День %d" % DayCycle.day)
 
 	# Порядок слоёв ViewRoot — решение владельца 2026-09-21: подложка/звёзды/
 	# солнце-месяц (всё внутри SkyView, см. sky_view.gd:_draw_celestial),

@@ -189,6 +189,8 @@ Godot умеет **сгенерировать Xcode-проект** на любо
 | `data/*.json` | Баланс (не трогать) |
 | `docs/GDD.md` | Дизайн-документ (не трогать) |
 | `web/index.html` | JS-эталон физики/ощущений (не трогать) |
+| `scripts/fx/` | «Сок»: `SfxService`, `FxService`, `JuiceDirector` (подключаются `Juice.attach(self)` в `main.gd`) |
+| `audio/` | Звук: эффекты WAV, музыка OGG, `catalog.json` (всё собирает `tools/gen_audio.py`, около 5 МБ) |
 | `tests/` | Headless-тесты |
 
 ### Нарезка присланного арта
@@ -203,6 +205,8 @@ python3 tools/import_move.py    # ходьба, падение, полёт
 python3 tools/import_drill.py   # ручной бур и бурмобиль
 python3 tools/import_house.py   # дом бабки после смерти деда
 ```
+
+Звук — не нарезка, а синтез: `python3 tools/gen_audio.py` (numpy + ffmpeg) пересобирает `audio/` целиком (`--sfx`, `--music`, `--only coin,mus_boss`), а `python3 tools/gen_audio.py --check` проверяет швы петель музыки, размер и покрытие каталога из шапки `scripts/core/sfx.gd`. После пересборки нужен `godot --headless --import`.
 
 Исходники лежат в `art/_source/`, результат — в `art/`. Скрипты не трогают ничего, кроме своих выходных файлов.
 

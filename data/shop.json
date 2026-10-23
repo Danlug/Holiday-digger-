@@ -36,10 +36,12 @@
 		}
 	},
 	"goods_coins": {
+		"_format": "Запись товара: id, name_ru, desc_ru, price_coins, effect (restore | full_restore | teleport_home | grant_item) и необязательные shelf (food | picks | tech | premium), icon, tier 0..5, unlock_depth, effects [{icon, text}]. Полное описание — docs/GDD.md §15 «Каталог витрины».",
 		"_comment": "Допинги за монеты не перечисляются здесь: их цена и эффект уже заданы в balance.json -> food.items (source=\"shop\") системой дома. Два места с ценой одного и того же энергетика разъедутся при первой же правке, поэтому лавка читает их оттуда, а этот список — только для товаров, которых там нет.",
 		"extra": []
 	},
 	"goods_dollars": {
+		"_format": "Тот же формат записи, что у goods_coins, но цена в price_dollars; по умолчанию полка premium.",
 		"_comment": "Гаджеты за доллары (ГДД раздел 15: часы-телепорт, таблетка полного восстановления, энергетик). Энергетик и батончик сюда не дублируются — они приходят из balance.json -> food.items (source=\"premium\").",
 		"extra": [
 			{

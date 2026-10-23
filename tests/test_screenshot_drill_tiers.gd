@@ -86,10 +86,9 @@ func _ready() -> void:
 	ui.open(ShopUI.TAB_TECH)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	# Апгрейд бура — последний блок списка, ниже рецептов техники: список
-	# длиннее экрана, и без прокрутки строку не увидеть в кадре вовсе (см.
-	# scroll — ScrollContainer, 4-й ребёнок _root: bg/head/tabs/scroll/footer).
-	var scroll: ScrollContainer = ui._root.get_child(3)
+	# Апгрейд бура — последний блок списка, ниже рецептов техники: без
+	# прокрутки строку в кадре не видно.
+	var scroll: ScrollContainer = ui._scroll
 	scroll.scroll_vertical = 100000
 	await get_tree().process_frame
 	var shop_img := get_viewport().get_texture().get_image()

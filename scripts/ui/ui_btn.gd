@@ -72,7 +72,7 @@ static func _box(kind: int, state: String) -> StyleBox:
 
 
 ## Одевает существующую кнопку в общий стиль и подключает отклик нажатия.
-static func style(b: Button, kind: int = Kind.NORMAL) -> Button:
+static func style(b: Button, kind: int = Kind.NORMAL, with_feedback: bool = true) -> Button:
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		b.add_theme_stylebox_override(state, _box(kind, "pressed" if state == "hover_pressed" else state))
 	b.add_theme_color_override("font_color", MUTED)
@@ -82,7 +82,8 @@ static func style(b: Button, kind: int = Kind.NORMAL) -> Button:
 	b.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
 	b.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.35))
 	b.focus_mode = Control.FOCUS_NONE
-	wire_feedback(b)
+	if with_feedback:
+		wire_feedback(b)
 	return b
 
 
@@ -183,3 +184,54 @@ static func set_badge(b: Control, n: int) -> void:
 	if grew or not badge.has_meta(&"_shown"):
 		badge.set_meta(&"_shown", true)
 		UiAnim.pulse(badge, 0.35, 0.26)
+
+
+## Ползунок в общем стиле: тёмная канавка, заливка цветом, золотая круглая ручка.
+static func style_slider(s: HSlider, fill: Color = GOLD_DIM) -> void:
+	var groove := StyleBoxFlat.new()
+	groove.bg_color = Color(0.06, 0.05, 0.04)
+	groove.border_color = BORDER
+	groove.set_border_width_all(1)
+	groove.set_corner_radius_all(3)
+	groove.content_margin_top = 3
+	groove.content_margin_bottom = 3
+	s.add_theme_stylebox_override("slider", groove)
+	var filled := StyleBoxFlat.new()
+	filled.bg_color = fill
+	filled.set_corner_radius_all(3)
+	filled.content_margin_top = 3
+	filled.content_margin_bottom = 3
+	s.add_theme_stylebox_override("grabber_area", filled)
+	s.add_theme_stylebox_override("grabber_area_highlight", filled)
+	var knob := knob_texture(GOLD)
+	s.add_theme_icon_override("grabber", knob)
+	s.add_theme_icon_override("grabber_highlight", knob_texture(GOLD.lightened(0.3)))
+	s.add_theme_icon_override("grabber_disabled", knob)
+	s.custom_minimum_size.y = maxf(s.custom_minimum_size.y, 22.0)
+
+
+## Ручка ползунка — золотой кружок с тёмной обводкой, рисуется из кода (16×16).
+static func knob_texture(col: Color) -> Texture2D:
+	var n := 16
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := (n - 1) * 0.5
+	for y in n:
+		for x in n:
+			var d := Vector2(x - c, y - c).length()
+			if d <= 7.5:
+				var shade := col
+				if d >= 6.2:
+					shade = Color8(0x1A, 0x13, 0x0D)
+				elif (x + y) < n - 3 and d < 4.5:
+					shade = col.lightened(0.35)
+				img.set_pixel(x, y, shade)
+	return ImageTexture.create_from_image(img)
+
+
+## Вызывает action при нажатии левой кнопкой/пальцем по control (затемнение за
+## шторкой: тап мимо карточки закрывает её).
+static func on_tap(c: Control, action: Callable) -> void:
+	c.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
+				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			action.call())

@@ -368,7 +368,7 @@ func _on_rig_button() -> void:
 	if player == null or not player.has_method("start_rig_boarding"):
 		return
 	if player.has_method("has_rig_fuel") and not player.has_rig_fuel():
-		_toast("Нет брикетов — сделай на верстаке из угля")
+		_toast("Бак пуст — заправься у станции")
 		return
 	player.start_rig_boarding()
 

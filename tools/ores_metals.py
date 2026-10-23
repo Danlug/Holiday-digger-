@@ -212,6 +212,7 @@ class Pic:
     def __init__(self):
         self.rgb = np.zeros((G, G, 3), dtype=np.uint8)
         self.solid = np.zeros((G, G), dtype=bool)
+        self.hair = []
 
     # ---- общие операции
 
@@ -337,6 +338,9 @@ class Pic:
         if shadow:
             sh = (shifted(self.solid, 1, 1) | shifted(self.solid, 0, 1)) & ~self.solid
             a[sh, 0], a[sh, 1], a[sh, 2], a[sh, 3] = shadow_col[0], shadow_col[1], shadow_col[2], shadow_a
+        for x, y, c in self.hair:
+            if not self.solid[y, x]:
+                a[y, x, 0], a[y, x, 1], a[y, x, 2], a[y, x, 3] = c[0], c[1], c[2], 112
         s.img = Image.fromarray(a, "RGBA")
         return s
 
@@ -344,10 +348,10 @@ class Pic:
 
 # ══ материалы ═══════════════════════════════════════════════════════════════
 
-R_SILVER = ramp(262, 5, [46, 66, 79, 90, 95, 98, 100, 100], dh_dark=-10, dh_light=10, spec=(255, 255, 255))
-R_ALU = ramp(268, 18, [41, 57, 67, 75, 81, 86, 90, 95], dh_dark=-6, dh_light=0)
+R_SILVER = ramp(262, 9, [40, 66, 81, 91, 96, 98, 100, 100], dh_dark=-14, dh_light=10, spec=(255, 255, 255))
+R_ALU = ramp(270, 8, [40, 55, 64, 71, 77, 82, 87, 93], dh_dark=-8, dh_light=0)
 R_PLAT = ramp(332, 42, [52, 66, 76, 84, 90, 94, 97, 100], dh_dark=-14, dh_light=6, spec=(255, 255, 255))
-R_MERC = ramp(208, 28, [14, 27, 38, 48, 56, 66, 82, 100], dh_dark=-10, dh_light=6, spec=(255, 255, 255))
+R_MERC = ramp(234, 44, [20, 33, 45, 56, 64, 72, 86, 100], dh_dark=-8, dh_light=4, spec=(255, 255, 255))
 R_LEAD = ramp(285, 20, [18, 29, 38, 45, 52, 59, 66, 76], dh_dark=-4, dh_light=0)
 R_TITAN = ramp(288, 62, [20, 31, 42, 51, 59, 69, 80, 92], dh_dark=-14, dh_light=40)
 R_NICK = ramp(126, 34, [24, 38, 49, 57, 64, 72, 82, 93], dh_dark=-6, dh_light=14)
@@ -439,17 +443,64 @@ def _shard(p, cx, cy, length, width, rot, rp, skew=0.34):
     return mask
 
 
-def silver_tile():
+def _facet_poly(p, pts, rp, base=4.0, gain=3.2, lo=1, hi=6, edge=None, apex=(0.0, 0.0), tones=None):
+    """Граненый самородок: грани-треугольники от центра, тон по нормали грани; тёмный контур со всех сторон
+    и светлая кромка внутри на освещённых рёбрах."""
+    mask = poly(pts)
+    cx, cy = sum(q[0] for q in pts) / len(pts), sum(q[1] for q in pts) / len(pts)
+    p.ring(mask, rp[0])
+    n = len(pts)
+    for i in range(n):
+        a, b = pts[i], pts[(i + 1) % n]
+        ex, ey = b[0] - a[0], b[1] - a[1]
+        ln = math.hypot(ex, ey)
+        nx, ny = ey / ln, -ex / ln
+        mx, my = (a[0] + b[0]) / 2 - cx, (a[1] + b[1]) / 2 - cy
+        if nx * mx + ny * my < 0:
+            nx, ny = -nx, -ny
+        lit = nx * _LIGHT[0] + ny * _LIGHT[1]
+        idx = int(np.clip(round(base + lit * gain), lo, hi))
+        col = rp[idx] if tones is None else tones[idx]
+        p.paint(poly([(cx + apex[0], cy + apex[1]), a, b]) & mask, col)
+    up, left = shifted(mask, 0, 1), shifted(mask, 1, 0)
+    p.paint(mask & ~(up & left) & ~erode(mask) & (~up | ~left), rp[7] if edge is None else edge)
+    return mask
+
+
+SIL_FACET = [lch(84, 9, 258), lch(91, 6, 262), lch(96, 4, 266), lch(99, 2, 270), (255, 255, 255)]
+_SILVER_CHUNKS = (
+    [(4, 19), (5, 13), (10, 9), (16, 9), (21, 12), (22, 18), (19, 24), (12, 26), (6, 24)],
+    [(20, 22), (24, 18), (29, 20), (30, 25), (26, 28), (21, 27)],
+    [(20, 6), (24, 4), (27, 7), (26, 11), (22, 11)],
+    [(4, 5), (7, 3), (10, 5), (9, 8), (5, 8)],
+)
+
+
+def _silver_pic(k, ox, oy):
     p = Pic()
-    k = dict(lo=-2.0, hi=1.3)
-    p.dome(blob(20.5, 8.8, 3.5, 2.9, 0.3, 0.14, 11), R_SILVER, streaks=_chrome(20.5, 8.8), **k)
-    p.dome(blob(13.0, 17.5, 6.8, 5.6, -0.35, 0.15, 12), R_SILVER, streaks=_chrome(13, 17.5), **k)
-    p.dome(blob(22.8, 21.0, 4.4, 3.7, 0.2, 0.14, 13), R_SILVER, streaks=_chrome(22.8, 21), **k)
-    p.dome(blob(7.5, 8.5, 2.2, 1.9, 0.0, 0.12, 14), R_SILVER, **k)
-    p.sparkle(25, 12, 3, (255, 255, 255), (232, 240, 255))
-    p.sparkle(5, 23, 2, (255, 255, 255), (232, 240, 255))
-    p.sparkle(12, 13, 2, (255, 255, 255), (255, 255, 255))
+    for pts in _SILVER_CHUNKS[::-1] if False else _SILVER_CHUNKS:
+        q = [(16 + (x - 16) * k + ox, 16 + (y - 16) * k + oy) for x, y in pts]
+        _facet_poly(p, q, R_SILVER, base=3.0, gain=2.2, lo=0, hi=4, apex=(-1.6, -1.4), tones=SIL_FACET)
+    return p
+
+
+def silver_tile():
+    p = _silver_pic(1.0, 0, 0)
+    # хромовая полоса поперёк большого куска: тёмный «горизонт» и светлый блик под ним
+    p.line((9, 22), (18, 12), R_SILVER[2], clip=erode(poly(_SILVER_CHUNKS[0])))
+    p.line((10, 22), (19, 12), R_SILVER[7], clip=erode(poly(_SILVER_CHUNKS[0])))
+    p.sparkle(26, 14, 3, (255, 255, 255), (222, 236, 255))
+    p.sparkle(5, 26, 2, (255, 255, 255), (222, 236, 255))
+    p.sparkle(14, 6, 2, (255, 255, 255), (255, 255, 255))
     return p.sprite()
+
+
+def silver_icon():
+    p = _silver_pic(1.22, 0, 1)
+    p.sparkle(27, 12, 3, (255, 255, 255), (222, 236, 255))
+    p.sparkle(4, 27, 2, (255, 255, 255), (222, 236, 255))
+    p.sparkle(14, 3, 2, (255, 255, 255), (255, 255, 255))
+    return p.sprite(shadow=False)
 
 
 def aluminium_tile():
@@ -562,14 +613,17 @@ def nickel_tile():
 
 
 R_IRON = ramp(48, 46, [16, 25, 35, 44, 52, 59, 67, 77], dh_dark=-16, dh_light=16)
-R_COPPER = ramp(55, 84, [22, 33, 44, 54, 62, 70, 80, 92], dh_dark=-24, dh_light=12)
+R_COPPER = ramp(60, 64, [24, 36, 48, 58, 66, 73, 82, 93], dh_dark=-24, dh_light=8, c_dark=0.9, c_light=0.8)
 R_PATINA = ramp(172, 30, [20, 34, 46, 56, 64, 72, 82, 92], dh_dark=-10, dh_light=14)
 R_GOLD = ramp(90, 98, [32, 46, 58, 67, 74, 81, 88, 95], dh_dark=-34, dh_light=4, c_dark=0.75, c_light=0.95)
 R_SCRAP = ramp(92, 8, [18, 30, 40, 48, 55, 62, 70, 80], dh_dark=-6, dh_light=6)
 R_RUST = ramp(52, 42, [14, 24, 33, 41, 48, 55, 63, 72], dh_dark=-14, dh_light=14)
-R_PEAT = ramp(66, 58, [10, 19, 30, 41, 51, 59, 68, 80], dh_dark=-10, dh_light=14, c_dark=0.95, c_light=0.75)
+R_PEAT = ramp(100, 30, [2, 3, 5, 7, 9, 12, 15, 32], dh_dark=-8, dh_light=8, c_dark=0.9, c_light=0.85)
 R_FIBER = ramp(70, 34, [16, 28, 40, 50, 58, 66, 74, 84], dh_dark=-8, dh_light=10)
-R_MOSS = ramp(124, 80, [10, 18, 28, 37, 46, 55, 66, 78], dh_dark=-6, dh_light=20, c_dark=0.9, c_light=0.85)
+R_MOSS = ramp(132, 64, [5, 9, 15, 21, 28, 36, 46, 62], dh_dark=-6, dh_light=14, c_dark=0.95, c_light=0.9)
+PEAT_FIBER = lch(72, 30, 86)
+PEAT_FIBER2 = lch(54, 30, 82)
+PEAT_RIM = lch(30, 30, 86)
 R_COAL = [lch(1.5, 4, 105), lch(2.5, 5, 108), lch(4, 8, 118), lch(6.5, 8, 118), lch(9, 5, 255), lch(20, 6, 250),
           lch(46, 8, 245), lch(74, 8, 240)]
 R_URAN = ramp(126, 92, [26, 44, 58, 69, 79, 87, 94, 99], dh_dark=22, dh_light=-8, c_dark=0.9, c_light=0.8)
@@ -952,18 +1006,6 @@ def lead_icon():
     return p.sprite(shadow=False)
 
 
-def silver_icon():
-    p = Pic()
-    k = dict(lo=-2.0, hi=1.3)
-    p.dome(blob(22.5, 10.5, 4.6, 3.8, 0.3, 0.12, 221), R_SILVER, streaks=_chrome(22.5, 10.5), **k)
-    p.dome(blob(14.0, 18.5, 10.0, 8.2, -0.3, 0.12, 222), R_SILVER, streaks=_chrome(14, 18.5), **k)
-    p.dome(blob(25.5, 24.5, 5.0, 4.0, 0.2, 0.12, 223), R_SILVER, streaks=_chrome(25.5, 24.5), **k)
-    p.sparkle(27, 5, 3, (255, 255, 255), (232, 240, 255))
-    p.sparkle(5, 8, 2, (255, 255, 255), (232, 240, 255))
-    p.sparkle(11, 14, 2, (255, 255, 255), (255, 255, 255))
-    return p.sprite(shadow=False)
-
-
 def copper_icon():
     p = Pic()
     k = dict(lo=-1.0, hi=1.2, spec_k=18)
@@ -1198,16 +1240,39 @@ def fuel_block_coal_icon():
     return p.sprite(shadow=False)
 
 
-def _peat_clod(p, cx, cy, rx, ry, rot, sd, moss_thr=0.68):
+def _hair(p, mask, n, seed):
+    """Светлые волокна-«шерсть» по краю комка: тонкие изогнутые нити наружу, полупрозрачные (стелются по грунту,
+    телом залежи не считаются)."""
+    rng = np.random.default_rng(seed)
+    ys, xs = np.nonzero(dilate(mask) & ~mask)
+    if len(ys) == 0:
+        return
+    cy, cx = np.mean(np.nonzero(mask), axis=1)
+    for k in rng.choice(len(ys), min(n, len(ys)), replace=False):
+        x, y = float(xs[k]), float(ys[k])
+        ang = math.atan2(y - cy, x - cx) + rng.uniform(-0.6, 0.6)
+        for i in range(int(rng.integers(3, 7))):
+            xi, yi = int(x), int(y)
+            if 0 <= xi < G and 0 <= yi < G and not mask[yi, xi] and not p.solid[yi, xi]:
+                p.hair.append((xi, yi, PEAT_FIBER if (i + k) % 3 else PEAT_FIBER2))
+            ang += rng.uniform(-0.55, 0.55)
+            x += math.cos(ang)
+            y += math.sin(ang)
+
+
+def _peat_clod(p, cx, cy, rx, ry, rot, sd, moss_thr=0.2):
+    """Тёмный комок торфа: сверху зелёный мох пятнами, внутри светлые волокна, снаружи торчат корешки."""
     m = blob(cx, cy, rx, ry, rot, 0.26, sd, 8, 2.2)
-    n = vnoise(sd + 7, 2.6) + (vnoise(sd + 9, 1.4) - 0.5) * 0.3
-    moss = erode(m) & (n > moss_thr) & (_YY < cy + 2)
-    p.dome(m, R_PEAT, spec=False, lo=-0.75, hi=1.4, alt=(moss, R_MOSS), rim=R_PEAT[7],
+    n = vnoise(sd + 7, 2.8) + (vnoise(sd + 9, 1.5) - 0.5) * 0.35
+    moss = erode(m) & (n > moss_thr) & (_YY < cy + 6)
+    p.dome(m, R_PEAT, spec=False, lo=-1.0, hi=2.2, alt=(moss, R_MOSS), rim=PEAT_RIM,
            tex=(vnoise(sd + 13, 2.0) - 0.5) * 0.3)
     area = int(m.sum())
-    _strands(p, m, area // 10, sd + 21, R_PEAT[1], 9, curl=0.5)
-    _strands(p, m, area // 14, sd + 25, R_PEAT[7], 7, curl=0.5)
-    _fibers(p, m, 4 + int(rx / 1.5), sd + 31, R_PEAT, out=True)
+    _strands(p, m, area // 45, sd + 19, R_PEAT[0], 8, curl=0.5)
+    _strands(p, m, area // 100, sd + 21, PEAT_FIBER2, 7, curl=0.5)
+    _strands(p, m, area // 160, sd + 22, PEAT_FIBER, 6, curl=0.5)
+    _hair(p, m, 8 + int(rx * 1.6), sd + 31)
+    _strands(p, m, area // 120, sd + 27, R_MOSS[6], 4, curl=0.4)
     return m
 
 

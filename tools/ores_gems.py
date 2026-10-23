@@ -382,8 +382,8 @@ def _universalium(mode):
     cx, cy = 15.5, 15.5
     turn = 11.0   # звезда повёрнута: без осевой симметрии
     # (угол, длина, оттенок): кардинальные лучи длинные, диагональные короткие
-    rays = [(-90, 13.5, 205), (-45, 9.5, 125), (0, 12.0, 85), (45, 9.0, 48), (90, 13.0, 356), (135, 9.5, 322),
-            (180, 12.5, 275), (-135, 9.0, 238)]
+    rays = [(-90, 12.0, 236), (-45, 12.0, 84), (0, 13.0, 8), (45, 11.5, 64), (90, 13.0, 4), (135, 9.5, 24),
+            (180, 13.0, 90), (-135, 7.0, 205)]
     order = sorted(range(len(rays)), key=lambda i: rays[i][1])
     for i in order:
         ang, ln, hue = rays[i]
@@ -395,20 +395,20 @@ def _universalium(mode):
         T = (cx + dx * ln, cy + dy * ln)
         sl = (cx + dx * d - px * w, cy + dy * d - py * w)
         sr = (cx + dx * d + px * w, cy + dy * d + py * w)
-        lit, dark = lch(84, 60, hue), lch(50, 96, hue)
+        lit, dark = lch(76, 70, hue), lch(50, 100, hue)
         cv.fill(poly_mask([(cx, cy), sl, T, sr]), dark)
         cv.fill(poly_mask([(cx, cy), sl, T]), lit)
-        cv.line((cx + dx * d * 0.6, cy + dy * d * 0.6), (cx + dx * ln * 0.78, cy + dy * ln * 0.78), lch(98, 10, hue))
+        cv.line((cx + dx * d * 0.6, cy + dy * d * 0.6), (cx + dx * ln * 0.78, cy + dy * ln * 0.78), lch(94, 24, hue))
     sil = cv.solid()
     cv.ring(sil, lch(26, 62, 264))
     # ядро: белый восьмигранник с призматическим бликом
-    core = ell_mask(cx, cy, 3.3 * k, 3.3 * k)
+    core = ell_mask(cx, cy, 2.7 * k, 2.7 * k)
     cv.fill(core, lch(96, 8, 250))
-    cv.fill(ell_mask(cx + 0.6, cy + 0.8, 2.4 * k, 2.4 * k), lch(88, 24, 205))
-    cv.fill(ell_mask(cx - 0.6, cy - 0.7, 1.8 * k, 1.8 * k), (255, 255, 255))
+    cv.fill(ell_mask(cx + 0.5, cy + 0.7, 1.9 * k, 1.9 * k), lch(88, 24, 205))
+    cv.fill(ell_mask(cx - 0.5, cy - 0.6, 1.3 * k, 1.3 * k), (255, 255, 255))
     cv.put(cx + 1.2 * k, cy + 1.8 * k, lch(90, 50, 340))
     cv.put(cx + 2.2 * k, cy + 0.3 * k, lch(92, 55, 95))
-    cv.ring(core, lch(42, 54, 262))
+    cv.ring(core, lch(44, 56, 340))
     cv.halo(lch(88, 52, 215), 1.3, 0.36)
     for (x, y, n) in ((4, 5, 1), (27, 26, 1), (28, 7, 0), (5, 26, 0)):
         if cv.a[y, x, 3] < 100:
@@ -509,8 +509,8 @@ def _brilliant(cv, cx, top, w, h, P, flip=0.0):
 def _diamond(mode):
     cv = Cv("diamond")
     P = {
-        "out": lch(28, 40, 236), "deep": lch(50, 44, 226), "shade": lch(66, 42, 214), "base": lch(81, 32, 204),
-        "light": lch(92, 17, 200), "hi": lch(99, 3, 200), "cyan": lch(76, 46, 196),
+        "out": lch(30, 42, 232), "deep": lch(74, 42, 204), "shade": lch(83, 38, 197), "base": lch(90, 32, 194),
+        "light": lch(96, 14, 194), "hi": lch(99, 3, 200), "cyan": lch(86, 44, 192),
     }
     if mode == "tile":
         gems = [(8.5, 5, 9, 9, -0.5), (24, 8, 7, 7, 0.5), (15, 12, 15, 14.5, 0.0)]
@@ -705,8 +705,8 @@ def _prism(cv, bx, by, H, W, ang, P, tilt=0.0):
 def _geocrystal(mode):
     cv = Cv("geocrystal")
     P = {
-        "out": lch(26, 48, 42), "deep": lch(42, 74, 44), "shade": lch(54, 84, 52), "base": lch(66, 88, 62),
-        "light": lch(78, 84, 72), "hi": lch(90, 52, 86), "core": lch(94, 40, 92), "white": (255, 252, 226),
+        "out": lch(22, 52, 32), "deep": lch(36, 80, 36), "shade": lch(48, 92, 40), "base": lch(59, 96, 46),
+        "light": lch(72, 92, 58), "hi": lch(90, 56, 80), "core": lch(94, 40, 90), "white": (255, 252, 226),
     }
     # (основание x, y, высота, ширина, наклон, смещение острия): веер из центра, у ног — самая яркая точка
     prisms = [(24, 27, 14, 6.4, 22, 0.8), (7.5, 27, 11, 5.4, -24, -0.6), (16, 28, 22, 8.2, -4, 0.8),
@@ -750,12 +750,14 @@ def _plate(cv, pts, P, runes=True, rivets=True):
     ys, xs = np.nonzero(face)
     # потёки патины сверху вниз и светлая окисная крапа
     rng = cv.rng
-    for _ in range(5):
+    for _ in range(9):
         i = rng.randrange(len(ys))
         x, y = xs[i], ys[i]
-        for dy in range(rng.randint(2, 4)):
+        for dy in range(rng.randint(2, 5)):
             if face[min(y + dy, G - 1), x]:
                 cv.put(x, y + dy, P["green"])
+                if dy == 0 and x + 1 < G and face[y, x + 1]:
+                    cv.put(x + 1, y, tone(P["green"], -8))
     cv.speckle(face, [P["light"], P["shade"]], 14)
     cv.rim(face, P["hi"], P["shade"], 0.8, 0.6, bottom=False)
     cv.ring(face | side, P["out"])
@@ -765,9 +767,9 @@ def _plate(cv, pts, P, runes=True, rivets=True):
 def _ancient_metal(mode):
     cv = Cv("ancient_metal")
     P = {
-        "out": lch(20, 26, 190), "deep": lch(34, 30, 188), "shade": lch(45, 34, 184), "base": lch(56, 36, 178),
-        "light": lch(68, 38, 172), "hi": lch(82, 28, 168), "green": lch(44, 36, 150),
-        "rune": lch(84, 72, 88), "rune2": lch(66, 62, 80), "bolt": lch(86, 20, 175),
+        "out": lch(14, 24, 60), "deep": lch(26, 30, 76), "shade": lch(36, 36, 80), "base": lch(46, 40, 82),
+        "light": lch(58, 42, 86), "hi": lch(74, 34, 92), "green": lch(52, 40, 158),
+        "rune": lch(88, 78, 92), "rune2": lch(64, 66, 76), "bolt": lch(82, 22, 90),
     }
     k = 0.93 if mode == "tile" else 1.1
 
@@ -835,8 +837,8 @@ def _crack(cv, pts, P, inside):
 def _hellstone(mode):
     cv = Cv("hellstone")
     P = {
-        "out": lch(3, 18, 28), "deep": lch(7, 20, 28), "shade": lch(12, 28, 30), "base": lch(19, 34, 32),
-        "lit": lch(29, 44, 34), "rim": lch(46, 68, 40),
+        "out": lch(2, 16, 28), "deep": lch(3, 16, 28), "shade": lch(6, 22, 28), "base": lch(10, 30, 30),
+        "lit": lch(17, 40, 32), "rim": lch(46, 68, 40),
         "red": lch(40, 80, 40), "orange": lch(66, 92, 58), "yellow": lch(88, 78, 88), "white": lch(97, 20, 95),
     }
     rocks = [

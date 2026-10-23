@@ -458,14 +458,14 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 	}
 
 	// ---------- падения: исключения движка, потеря WebGL-контекста
+	// Пока идёт загрузка, фатально любое необработанное: Engine.init при сбое скачивания wasm не отклоняет свой промис,
+	// и без этого страница вечно стояла бы на проценте.
 	function crashLike(msg) { return /RuntimeError|abort|unreachable|out of bounds|memory|wasm|WebAssembly/i.test(String(msg || '')); }
-	window.addEventListener('error', function (e) {
-		if (crashLike(e.message) || crashLike(e.error && e.error.message)) { shell.fail(shell.phase === 'loading' ? 'load' : 'crash', e.message); }
-	});
-	window.addEventListener('unhandledrejection', function (e) {
-		var msg = e.reason && e.reason.message ? e.reason.message : e.reason;
-		if (crashLike(msg)) { shell.fail(shell.phase === 'loading' ? 'load' : 'crash', msg); }
-	});
+	function onFatal(msg) {
+		if (shell.phase === 'loading') { shell.fail('load', msg); } else if (crashLike(msg)) { shell.fail('crash', msg); }
+	}
+	window.addEventListener('error', function (e) { onFatal(e.message || (e.error && e.error.message)); });
+	window.addEventListener('unhandledrejection', function (e) { onFatal(e.reason && e.reason.message ? e.reason.message : e.reason); });
 	// Слушатель стоит раньше, чем у движка, и гасит его alert().
 	canvas.addEventListener('webglcontextlost', function (e) {
 		e.preventDefault();

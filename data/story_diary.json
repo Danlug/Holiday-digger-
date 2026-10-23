@@ -1,0 +1,19 @@
+{
+	"version": 1,
+	"_note": "Дневник деда (ГДД раздел 2): страницы по порядку. when — условие открытия: depth (макс. глубина), seen (сцена показана), flag (сюжетный флаг); условия складываются по «И». Тексты — ключи diary.<id>.text и diary.<id>.note в story_<локаль>.json (note — пометка на полях, подсказка по игре без чисел).",
+	"pages": [
+		{"id": "first", "icon": "res://art/story/sketch_first.png", "when": {"flag": "diary_found"}},
+		{"id": "peat", "icon": "res://art/story/sketch_peat.png", "when": {"depth": 50}},
+		{"id": "diamond", "icon": "res://art/story/sketch_diamond.png", "when": {"depth": 70}},
+		{"id": "relic", "icon": "res://art/story/sketch_relic.png", "when": {"seen": "first_artifact"}},
+		{"id": "gold", "icon": "res://art/story/sketch_gold.png", "when": {"depth": 100}},
+		{"id": "heavy", "icon": "res://art/story/sketch_heavy.png", "when": {"depth": 300}},
+		{"id": "whisper", "icon": "res://art/story/sketch_whisper.png", "when": {"seen": "whisper_1200"}},
+		{"id": "rig", "icon": "res://art/story/sketch_rig.png", "when": {"seen": "grandma_returns"}},
+		{"id": "gems", "icon": "res://art/story/sketch_gems.png", "when": {"depth": 2000}},
+		{"id": "lava", "icon": "res://art/story/sketch_lava.png", "when": {"depth": 3000}},
+		{"id": "monsters", "icon": "res://art/story/sketch_monsters.png", "when": {"seen": "abyss_warning"}},
+		{"id": "bottom", "icon": "res://art/story/sketch_bottom.png", "when": {"seen": "bottom_near"}},
+		{"id": "last", "icon": "res://art/story/sketch_last.png", "when": {"seen": "ending"}}
+	]
+}

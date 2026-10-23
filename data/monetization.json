@@ -143,7 +143,9 @@
    {"id": "restore_stamina_hunger_in_mine", "trigger": "второе истощение в шахте (см. GDD п.9, энергетический батончик) — предложить ролик перед платным батончиком", "implemented": false},
    {"id": "cancel_loot_loss_on_death", "trigger": "экран смерти/возрождения — до подтверждения потери лута", "implemented": false},
    {"id": "remote_dump_loot_for_sale", "trigger": "полный рюкзак в шахте — рядом с обычной продажей на месте", "implemented": false},
-   {"id": "well_report_double", "trigger": "окно отчёта скважины, кнопка «×2» (scripts/tech/well_report.gd, TechAds)", "implemented": true, "reward_source": "tech.json -> well.ad_double: удваивает добычу на склад; доллары скважина не платит никогда (решение владельца)"}
+   {"id": "well_report_double", "trigger": "окно отчёта скважины, кнопка «×2» (scripts/tech/well_report.gd, TechAds)", "implemented": true, "reward_source": "tech.json -> well.ad_double: удваивает добычу на склад; доллары скважина не платит никогда (решение владельца)"},
+   {"id": "daily_reward_double", "trigger": "окно ежедневной награды — кнопка «×2» (монеты и опыт; доллары не удваиваются)", "implemented": true, "reward_source": "data/daily_rewards.json -> ad_double", "note": "ПРЕДЛОЖЕНО веткой meta, в ГДД раздел 15 такой точки нет; лимит 1/сутки лежит в daily_rewards.json, пока владелец не внесёт строку в balance.json -> ads.daily_limits"},
+   {"id": "quest_reward_double", "trigger": "готовое ежедневное/недельное задание — кнопка «×2»", "implemented": true, "reward_source": "data/quests.json -> ad_double", "note": "ПРЕДЛОЖЕНО веткой meta; лимит 3/сутки лежит в quests.json, пока владелец не внесёт строку в balance.json -> ads.daily_limits"}
   ]
  }
 }

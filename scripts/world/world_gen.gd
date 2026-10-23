@@ -693,7 +693,12 @@ func _ore_density(ore: Dictionary, y: int) -> float:
 		if width <= 0.0:
 			return maxf(peak, tail)
 		var t := float(y - peak_y) / width
-		return maxf(peak * (1.0 - t * t), tail)
+		var floor_d := tail
+		# rise=zero: до пика плотность растёт с нуля на y_min, без ступеньки до
+		# tail (у глубинных руд tail = 3/4 пика, и «парабола» была ступенькой).
+		if y <= peak_y and ore.get("rise", "") == "zero":
+			floor_d = 0.0
+		return maxf(peak * (1.0 - t * t), floor_d)
 
 	if curve == "ramp" or ore.has("ramp_end_y"):
 		var y_min := int(ore.get("y_min", 0))

@@ -91,7 +91,7 @@
 		"void_chance": 0.1,
 		"stone_chance": 0.14
 	},
-	"_ores_comment": "Глубины и профили руд синхронизированы с data/minerals.json — один источник правды, чтобы экономика и генерация не расходились. Значения, не заданные владельцем, помечены proposed там же. curve=ramp — линейный рост density_start->density_end к ramp_end_y (торф). curve=parabola — рост к пику и вечный хвост (все руды).",
+	"_ores_comment": "Глубины и профили руд синхронизированы с data/minerals.json — один источник правды, чтобы экономика и генерация не расходились. Значения, не заданные владельцем, помечены proposed там же. curve=ramp — линейный рост density_start->density_end к ramp_end_y (торф). curve=parabola — рост к пику и вечный хвост. rise=zero — подъём к пику начинается с нуля на y_min (без ступеньки); без него до пика плотность не ниже tail (старое поведение для железа/свинца/серебра/золота/алюминия/алмаза — не трогаем, их кривые утверждены ранее). Расчёт слоёв глубинных руд — docs/GDD.md §4.1, замер — tools/world_economy.gd.",
 	"ores": [
 		{
 			"id": "divine_heart",
@@ -151,7 +151,8 @@
 			"peak_y": 3000,
 			"peak": 0.0342,
 			"fall_width": 1800,
-			"tail": 0.02565
+			"tail": 0.02565,
+			"rise": "zero"
 		},
 		{
 			"id": "emerald",
@@ -161,7 +162,8 @@
 			"peak_y": 3000,
 			"peak": 0.0342,
 			"fall_width": 1800,
-			"tail": 0.02565
+			"tail": 0.02565,
+			"rise": "zero"
 		},
 		{
 			"id": "platinum",
@@ -171,7 +173,8 @@
 			"peak_y": 1800,
 			"peak": 0.038,
 			"fall_width": 1600,
-			"tail": 0.0285
+			"tail": 0.0285,
+			"rise": "zero"
 		},
 		{
 			"id": "geocrystal",
@@ -181,7 +184,8 @@
 			"peak_y": 3800,
 			"peak": 0.038,
 			"fall_width": 2000,
-			"tail": 0.0285
+			"tail": 0.0285,
+			"rise": "zero"
 		},
 		{
 			"id": "ancient_metal",
@@ -189,9 +193,10 @@
 			"curve": "parabola",
 			"y_min": 3000,
 			"peak_y": 4000,
-			"peak": 0.038,
+			"peak": 0.032,
 			"fall_width": 2000,
-			"tail": 0.0285
+			"tail": 0.024,
+			"rise": "zero"
 		},
 		{
 			"id": "mercury",
@@ -201,7 +206,8 @@
 			"peak_y": 1600,
 			"peak": 0.0475,
 			"fall_width": 1500,
-			"tail": 0.03563
+			"tail": 0.03563,
+			"rise": "zero"
 		},
 		{
 			"id": "uranium",
@@ -209,9 +215,10 @@
 			"curve": "parabola",
 			"y_min": 1500,
 			"peak_y": 2600,
-			"peak": 0.0475,
+			"peak": 0.021,
 			"fall_width": 1800,
-			"tail": 0.03563
+			"tail": 0.0158,
+			"rise": "zero"
 		},
 		{
 			"id": "silver",
@@ -229,9 +236,10 @@
 			"curve": "parabola",
 			"y_min": 3000,
 			"peak_y": 4200,
-			"peak": 0.057,
+			"peak": 0.026,
 			"fall_width": 2000,
-			"tail": 0.04275
+			"tail": 0.0195,
+			"rise": "zero"
 		},
 		{
 			"id": "hellstone",
@@ -261,7 +269,8 @@
 			"peak_y": 1900,
 			"peak": 0.0665,
 			"fall_width": 1600,
-			"tail": 0.04988
+			"tail": 0.04988,
+			"rise": "zero"
 		},
 		{
 			"id": "lithium",
@@ -271,7 +280,8 @@
 			"peak_y": 2000,
 			"peak": 0.0665,
 			"fall_width": 1600,
-			"tail": 0.04988
+			"tail": 0.04988,
+			"rise": "zero"
 		},
 		{
 			"id": "nickel",
@@ -281,7 +291,8 @@
 			"peak_y": 1200,
 			"peak": 0.076,
 			"fall_width": 1500,
-			"tail": 0.057
+			"tail": 0.057,
+			"rise": "zero"
 		},
 		{
 			"id": "copper",
@@ -291,7 +302,8 @@
 			"peak_y": 320,
 			"peak": 0.05,
 			"fall_width": 900,
-			"tail": 0.0125
+			"tail": 0.0125,
+			"rise": "zero"
 		},
 		{
 			"id": "aluminium",

@@ -172,11 +172,13 @@ func spawn_once(hero_x: float, hero_y: float) -> Array:
 	var out: Array = []
 	match beh2:
 		"crawler", "jumper":
-			var cc2: Vector2i = ground[rng.randi() % ground.size()]
-			out.append(_req(pick, cc2.x + 0.5, float(cc2.y), _group_seq))
+			var cc2: Variant = _pick_fit(ground, pick, depth, 0.5, 0.0, true)
+			if cc2 != null:
+				out.append(_req(pick, cc2.x + 0.5, float(cc2.y), _group_seq))
 		"flyer":
-			var cc3: Vector2i = air[rng.randi() % air.size()]
-			out.append(_req(pick, cc3.x + 0.5, cc3.y + 0.5, _group_seq))
+			var cc3: Variant = _pick_fit(air, pick, depth, 0.5, 0.5, false)
+			if cc3 != null:
+				out.append(_req(pick, cc3.x + 0.5, cc3.y + 0.5, _group_seq))
 		"swarm":
 			var cc4: Vector2i = air[rng.randi() % air.size()]
 			var g: Array = def.get("group", [3, 5])
@@ -185,14 +187,30 @@ func spawn_once(hero_x: float, hero_y: float) -> Array:
 				out.append(_req(pick, cc4.x + 0.5 + rng.randf_range(-0.25, 0.25),
 					cc4.y + 0.5 + rng.randf_range(-0.25, 0.25), _group_seq))
 		"ambusher":
-			var pair: Array = amb[rng.randi() % amb.size()]
-			var rock: Vector2i = pair[0]
-			var open: Vector2i = pair[1]
-			var r := _req(pick, rock.x + 0.5, float(rock.y), _group_seq)
-			var hh: float = float((def.get("size", [1.0, 0.8]) as Array)[1]) / 2.0
-			r["emerge"] = Vector2(open.x + 0.5, float(open.y) + 1.0 - hh - Monster.EPS)
-			out.append(r)
+			for attempt in range(8):
+				var pair: Array = amb[rng.randi() % amb.size()]
+				var rock: Vector2i = pair[0]
+				var open: Vector2i = pair[1]
+				var hh: float = float((def.get("size", [1.0, 0.8]) as Array)[1]) / 2.0
+				var em := Vector2(open.x + 0.5, float(open.y) + 1.0 - hh - Monster.EPS)
+				var probe := Monster.create(pick, em.x, float(open.y), depth)
+				if not probe.fits(cw.solid):
+					continue
+				var r := _req(pick, rock.x + 0.5, float(rock.y), _group_seq)
+				r["emerge"] = em
+				out.append(r)
+				break
 	return out
+
+
+## Случайная клетка из списка, где монстр вида mid помещается. null — нет такой.
+func _pick_fit(cells: Array, mid: String, depth: int, ox: float, oy: float, ground: bool) -> Variant:
+	for attempt in range(10):
+		var c: Vector2i = cells[rng.randi() % cells.size()]
+		var probe := Monster.create(mid, c.x + ox, float(c.y) + (0.0 if ground else oy), depth)
+		if probe.fits(cw.solid):
+			return c
+	return null
 
 
 func _req(mid: String, x: float, y: float, group: int) -> Dictionary:

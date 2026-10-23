@@ -454,7 +454,30 @@ func _test_spawner() -> void:
 			bad += 1
 	check("все заявки — в тоннеле, вне кадра, не рядом с героем (засадник — в породе)", bad == 0)
 	check("на глубине 4600 только подходящие виды", not kinds.has("abyss_warden") and kinds.has("cinder_grub"))
-	check("нет монстров слишком глубоких для пояса", not kinds.has("spark_swarm"))
+	var fit_bad := 0
+	for r in spawned:
+		var rq: Dictionary = r
+		if String(rq["id"]) == "rock_mimic":
+			continue
+		var probe := Monster.create(String(rq["id"]), float(rq["x"]), float(rq["y"]), 4600)
+		if not probe.fits(cw.solid):
+			fit_bad += 1
+	check("каждый появившийся монстр помещается в проход (не застрянет в породе)", fit_bad == 0)
+	# шахта шириной 1 (так копает бурмобиль): монстры ей по ширине — все виды влезают
+	var shaft := WorldGen.new(778)
+	for y in range(4590, 4620):
+		shaft.diffs[y * WorldGen.WIDTH + 16] = true
+	var shaft_cw := CombatWorld.new(shaft)
+	var sp_shaft := MonsterSpawner.new(shaft_cw, 31)
+	var shaft_bad := 0
+	var shaft_n := 0
+	for i in range(120):
+		for r in sp_shaft.spawn_once(16.5, 4605.5):
+			var rq2: Dictionary = r
+			shaft_n += 1
+			if String(rq2["id"]) != "rock_mimic" and not Monster.create(String(rq2["id"]), float(rq2["x"]), float(rq2["y"]), 4605).fits(shaft_cw.solid):
+				shaft_bad += 1
+	check("в шахте шириной 1 монстры появляются и помещаются", shaft_n > 0 and shaft_bad == 0)
 	# стая даёт несколько
 	var w2 := _tunnel_world(7200)
 	var sp3 := MonsterSpawner.new(CombatWorld.new(w2), 3)

@@ -110,6 +110,13 @@ func hurtbox() -> Rect2:
 	return Rect2(x - hw - pad, y - hh - pad, (hw + pad) * 2.0, (hh + pad) * 2.0)
 
 
+## Помещается ли хитбокс в текущей точке (не в породе). Спавнер проверяет это
+## до появления: монстр шире прохода (1.1 клетки в шахте шириной 1) застрял бы
+## намертво.
+func fits(solid: Callable) -> bool:
+	return not _box_hits(solid, x, y)
+
+
 func is_flying() -> bool:
 	return behavior == "flyer" or behavior == "swarm"
 

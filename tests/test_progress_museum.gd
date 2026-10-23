@@ -290,9 +290,13 @@ func _test_museum_panel_shows_all_slots() -> void:
 	check("сет собран из пятых предметов всех веток",
 		ultimate_ids.has("antiquity_5") and ultimate_ids.has("legends_5"))
 
-	# Спрайтов артефактов ещё нет — витрина обязана открываться и без них.
-	check("витрина работает без спрайтов (заглушка вместо картинки)",
-		not ArtifactArt.has_art("antiquity_1"))
+	# Иконки артефактов теперь есть (tools/gen_artifact_art.py) — у каждого из 25.
+	# Заглушка с инициалами остаётся на случай, если художник удалит файл.
+	var missing := 0
+	for a in Balance.artifacts.get("artifacts", []):
+		if not ArtifactArt.has_art(String(a["id"])):
+			missing += 1
+	check_eq("у всех 25 артефактов есть иконка", missing, 0)
 	check_eq("инициалы для заглушки", ArtifactArt.placeholder_initials("Религиозный свиток"), "РС")
 	panel.queue_free()
 
@@ -300,7 +304,7 @@ func _test_museum_panel_shows_all_slots() -> void:
 func _count_buttons(node: Node) -> int:
 	var count := 0
 	for child in node.get_children():
-		if child is Button and child.custom_minimum_size.x == MuseumPanel.SLOT:
+		if child is ArtifactSlot:
 			count += 1
 		count += _count_buttons(child)
 	return count

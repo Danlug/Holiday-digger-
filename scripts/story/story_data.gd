@@ -7,6 +7,11 @@ extends RefCounted
 ## JSON, а не правкой GDScript с последующей пересборкой.
 
 const PATH := "res://data/story.json"
+## Сцены сюжета после старта лежат отдельным файлом той же структуры: основной
+## файл — это обучение, и двенадцать его сцен правятся осторожно, а арка с
+## дневником и концовкой растёт. Таблицы props/actors/moods сливаются, сцены
+## дописываются в конец.
+const ARC_PATH := "res://data/story_arc.json"
 
 static var _doc: Dictionary = {}
 static var _scenes_by_id: Dictionary = {}
@@ -25,9 +30,28 @@ static func ensure_loaded() -> void:
 		push_error("StoryData: %s повреждён" % PATH)
 		return
 	_doc = raw
+	_merge_arc()
 	_scenes_by_id.clear()
 	for scene in _doc.get("scenes", []):
 		_scenes_by_id[String(scene.get("id", ""))] = scene
+
+
+static func _merge_arc() -> void:
+	if not FileAccess.file_exists(ARC_PATH):
+		return
+	var f := FileAccess.open(ARC_PATH, FileAccess.READ)
+	var arc = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(arc) != TYPE_DICTIONARY:
+		push_error("StoryData: %s повреждён" % ARC_PATH)
+		return
+	for table in ["moods", "props", "actors"]:
+		var merged: Dictionary = _doc.get(table, {})
+		merged.merge(arc.get(table, {}), true)
+		_doc[table] = merged
+	var scenes: Array = _doc.get("scenes", [])
+	scenes.append_array(arc.get("scenes", []))
+	_doc["scenes"] = scenes
 
 
 static func scene(id: String) -> Dictionary:
@@ -58,6 +82,20 @@ static func is_world_scene(scene_id: String) -> bool:
 
 static func effects(scene_id: String) -> Array:
 	return scene(scene_id).get("effects", [])
+
+
+## Сцены, которые играют по достижении глубины (поле "depth" в сцене), от
+## мелкой к глубокой: [{id, depth}, ...]. Порядок нужен режиссёру, чтобы при
+## загрузке глубокого сейва сыграть только последнюю из пропущенных.
+static func depth_scenes() -> Array:
+	ensure_loaded()
+	var out: Array = []
+	for id in _scenes_by_id.keys():
+		var d: int = int(_scenes_by_id[id].get("depth", 0))
+		if d > 0:
+			out.append({"id": id, "depth": d})
+	out.sort_custom(func(a, b): return int(a.depth) < int(b.depth))
+	return out
 
 
 static func mood(id: String) -> Dictionary:

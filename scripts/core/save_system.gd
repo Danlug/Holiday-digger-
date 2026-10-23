@@ -14,6 +14,10 @@ extends RefCounted
 ## будущем — прибавить SCHEMA_VERSION и дописать шаг в _migrate().
 
 const SAVE_PATH := "user://save.json"
+## Предыдущая удачная запись и временный файл текущей: запись идёт «во временный, потом
+## переименовать», и оборванная запись (выход посреди записи, полный диск) не съедает прогресс.
+const BACKUP_PATH := "user://save.json.bak"
+const TMP_PATH := "user://save.json.tmp"
 const SCHEMA_VERSION := 2
 
 
@@ -22,11 +26,13 @@ static func has_save() -> bool:
 
 
 static func delete_save() -> void:
-	if not has_save():
-		return
+	# Копия тоже: после «Сброса» из неё поднялась бы стёртая игра.
 	var dir := DirAccess.open("user://")
-	if dir:
-		dir.remove(SAVE_PATH.get_file())
+	if dir == null:
+		return
+	for path in [SAVE_PATH, BACKUP_PATH, TMP_PATH]:
+		if FileAccess.file_exists(path):
+			dir.remove(String(path).get_file())
 
 
 ## Собирает состояние GameState в plain-Dictionary, готовый к JSON.stringify.
@@ -340,30 +346,160 @@ static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 static func save_game() -> bool:
 	var data := _serialize()
 	var json_text := JSON.stringify(data, "\t")
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(TMP_PATH, FileAccess.WRITE)
 	if f == null:
-		push_error("SaveSystem: не удалось открыть %s для записи (код %d)" % [SAVE_PATH, FileAccess.get_open_error()])
+		push_error("SaveSystem: не удалось открыть %s для записи (код %d)" % [TMP_PATH, FileAccess.get_open_error()])
 		return false
 	f.store_string(json_text)
 	f.close()
+	# Записано всё? Полный диск оставляет обрубок: сверяем размер, не разбирая JSON заново
+	# (на сейве с десятками тысяч клеток разбор — десятки миллисекунд, а пишем часто).
+	if FileAccess.open(TMP_PATH, FileAccess.READ).get_length() != json_text.to_utf8_buffer().size():
+		push_error("SaveSystem: запись во временный файл неполная — старый сейв оставлен как есть")
+		DirAccess.remove_absolute(TMP_PATH)
+		return false
+	# Прежний сейв уходит в копию, если он выглядит целым: битый не должен затереть хорошую копию.
+	if has_save() and _looks_complete(SAVE_PATH):
+		DirAccess.copy_absolute(SAVE_PATH, BACKUP_PATH)
+	if DirAccess.rename_absolute(TMP_PATH, SAVE_PATH) != OK:
+		push_error("SaveSystem: не удалось подменить %s" % SAVE_PATH)
+		return false
 	return true
+
+
+## Дёшево: файл начинается с «{» и кончается «}» (обрыв записи так не выглядит).
+static func _looks_complete(path: String) -> bool:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null or f.get_length() < 2:
+		return false
+	var head := f.get_buffer(1)
+	var tail_len: int = mini(16, int(f.get_length()))
+	f.seek(f.get_length() - tail_len)
+	var tail := f.get_buffer(tail_len).get_string_from_utf8().strip_edges()
+	f.close()
+	return head.size() == 1 and head[0] == 0x7B and tail.ends_with("}")
+
+
+## Читает файл как JSON-объект. null — нет файла, мусор, обрыв или не объект.
+static func _read_dict(path: String):
+	if not FileAccess.file_exists(path):
+		return null
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	var text := f.get_as_text()
+	f.close()
+	var parsed = JSON.parse_string(text)
+	return parsed if typeof(parsed) == TYPE_DICTIONARY else null
 
 
 static func load_game() -> bool:
 	if not has_save():
 		return false
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if f == null:
-		push_error("SaveSystem: не удалось открыть %s для чтения (код %d)" % [SAVE_PATH, FileAccess.get_open_error()])
-		return false
-	var text := f.get_as_text()
-	f.close()
+	var parsed = _read_dict(SAVE_PATH)
+	if parsed == null:
+		# Главный файл испорчен — пробуем предыдущую удачную запись.
+		parsed = _read_dict(BACKUP_PATH)
+		if parsed == null:
+			push_error("SaveSystem: сейв повреждён или не является объектом JSON")
+			return false
+		push_warning("SaveSystem: основной сейв повреждён — поднята резервная копия")
 
-	var parsed = JSON.parse_string(text)
-	if parsed == null or typeof(parsed) != TYPE_DICTIONARY:
-		push_error("SaveSystem: сейв повреждён или не является объектом JSON")
-		return false
-
-	var migrated := _migrate(parsed)
+	var migrated := _migrate(_sanitize(parsed))
 	_apply(migrated)
 	return true
+
+
+# ---------------------------------------------------------------------------
+# Санитайзер: сейв с «правильным JSON, но неправильными типами» (ручная правка, чужая версия,
+# битая синхронизация). Тип не тот — ошибка скрипта посреди _apply, и остальной сейв не
+# накатывается. Всё, чего не ждёт _apply, выбрасывается ДО него: значение берётся по умолчанию.
+# ---------------------------------------------------------------------------
+
+## Блоки-словари корня сейва. ext и world свободной формы — их содержимое не трогаем.
+const _SAN_BLOCKS: Array[String] = ["survival", "progression", "currency", "black_box", "tool", "depth",
+	"artifacts", "time", "ads", "world", "events", "house", "economy", "ext"]
+const _SAN_FREE_BLOCKS: Array[String] = ["ext", "world"]
+## Листья-строки; любая другая строка там, где ждут число или bool, ломает int()/bool().
+const _SAN_STRING_KEYS: Array[String] = ["current_tool", "tier", "last_reset_utc_date", "room", "current_gear"]
+## Листья, где контейнер — норма; в любом другом месте словарь или массив вместо числа ломает float()/int().
+const _SAN_CONTAINER_KEYS: Array[String] = ["skill_stages", "contents", "daily_counts", "food_at_door", "storage",
+	"collected", "completed_branches", "owned_tools", "owned_gear", "craft_invested"]
+## Словари «ключ → число» (inventory — в корне; остальные — [блок, ключ]).
+const _SAN_COUNT_DICTS: Array = [["", "inventory"], ["progression", "skill_stages"], ["black_box", "contents"],
+	["ads", "daily_counts"], ["house", "food_at_door"], ["house", "storage"]]
+## Массивы строк / чисел.
+const _SAN_ARRAYS: Array = [["artifacts", "collected", TYPE_STRING], ["artifacts", "completed_branches", TYPE_FLOAT],
+	["economy", "owned_tools", TYPE_STRING], ["economy", "owned_gear", TYPE_STRING]]
+
+
+static func _san_warn(what: String) -> void:
+	push_warning("SaveSystem: в сейве испорчено «%s» — беру значение по умолчанию" % what)
+
+
+static func _is_num(v) -> bool:
+	return typeof(v) == TYPE_INT or typeof(v) == TYPE_FLOAT
+
+
+static func _sanitize(data: Dictionary) -> Dictionary:
+	# Корень: версия и сид — числа.
+	for key in ["version", "world_seed"]:
+		if data.has(key) and not _is_num(data[key]):
+			_san_warn(String(key))
+			data.erase(key)
+
+	for block in _SAN_BLOCKS:
+		if not data.has(block):
+			continue
+		if typeof(data[block]) != TYPE_DICTIONARY:
+			_san_warn(block)
+			data.erase(block)
+			continue
+		if _SAN_FREE_BLOCKS.has(block):
+			continue
+		var b: Dictionary = data[block]
+		for key in b.keys():
+			var v = b[key]
+			var t := typeof(v)
+			if t == TYPE_INT or t == TYPE_FLOAT or t == TYPE_BOOL:
+				continue
+			if (t == TYPE_DICTIONARY or t == TYPE_ARRAY) and _SAN_CONTAINER_KEYS.has(String(key)):
+				continue  # содержимое проверяют таблицы ниже
+			if t == TYPE_STRING and _SAN_STRING_KEYS.has(String(key)):
+				continue
+			_san_warn("%s.%s" % [block, key])
+			b.erase(key)
+
+	for pair in _SAN_COUNT_DICTS:
+		var holder: Dictionary = data if String(pair[0]).is_empty() else data.get(pair[0], {})
+		if not holder.has(pair[1]):
+			continue
+		if typeof(holder[pair[1]]) != TYPE_DICTIONARY:
+			_san_warn("%s.%s" % [pair[0], pair[1]])
+			holder.erase(pair[1])
+			continue
+		var counts: Dictionary = holder[pair[1]]
+		for id in counts.keys():
+			if not _is_num(counts[id]):
+				counts.erase(id)
+
+	for row in _SAN_ARRAYS:
+		var holder2: Dictionary = data.get(row[0], {})
+		if not holder2.has(row[1]):
+			continue
+		if typeof(holder2[row[1]]) != TYPE_ARRAY:
+			_san_warn("%s.%s" % [row[0], row[1]])
+			holder2.erase(row[1])
+			continue
+		var kept: Array = []
+		for item in holder2[row[1]]:
+			var ok: bool = typeof(item) == TYPE_STRING if int(row[2]) == TYPE_STRING else _is_num(item)
+			if ok:
+				kept.append(item)
+		holder2[row[1]] = kept
+
+	# craft_invested: словарь словарей — нужен только словарь.
+	var economy: Dictionary = data.get("economy", {})
+	if economy.has("craft_invested") and typeof(economy["craft_invested"]) != TYPE_DICTIONARY:
+		economy.erase("craft_invested")
+	return data

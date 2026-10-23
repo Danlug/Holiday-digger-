@@ -237,13 +237,14 @@ func _build_outdoor_hotspot() -> void:
 	_outdoor_layer.layer = 8
 	add_child(_outdoor_layer)
 
-	_outdoor_button = Button.new()
+	# Пузырь-значок, а не кнопка с подписью: «Зайти» — заголовок его подсказки.
+	_outdoor_button = HouseBubble.create({"action": "enter_house", "label": "Зайти",
+		"icon": "act_enter", "tip": "Войти в дом: сон, еда, верстак, склад."})
 	_outdoor_button.name = "EnterHouseBtn"
-	_outdoor_button.text = "Зайти"
-	_outdoor_button.custom_minimum_size = Vector2(64, 22)
-	_style_outdoor_button(_outdoor_button)
 	_outdoor_button.visible = false
-	_outdoor_button.pressed.connect(func(): enter_house("hall"))
+	_outdoor_button.pressed.connect(func():
+		if not Tip.swallowed():
+			enter_house("hall"))
 	_outdoor_layer.add_child(_outdoor_button)
 
 
@@ -256,31 +257,14 @@ func _build_rig_hotspot() -> void:
 	_rig_layer.layer = 8
 	add_child(_rig_layer)
 
-	_rig_button = Button.new()
+	_rig_button = HouseBubble.create({"action": "board_rig", "label": "В бурмобиль",
+		"icon": "act_rig", "tip": "Сесть за руль: бур и грузоподъёмность машины."})
 	_rig_button.name = "BoardRigBtn"
-	_rig_button.text = "В бурмобиль"
-	_rig_button.custom_minimum_size = Vector2(88, 22)
-	_style_outdoor_button(_rig_button)
 	_rig_button.visible = false
-	_rig_button.pressed.connect(_on_rig_button)
+	_rig_button.pressed.connect(func():
+		if not Tip.swallowed():
+			_on_rig_button())
 	_rig_layer.add_child(_rig_button)
-
-
-func _style_outdoor_button(b: Button) -> void:
-	b.add_theme_font_size_override("font_size", 10)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.06, 0.05, 0.04, 0.9)
-		sb.border_color = Color8(0xE0, 0xA9, 0x3B) if state == "pressed" else Color8(0x3E, 0x31, 0x25)
-		sb.set_border_width_all(1)
-		sb.content_margin_top = 2
-		sb.content_margin_bottom = 2
-		sb.content_margin_left = 6
-		sb.content_margin_right = 6
-		b.add_theme_stylebox_override(state, sb)
-	b.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	b.add_theme_color_override("font_hover_color", Color8(0xE0, 0xA9, 0x3B))
-	b.add_theme_color_override("font_pressed_color", Color8(0xE0, 0xA9, 0x3B))
 
 
 # ---------------------------------------------------------------------------
@@ -336,7 +320,16 @@ func _update_outdoor_hotspot() -> void:
 	var cam := _outdoor_camera()
 	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
 	_outdoor_button.position = head - Vector2(
-		_outdoor_button.custom_minimum_size.x / 2.0, _outdoor_button.custom_minimum_size.y + 4.0)
+		_outdoor_button.custom_minimum_size.x / 2.0 + _side_shift(-1.0), _outdoor_button.custom_minimum_size.y + 4.0)
+
+
+## Машина припаркована у самой двери: два пузыря не должны лечь друг на друга.
+## side: -1 — левый («Зайти»), +1 — правый («В бурмобиль»); сдвиг в сторону
+## «минус» уходит ВЛЕВО (position = head - сдвиг), поэтому знак перевёрнут.
+func _side_shift(side: float) -> float:
+	if not (near_door() and near_parked_rig()):
+		return 0.0
+	return -side * (HouseBubble.W * 0.5 + 3.0)
 
 
 ## Видимость и позиция кнопки «В бурмобиль» — теми же правилами, что «Зайти»
@@ -357,7 +350,7 @@ func _update_rig_hotspot() -> void:
 	var cam := _outdoor_camera()
 	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
 	_rig_button.position = head - Vector2(
-		_rig_button.custom_minimum_size.x / 2.0, _rig_button.custom_minimum_size.y + 4.0)
+		_rig_button.custom_minimum_size.x / 2.0 + _side_shift(1.0), _rig_button.custom_minimum_size.y + 4.0)
 
 
 ## Нажатие «В бурмобиль» — сама посадка (фазы, блокировка управления,

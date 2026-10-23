@@ -969,45 +969,69 @@ func _clear_hotspots() -> void:
 
 
 func _make_hotspot_button(def: Dictionary) -> Button:
-	var btn := Button.new()
-	btn.text = String(def.get("label", ""))
-	_style_button(btn)
-	btn.custom_minimum_size = Vector2(0, 22)
-	btn.set_meta("action", String(def.get("action", "")))
-	btn.set_meta("label", String(def.get("label", "")))
-	btn.pressed.connect(func(): _fire(def))
+	var btn := HouseBubble.create(def, float(_hotspot_buttons.size()) * 0.25)
+	# Долгое нажатие показывает подсказку, а отпускание всё равно «нажимает»:
+	# без этой проверки Tip заодно увёл бы героя через дверь.
+	btn.pressed.connect(func():
+		if not Tip.swallowed():
+			_fire(def))
 	_hotspot_layer.add_child(btn)
 	return btn
 
 
 ## Кнопки всегда всплывают НАД ГЕРОЕМ (решение владельца), не над самой
-## точкой на фоне: несколько кнопок ложатся в ряд вокруг его макушки.
+## точкой на фоне: несколько пузырей ложатся в ряд вокруг его макушки.
 func _position_hotspot_buttons() -> void:
 	var n := _hotspot_buttons.size()
 	if n == 0:
 		return
 	var hero_center_x: float = _hero.position.x + HERO_W * HERO_SCALE / 2.0
 	# Над макушкой, а не над рамкой кадра: в кадре 48×48 у героя сверху шесть
-	# пустых пикселей, и после увеличения это уже тридцать — кнопка висела бы
-	# заметно выше головы.
-	var top_y: float = _hero.position.y + 6.0 * HERO_SCALE - 26.0
-	var gap := 4.0
-	var widths: Array = []
-	var total := 0.0
-	for b in _hotspot_buttons:
-		var w: float = maxf(56.0, b.get_minimum_size().x + 16.0)
-		widths.append(w)
-		total += w
-	total += gap * float(maxi(0, n - 1))
+	# пустых пикселей, и после увеличения это уже тридцать — пузырь висел бы
+	# заметно выше головы. Кончик хвостика — в паре точек над макушкой.
+	var top_y: float = _hero.position.y + 6.0 * HERO_SCALE - HouseBubble.H - 2.0
+	var gap := 6.0
+	var total := float(n) * HouseBubble.W + gap * float(n - 1)
 	var hi: float = maxf(4.0, _view_w - total - 4.0)
 	var start_x: float = clampf(hero_center_x - total / 2.0, 4.0, hi)
-	var x := start_x
 	for i in range(n):
 		var b: Button = _hotspot_buttons[i]
-		var w: float = widths[i]
-		b.position = Vector2(x, top_y)
-		b.size = Vector2(w, 22)
-		x += w + gap
+		b.position = Vector2(start_x + float(i) * (HouseBubble.W + gap), maxf(top_y, 2.0))
+	_update_bubble_dynamic()
+
+
+## Живые числа на пузырях: сколько порций ждёт у двери, что даст сон.
+## Подсказку и цифру трогаем, только когда они поменялись — Tip перерисовывается
+## при каждом bind, а кадров в секунду много.
+func _update_bubble_dynamic() -> void:
+	for b in _hotspot_buttons:
+		var bubble := b as HouseBubble
+		if bubble == null or not is_instance_valid(bubble):
+			continue
+		var action := String(bubble.get_meta("action", ""))
+		var extra := ""
+		var dim := false
+		if action == "take_delivery":
+			var n := HouseFood.food_at_door_count()
+			extra = "Порций у двери: %d" % n
+			bubble.set_count(n)
+		elif action == "sleep":
+			var plan := HouseSleep.plan(GameState.stamina, GameState.hunger)
+			if bool(plan["ok"]):
+				extra = "%d ч · бодрость +%d%% · сытость −%d%%" % [
+					int(round(float(plan["hours"]))), int(round(float(plan["stamina_gain"]))),
+					int(round(float(plan["hunger_cost"])))]
+			else:
+				extra = String(plan["reason"])
+				dim = true
+		else:
+			continue
+		var sig := "%s|%s" % [extra, dim]
+		if String(bubble.get_meta("_dyn", "")) == sig:
+			continue
+		bubble.set_meta("_dyn", sig)
+		bubble.set_tip_extra(extra)
+		bubble.set_state("dim" if dim else "normal")
 
 
 ## Нажатие кнопки хотспота. "goto:<room>" дом решает сам (это чисто вид —

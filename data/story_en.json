@@ -9,6 +9,7 @@
 	"speaker.parents": "Parents",
 	"ui.skip": "Skip",
 	"ui.tap_to_continue": "next",
+	"ui.skip_hint": "Hold or double-tap",
 	"ui.autodig_banner": "Digging itself · ×10",
 	"ui.item_taken": "in the backpack",
 	"fuel.title": "Fuel station",

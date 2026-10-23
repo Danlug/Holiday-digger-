@@ -9,6 +9,7 @@
 	"speaker.parents": "Родители",
 	"ui.skip": "Пропустить",
 	"ui.tap_to_continue": "дальше",
+	"ui.skip_hint": "Удерживай или нажми дважды",
 	"ui.autodig_banner": "Копает само · ×10",
 	"ui.item_taken": "в рюкзак",
 	"fuel.title": "Заправка",

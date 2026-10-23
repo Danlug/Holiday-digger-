@@ -27,15 +27,14 @@ func _ready() -> void:
 
 	StoryState.mark_seen("intro_grandpa")
 	StoryState.mark_seen("intro_boy")
-	# Полоски жизни режиссура прячет до сцены смерти; флаг — только в памяти,
-	# на диск (user://) тест ничего не пишет.
-	StoryState.flags()["bars_introduced"] = true
-	Settings.reduce_motion = true   # снимки без «полёта» посреди твина
-
 	var main: Node2D = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames(3)
 	_hud = main.hud
+	# Полоски жизни режиссура прячет до сцены смерти. Запуск — с отдельным
+	# каталогом пользователя (XDG_DATA_HOME), поэтому флаг на диск безопасен.
+	StoryState.set_flag("bars_introduced")
+	Settings.reduce_motion = true   # снимки без «полёта» посреди твина
 	_hud.set_gauges_visible(true)
 	GameState.coins = 1250
 	GameState.dollars = 3

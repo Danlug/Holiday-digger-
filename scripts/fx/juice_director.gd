@@ -479,8 +479,7 @@ func _on_artifact(_id: String) -> void:
 	Fx.flash(Color(1, 0.95, 0.75, 0.45), 0.55)
 	Fx.shake(2.0, 0.2)
 	Haptics.buzz(100)
-	if player != null:
-		Fx.burst("levelup", _head() + Vector2(0, 8), 1.2)
+	# искры на герое пускает ArtifactFinder — второй раз не дублируем
 
 
 func _on_jump() -> void:

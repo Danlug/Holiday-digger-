@@ -261,6 +261,10 @@ func reset_progress() -> void:
 	world_dug_cells.clear()
 	pending_earthquake = false
 	ext.clear()
+	# Служебное состояние выживания: иначе новая игра начиналась бы «обессиленной» и
+	# с уже показанными предупреждениями (находка tests/test_save_robustness).
+	is_exhausted = false
+	_warned.clear()
 	reset_economy()
 	reset_house()
 	hp_changed.emit(hp, get_max_hp())

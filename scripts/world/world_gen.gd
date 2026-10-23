@@ -111,6 +111,10 @@ var _diamond_guards: Array = []  # [Vector2i, ...] относительно кл
 # массив: _permanent_feature_type зовут на каждую клетку экрана, и линейный
 # перебор списка там обошёлся бы дороже самой генерации.
 var _scripted_loot: Dictionary = {}  # "x,y" -> TileTypes.Type
+# Глубже этой строки зафиксированных структур нет вовсе: get_tile зовут на каждую
+# клетку экрана каждый кадр, и разбирать все условия _permanent_feature_type на
+# глубине тысяч рядов незачем. Считается в _apply_layers.
+var _perm_max_y: int = 1 << 30
 
 # Огород закрыт Робертом: лестницы больше нет, вместо неё тоннель, а сам
 # огород запечатан. Флаг живёт в мире, а не читается из GameState, потому
@@ -219,6 +223,12 @@ func _apply_layers() -> void:
 		if t == TileTypes.Type.EMPTY:
 			continue
 		_scripted_loot[_key(int(cell.get("x", -1)), int(cell.get("y", -1)))] = t
+
+	_perm_max_y = maxi(maxi(_foundation_y, _peat_seam_y_max), maxi(_staircase_y_max, TUNNEL_DEPTH))
+	if _diamond_x >= 0:
+		_perm_max_y = maxi(_perm_max_y, _diamond_y + 1)
+	for k in _scripted_loot.keys():
+		_perm_max_y = maxi(_perm_max_y, int(k) / WIDTH)
 
 	_shallow_layers = layers.get("shallow_layers", [])
 	_deep = layers.get("deep", {})
@@ -605,6 +615,8 @@ func _clear_diffs_in_rect(x0: int, y0: int, w: int, h: int) -> void:
 ## Возвращает тип зафиксированной структуры в (x, y) или -1, если клетка
 ## обычная (генерируется послойно).
 func _permanent_feature_type(x: int, y: int) -> int:
+	if y > _perm_max_y:
+		return -1
 	if y == _foundation_y:
 		return TileTypes.Type.FOUNDATION
 	if _garden_locked:

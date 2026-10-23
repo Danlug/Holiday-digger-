@@ -14,6 +14,7 @@ func _init() -> void:
 	test_formations_content()
 	test_formations_events_and_save()
 	test_protect_cell_and_cache()
+	test_art_complete()
 	print("=== Итог: %d проверок, %d провалов ===" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -295,3 +296,56 @@ func test_protect_cell_and_cache() -> void:
 			changed = true
 			break
 	check("смена world_seed сбрасывает кэш", changed)
+
+
+# ============================== ГРАФИКА ==============================
+
+func test_art_complete() -> void:
+	print("-- Графика поясов --")
+	var missing := []
+	for t in TileTypes.Type.values():
+		if t == TileTypes.Type.EMPTY or t == TileTypes.Type.STAIRCASE or t == TileTypes.Type.REINFORCED:
+			continue
+		if TileArt.texture_for(t, 3, 100) == null:
+			missing.append(TileTypes.type_name(t))
+	check("у каждого типа клетки есть тайл пояса 0 (нет: %s)" % ", ".join(missing), missing.is_empty())
+	var bad_belts := []
+	for belt in range(1, Biomes.count()):
+		var y := int(Biomes.get_biome(belt).y_from) + Biomes.transition() + 5
+		for t in TileTypes.Type.values():
+			if t == TileTypes.Type.EMPTY or t == TileTypes.Type.STAIRCASE or t == TileTypes.Type.REINFORCED \
+					or t == TileTypes.Type.FOUNDATION:
+				continue
+			var tex := TileArt.texture_for(t, 7, y)
+			if tex == null or tex.get_width() != 96 or tex.get_height() != 96:
+				bad_belts.append("%d:%s" % [belt, TileTypes.type_name(t)])
+	check("в каждом поясе у каждого типа есть тайл 96x96 из атласа (проблемы: %s)" % ", ".join(bad_belts), bad_belts.is_empty())
+	var tex1 := TileArt.texture_for(TileTypes.Type.DIRT, 5, 1500)
+	var tex0 := TileArt.texture_for(TileTypes.Type.DIRT, 5, 500)
+	check("земля пояса 1 — вырезка из атласа, пояса 0 — отдельный файл",
+			tex1 is AtlasTexture and not (tex0 is AtlasTexture))
+	var walls_ok := true
+	for i in range(Biomes.count()):
+		if not ResourceLoader.exists("res://art/env/deep/wall_%s.png" % Biomes.get_biome(i).wall):
+			walls_ok = false
+	check("у каждого пояса есть стена-фон", walls_ok)
+	# цвет земли внутри пояса одной светлоты: средняя яркость вариантов не разъезжается
+	var spread_ok := true
+	for belt in range(1, Biomes.count()):
+		var lo := 1000.0
+		var hi := 0.0
+		for v in range(8):
+			var tex: AtlasTexture = TileArt._belt_tile(belt, "dirt_%d" % (v + 1))
+			var img: Image = tex.atlas.get_image().get_region(Rect2i(tex.region))
+			var sum := 0.0
+			for yy in range(0, 96, 4):
+				for xx in range(0, 96, 4):
+					var c := img.get_pixel(xx, yy)
+					sum += 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+			var m := sum / 576.0 * 255.0
+			lo = minf(lo, m)
+			hi = maxf(hi, m)
+		if hi - lo > 7.0:
+			spread_ok = false
+			print("     пояс %d: разброс средней яркости вариантов земли %.1f" % [belt, hi - lo])
+	check("варианты земли внутри пояса одной светлоты (разброс <= 7 из 255)", spread_ok)

@@ -12,6 +12,8 @@ var world_view: Node2D
 var sky_view: SkyView
 var backdrop: Backdrop
 var clouds_view: CloudsView
+var deep_backdrop: DeepBackdrop   # подземная стена пояса, видна сквозь пустоту (ветка «world»)
+var ambient_fx: AmbientFx         # капли, пыль, светлячки, блики по поясам (ветка «world»)
 var hud: Control
 var view_root: Node2D
 
@@ -63,8 +65,13 @@ func _ready() -> void:
 	clouds_view.name = "CloudsView"
 	view_root.add_child(clouds_view)
 
+	deep_backdrop = DeepBackdrop.new()
+	deep_backdrop.name = "DeepBackdrop"
+	view_root.add_child(deep_backdrop)
+
 	world_view = preload("res://scripts/world/world_view.gd").new()
 	world_view.name = "WorldView"
+	world_view.deep_backdrop_active = true
 	world_view.world = world
 	world_view.fog = fog
 	view_root.add_child(world_view)
@@ -75,6 +82,16 @@ func _ready() -> void:
 	player.world = world
 	view_root.add_child(player)
 	world_view.player = player
+
+	ambient_fx = AmbientFx.new()
+	ambient_fx.name = "AmbientFx"
+	ambient_fx.world = world
+	ambient_fx.fog = fog
+	ambient_fx.player = player
+	view_root.add_child(ambient_fx)
+	# Образования не вырывают воздух из клеток-кандидатов артефактов: артефакт
+	# выдаётся при раскопке клетки, а в каверне копать нечего.
+	world.set_protect_cell(_is_artifact_candidate)
 
 	var char_holder := preload("res://scripts/player/character_view.gd").new()
 	char_holder.name = "CharacterView"
@@ -135,6 +152,22 @@ func _ready() -> void:
 	GameState.debug_action_triggered.connect(_on_debug_action)
 
 
+var _artifact_cells: Dictionary = {}
+
+
+## Клетка — кандидат на артефакт (ArtifactSpawn) при текущем сиде. Множество
+## строится один раз, из тех же функций, что и сама раскладка артефактов.
+func _is_artifact_candidate(x: int, y: int) -> bool:
+	if _artifact_cells.is_empty():
+		for a in Balance.artifacts.get("artifacts", []):
+			if ArtifactSpawn.is_scripted_row(a):
+				continue
+			for c: Vector2i in ArtifactSpawn.candidate_cells(a, GameState.world_seed):
+				_artifact_cells[c.y * WorldGen.WIDTH + c.x] = true
+		_artifact_cells[-1] = false
+	return _artifact_cells.has(y * WorldGen.WIDTH + x)
+
+
 func _view_w() -> int:
 	return hud.get_view_cells().x
 
@@ -190,6 +223,8 @@ func _process(delta: float) -> void:
 	hud.set_camera(cam)
 
 	world_view.render(cam)
+	deep_backdrop.update(cam, _view_w(), _view_h())
+	ambient_fx.update(cam, _view_w(), _view_h(), dt)
 	# Солнце/месяц — экранно-относительные (DayCycle.sun_t()/moon_t() отдают
 	# долю ШИРИНЫ ЭКРАНА, не всей карты, см. sky_view.gd) — без этого вызова
 	# они почти всегда стояли бы за пределами узкого 7-клеточного окна камеры.

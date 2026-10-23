@@ -67,6 +67,7 @@ var _load_pill: PanelContainer
 var _load_bar: HudBar
 var _clock_label: Label
 var _clock_box: Control
+var _purse_box: VBoxContainer
 var _vignette: HpVignette
 var _depth_box: Control
 var _depth_label: Label
@@ -76,7 +77,7 @@ var _toast_timer: Timer
 var _toast_tween: Tween
 var _stick: Control
 var _knob: Control
-var _hold_hint: Label
+var _hold_hint: TextureRect
 
 # --- третий режим: экранные стрелки ---
 ## Четыре кнопки, разнесённые по двум бортам (решение владельца): слева пара
@@ -376,6 +377,7 @@ func _build_purse(parent: Control) -> void:
 	box.offset_top = 8
 	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
+	_purse_box = box
 
 	# Часы (решение владельца, отчёт агента про "время не течёт во дворе"):
 	# DayCycle.hour и раньше честно тикал на поверхности, но нигде не
@@ -563,18 +565,46 @@ func hold_active() -> bool:
 	return player != null and (player.hold_dx != 0 or player.hold_up or player.hold_down)
 
 
+## Подсказка режима «нажатия»: вместо абзаца текста — иконка руки с «кругом»
+## от касания. При включении режима пульсирует несколько секунд, потом
+## остаётся бледным напоминанием; слова — в подсказке Tip. «Зажми экран в
+## нужную сторону — герой пойдёт туда и будет копать. Отпустил — остановился.»
 func _build_hold_hint(parent: Control) -> void:
-	_hold_hint = Label.new()
-	_hold_hint.text = "Зажми экран в нужную сторону — герой пойдёт туда и будет копать.\nОтпустил — остановился."
-	_hold_hint.add_theme_font_size_override("font_size", 11)
-	_hold_hint.add_theme_color_override("font_color", Color8(0x9D, 0x8B, 0x73))
-	_hold_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hold_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_hold_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_hold_hint.offset_left = 10; _hold_hint.offset_right = -10
-	_hold_hint.offset_top = -40; _hold_hint.offset_bottom = -8
+	_hold_hint = TextureRect.new()
+	_hold_hint.texture = UiIcons.tex("ctl_hold")
+	_hold_hint.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_hold_hint.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_hold_hint.mouse_filter = Control.MOUSE_FILTER_PASS
+	_hold_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_hold_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_hold_hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_hold_hint.offset_left = -16
+	_hold_hint.offset_right = 16
+	_hold_hint.offset_top = -48
+	_hold_hint.offset_bottom = -16
+	_hold_hint.pivot_offset = Vector2(16, 16)
 	_hold_hint.visible = false
+	Tip.bind(_hold_hint, "Зажми экран", "Герой идёт и копает туда, где палец. Отпустил — остановился")
 	parent.add_child(_hold_hint)
+
+
+## Показывает подсказку режима: яркий пульс, затем бледный значок.
+func _flash_hold_hint() -> void:
+	if _hold_hint == null:
+		return
+	_hold_hint.visible = true
+	_hold_hint.modulate.a = 1.0
+	_hold_hint.scale = Vector2.ONE
+	if Settings.reduce_motion or not _hold_hint.is_inside_tree():
+		_hold_hint.modulate.a = 0.5
+		return
+	var tw := _hold_hint.create_tween()
+	for i in 3:
+		tw.tween_property(_hold_hint, "scale", Vector2.ONE * 1.25, 0.35) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(_hold_hint, "scale", Vector2.ONE, 0.35) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_hold_hint, "modulate:a", 0.35, 0.6)
 
 
 ## Экранные стрелки — третий режим управления (решение владельца). Слева
@@ -595,6 +625,10 @@ func _build_arrows(parent: Control) -> void:
 	for cell in ARROW_CELLS:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
+		# Плитки в общем стиле, но без звука: стрелки держат намерение, а не
+		# «нажимают» — «ui_tap» на каждый шаг был бы шумом. Вибро — на касании.
+		UiBtn.style(b, UiBtn.Kind.NORMAL, false)
+		b.button_down.connect(Haptics.tap)
 		var dir := String(cell["dir"])
 		b.button_down.connect(func(): _on_arrow_down(dir))
 		b.button_up.connect(func(): _on_arrow_up(dir))
@@ -1072,56 +1106,72 @@ func show_well_report(report: Dictionary) -> void:
 	card.set_anchors_preset(Control.PRESET_CENTER)
 	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card.custom_minimum_size = Vector2(200, 0)
+	card.custom_minimum_size = Vector2(198, 0)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
 	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
 	sb.set_border_width_all(1)
-	sb.set_content_margin_all(8)
+	sb.set_corner_radius_all(10)
+	sb.set_content_margin_all(10)
+	sb.shadow_color = Color(0, 0, 0, 0.55)
+	sb.shadow_size = 6
 	card.add_theme_stylebox_override("panel", sb)
 	_well_panel.add_child(card)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 5)
+	box.add_theme_constant_override("separation", 8)
 	card.add_child(box)
 
-	var title := Label.new()
-	title.text = "Скважина работала без тебя"
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	box.add_child(title)
+	# Шапка без слов: бур, часы с «сколько прошло», сундук (всё лежит на складе).
+	# «Скважина работала без тебя… Всё сложено на склад в мастерской» — в Tip.
+	var head := HBoxContainer.new()
+	head.alignment = BoxContainer.ALIGNMENT_CENTER
+	head.add_theme_constant_override("separation", 8)
+	box.add_child(head)
+	var well := TextureRect.new()
+	well.texture = load("res://art/items/hand_drill.png")
+	well.custom_minimum_size = Vector2(28, 28)
+	well.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	well.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	well.mouse_filter = Control.MOUSE_FILTER_PASS
+	Tip.bind(well, "Скважина работала без тебя", "Накопала за время отсутствия")
+	head.add_child(well)
+	var seconds := float(report.get("seconds", 0.0))
+	var clock := HudPill.new().setup(UiIcons.tex("clock"), Color8(0xF2, 0xE6, 0xC8))
+	clock.count.text = _humanize_short(seconds)
+	clock.count.custom_minimum_size = Vector2(0, 0)
+	Tip.bind(clock, "Прошло", _humanize_seconds(seconds))
+	head.add_child(clock)
+	var chest := TextureRect.new()
+	chest.texture = UiIcons.tex("inventory")
+	chest.custom_minimum_size = Vector2(24, 24)
+	chest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	chest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	chest.mouse_filter = Control.MOUSE_FILTER_PASS
+	Tip.bind(chest, "Склад", "Всё сложено на склад в мастерской")
+	head.add_child(chest)
 
-	var since := Label.new()
-	since.text = "За %s накопала:" % _humanize_seconds(float(report.get("seconds", 0.0)))
-	since.add_theme_font_size_override("font_size", 10)
-	box.add_child(since)
-
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	var center := CenterContainer.new()
+	center.add_child(grid)
+	box.add_child(center)
 	for id in report.get("items", {}).keys():
-		var row := HBoxContainer.new()
-		var name_label := Label.new()
-		name_label.text = String(Balance.get_mineral(String(id)).get("name_ru", id))
-		name_label.add_theme_font_size_override("font_size", 10)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_label)
-		var count_label := Label.new()
-		count_label.text = "×%d" % int(report["items"][id])
-		count_label.add_theme_font_size_override("font_size", 10)
-		count_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-		row.add_child(count_label)
-		box.add_child(row)
+		var tile := BackpackSheet.make_tile(String(id), int(report["items"][id]))
+		tile.focus_mode = Control.FOCUS_NONE
+		grid.add_child(tile)
 
-	var note := Label.new()
-	note.text = "Всё сложено на склад в мастерской."
-	note.add_theme_font_size_override("font_size", 9)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	note.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
-	box.add_child(note)
-
-	var ok := Button.new()
-	ok.text = "Хорошо"
-	ok.add_theme_font_size_override("font_size", 10)
-	ok.pressed.connect(close_well_report)
+	var ok := UiBtn.icon_button(UiIcons.tex("check"), Vector2(0, 30), UiBtn.Kind.ACCENT)
+	Tip.bind(ok, "Хорошо")
+	ok.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		close_well_report())
 	box.add_child(ok)
+	Sfx.play("ui_open")
+	UiAnim.appear(card, 0.9, 0.18)
 
 
 func close_well_report() -> void:
@@ -1129,6 +1179,16 @@ func close_well_report() -> void:
 		return
 	_well_panel.queue_free()
 	_well_panel = null
+
+
+## «45 мин», «2 ч» — коротко, для плашки отчёта.
+static func _humanize_short(seconds: float) -> String:
+	var total := int(seconds)
+	var h := total / 3600
+	var m := (total % 3600) / 60
+	if h > 0:
+		return "%d ч" % h if m == 0 else "%d:%02d" % [h, m]
+	return "%d мин" % maxi(m, 1)
 
 
 static func _humanize_seconds(seconds: float) -> String:
@@ -1150,10 +1210,16 @@ func _build_objective_line() -> void:
 	_objective_panel.visible = false
 	_objective_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.92)
+	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
 	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
 	sb.set_border_width_all(1)
-	sb.set_content_margin_all(5)
+	sb.set_corner_radius_all(9)
+	sb.shadow_color = Color(0, 0, 0, 0.4)
+	sb.shadow_size = 3
+	sb.content_margin_left = 7
+	sb.content_margin_right = 8
+	sb.content_margin_top = 5
+	sb.content_margin_bottom = 5
 	_objective_panel.add_theme_stylebox_override("panel", sb)
 	_objective_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_objective_panel.offset_left = 8
@@ -1161,24 +1227,40 @@ func _build_objective_line() -> void:
 	add_child(_objective_panel)
 	_place_objective()
 
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 6)
+	_objective_panel.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = UiIcons.tex("quest")
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
 	_objective_label = Label.new()
 	_objective_label.add_theme_font_size_override("font_size", 10)
-	_objective_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_objective_label.add_theme_color_override("font_color", Color8(0xF2, 0xD9, 0x9B))
+	_objective_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_objective_panel.add_child(_objective_label)
+	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_objective_label)
 
 
-## Строка задания встаёт ПОД левым столбиком (опыт, полоски, «Герой»), а не
-## на фиксированной высоте: столбик то появляется целиком, то исчезает на
-## время обучения, и жёсткая координата либо накрывала полоски, либо висела
-## в пустоте. Высоту берём минимальную — она известна до раскладки.
+## Строка задания встаёт ПОД обоими верхними кластерами (герой с полосками слева,
+## кошелёк справа), а не на фиксированной высоте: левый столбик то появляется
+## целиком, то исчезает на время обучения, и жёсткая координата либо накрывала
+## полоски, либо висела в пустоте. Высоту берём минимальную — она известна до
+## раскладки.
 func _place_objective() -> void:
 	if _objective_panel == null:
 		return
 	var top := 12.0
+	if _purse_box != null:
+		top = _purse_box.position.y + _purse_box.get_combined_minimum_size().y + 6.0
 	if _gauges_box != null and _gauges_box.visible:
-		top = _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0
+		top = maxf(top, _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0)
 	_objective_panel.offset_top = top
 
 
@@ -1196,9 +1278,9 @@ func set_objective(text: String) -> void:
 		if _quest_button != null:
 			_quest_button.visible = false
 		return
-	_show_objective_banner()
 	if _quest_button != null:
 		_quest_button.visible = true
+	_show_objective_banner()
 
 
 func _show_objective_banner() -> void:
@@ -1207,6 +1289,7 @@ func _show_objective_banner() -> void:
 	_objective_panel.visible = true
 	_objective_hide_at_msec = Time.get_ticks_msec() + OBJECTIVE_SHOW_SECONDS * 1000.0
 	_place_objective()
+	UiAnim.appear(_objective_panel, 0.96, 0.18)
 
 
 func _on_quest_button_pressed() -> void:
@@ -1916,7 +1999,10 @@ func _set_mode(m: String) -> void:
 	if player != null:
 		player.release_control()
 	_stick.visible = mode == "stick"
-	_hold_hint.visible = mode == "hold"
+	if mode == "hold":
+		_flash_hold_hint()
+	else:
+		_hold_hint.visible = false
 	if _arrows_panel != null:
 		_arrows_panel.visible = mode == "arrows"
 		_layout_arrows()

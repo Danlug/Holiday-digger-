@@ -222,6 +222,8 @@ func _build() -> void:
 	_dim.color = Color(0, 0, 0, 0.6)
 	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_dim)
+	# Тап по затемнению над карточкой закрывает шторку.
+	UiBtn.on_tap(_dim, close)
 
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -351,7 +353,17 @@ func _build() -> void:
 
 func _make_slot(row: Dictionary) -> Button:
 	var id: String = row.id
-	var tier := tier_of(id)
+	var b := make_tile(id, int(row.count), id == _selected)
+	b.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		_select(id))
+	return b
+
+
+## Плитка предмета: иконка, число штук в углу, рамка по редкости, подсказка с
+## названием, весом и ценой. Общая для рюкзака и отчёта скважины.
+static func make_tile(id: String, count: int, selected: bool = false) -> Button:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(SLOT, SLOT)
 	b.focus_mode = Control.FOCUS_NONE
@@ -360,12 +372,12 @@ func _make_slot(row: Dictionary) -> Button:
 	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	b.expand_icon = false
 	b.add_theme_constant_override("icon_max_width", 32)
-	_style_slot(b, tier, id == _selected)
+	style_tile(b, tier_of(id), selected)
 	UiBtn.wire_feedback(b)
 
-	if int(row.count) > 1:
+	if count > 1:
 		var badge := Label.new()
-		badge.text = str(row.count) if int(row.count) <= MAX_BADGE else "%d+" % MAX_BADGE
+		badge.text = str(count) if count <= MAX_BADGE else "%d+" % MAX_BADGE
 		badge.add_theme_font_size_override("font_size", 10)
 		badge.add_theme_color_override("font_color", Color.WHITE)
 		badge.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
@@ -381,19 +393,15 @@ func _make_slot(row: Dictionary) -> Button:
 	var name_ru := String(Balance.get_mineral(id).get("name_ru", id))
 	if HouseConfig.is_food(id):
 		name_ru = HouseConfig.food_name(id)
-	var weight := float(row.weight)
+	var price := Balance.get_mineral_price(id)
 	Tip.bind(b, name_ru,
-		"%d шт · %.1f кг" % [row.count, weight * int(row.count)],
-		("%s за штуку · всего %s" % [CountLabel.group_digits(int(row.price)),
-			CountLabel.group_digits(int(row.sum))]) if int(row.price) > 0 else "Не продаётся")
-	b.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		_select(id))
+		"%d шт · %.1f кг" % [count, Balance.get_mineral_weight(id) * count],
+		("%s за штуку · всего %s" % [CountLabel.group_digits(price),
+			CountLabel.group_digits(price * count)]) if price > 0 else "Не продаётся")
 	return b
 
 
-func _style_slot(b: Button, tier: int, selected: bool) -> void:
+static func style_tile(b: Button, tier: int, selected: bool) -> void:
 	var col := TIER_COLORS[tier]
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
@@ -428,7 +436,7 @@ func _make_empty_slot() -> Control:
 func _select(id: String) -> void:
 	_selected = "" if _selected == id else id
 	for rid in _slot_buttons.keys():
-		_style_slot(_slot_buttons[rid], tier_of(rid), rid == _selected)
+		style_tile(_slot_buttons[rid], tier_of(rid), rid == _selected)
 	_refresh_actions()
 
 

@@ -25,7 +25,7 @@ var loss_color: Color = Color(1.0, 0.55, 0.5)
 var _target: int = 0
 var _shown: float = 0.0
 var _from: float = 0.0
-var _elapsed: float = 0.0
+var _elapsed: float = ROLL_TIME
 var _tint: float = 0.0       # 1 = приход, -1 = трата, гаснет к 0
 
 
@@ -33,7 +33,12 @@ func _init() -> void:
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	text = "0"
-	set_process(false)
+
+
+## У узла со своим _process обработка включается сама при входе в дерево,
+## поэтому выключаем её здесь: считать нечего, пока число не меняется.
+func _ready() -> void:
+	set_process(_elapsed < ROLL_TIME)
 
 
 func value() -> int:

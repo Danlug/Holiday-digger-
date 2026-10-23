@@ -16,7 +16,10 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	visible = false
-	set_process(false)
+
+
+func _ready() -> void:
+	set_process(visible and not Settings.reduce_motion)
 
 
 ## frac — доля здоровья 0..1.

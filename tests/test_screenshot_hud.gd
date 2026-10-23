@@ -97,6 +97,42 @@ func _ready() -> void:
 		_hud.toast("Готово.")
 		await _frames(3)
 		await _shot("toast_short")
+		_hud.toast("Это очень длинный тестовый текст тоста, специально составленный так, чтобы проверить перенос по словам и то, как панель тоста растягивается вверх, когда строка занимает много строк подряд и грозит вылезти за пределы видимой области экрана на портретном вьюпорте.")
+		await _frames(3)
+		await _shot("toast_long")
+		_hud.show_rare_find("diamond")
+		await _frames(3)
+		await _shot("toast_rare")
+		_hud._on_dig_blocked(TileTypes.Type.DIAMOND)
+		await _frames(3)
+		await _shot("toast_blocked")
+		_hud._on_fell(12.0, 9.0)
+		await _frames(3)
+		await _shot("toast_fall")
+		_hud._eat_from_inventory("energy_bar")
+		await _frames(3)
+		await _shot("toast_eat")
+
+	if _want("objective"):
+		_hud.set_objective("Накопай золота и продай его в мастерской — на кирку.")
+		await _frames(4)
+		await _shot("objective")
+		_hud.set_objective("")
+
+	if _want("well"):
+		_hud.show_well_report({"seconds": 5400.0, "items": {"iron_ore": 24, "copper": 11, "coal": 7, "silver": 3, "gold": 1}})
+		await _frames(3)
+		await _shot("well")
+		_hud.close_well_report()
+
+	if _want("hold"):
+		_hud._set_mode("hold")
+		await _frames(3)
+		await _shot("mode_hold")
+		_hud._set_mode("arrows")
+		await _frames(3)
+		await _shot("mode_arrows")
+		_hud._set_mode("stick")
 
 	print("test_screenshot_hud: снимки -> " + _out_dir)
 	get_tree().quit(0)

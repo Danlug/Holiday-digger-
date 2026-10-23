@@ -72,7 +72,7 @@ static func _box(kind: int, state: String) -> StyleBox:
 
 
 ## Одевает существующую кнопку в общий стиль и подключает отклик нажатия.
-static func style(b: Button, kind: int = Kind.NORMAL) -> Button:
+static func style(b: Button, kind: int = Kind.NORMAL, with_feedback: bool = true) -> Button:
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		b.add_theme_stylebox_override(state, _box(kind, "pressed" if state == "hover_pressed" else state))
 	b.add_theme_color_override("font_color", MUTED)
@@ -82,7 +82,8 @@ static func style(b: Button, kind: int = Kind.NORMAL) -> Button:
 	b.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
 	b.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.35))
 	b.focus_mode = Control.FOCUS_NONE
-	wire_feedback(b)
+	if with_feedback:
+		wire_feedback(b)
 	return b
 
 
@@ -225,3 +226,12 @@ static func knob_texture(col: Color) -> Texture2D:
 					shade = col.lightened(0.35)
 				img.set_pixel(x, y, shade)
 	return ImageTexture.create_from_image(img)
+
+
+## Вызывает action при нажатии левой кнопкой/пальцем по control (затемнение за
+## шторкой: тап мимо карточки закрывает её).
+static func on_tap(c: Control, action: Callable) -> void:
+	c.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
+				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			action.call())

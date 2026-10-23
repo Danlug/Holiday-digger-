@@ -103,6 +103,7 @@ func _build() -> void:
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
+	UiBtn.on_tap(dim, close)
 
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)

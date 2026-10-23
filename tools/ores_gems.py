@@ -295,11 +295,11 @@ def fit_blades(params, box):
 def _obsidian(mode):
     cv = Cv("obsidian")
     P = {
-        "deep": lch(3, 14, 322), "base": lch(8, 24, 320), "mid": lch(17, 42, 318), "lit": lch(32, 58, 316),
-        "rim": lch(72, 50, 322), "rim2": lch(46, 62, 318), "glint": lch(96, 8, 310),
+        "deep": lch(3, 14, 328), "base": lch(8, 26, 328), "mid": lch(16, 42, 326), "lit": lch(32, 60, 324),
+        "rim": lch(74, 52, 328), "rim2": lch(40, 64, 326), "glint": lch(96, 8, 316),
     }
     blades = [(23, 27, 17, 7, 19, 1.5), (7, 27, 12, 5, -24, -1.0), (14, 29, 25, 10, -8, 1.5),
-              (19, 30, 8, 5, 6, 0.5), (4, 28, 6, 4, -52, 0.0)]
+              (19, 30, 8, 5, 6, 0.5)]
     box = (4, 3, 28, 29) if mode == "tile" else (1, 1, 31, 31)
     for bx, by, ln, wd, ang, sk in fit_blades(blades, box):
         b = blade(bx, by, ln, wd, ang, sk)
@@ -312,10 +312,10 @@ def _obsidian(mode):
         kx, ky = b["KL"]
         cap = poly_mask([b["T"], b["KL"], ((tx + kx) / 2 + 2, (ty + ky) / 2 + 1)]) & sil
         cv.fill(cap, P["lit"])
-        cv.rim(sil, P["rim"], P["rim2"], 0.95, 0.85)
+        cv.rim(sil, P["rim"], P["rim2"], 0.95, 0.7)
         cv.line((tx, ty + 1), (tx + (kx - tx) * 0.5, ty + (ky - ty) * 0.5 + 1), P["glint"])
     cv.shadow()
-    cv.halo(lch(38, 62, 318), 1.6, 0.5)
+    cv.halo(lch(38, 64, 326), 1.6, 0.5)
     return cv.sprite()
 
 
@@ -346,13 +346,13 @@ def _disc(cv, cx, cy, rx, ry, ang, front, tones, qlo=0.6):
 
 def _dark_matter(mode):
     cv = Cv("dark_matter")
-    k = 0.9 if mode == "tile" else 1.1
+    k = 0.92 if mode == "tile" else 1.1
     cx, cy = 15.5, 15.5
-    r = 6.3 * k
-    rx, ry, ang = 14.6 * k, 5.4 * k, -24.0
-    ring = [lch(22, 50, 298), lch(42, 72, 296), lch(76, 42, 298), lch(96, 8, 290)]
-    _disc(cv, cx, cy, rx, ry, ang, False, [tone(c, -16, 0.9) for c in ring], qlo=0.74)
-    sph = [lch(1, 4, 295), lch(3, 12, 295), lch(7, 28, 296), lch(14, 46, 297)]
+    r = 6.8 * k
+    rx, ry, ang = 14.8 * k, 4.8 * k, -14.0
+    ring = [lch(24, 56, 297), lch(46, 80, 295), lch(78, 42, 297), lch(97, 8, 288)]
+    _disc(cv, cx, cy, rx, ry, ang, False, [tone(c, -16, 0.9) for c in ring], qlo=0.8)
+    sph = [lch(1, 8, 296), lch(4, 26, 296), lch(8, 40, 296), lch(14, 52, 296)]
     sphere(cv, cx, cy, r, sph, light=(0.4, 0.5), bias=0.6)
     # ободок линзирования: тонкая светлая кромка сверху-слева, на нижне-правой — тёмно-фиолетовая
     for y in range(G):
@@ -363,11 +363,11 @@ def _dark_matter(mode):
                 cv.put(x, y, ring[3] if t > 0.55 else (ring[2] if t > 0.0 else ring[0]))
     for (x, y) in ((12, 12), (14, 10), (17, 13), (11, 16)):
         cv.put(x, y, tone(ring[1], -10))
-    _disc(cv, cx, cy, rx, ry, ang, True, ring, qlo=0.74)
+    _disc(cv, cx, cy, rx, ry, ang, True, ring, qlo=0.8)
     for (x, y) in ((4, 5), (27, 5), (28, 25), (4, 27), (16, 2), (22, 29), (2, 14), (29, 14)):
         if cv.a[y, x, 3] == 0:
             cv.put(x, y, ring[3] if (x + y) % 3 else ring[2])
-    cv.halo(lch(36, 66, 298), 2.0, 0.6)
+    cv.halo(lch(42, 78, 296), 2.3, 0.72)
     return cv.sprite()
 
 
@@ -514,21 +514,21 @@ def _diamond(mode):
         "light": lch(92, 14, 200), "hi": lch(99, 3, 200), "cyan": lch(76, 40, 195),
     }
     if mode == "tile":
-        gems = [(22, 4, 10, 10, 0.0), (11.5, 9, 14, 14, -0.5), (21.5, 17, 8, 8, 0.5)]
+        gems = [(8.5, 5, 9, 9, -0.5), (24, 8, 7, 7, 0.5), (15, 12, 15, 14.5, 0.0)]
     else:
-        gems = [(22, 1, 12, 12, 0.0), (11, 8, 17, 17, -0.5), (22, 18, 11, 11, 0.5)]
+        gems = [(8, 2, 11, 11, -0.5), (24.5, 6, 9, 9, 0.5), (15.5, 11, 18, 18, 0.0)]
     for cx, top, w, h, fl in gems:
         _brilliant(cv, cx, top, w, h, P, fl)
     # искры-кресты на гранях и мелкая крошка
     if mode == "tile":
-        cv.spark(9, 11, (255, 255, 255), P["hi"], 1)
-        cv.spark(23, 7, (255, 255, 255), P["hi"], 0)
-        cv.put(26, 24, P["base"])
-        cv.put(26, 25, P["deep"])
-        cv.put(6, 26, P["light"])
+        cv.spark(10, 15, (255, 255, 255), P["hi"], 2)
+        cv.spark(26, 6, (255, 255, 255), P["hi"], 0)
+        cv.put(5, 24, P["base"])
+        cv.put(5, 25, P["deep"])
+        cv.put(26, 25, P["light"])
     else:
-        cv.spark(8, 11, (255, 255, 255), P["hi"], 2)
-        cv.spark(24, 7, (255, 255, 255), P["hi"], 1)
+        cv.spark(9, 16, (255, 255, 255), P["hi"], 2)
+        cv.spark(26, 5, (255, 255, 255), P["hi"], 1)
     return cv.sprite()
 
 
@@ -580,18 +580,18 @@ def _ruby(mode):
         "light": lch(53, 76, 34), "hi": lch(70, 56, 28), "spec": lch(90, 22, 20), "reflex": lch(60, 70, 34),
     }
     if mode == "tile":
-        gems = [(22.5, 11, 3.6, 4.6, 26, True), (11.5, 16, 6.8, 5.0, -28, False), (21.5, 22.5, 3.4, 3.4, 0, False)]
+        gems = [(8.5, 9.5, 3.7, 4.5, -128, True), (17.5, 18.5, 7.0, 5.2, 16, False), (7.5, 23.5, 3.4, 3.4, 0, False)]
     else:
-        gems = [(23, 9, 4.4, 5.6, 26, True), (12, 17, 8.4, 6.2, -28, False), (23, 24, 4.2, 4.2, 0, False)]
+        gems = [(8, 8.5, 4.6, 5.6, -128, True), (18, 18.5, 8.8, 6.5, 16, False), (7, 25, 4.2, 4.2, 0, False)]
     for cx, cy, rx, ry, rot, pear in gems:
         _gem_oval(cv, cx, cy, rx, ry, rot, P, pear)
     if mode == "tile":
-        cv.spark(8, 11, (255, 235, 240), P["hi"], 1)
-        cv.put(26, 18, P["base"])
-        cv.put(5, 24, P["shade"])
-        cv.put(6, 24, P["out"])
+        cv.spark(21, 11, (255, 235, 240), P["hi"], 1)
+        cv.put(26, 24, P["base"])
+        cv.put(27, 24, P["out"])
+        cv.put(15, 5, P["shade"])
     else:
-        cv.spark(7, 10, (255, 235, 240), P["hi"], 2)
+        cv.spark(22, 9, (255, 235, 240), P["hi"], 2)
     return cv.sprite()
 
 
@@ -654,17 +654,17 @@ def _emerald(mode):
         "reflex": lch(60, 64, 150),
     }
     if mode == "tile":
-        gems = [(22.5, 9.5, 7.0, 9.5, 20), (11.5, 17, 10.0, 14.0, 0), (22.5, 22, 6.5, 8.0, -12)]
+        gems = [(8.5, 10, 7.5, 10.0, -24), (17.5, 16, 11.0, 15.0, 6), (8.5, 23.5, 6.0, 7.5, 14)]
     else:
-        gems = [(24, 8, 8.0, 11.0, 20), (11.5, 17.5, 12.0, 17.0, 0), (24, 24, 8.0, 10.0, -12)]
+        gems = [(8, 9, 9.0, 12.0, -24), (18, 16.5, 13.0, 18.0, 6), (8, 25, 7.0, 9.0, 14)]
     for cx, cy, w, h, ang in gems:
         _gem_step(cv, cx, cy, w, h, ang, P)
     if mode == "tile":
-        cv.spark(7, 8, P["spec"], P["hi"], 1)
-        cv.put(27, 27, P["shade"])
-        cv.put(4, 27, P["deep"])
+        cv.spark(25, 8, P["spec"], P["hi"], 1)
+        cv.put(26, 25, P["shade"])
+        cv.put(26, 26, P["deep"])
     else:
-        cv.spark(6, 6, P["spec"], P["hi"], 2)
+        cv.spark(26, 6, P["spec"], P["hi"], 2)
     return cv.sprite()
 
 

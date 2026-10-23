@@ -36,6 +36,7 @@ func _run() -> void:
 	await _test_slots()
 	await _test_geometry()
 	await _test_skip_button()
+	await _test_real_input()
 	await _test_bars_and_card()
 	await _test_locale()
 	await _test_all_scenes()
@@ -308,6 +309,73 @@ func _test_skip_button() -> void:
 	btn.press()
 	btn.release()
 	check("касания вразнос — два одиночных, а не двойной", _confirmed == 2)
+	holder.queue_free()
+	await _frame()
+
+
+func _mouse(pos: Vector2, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.position = pos
+	ev.global_position = pos
+	ev.pressed = pressed
+	get_viewport().push_input(ev, true)
+
+
+func _touch(pos: Vector2, pressed: bool) -> void:
+	var ev := InputEventScreenTouch.new()
+	ev.index = 0
+	ev.position = pos
+	ev.pressed = pressed
+	get_viewport().push_input(ev, true)
+
+
+## Настоящие события ввода: тап по сцене (дописать → дальше) и кнопка «Пропустить»
+## мышью и пальцем, а не прямые вызовы методов.
+func _test_real_input() -> void:
+	var cs := CutscenePlayer.new()
+	add_child(cs)
+	await _frame()
+	var done := [false]
+	cs.finished.connect(func(_s: String) -> void: done[0] = true)
+	cs.play("autodig_done", {})
+	check("реплика сцены печатается", cs._typing and cs.is_playing)
+	_mouse(Vector2(112, 200), true)
+	check("первый тап дописывает реплику целиком", not cs._typing and cs.is_playing and cs._dlg.line.visible_ratio >= 1.0)
+	_mouse(Vector2(112, 200), false)
+	_touch(Vector2(112, 200), true)
+	check("второе событие того же касания не пролистывает реплику", cs.is_playing)
+	await get_tree().create_timer(0.15).timeout
+	_mouse(Vector2(112, 200), true)
+	check("следующий тап ведёт дальше: сцена закончена", done[0] and not cs.is_playing)
+	_mouse(Vector2(112, 200), false)
+	cs.queue_free()
+
+	var holder := Control.new()
+	add_child(holder)
+	var btn := SkipButton.new()
+	holder.add_child(btn)
+	btn.position = Vector2(150, 20)
+	_confirmed = 0
+	btn.confirmed.connect(func() -> void: _confirmed += 1)
+	await _frame()
+	var at := btn.position + SkipButton.SIZE_PX * 0.5
+	_mouse(at, true)
+	_mouse(at, false)
+	check("мышь: одиночный щелчок только подсказывает", _confirmed == 0 and btn.hint_visible())
+	_mouse(at, true)
+	_mouse(at, false)
+	check("мышь: двойной щелчок пропускает", _confirmed == 1)
+	await get_tree().create_timer(0.7).timeout
+	btn.reset_state()
+	_touch(at, true)
+	await get_tree().create_timer(SkipButton.HOLD_SEC + 0.2).timeout
+	check("палец: долгое нажатие пропускает", _confirmed == 2)
+	_touch(at, false)
+	check("палец: отпускание после пропуска ничего не добавляет", _confirmed == 2)
+	_mouse(Vector2(10, 300), true)
+	_mouse(Vector2(10, 300), false)
+	check("касание мимо кнопки её не трогает", _confirmed == 2)
 	holder.queue_free()
 	await _frame()
 

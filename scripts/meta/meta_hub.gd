@@ -596,12 +596,17 @@ func _build_road() -> void:
 	_vbox.add_child(top)
 
 	_road_scroll = MetaHScroll.new()
-	_road_scroll.custom_minimum_size = Vector2(0, 98)
+	_road_scroll.custom_minimum_size = Vector2(0, 106)
 	_road_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_vbox.add_child(_road_scroll)
+	# Поля сверху и снизу: пульсирующая плитка (масштаб 1.05) иначе упирается в обрез ленты.
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_top", 7)
+	pad.add_theme_constant_override("margin_bottom", 7)
+	_road_scroll.add_child(pad)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
-	_road_scroll.add_child(row)
+	pad.add_child(row)
 	var focus_x := 0.0
 	var claimable := TrophyRoad.claimable()
 	for i in range(steps.size()):
@@ -625,6 +630,7 @@ func _build_road() -> void:
 		_road_scroll.scroll_horizontal = int(maxf(0.0, focus_x - 70.0))
 
 	_vbox.add_child(_next_prize_card(steps, pts))
+	_vbox.add_child(_road_stats())
 
 
 func _step_tile(i: int) -> Control:
@@ -710,7 +716,32 @@ func _next_prize_card(steps: Array, pts: int) -> Control:
 	rr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(rr)
 	var need := maxi(0, int(steps[idx]["at"]) - pts)
-	h.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(need) if need > 0 else "!", MetaUiKit.GOLD_LIGHT, 13, 11))
+	if need > 0:
+		h.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(need), MetaUiKit.GOLD_LIGHT, 13, 11))
+	else:
+		h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("check"), 22))
 	Tip.bind(card, "Ближайший крупный приз", "Ступень %d" % (idx + 1),
 		("Не хватает очков: %d" % need) if need > 0 else "Можно забрать")
 	return card
+
+
+## Итоги жизни в числах: достижений, заданий, лучшая серия.
+func _road_stats() -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	var items := [
+		["medal", "%d/%d" % [Achievements.done_count(), MetaData.achievements().size()], "Достижения", "Получено из всех."],
+		["clipboard", str(MetaState.counter("quests")), "Задания", "Выполнено и забрано за всё время."],
+		["flame", str(MetaState.counter("streak_best")), "Лучшая серия", "Дней подряд за ежедневной наградой."],
+	]
+	for it in items:
+		var chip := MetaUiKit.chip(MetaUiKit.tex(it[0]), it[1], MetaUiKit.GOLD_LIGHT, 22, 12)
+		chip.mouse_filter = Control.MOUSE_FILTER_PASS
+		Tip.bind(chip, it[2], it[3])
+		row.add_child(chip)
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_top", 10)
+	wrap.add_child(row)
+	return wrap

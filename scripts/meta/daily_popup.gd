@@ -112,8 +112,8 @@ func _build_header() -> Control:
 		h.add_child(chip)
 	var x := Button.new()
 	x.text = "×"
-	x.add_theme_font_size_override("font_size", 12)
-	x.custom_minimum_size = Vector2(24, 24)
+	x.add_theme_font_size_override("font_size", 16)
+	x.custom_minimum_size = Vector2(28, 28)
 	UiBtn.style(x, UiBtn.Kind.GHOST)
 	x.pressed.connect(close)
 	h.add_child(x)
@@ -182,7 +182,7 @@ func _make_tile(i: int) -> Control:
 	day_l.position = Vector2(3, 0)
 	lay.add_child(day_l)
 
-	var icon_name := "chest" if grand else ("gift" if reward.has("item") else "coins")
+	var icon_name := "chest" if grand else "coins"
 	var ic := MetaUiKit.icon_rect(MetaUiKit.tex(icon_name), 32)
 	ic.position = Vector2(5, 11) if not grand else Vector2(6, 12)
 	lay.add_child(ic)
@@ -193,7 +193,7 @@ func _make_tile(i: int) -> Control:
 		col.position = Vector2(44, 9)
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var rr := reward
-		col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("coins"), MetaUiKit.compact(int(rr.get("coins", 0))), MetaUiKit.GOLD_LIGHT, 12, 9))
+		col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("coins"), str(int(rr.get("coins", 0))), MetaUiKit.GOLD_LIGHT, 12, 9))
 		if rr.has("dollars"):
 			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("dollars"), str(int(rr["dollars"])), Color8(0x4D, 0xE0, 0x94), 12, 9))
 		if rr.has("xp"):

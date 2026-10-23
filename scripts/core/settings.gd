@@ -1,7 +1,7 @@
 class_name Settings
 extends RefCounted
-## Настройки игрока: звук/музыка (громкость + мьют), схема управления,
-## видимость радиуса обзора, язык. Отдельный файл user://settings.json —
+## Настройки игрока: звук/музыка (громкость + мьют), вибро, схема управления,
+## видимость радиуса обзора, «меньше движения», язык. Отдельный файл user://settings.json —
 ## тот же приём, что у StoryState/RecordsStore: своя маленькая система, не
 ## часть общего сейва (настройки не игровой прогресс, «Сброс» их не трогает
 ## и не обязан — см. hud.gd:_on_reset_pressed).
@@ -39,6 +39,13 @@ static var music_muted: bool = false
 static var control_mode: String = "stick"
 static var show_vision_radius: bool = true
 static var language: String = "ru"
+## Вибро-отклик (Haptics.enabled). Включено по умолчанию: на ПК и в вебе
+## без поддержки вибро всё равно молчит.
+static var haptics_enabled: bool = true
+## «Меньше движения» — гасит лишние твины интерфейса (всплытие шторок, пульс,
+## накрутку чисел). Первое значение берём у системы, как prefers-reduced-motion
+## в вебе; дальше решает игрок.
+static var reduce_motion: bool = false
 
 
 ## Заводит звуковые шины, если их ещё нет (первый запуск процесса — шины
@@ -117,6 +124,26 @@ static func set_language(code: String) -> void:
 	save()
 
 
+static func set_haptics_enabled(v: bool) -> void:
+	haptics_enabled = v
+	Haptics.enabled = v
+	save()
+
+
+static func set_reduce_motion(v: bool) -> void:
+	reduce_motion = v
+	save()
+
+
+## Системное «меньше движения»: есть только в вебе (matchMedia); в остальных
+## сборках остаётся false, пока игрок сам не включит в настройках.
+static func detect_system_reduce_motion() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var v = JavaScriptBridge.eval("window.matchMedia('(prefers-reduced-motion: reduce)').matches")
+	return bool(v)
+
+
 static func save() -> bool:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:
@@ -131,6 +158,8 @@ static func save() -> bool:
 		"control_mode": control_mode,
 		"show_vision_radius": show_vision_radius,
 		"language": language,
+		"haptics_enabled": haptics_enabled,
+		"reduce_motion": reduce_motion,
 	}, "\t"))
 	f.close()
 	return true
@@ -138,6 +167,9 @@ static func save() -> bool:
 
 static func load_from_disk() -> bool:
 	if not FileAccess.file_exists(PATH):
+		# Первый запуск: «меньше движения» берём у системы, вибро — включено.
+		reduce_motion = detect_system_reduce_motion()
+		Haptics.enabled = haptics_enabled
 		return false
 	var f := FileAccess.open(PATH, FileAccess.READ)
 	if f == null:
@@ -154,4 +186,7 @@ static func load_from_disk() -> bool:
 	control_mode = String(raw.get("control_mode", "stick"))
 	show_vision_radius = bool(raw.get("show_vision_radius", true))
 	language = String(raw.get("language", "ru"))
+	haptics_enabled = bool(raw.get("haptics_enabled", true))
+	reduce_motion = bool(raw.get("reduce_motion", detect_system_reduce_motion()))
+	Haptics.enabled = haptics_enabled
 	return true

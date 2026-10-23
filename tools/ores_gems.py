@@ -28,7 +28,7 @@ import math
 import random
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from sprite_kit import G, Sprite
 
@@ -212,7 +212,6 @@ class Cv:
         """Ореол под фигурой: размытая маска в 3 ступени альфы с упорядоченным дизерингом на границах ступеней."""
         solid = self.solid(solid_thr)
         al = Image.fromarray((solid * 255).astype(np.uint8))
-        from PIL import ImageFilter
         v = np.array(al.filter(ImageFilter.GaussianBlur(r)), dtype=np.float64) / 255.0 * strength
         yy, xx = np.mgrid[0:G, 0:G]
         bay = BAYER[yy % 4, xx % 4]
@@ -383,8 +382,8 @@ def _universalium(mode):
     cx, cy = 15.5, 15.5
     turn = 11.0   # звезда повёрнута: без осевой симметрии
     # (угол, длина, оттенок): кардинальные лучи длинные, диагональные короткие
-    rays = [(-90, 13.5, 218), (-45, 9.5, 172), (0, 12.0, 88), (45, 9.0, 52), (90, 13.0, 352), (135, 9.5, 328),
-            (180, 12.5, 285), (-135, 9.0, 245)]
+    rays = [(-90, 13.5, 205), (-45, 9.5, 125), (0, 12.0, 85), (45, 9.0, 48), (90, 13.0, 356), (135, 9.5, 322),
+            (180, 12.5, 275), (-135, 9.0, 238)]
     order = sorted(range(len(rays)), key=lambda i: rays[i][1])
     for i in order:
         ang, ln, hue = rays[i]
@@ -392,16 +391,16 @@ def _universalium(mode):
         dx, dy = math.cos(a), math.sin(a)
         px, py = -dy, dx
         ln *= k
-        d, w = ln * 0.3, 3.3 * k * (1.0 if ln > 10.5 * k else 0.8)
+        d, w = ln * 0.3, 2.8 * k * (1.0 if ln > 10.5 * k else 0.8)
         T = (cx + dx * ln, cy + dy * ln)
         sl = (cx + dx * d - px * w, cy + dy * d - py * w)
         sr = (cx + dx * d + px * w, cy + dy * d + py * w)
-        lit, dark = lch(86, 48, hue), lch(56, 74, hue)
+        lit, dark = lch(84, 60, hue), lch(50, 96, hue)
         cv.fill(poly_mask([(cx, cy), sl, T, sr]), dark)
         cv.fill(poly_mask([(cx, cy), sl, T]), lit)
         cv.line((cx + dx * d * 0.6, cy + dy * d * 0.6), (cx + dx * ln * 0.78, cy + dy * ln * 0.78), lch(98, 10, hue))
     sil = cv.solid()
-    cv.ring(sil, lch(22, 52, 298))
+    cv.ring(sil, lch(26, 62, 264))
     # ядро: белый восьмигранник с призматическим бликом
     core = ell_mask(cx, cy, 3.3 * k, 3.3 * k)
     cv.fill(core, lch(96, 8, 250))
@@ -409,7 +408,7 @@ def _universalium(mode):
     cv.fill(ell_mask(cx - 0.6, cy - 0.7, 1.8 * k, 1.8 * k), (255, 255, 255))
     cv.put(cx + 1.2 * k, cy + 1.8 * k, lch(90, 50, 340))
     cv.put(cx + 2.2 * k, cy + 0.3 * k, lch(92, 55, 95))
-    cv.ring(core, lch(40, 44, 298))
+    cv.ring(core, lch(42, 54, 262))
     cv.halo(lch(88, 52, 215), 1.3, 0.36)
     for (x, y, n) in ((4, 5, 1), (27, 26, 1), (28, 7, 0), (5, 26, 0)):
         if cv.a[y, x, 3] < 100:
@@ -510,8 +509,8 @@ def _brilliant(cv, cx, top, w, h, P, flip=0.0):
 def _diamond(mode):
     cv = Cv("diamond")
     P = {
-        "out": lch(30, 32, 238), "deep": lch(52, 34, 228), "shade": lch(68, 32, 216), "base": lch(82, 26, 204),
-        "light": lch(92, 14, 200), "hi": lch(99, 3, 200), "cyan": lch(76, 40, 195),
+        "out": lch(28, 40, 236), "deep": lch(50, 44, 226), "shade": lch(66, 42, 214), "base": lch(81, 32, 204),
+        "light": lch(92, 17, 200), "hi": lch(99, 3, 200), "cyan": lch(76, 46, 196),
     }
     if mode == "tile":
         gems = [(8.5, 5, 9, 9, -0.5), (24, 8, 7, 7, 0.5), (15, 12, 15, 14.5, 0.0)]
@@ -548,7 +547,6 @@ def _gem_oval(cv, cx, cy, rx, ry, rot, P, pear=False):
         vx, vy = -math.sin(r), math.cos(r)
         tip = (cx + ux * rx * 1.45, cy + uy * rx * 1.45)
         m |= poly_mask([(cx + vx * ry * 0.9, cy + vy * ry * 0.9), (cx - vx * ry * 0.9, cy - vy * ry * 0.9), tip])
-    r = math.radians(rot)
     tones = [P["deep"], P["shade"], P["base"], P["light"]]
     for y, x in zip(*np.nonzero(m)):
         dx, dy = x - cx, y - cy
@@ -562,7 +560,8 @@ def _gem_oval(cv, cx, cy, rx, ry, rot, P, pear=False):
     tb &= m
     for y, x in zip(*np.nonzero(tb)):
         cv.put(x, y, P["hi"] if (x - cx) * 0.9 + (y - cy) < -0.8 else P["light"])
-    cv.ring(tb, tone(P["shade"], 2), diag=False) if rx > 4.5 else None
+    if rx > 4.5:
+        cv.ring(tb, tone(P["shade"], 2))
     cv.rim(m, P["hi"], P["reflex"], 0.55, 0.65, bottom=True)
     cv.ring(m, P["out"])
     # глянец
@@ -712,14 +711,11 @@ def _geocrystal(mode):
     # (основание x, y, высота, ширина, наклон, смещение острия): веер из центра, у ног — самая яркая точка
     prisms = [(24, 27, 14, 6.4, 22, 0.8), (7.5, 27, 11, 5.4, -24, -0.6), (16, 28, 22, 8.2, -4, 0.8),
               (11, 29, 8, 5.0, -40, 0.0), (22, 29, 7, 4.6, 36, 0.0)]
-    pts = []
-    for bx, by, H, W, ang, tl in prisms:
-        pts.append((bx, by, H, W, ang, tl))
     box = (4, 2, 28, 29) if mode == "tile" else (1, 0, 31, 31)
-    fit = _fit_prisms(pts, box)
-    for bx, by, H, W, ang, tl in fit:
+    for bx, by, H, W, ang, tl in _fit_prisms(prisms, box):
         _prism(cv, bx, by, H, W, ang, P, tl)
-    cv.spark(14, 10, P["white"], P["hi"], 1) if mode == "tile" else cv.spark(13, 7, P["white"], P["hi"], 1)
+    sx, sy = (14, 10) if mode == "tile" else (13, 7)
+    cv.spark(sx, sy, P["white"], P["hi"], 1)
     cv.shadow()
     cv.halo(lch(72, 90, 62), 2.2, 0.62, lch(50, 84, 48))
     return cv.sprite()
@@ -780,9 +776,9 @@ def _ancient_metal(mode):
         return [(16 + (x - 16.2) * k, 16 + (y - 18.0) * k) for x, y in pts]
 
     # малая плита-обломок позади (справа-снизу) и большая плита впереди с отколотым углом
-    small = _plate(cv, S([(15, 19), (27, 17), (29, 24), (18, 27)], 6), P)
+    _plate(cv, S([(15, 19), (27, 17), (29, 24), (18, 27)], 6), P)
     big_pts = S([(4, 9), (21, 7), (25, 11), (24, 12), (22, 22), (6, 24), (3, 20)], -4)
-    big = _plate(cv, big_pts, P)
+    _plate(cv, big_pts, P)
     # заклёпки в углах лицевой стороны
     for (x, y) in ((6.5, 11), (21.5, 10), (7.5, 21.5), (21, 20)):
         X, Y = S([(x, y)], -4)[0]

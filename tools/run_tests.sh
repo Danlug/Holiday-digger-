@@ -43,6 +43,9 @@ done
 run_one() {
 	local kind="${1%%:*}" n="${1#*:}"
 	local log="$2/$n.log"
+	# user:// (save.json, settings.json) общий на всю машину: у каждого теста свой каталог данных,
+	# иначе параллельные тесты и соседние worktree-ветки ломают друг другу сейв.
+	export XDG_DATA_HOME="$2/xdg_$n"
 	if [ "$kind" = scene ]; then
 		timeout 240 "$GODOT" --headless --path . "res://tests/$n.tscn" >"$log" 2>&1
 	else

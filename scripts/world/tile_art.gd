@@ -156,6 +156,9 @@ static func texture_for(type: int, wx: int, wy: int) -> Texture2D:
 ## откатится на тайл пояса 0). Ключ кэша — число, а не строка: зовут на каждую клетку
 ## экрана каждый кадр.
 static func _belt_tile(belt: int, file: String) -> Texture2D:
+	var shared := _world_region(belt, file)
+	if shared != null:
+		return shared
 	if _atlas_meta.is_empty():
 		_load_atlas_meta()
 	var idx: int = _atlas_idx.get(file, -1)
@@ -211,9 +214,74 @@ static func _belt_atlas(belt: int) -> Texture2D:
 static func _load(file: String) -> Texture2D:
 	if _cache.has(file):
 		return _cache[file]
-	var path := DIR + file + ".png"
-	var tex: Texture2D = null
-	if ResourceLoader.exists(path):
-		tex = load(path)
+	var tex: Texture2D = _world_region(0, file)
+	if tex == null:
+		var path := DIR + file + ".png"
+		if ResourceLoader.exists(path):
+			tex = load(path)
 	_cache[file] = tex
 	return tex
+
+
+# ---- единый атлас мира (tools/gen_world_atlas.py) ----
+# Все клетки мира и заливка тумана берутся из ОДНОЙ текстуры, поэтому соседние спрайты с разными
+# тайлами не рвут пакет отрисовки: весь слой мира — один draw call вместо 100-190. Нет файла атласа —
+# всё работает по-старому, из отдельных файлов и атласов поясов.
+const WORLD_ATLAS_PNG := "res://art/tiles/world_atlas.png"
+const WORLD_ATLAS_JSON := "res://art/tiles/world_atlas.json"
+
+static var _wa_ready: bool = false
+static var _wa_tex: Texture2D = null
+static var _wa_belts: Array = []     # [пояс] -> {имя файла -> AtlasTexture}
+static var _wa_white: Texture2D = null
+
+
+static func _wa_init() -> void:
+	_wa_ready = true
+	if not (FileAccess.file_exists(WORLD_ATLAS_JSON) and ResourceLoader.exists(WORLD_ATLAS_PNG)):
+		return
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(WORLD_ATLAS_JSON))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var atlas: Texture2D = load(WORLD_ATLAS_PNG)
+	if atlas == null:
+		return
+	var cell := int(parsed.get("cell", 96))
+	var pad := int(parsed.get("pad", 2))
+	var cols := int(parsed.get("cols", 18))
+	var stride := cell + 2 * pad
+	var tiles: Dictionary = parsed.get("tiles", {})
+	for key: String in tiles:
+		var idx := int(tiles[key])
+		var origin := Vector2((idx % cols) * stride + pad, (idx / cols) * stride + pad)
+		var at := AtlasTexture.new()
+		at.atlas = atlas
+		at.filter_clip = true
+		if key == "white":
+			# одного текселя из середины белой клетки хватает: спрайт растягивают на клетку и красят modulate
+			at.region = Rect2(origin + Vector2(cell / 2, cell / 2), Vector2.ONE)
+			_wa_white = at
+			continue
+		at.region = Rect2(origin, Vector2(cell, cell))
+		var parts := key.split("/")
+		var belt := int(parts[0])
+		while _wa_belts.size() <= belt:
+			_wa_belts.append({})
+		_wa_belts[belt][parts[1]] = at
+	_wa_tex = atlas
+
+
+## Вырезка тайла из общего атласа или null (нет атласа или такого тайла у пояса нет).
+static func _world_region(belt: int, file: String) -> Texture2D:
+	if not _wa_ready:
+		_wa_init()
+	if _wa_tex == null or belt >= _wa_belts.size():
+		return null
+	return _wa_belts[belt].get(file)
+
+
+## Белая заливка из того же атласа (цвет тумана и серой породы красится modulate); null — атласа нет.
+static func white_texture() -> Texture2D:
+	if not _wa_ready:
+		_wa_init()
+	return _wa_white

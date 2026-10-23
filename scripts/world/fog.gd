@@ -30,6 +30,12 @@ const LOG_MAX_CELLS := 600   # сброс больше этого — проще
 var version: int = 0
 var _all_version: int = 0
 var _log_keys: Array = []
+# последний reveal_around: тот же вызов при той же версии пропускается
+var _rv_x: float = INF
+var _rv_y: float = INF
+var _rv_t: int = -1
+var _rv_r: int = -1
+var _rv_ver: int = -1
 
 
 ## Доля клетки, которую круг обзора должен накрыть, чтобы клетка открылась
@@ -59,8 +65,18 @@ static func vision_radius(stage_radius: int) -> float:
 func reveal_around(center_x: float, center_y: float,
 		terrain_radius: int = DEFAULT_TERRAIN_RADIUS,
 		resource_radius: int = DEFAULT_RESOURCE_RADIUS) -> void:
+	# main зовёт это каждый кадр. Тот же центр и радиусы при той же версии тумана — раскрывать нечего
+	# (биты только добавляются, а любой сброс поднимает версию).
+	if center_x == _rv_x and center_y == _rv_y and terrain_radius == _rv_t \
+			and resource_radius == _rv_r and version == _rv_ver:
+		return
 	reveal_terrain(center_x, center_y, terrain_radius)
 	reveal_resources(center_x, center_y, resource_radius)
+	_rv_x = center_x
+	_rv_y = center_y
+	_rv_t = terrain_radius
+	_rv_r = resource_radius
+	_rv_ver = version
 
 
 ## То же, но от СЕРЕДИНЫ клетки, а не от точки. Отдельным методом, потому что

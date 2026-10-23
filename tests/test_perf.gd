@@ -18,6 +18,7 @@ class FakePlayer extends Node:
 
 func _ready() -> void:
 	print("=== test_perf: старт ===")
+	test_world_atlas()
 	test_fog_matches_reference()
 	test_fog_versions()
 	test_world_versions()
@@ -38,6 +39,86 @@ func check(label: String, condition: bool) -> void:
 	else:
 		failures += 1
 		print("  FAIL  ", label)
+
+
+# ---------------------------------------------------------------------------
+# Единый атлас тайлов мира
+# ---------------------------------------------------------------------------
+
+## Исходный PNG как есть (без импорта): сверяем атлас с тем, из чего его собирает скрипт.
+func _img(path: String) -> Image:
+	return Image.load_from_file(ProjectSettings.globalize_path(path))
+
+
+func test_world_atlas() -> void:
+	print("-- Единый атлас тайлов мира (tools/gen_world_atlas.py) --")
+	var meta = JSON.parse_string(FileAccess.get_file_as_string(TileArt.WORLD_ATLAS_JSON))
+	check("world_atlas.json читается", typeof(meta) == TYPE_DICTIONARY)
+	if typeof(meta) != TYPE_DICTIONARY:
+		return
+	var atlas_img := _img(TileArt.WORLD_ATLAS_PNG)
+	check("world_atlas.png читается", atlas_img != null and not atlas_img.is_empty())
+	if atlas_img == null or atlas_img.is_empty():
+		return
+	var cell := int(meta.cell)
+	var pad := int(meta.pad)
+	var cols := int(meta.cols)
+	var stride := cell + 2 * pad
+	var deep_meta = JSON.parse_string(FileAccess.get_file_as_string("res://art/tiles/deep/atlas.json"))
+	var deep_names: Array = deep_meta.names
+	var belts := {}
+	var stale: Array = []
+	var tiles: Dictionary = meta.tiles
+	for key: String in tiles:
+		var idx := int(tiles[key])
+		var region := Rect2i((idx % cols) * stride + pad, (idx / cols) * stride + pad, cell, cell)
+		var got := atlas_img.get_region(region)
+		var want: Image = null
+		var parts := key.split("/")
+		if key == "white":
+			want = Image.create(cell, cell, false, got.get_format())
+			want.fill(Color.WHITE)
+		elif parts[0] == "0":
+			want = _img("res://art/tiles/%s.png" % parts[1])
+		else:
+			var belt := int(parts[0])
+			if not belts.has(belt):
+				belts[belt] = _img("res://art/tiles/deep/belt_%d.png" % belt)
+			var i := deep_names.find(parts[1])
+			var bs := int(deep_meta.cell) + 2 * int(deep_meta.pad)
+			want = (belts[belt] as Image).get_region(Rect2i((i % int(deep_meta.cols)) * bs + int(deep_meta.pad),
+				(i / int(deep_meta.cols)) * bs + int(deep_meta.pad), cell, cell))
+		if want == null or want.get_format() != got.get_format():
+			want.convert(got.get_format()) if want != null else null
+		if want == null or want.get_data() != got.get_data():
+			stale.append(key)
+	check("каждая клетка атласа совпадает с исходным тайлом (устарели: %s) — запусти tools/gen_world_atlas.py" % ", ".join(stale),
+		stale.is_empty())
+	# что просит TileArt, то в атласе есть: иначе клетка выпадет из общего пакета отрисовки
+	var missing: Array = []
+	var files: Array = TileArt._tile_to_file.values()
+	files.append_array(TileArt.DIRT_FILES)
+	files.append_array(TileArt.GRASS_FILES)
+	for i in range(TileArt.LAVA_FRAMES):
+		files.append("lava_%d" % (i + 1))
+	for f in files:
+		if tiles.get("0/" + String(f)) == null:
+			missing.append("0/" + String(f))
+	for belt in range(1, Biomes.count()):
+		for n in deep_names:
+			if tiles.get("%d/%s" % [belt, n]) == null:
+				missing.append("%d/%s" % [belt, n])
+	check("у каждого файла тайла и каждой вырезки пояса есть клетка в атласе (нет: %s)" % ", ".join(missing), missing.is_empty())
+	# и отдаёт именно её
+	var t0 := TileArt.texture_for(TileTypes.Type.GOLD_ORE, 3, 100)
+	var t3 := TileArt.texture_for(TileTypes.Type.GOLD_ORE, 3, 3500)
+	var w := TileArt.white_texture()
+	check("тайлы поясов 0 и 3 и заливка — вырезки одной текстуры",
+		t0 is AtlasTexture and t3 is AtlasTexture and w is AtlasTexture
+		and (t0 as AtlasTexture).atlas == (t3 as AtlasTexture).atlas and (w as AtlasTexture).atlas == (t0 as AtlasTexture).atlas)
+	check("белая заливка — один тексель, как прежняя текстура 1x1", w != null and w.get_width() == 1 and w.get_height() == 1)
+	check("лава и трава тоже из атласа", (TileArt.texture_for(TileTypes.Type.LAVA, 1, 3500) as AtlasTexture).atlas == (t0 as AtlasTexture).atlas
+		and (TileArt.grass_texture(5) as AtlasTexture).atlas == (t0 as AtlasTexture).atlas)
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +194,11 @@ func test_fog_versions() -> void:
 	var k2: Variant = fog.changed_since(v1)
 	check("сдвиг на клетку: изменился узкий серп, а не весь круг", k2 is PackedInt32Array and (k2 as PackedInt32Array).size() < 20)
 	var v2 := fog.version
+	fog.reset_rect(9, 19, 3, 3)
+	fog.reveal_around(10.5, 20.5, 3, 2)
+	check("тот же reveal_around после сброса снова открывает клетки (мемо не залипает)",
+		fog.get_state(10, 20) != FogOfWar.State.BLACK)
+	v2 = fog.version
 	fog.reset_rect(8, 18, 4, 4)
 	var k3: Variant = fog.changed_since(v2)
 	check("reset_rect даёт ровно клетки зоны", k3 is PackedInt32Array and (k3 as PackedInt32Array).size() == 16

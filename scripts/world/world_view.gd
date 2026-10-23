@@ -24,7 +24,7 @@ var view_h: int = 14
 var _pool: Array = []          # Array[Sprite2D], индекс = (y mod rows)*cols + (x mod cols)
 var _pool_cols: int = 0
 var _pool_rows: int = 0
-var _white_tex: ImageTexture
+var _white_tex: Texture2D
 
 # Кэш окна: какая клетка сейчас лежит в каждом спрайте и анимирована ли она (лава).
 var _slot_wx: PackedInt32Array = PackedInt32Array()
@@ -95,9 +95,13 @@ var _gray_empty: PackedColorArray = PackedColorArray()
 
 
 func _ready() -> void:
-	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
-	img.fill(Color.WHITE)
-	_white_tex = ImageTexture.create_from_image(img)
+	# Белая заливка берётся из общего атласа тайлов: тогда соседние клетки (тайл / туман) идут одним
+	# пакетом отрисовки. Нет атласа — отдельная текстура 1x1, как раньше.
+	_white_tex = TileArt.white_texture()
+	if _white_tex == null:
+		var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		img.fill(Color.WHITE)
+		_white_tex = ImageTexture.create_from_image(img)
 
 	_build_sky_colors()
 	for i in range(Biomes.count()):
@@ -108,6 +112,17 @@ func _ready() -> void:
 	_overlay.name = "Overlay"
 	_overlay.draw.connect(_on_overlay_draw)
 	add_child(_overlay)
+	get_viewport().size_changed.connect(_on_viewport_resized)
+
+
+## Окно браузера или поворот телефона растянули вьюпорт: пул размером со старый экран оставил бы
+## пустые полосы справа и снизу. Только растим, не сжимаем — чтобы пул не пересобирался туда-сюда.
+func _on_viewport_resized() -> void:
+	var vp := get_viewport_rect().size
+	var need_w := int(ceil(vp.x / TILE))
+	var need_h := int(ceil(vp.y / TILE))
+	if need_w > view_w or need_h > view_h:
+		set_view_size(maxi(view_w, need_w), maxi(view_h, need_h))
 
 
 func set_view_size(w: int, h: int) -> void:

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>$GODOT_PROJECT_NAME</title>
+<meta name="description" content="Раскопки на каникулах — пиксельная игра про раскопки: копай, находи руду, открывай тайны.">
+<meta name="theme-color" content="#16120E">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Раскопки">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+$GODOT_HEAD_INCLUDE
+<style>
+/* Оболочка веб-сборки. Исходник — web/shell.src.html, готовый web/shell.html собирает tools/build_web_shell.py
+   (вшивает пиксель-арт и шрифт из art/brand как data: — ни CDN, ни отдельных запросов). Единица --u — размер
+   «пикселя оболочки» в CSS-пикселях, его выбирает JS так, чтобы он ложился на целое число физических пикселей. */
+@font-face{font-family:"RaskopkiPixel";src:url(data:font/woff;base64,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) format("woff");font-display:block}
+:root{
+	color-scheme:dark;
+	--ink:#150E09;--gold:#E8B32E;--gold-hi:#FFE066;--parch:#E8D8B0;--soil-warm:#B4854E;--void:#161A24;
+	--panel:#241E2C;--rim:#A4835A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0D0A07;overscroll-behavior:none}
+body{
+	position:fixed;inset:0;
+	color:var(--parch);
+	font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+	touch-action:none;
+	-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+	-webkit-tap-highlight-color:transparent;
+	-webkit-text-size-adjust:100%;text-size-adjust:100%;
+}
+img{-webkit-user-drag:none;user-select:none;image-rendering:crisp-edges;image-rendering:pixelated}
+noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;background:#0D0A07;font-size:18px;line-height:1.4}
+
+/* ---- пиксельный текст: клетка шрифта = --u */
+.px{font-family:"RaskopkiPixel",ui-monospace,Menlo,Consolas,monospace;font-size:calc(var(--u)*10);line-height:calc(var(--u)*10);
+	font-weight:normal;letter-spacing:0;text-transform:uppercase;white-space:nowrap;-webkit-font-smoothing:none;font-smooth:never;
+	--ol:var(--u);
+	text-shadow:var(--ol) 0 0 var(--ink),calc(-1*var(--ol)) 0 0 var(--ink),0 var(--ol) 0 var(--ink),0 calc(-1*var(--ol)) 0 var(--ink),
+		var(--ol) var(--ol) 0 var(--ink),calc(-1*var(--ol)) var(--ol) 0 var(--ink),var(--ol) calc(-1*var(--ol)) 0 var(--ink),calc(-1*var(--ol)) calc(-1*var(--ol)) 0 var(--ink)}
+
+/* ---- сцена: небо ступенями, сосны, трава, земля. Одна и та же — на экране загрузки и вокруг колонки на десктопе */
+.scene{position:absolute;inset:0;overflow:hidden;
+	--hz:calc(var(--stageh,100vh)*.56 - var(--y0,0px));
+	background:linear-gradient(#3C86CC 0 14%,#4A94D6 14% 26%,#5BA3DF 26% 36%,#72B4E6 36% 44%,#8EC4EC 44% 50%,#B2D7F0 50% 56%,transparent 56%)
+		0 calc(0px - var(--y0,0px))/100% var(--stageh,100vh) no-repeat}
+.scene .cloud{position:absolute;left:0;animation:drift 110s linear infinite}
+.scene .cloud.c1{top:9%;width:calc(44*var(--u));animation-duration:120s;animation-delay:-35s}
+.scene .cloud.c2{top:21%;width:calc(30*var(--u));animation-duration:80s;animation-delay:-12s}
+.scene .trees{position:absolute;left:0;right:0;top:calc(var(--hz) - 44*var(--u));height:calc(44*var(--u));
+	background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAsCAYAAACaAr0vAAADLklEQVR42u1aO47bMBCVBdeGiu1crJptFobX5VZRbqDW2BMI8CF0ilwhyDG8rlIqgpDGjVKkMxAhF2CKeBSaK5IzFCXZ2ZnKsMTh/N6bIe0gYGFhYWFhYWFhYRldZhyCf3KfPAr4/OP1+yixCTns0wonYGKZq18ku20Lw9dPX4wwxLxL0TcEHbjuzwh4rwhgGRc9jIBrRUBdlS0PjzWSDVWldVW2feXafGEEnOXp5VnohgDuAf9xvxglAddMASDNz9/efLVRt5ysUPfAd1W4XgmMRQfRcjF9D4juIr9OOeqbKhg31YTTPBNDoseHpHkmml91gEGTjYKG8u8iAc2pwXMm4l2KviH4uDk1KF1PL8+iC3XQu9D7IZNtpSCMIgy9TE1B0V2E0vXt89fOZhmv1oMXTqijFB/wd6kKdR43rfNFgzqbqAhwKZwQjJbpwgcF9KEf7P62PYr9oVOXGvC+iKMUr/puKMMVHMIYZHMe9FGTGS0X6IDYKA6rC5t0G8J6URCVs7E94BZGSkrSTQ24S4eNckOXTOogp1ZIfSxInHufPApTNarrTChM80xgKlvXc1z7gBMC0jwTzan5SxmITMK7RufP9EOBJbUSTSisj4VRH/gDNvbpexRf1biF8CWVfqz8e6YfF2hj1thQGD9sjOvhngZsxNqpohwOe6b1kOw0z4Qat3CoQ9DQBzAbCnUTkBwUG/1Qacil2OYXDiEyGa/WRseT3VY0pyaoq9KqS74thGDYkgDr2kNjhy3JbvvmCmKoEzfQj+vkOKcaZXJcfh4tF04OYta1hzyNDRB8kx41YLY966p8czJO80zAoIEpHHnU11KQz7ERqwumH6wU+4MRhaDLtD+l8car9UXw1T7QZ4wNdRdJzs5buNnUELFB2Xz8oB0CbDTqkghdD6D62UlB4EhdEcbFDijJ9FMfC1Qg5T4gB60PN8cPm6DYH8gIpe4J9ENZV1dlW2yAolnXgcSm1PazIlWXOo1gnNLZgNVF7QFde/qwe445DdommDHHz1ves0tmmPsKSgVSdblUos4G7N4+9uzzO7Vs92ys/7+wEC7jWDgBnAAWTsC7kD8Av12525peOwAAAABJRU5ErkJggg==) repeat-x calc(0px - var(--x0,0px)) 0/calc(96*var(--u)) calc(44*var(--u));image-rendering:pixelated}
+.scene .grass{position:absolute;left:0;right:0;top:calc(var(--hz) - var(--u));height:calc(3*var(--u));
+	background:linear-gradient(#7FA84A 0 var(--u),#4F7A34 var(--u) calc(2*var(--u)),#365423 calc(2*var(--u)) 100%)}
+.scene .ground{position:absolute;left:0;right:0;top:calc(var(--hz) + 2*var(--u));bottom:0;
+	background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAEU0lEQVR42s1av0tbURT+fDwcOqSBFpUMD4lPcXGocQgdSgQXOxQCbUFcSulUB6FDuqiDUKQu/QPawUWQLo6Ci05FikMhgxATCaGEYi1oKEInO5QT7ju5P997ag8EX/Leu/e7554f3znXvg8vi1dgUm+dd69np8cAADt7NZik2u5Evk/kMtrfASAMstg+aEV+D4MsmisbeDeYx8eFR1DhC4MsPB34MMjCRURg4nW5GEiv+XyiDK++kILn2HzVQPTAceM09iLEsel3mudiqIR8PsSvL5+k79iKp9PCdcrJSR0nJ3WpGZJJyYSw0t++hZnxK9M2pblA3ZjcV2zMzddNZgOcAHFH1D1L1+L4HLxqfq4APw1tiltebXecbVoGno/BAwp9927S7kWN0rUMvIv4fCtdAYVBFuVi0N0Fk926zGUTxr00tDpXvsTn9/e75kQfGxAyc3MxQS+tCDNYWo39rioBWpmQTEuui3r+9gzAa2X4i5sArX1AZnuui6jMTwEA1jcPAQCjIwPdTC7O4TKujtbQvVSikIr3JJFqu9ONUColK/OATVIShRgraX5nrxZhjEnzimoMKRuNI1tHOXz980ipwdGRga5JuYDnCrWOQuVi4GQKIjHjdYMseaUpfQsz41eqLbpJlipi4BrXKdP/H8DLLMDkh3PlS3kUqrfOncHPTo9FHDkpTzLdo8UNllbRZ6qJbTgKOahN3WxipBO5jLaG5vf8JLZKctw4TWRyIihXduql6YSuTYCk3KhcDG62HnABPJHL9ICX7Y6fdvSJW1/EJXOeK/jbDq/82o/TiaNK7DYWyJOasqBJGtevu6bu+oBL71NFsKgWSJIHdHlBtwjPlianye/5b/xetd1BZX4KlfkpY17wt45yyOdDALXYWlnfPOzpRKuyp6lvRM9mfp5p5+32hXiPUmzmiiYhy5bB5BOUnr4BACwv9mN5sV+rcZd2CQBMru33LI4nTO/Z+G8U+r9Fbhw3TntqWVnc5otXdSZkJadqbHp2abeJx4Vhcz0gI3Mqp9GZh+kwwzXsqnavJ4y6kDcVSJPf6HYyKX/y4oS2yvwUZqfHpH6hc1Cxa8errouhEu49fKWlFrLKzHjAwZuwFPP5tW5nbMaXHXgQodPV6MpMTFpKiyKb5MGd77j7Y99ZAT0nNJS8qMMms33ehbNllKbTShPYMMhGOn711jk8Gw3TxLSN65uHOG6cRrZVxt1lgMWPzJF1eGQHkT31ANcqH5jbYpITxjjCT009m8JCBXJ0ZEDJl2QVlaoELWQ8FDJeLDruybabZ06yPVN7ME5jgK4n1/atwYtYfNVLqrAVid8HrVS60Uu7TWB3WLvjKt/wq+1OBIRqQaoTe/68TUITK7o4FZzop55raieenrS/Qx1AE83g7HN0ZCAyvxOV0PmADLB4QEF+ZhsybROoH6dw39mrOYVP0W+2D1o975IJi4cizZUNAP/+a4WbsjjeXxIaow3eVUgLAAAAAElFTkSuQmCC) calc(0px - var(--x0,0px)) 0/calc(48*var(--u)) calc(48*var(--u));image-rendering:pixelated}
+.scene .ground::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(21,14,9,.38),rgba(21,14,9,.62) 35%,rgba(21,14,9,.9))}
+@keyframes drift{from{left:-50%}to{left:105%}}
+
+/* ---- страница: сцена на весь экран + мягкая виньетка; в ней лежит колонка 224:480 */
+#stage{position:fixed;top:0;left:0;right:0;bottom:0}
+@supports (height:100dvh){#stage{bottom:auto;height:100dvh}}
+#bg{--u:3px;--x0:0px;--y0:0px}
+#bg::after{content:"";position:absolute;inset:0;pointer-events:none;
+	background:radial-gradient(ellipse 78% 72% at 50% 46%,rgba(0,0,0,0) 38%,rgba(8,5,3,.66) 100%)}
+#avail{position:absolute;inset:0;display:flex;align-items:stretch;justify-content:stretch;
+	padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+#slot{flex:1 1 auto;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center}
+#frame{position:relative;flex:none;width:224px;height:480px;overflow:hidden;background:#0B0907;--u:3px}
+#frame.col{box-shadow:0 14px 50px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.45)}
+#canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;outline:none;touch-action:none;
+	image-rendering:crisp-edges;image-rendering:pixelated}
+
+/* ---- экран загрузки */
+#splash{position:absolute;inset:0;overflow:hidden;transition:opacity .6s ease}
+#splash.out{opacity:0;pointer-events:none}
+#splash .logo{position:absolute;left:50%;top:calc(var(--hz) - 116*var(--u));width:calc(96*var(--u));transform:translateX(-50%)}
+#splash .logo img{display:block;width:100%;height:auto;animation:bob 2.4s steps(1,end) infinite}
+@keyframes bob{0%{transform:translateY(0)}50%{transform:translateY(calc(var(--u)*-1))}}
+.grp{position:absolute;left:0;right:0;top:calc(var(--hz) + 16*var(--u));display:none;flex-direction:column;align-items:center;text-align:center}
+#splash[data-mode=loading] .g-load,#splash[data-mode=starting] .g-load{display:flex}
+#splash[data-mode=ready] .g-tap{display:flex;animation:fadein .5s ease both;cursor:pointer}
+#splash[data-mode=fail] .g-fail{display:flex;top:calc(var(--hz) - 30*var(--u))}
+#splash[data-mode=ready]{cursor:pointer}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+
+.lbl{color:var(--gold-hi);margin-bottom:calc(4*var(--u))}
+.bar{padding:calc(2*var(--u));background:var(--ink);box-shadow:inset 0 0 0 var(--u) #5A4630}
+.well{position:relative;width:calc(100*var(--u));height:calc(7*var(--u));background:var(--void);overflow:hidden}
+.fill{position:absolute;left:0;top:0;bottom:0;width:calc(var(--n,0)*5*var(--u));
+	background:linear-gradient(#FFF1A8 0 var(--u),#E8B32E var(--u) calc(5*var(--u)),#C2703A calc(5*var(--u)) 100%)}
+.cells{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(4*var(--u)),var(--void) calc(4*var(--u)) calc(5*var(--u)))}
+.blink{position:absolute;top:0;bottom:0;left:calc(var(--n,0)*5*var(--u));width:calc(4*var(--u));background:rgba(255,224,102,.4);animation:blink .8s steps(1,end) infinite}
+.indet .fill{width:calc(20*var(--u));animation:march 1.4s steps(20,end) infinite}
+.indet .blink{display:none}
+@keyframes blink{0%{opacity:1}50%{opacity:0}}
+@keyframes march{from{left:calc(-20*var(--u))}to{left:calc(100*var(--u))}}
+#splash[data-mode=starting] .blink,#splash[data-mode=starting] .pct{display:none}
+.pct{margin-top:calc(5*var(--u));font-size:calc(var(--u)*20);line-height:calc(var(--u)*20);color:var(--parch);--ol:calc(2*var(--u))}
+.pct .sign{color:var(--gold)}
+
+.hand{position:relative;width:calc(36*var(--u));height:calc(38*var(--u))}
+.hand img{position:absolute;left:0;top:0;width:100%;animation:tapdown 1.5s steps(1,end) infinite}
+.hand i{position:absolute;left:47%;top:calc(3*var(--u));width:calc(18*var(--u));height:calc(18*var(--u));margin:calc(-9*var(--u)) 0 0 calc(-9*var(--u));
+	border:var(--u) solid rgba(255,243,176,.95);border-radius:50%;opacity:0;animation:ripple 1.5s steps(6,end) infinite;animation-delay:.3s}
+.hand i.r2{animation-delay:.55s}
+@keyframes tapdown{0%{transform:translateY(0)}20%{transform:translateY(calc(3*var(--u)))}40%{transform:translateY(0)}}
+@keyframes ripple{0%{opacity:.95;transform:scale(.25)}100%{opacity:0;transform:scale(1.7)}}
+.prompt{margin-top:calc(6*var(--u));color:var(--parch);animation:pulse 1.6s steps(1,end) infinite}
+@keyframes pulse{0%{opacity:1}60%{opacity:.55}}
+
+.panel{width:min(calc(104*var(--u)),90%);padding:calc(4*var(--u));background:var(--panel);box-shadow:0 0 0 calc(2*var(--u)) var(--gold),0 0 0 calc(3*var(--u)) var(--ink),0 calc(6*var(--u)) 0 calc(3*var(--u)) rgba(0,0,0,.35)}
+.panel .ftitle{color:var(--gold-hi);white-space:normal}
+.panel p{margin:calc(3*var(--u)) 0 0;font-size:max(14px,calc(var(--u)*4.4));line-height:1.4;color:var(--parch)}
+.panel p.detail{font-size:max(11px,calc(var(--u)*3.2));color:#8D7C66;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace}
+.panel p.detail:empty{display:none}
+.btn{appearance:none;-webkit-appearance:none;border:0;border-radius:0;margin:calc(6*var(--u)) 0 calc(2*var(--u));padding:calc(3*var(--u)) calc(5*var(--u));cursor:pointer;
+	color:#3E2A1A;text-shadow:none;touch-action:manipulation;
+	background:linear-gradient(#FFF1A8 0 var(--u),#E8B32E var(--u) calc(100% - 2*var(--u)),#C2703A calc(100% - 2*var(--u)) 100%);
+	box-shadow:0 0 0 var(--u) var(--ink),0 calc(2*var(--u)) 0 var(--u) var(--ink)}
+.btn:active{transform:translateY(var(--u))}
+.btn[hidden]{display:none}
+
+/* ---- плашка «поверни телефон»: только телефон в ландшафте; планшеты и десктоп её не видят */
+#rotate{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+	background:rgba(13,10,7,.94);--u:5px}
+#rotate .rcard{display:flex;align-items:center;gap:calc(8*var(--u));padding:calc(5*var(--u)) calc(9*var(--u));
+	background:var(--panel);box-shadow:0 0 0 calc(var(--u)*1) var(--gold),0 0 0 calc(var(--u)*2) var(--ink)}
+#rotate .rphone{width:calc(14*var(--u));height:auto;animation:turn 2.8s ease-in-out infinite}
+#rotate .rtext{color:var(--parch);white-space:normal}
+@keyframes turn{0%,15%{transform:rotate(-90deg)}45%,85%{transform:rotate(0deg)}100%{transform:rotate(-90deg)}}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:520px){#rotate{display:flex}}
+
+@media (prefers-reduced-motion:reduce){
+	.scene .cloud,#splash .logo img,.blink,.hand img,.hand i,.prompt,#rotate .rphone{animation:none}
+	.hand i{display:none}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+	<div id="bg" class="scene" aria-hidden="true">
+		<img class="cloud c1" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAaCAYAAADMp76xAAAAjElEQVR42mNgGAWjYBSMAnyAkRhFX77/+o8uxsPJxjjoHIzNocQ4HF0fNT3HSK5DsTmIXA9S5GBSHUsOoMTRTPR2LKX2MNHbsZTaxzQQjqXE0UwDXa6S6ugBd/CQC2FYKBMb0oMqhIlx+GiSoHVGZIHVPHsuPPs/GsK0dLCLgRTjYHHUYHLLKBgF1AYA+eFLehuzIC8AAAAASUVORK5CYII=" alt="">
+		<img class="cloud c2" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAATCAYAAACHrr18AAAAbUlEQVR42mNgGAXDHTDikvjy/dd/BgYGBh5ONkZyDYeZgc0cRnyKkQEpDsBlBrI5TMRqwCdHijqYPCOpBuPzCSlmMFErsZDqcKaBStUjz2IWGOPEzTcD42MXAylGelnqYiDFyIQuMFqYjwJqAQBL4S+ocHF5tQAAAABJRU5ErkJggg==" alt="">
+		<div class="trees"></div><div class="grass"></div><div class="ground"></div>
+	</div>
+	<div id="avail"><div id="slot">
+		<div id="frame">
+			<canvas id="canvas" tabindex="0">Браузер не поддерживает canvas.</canvas>
+			<div id="splash" class="scene" data-mode="loading">
+				<img class="cloud c1" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAaCAYAAADMp76xAAAAjElEQVR42mNgGAWjYBSMAnyAkRhFX77/+o8uxsPJxjjoHIzNocQ4HF0fNT3HSK5DsTmIXA9S5GBSHUsOoMTRTPR2LKX2MNHbsZTaxzQQjqXE0UwDXa6S6ugBd/CQC2FYKBMb0oMqhIlx+GiSoHVGZIHVPHsuPPs/GsK0dLCLgRTjYHHUYHLLKBgF1AYA+eFLehuzIC8AAAAASUVORK5CYII=" alt="">
+				<img class="cloud c2" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAATCAYAAACHrr18AAAAbUlEQVR42mNgGAXDHTDikvjy/dd/BgYGBh5ONkZyDYeZgc0cRnyKkQEpDsBlBrI5TMRqwCdHijqYPCOpBuPzCSlmMFErsZDqcKaBStUjz2IWGOPEzTcD42MXAylGelnqYiDFyIQuMFqYjwJqAQBL4S+ocHF5tQAAAABJRU5ErkJggg==" alt="">
+				<div class="trees"></div><div class="grass"></div><div class="ground"></div>
+				<div class="logo"><img src="data:image/png;base64,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" alt="Раскопки на каникулах"></div>
+				<div class="grp g-load" role="status" aria-live="polite">
+					<div class="px lbl" id="loadLabel">Загрузка</div>
+					<div class="bar" id="bar" role="progressbar" aria-label="Загрузка игры" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+						<div class="well" id="well"><div class="fill" id="fill"></div><div class="cells"></div><div class="blink"></div></div>
+					</div>
+					<div class="px pct"><span id="pct">0</span><span class="sign" id="pctSign">%</span></div>
+				</div>
+				<div class="grp g-tap">
+					<div class="hand"><i></i><i class="r2"></i><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAATCAYAAACdkl3yAAAA6klEQVR42rWTMQqDMBSG/wQXB910EVw6C17BG7h6gtKlh+ki3dxcvYEnEAS3Qhehi1PRA6TTE6PGWrX/kkfy+PIn7z1gQaLLhOgygT0SXSYsUxeWqW+HEaQtEtEWySoYx0HivzpVnWlrIbYTSTBmhGwWpEogPfN4Echp03Yi2E6ENRV65jG6x1vK1wgyvnGo/HYGANRV2edRTDCuegKtAOB6vrSOYwDgzAhZ80pxCi4T2JLqqpyWfw721z4ayvV8yVUP2utqs6O6KhFc72heKZgRMgm0x9VhQ8tUwznXmGPRs5Sgb5M+/AqKP/Q2iaDwshn0AAAAAElFTkSuQmCC" alt=""></div>
+					<div class="px prompt">Нажмите,<br>чтобы играть</div>
+				</div>
+				<div class="grp g-fail">
+					<div class="panel" role="alert">
+						<div class="px ftitle" id="failTitle"></div>
+						<p id="failText"></p>
+						<p class="detail" id="failDetail"></p>
+						<button class="btn px" id="reload" type="button">Перезагрузить</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div></div>
+</div>
+<div id="rotate" role="alert" aria-label="Поверните телефон вертикально">
+	<div class="rcard"><img class="rphone" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADKx8xXAAAAjklEQVR42mNkYGBgEOXj/M9AAnj96Tsjoygf5//WGZtJ0cdQneHLwALjnGBRJkqTxZ+7DAwMDAxMDGSCUY3DQyM85by9EEqcDp0OKtkoc+oLkTbi8KOKnACDipwA8TbCwJ1HH6gTqrX5bAy1+WyEbUQHzRN/DbYEoJ80hTyNyODQkRMofDsbCww1jOQWjwA8DR+cC/3f0gAAAABJRU5ErkJggg==" alt=""><div class="px rtext">Поверни<br>телефон</div></div>
+</div>
+<noscript>Для игры нужен включённый JavaScript.</noscript>
+
+<script>
+/* Ядро оболочки: раскладка, защита от жестов браузера, разблокировка звука, окно ошибки.
+   Стоит ДО index.js, чтобы экран загрузки был размерён сразу, а не после 300 КБ скрипта движка. */
+(function () {
+	'use strict';
+	var $ = function (id) { return document.getElementById(id); };
+	var frame = $('frame'), canvas = $('canvas'), slot = $('slot'), splash = $('splash'), bg = $('bg'), rotate = $('rotate'), stage = $('stage');
+	var root = document.documentElement;
+	var shell = window.RaskopkiShell = { phase: 'boot' };
+
+	function setPhase(p) { shell.phase = p; root.setAttribute('data-phase', p); }
+	function setMode(m) { splash.setAttribute('data-mode', m); }
+	setPhase('boot');
+
+	// ---------- раскладка
+	// Телефон: игра заполняет экран (Godot растягивает вьюпорт по expand, как и раньше).
+	// Планшет и десктоп: колонка ровно 224:480 с целым множителем пикселей, пока он не съедает больше пятой части экрана.
+	var BASE_W = 224, BASE_H = 480;
+	function isPhone() {
+		return window.matchMedia('(pointer: coarse)').matches && Math.min(window.innerWidth, window.innerHeight) <= 640;
+	}
+	function layout() {
+		var r = slot.getBoundingClientRect();
+		var aw = Math.max(1, r.width), ah = Math.max(1, r.height);
+		var dpr = Math.min(window.devicePixelRatio || 1, 3);
+		var phone = isPhone(), w, h;
+		if (phone) {
+			w = aw; h = ah;
+			var a = w / h;
+			if (a > 0.62) { w = h * 0.62; } else if (a < 0.40) { h = w / 0.40; }
+		} else {
+			var fit = Math.min(aw * dpr / BASE_W, ah * dpr / BASE_H);
+			var k = fit;
+			if (fit >= 1) {
+				k = Math.floor(fit);
+				if (fit / k > 1.25) { k = fit; }
+			}
+			w = BASE_W * k / dpr; h = BASE_H * k / dpr;
+		}
+		var cw = Math.max(1, Math.round(w * dpr)), ch = Math.max(1, Math.round(h * dpr));
+		frame.style.width = (cw / dpr) + 'px';
+		frame.style.height = (ch / dpr) + 'px';
+		frame.classList.toggle('col', !phone);
+		// Godot при canvasResizePolicy=0 берёт размер из canvas.width/height; трогаем, только когда он правда изменился.
+		if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+		var U = Math.max(1, Math.floor(Math.min(cw * 0.9 / 104, ch * 0.30 / 68)));
+		frame.style.setProperty('--u', (U / dpr) + 'px');
+		// Фон вокруг колонки — та же сцена в том же масштабе и с той же линией горизонта: колонка выглядит окном в неё.
+		var fr = frame.getBoundingClientRect(), st = stage.getBoundingClientRect();
+		bg.style.setProperty('--u', (U / dpr) + 'px');
+		root.style.setProperty('--stageh', st.height + 'px');
+		root.style.setProperty('--y0', (fr.top - st.top) + 'px');
+		root.style.setProperty('--x0', (fr.left - st.left) + 'px');
+		var Ur = Math.max(1, Math.floor(Math.min(window.innerWidth, window.innerHeight) * dpr / 80));
+		rotate.style.setProperty('--u', (Ur / dpr) + 'px');
+	}
+	shell.layout = layout;
+	layout();
+	window.addEventListener('resize', layout);
+	window.addEventListener('orientationchange', function () { setTimeout(layout, 120); setTimeout(layout, 400); });
+	if (window.visualViewport) { window.visualViewport.addEventListener('resize', layout); }
+	document.addEventListener('fullscreenchange', layout);
+
+	// ---------- жесты браузера: щипок, двойной тап, оттяжка страницы, меню и выделение по долгому нажатию
+	// Долгое нажатие в игре показывает подсказки — браузер не должен его перехватывать.
+	['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+		document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+	});
+	document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+	['contextmenu', 'selectstart', 'dragstart'].forEach(function (t) {
+		document.addEventListener(t, function (e) { e.preventDefault(); });
+	});
+	window.addEventListener('wheel', function (e) { if (e.ctrlKey) { e.preventDefault(); } }, { passive: false });
+
+	// ---------- звук: контекст, созданный в жесте, отдаём движку; остальные будим на каждом жесте
+	var NativeAC = window.AudioContext || window.webkitAudioContext;
+	var contexts = [], spare = null;
+	if (NativeAC) {
+		var Wrapped = function (opts) {
+			var c;
+			if (spare) { c = spare; spare = null; } else { c = new NativeAC(opts); }
+			contexts.push(c);
+			return c;
+		};
+		Wrapped.prototype = NativeAC.prototype;
+		Object.setPrototypeOf(Wrapped, NativeAC);
+		window.AudioContext = Wrapped;
+		window.webkitAudioContext = Wrapped;
+	}
+	function resumeAudio() {
+		contexts.forEach(function (c) {
+			if (c.state !== 'running' && c.state !== 'closed') { c.resume().catch(function () {}); }
+		});
+	}
+	shell.unlockAudio = function () {
+		if (!NativeAC) { return; }
+		try {
+			spare = new NativeAC({ latencyHint: 'interactive' });
+			spare.resume().catch(function () {});
+			var src = spare.createBufferSource();
+			src.buffer = spare.createBuffer(1, 1, 22050);
+			src.connect(spare.destination);
+			src.start(0);
+		} catch (e) { spare = null; }
+	};
+	shell.audioStates = function () { return contexts.map(function (c) { return c.state; }); };
+	['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(function (t) {
+		window.addEventListener(t, resumeAudio, { capture: true, passive: true });
+	});
+	document.addEventListener('visibilitychange', function () { if (!document.hidden) { resumeAudio(); } });
+
+	// ---------- полноэкранный режим: только там, где есть смысл и где браузер умеет (iPhone Safari — тихо пропускаем)
+	shell.goFullscreen = function () {
+		try {
+			if (!window.matchMedia('(pointer: coarse)').matches) { return; }
+			if (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) { return; }
+			var el = document.documentElement;
+			var req = el.requestFullscreen || el.webkitRequestFullscreen;
+			if (!req) { return; }
+			var p = req.call(el, { navigationUI: 'hide' });
+			if (p && p.then) {
+				p.then(function () {
+					try { screen.orientation.lock('portrait').catch(function () {}); } catch (e) {}
+				}, function () {});
+			}
+		} catch (e) { /* не вышло — играем в окне */ }
+	};
+
+	// ---------- окно ошибки
+	var MESSAGES = {
+		webgl: ['Нет графики', 'Браузер не даёт запустить WebGL 2. Включите аппаратное ускорение в настройках браузера или откройте игру в свежем Chrome, Firefox или Safari.', false],
+		wasm: ['Старый браузер', 'Браузер не поддерживает WebAssembly. Обновите его или откройте игру в другом браузере.', false],
+		https: ['Нет доступа', 'Игра запускается только по защищённому адресу (https). Откройте её по ссылке, которая начинается с https://', false],
+		features: ['Не запустится', 'Этому браузеру не хватает возможностей, нужных игре. Попробуйте свежий Chrome, Firefox или Safari.', false],
+		load: ['Не загрузилось', 'Не получилось скачать игру. Проверьте интернет и попробуйте ещё раз.', true],
+		crash: ['Сбой', 'Игра остановилась. Сохранения лежат в браузере и не пропадут — перезагрузите страницу.', true],
+		gl: ['Сбой графики', 'Видеопамять закончилась или экран был заблокирован. Перезагрузите игру.', true],
+		exit: ['Игра закрыта', 'Игра завершилась. Нажмите «Перезагрузить», чтобы начать снова.', true]
+	};
+	shell.fail = function (kind, detail) {
+		if (shell.phase === 'fail') { return; }
+		var m = MESSAGES[kind] || MESSAGES.crash;
+		setPhase('fail');
+		$('failTitle').textContent = m[0];
+		$('failText').textContent = m[1];
+		$('failDetail').textContent = detail ? String(detail).slice(0, 280) : '';
+		$('reload').hidden = !m[2];
+		splash.classList.remove('out');
+		splash.style.display = '';
+		setMode('fail');
+		layout();
+		if (window.console) { console.error('[shell] ' + kind + (detail ? ': ' + detail : '')); }
+	};
+	$('reload').addEventListener('click', function () { window.location.reload(); });
+	shell.setPhase = setPhase;
+	shell.setMode = setMode;
+}());
+</script>
+<script src="$GODOT_URL"></script>
+<script>
+(function () {
+	'use strict';
+	var shell = window.RaskopkiShell;
+	var $ = function (id) { return document.getElementById(id); };
+	var canvas = $('canvas'), splash = $('splash');
+	var GODOT_CONFIG = $GODOT_CONFIG;
+	var GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+
+	// ---------- проверка возможностей браузера
+	if (typeof WebAssembly !== 'object') { shell.fail('wasm'); return; }
+	if (typeof Engine === 'undefined') { shell.fail('load', 'index.js'); return; }
+	var missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
+	if (missing.length) {
+		var text = missing.join(' | ');
+		shell.fail(/WebGL2/.test(text) ? 'webgl' : /Secure Context/.test(text) ? 'https' : 'features', text);
+		return;
+	}
+
+	// ---------- индикатор: число и ячейки следуют за реальным прогрессом, но догоняют плавно
+	var CELLS = 20, MIN_SPLASH_MS = 700;
+	var t0 = performance.now();
+	var target = 0, shown = 0, loaded = false, indeterminate = false, mb = 0;
+	var well = $('well'), pct = $('pct'), bar = $('bar'), pctSign = $('pctSign');
+	function onProgress(current, total) {
+		if (total > 0 && current >= 0) {
+			target = Math.min(0.99, current / total);
+			if (indeterminate) { indeterminate = false; bar.classList.remove('indet'); pctSign.textContent = '%'; }
+		} else {
+			indeterminate = true;
+			mb = current / 1048576;
+			bar.classList.add('indet');
+			pctSign.textContent = ' МБ';
+		}
+	}
+	function paint() {
+		if (shell.phase !== 'loading') { return; }
+		var goal = loaded ? 1 : target;
+		shown += Math.max(0.004, (goal - shown) * 0.2) * (goal > shown ? 1 : 0);
+		if (shown > goal) { shown = goal; }
+		var p = Math.floor(shown * 100 + 1e-6);
+		pct.textContent = indeterminate ? mb.toFixed(1) : String(p);
+		bar.setAttribute('aria-valuenow', String(p));
+		well.style.setProperty('--n', String(Math.min(CELLS, Math.floor(shown * CELLS + 1e-6))));
+		if (loaded && shown >= 1 && performance.now() - t0 >= MIN_SPLASH_MS) { enterReady(); return; }
+		requestAnimationFrame(paint);
+	}
+	function enterReady() {
+		shell.setPhase('ready');
+		shell.setMode('ready');
+	}
+
+	// ---------- загрузка движка и пака до жеста; старт движка — после него
+	var exe = GODOT_CONFIG.executable;
+	var pack = GODOT_CONFIG.mainPack || (exe + '.pck');
+	var engine = new Engine(Object.assign({}, GODOT_CONFIG, {
+		canvas: canvas,
+		canvasResizePolicy: 0, // размером холста управляет оболочка (колонка 224:480), движок его только читает
+		onProgress: onProgress,
+		onExit: function () { if (shell.phase === 'running' || shell.phase === 'starting') { shell.fail('exit'); } }
+	}));
+	shell.setPhase('loading');
+	shell.layout();
+	requestAnimationFrame(paint);
+	Promise.all([engine.init(exe), engine.preloadFile(pack, pack)]).then(function () {
+		loaded = true;
+	}, function (err) {
+		shell.fail('load', err && err.message ? err.message : err);
+	});
+	// Если качалось всё, а движок так и не поднялся — не висеть на 100% вечно.
+	var watchdog = setInterval(function () {
+		if (shell.phase !== 'loading') { clearInterval(watchdog); return; }
+		if (shown >= 0.98 && !loaded && performance.now() - t0 > 90000) { clearInterval(watchdog); shell.fail('load', 'engine init timeout'); }
+	}, 2000);
+
+	// ---------- жест: звук, полный экран, старт
+	function begin() {
+		if (shell.phase !== 'ready') { return; }
+		shell.setPhase('starting');
+		shell.unlockAudio();
+		shell.goFullscreen();
+		$('loadLabel').textContent = 'Запуск';
+		shell.setMode('starting');
+		shell.layout();
+		// два кадра на то, чтобы «Запуск» успел нарисоваться: engine.start() синхронно грузит главную сцену и держит поток
+		requestAnimationFrame(function () { requestAnimationFrame(function () {
+			try {
+				engine.start({ args: ['--main-pack', pack].concat(GODOT_CONFIG.args || []) }).then(started, function (e) {
+					shell.fail('crash', e && e.message ? e.message : e);
+				});
+			} catch (e) { shell.fail('crash', e && e.message ? e.message : e); }
+		}); });
+	}
+	splash.addEventListener('click', begin);
+	window.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && shell.phase === 'ready') { e.preventDefault(); begin(); } });
+
+	function started() {
+		if (shell.phase === 'fail') { return; }
+		shell.setPhase('running');
+		var frames = 0, t = performance.now();
+		(function wait() {
+			if (shell.phase !== 'running') { return; }
+			if (++frames >= 4 && performance.now() - t > 300) {
+				splash.classList.add('out');
+				setTimeout(function () { if (shell.phase === 'running') { splash.style.display = 'none'; } }, 750);
+				try { canvas.focus(); } catch (e) {}
+			} else { requestAnimationFrame(wait); }
+		}());
+	}
+
+	// ---------- падения: исключения движка, потеря WebGL-контекста
+	function crashLike(msg) { return /RuntimeError|abort|unreachable|out of bounds|memory|wasm|WebAssembly/i.test(String(msg || '')); }
+	window.addEventListener('error', function (e) {
+		if (crashLike(e.message) || crashLike(e.error && e.error.message)) { shell.fail(shell.phase === 'loading' ? 'load' : 'crash', e.message); }
+	});
+	window.addEventListener('unhandledrejection', function (e) {
+		var msg = e.reason && e.reason.message ? e.reason.message : e.reason;
+		if (crashLike(msg)) { shell.fail(shell.phase === 'loading' ? 'load' : 'crash', msg); }
+	});
+	// Слушатель стоит раньше, чем у движка, и гасит его alert().
+	canvas.addEventListener('webglcontextlost', function (e) {
+		e.preventDefault();
+		e.stopImmediatePropagation();
+		shell.fail('gl');
+	}, false);
+}());
+</script>
+</body>
+</html>

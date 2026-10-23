@@ -12,11 +12,18 @@ index.pck. Браузер, один раз забравший 43-мегабай�
 мало: fetch подменяется рядом, до загрузки index.js. Аудио-ворклеты идут
 через audioWorklet.addModule — его подменяем тем же способом.
 
+Тег <script src="$GODOT_URL"> в web/shell.html должен остаться ровно таким (после экспорта —
+<script src="index.js"></script>): по нему подставляется подмена. Заодно скрипт копирует в build/web
+manifest.webmanifest и иконки приложения (tools/build_web_shell.py --install).
+
 Запуск: python3 tools/stamp_web_build.py   (после экспорта)
 """
 import json
 import pathlib
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import build_web_shell  # noqa: E402  — кладёт рядом с экспортом manifest и иконки оболочки
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HTML = ROOT / "build" / "web" / "index.html"
@@ -83,6 +90,7 @@ def main() -> None:
     html = html.replace(old, patch, 1)
     HTML.write_text(html, encoding="utf-8")
     print(f"build/web/index.html: метка v={build}")
+    build_web_shell.install(HTML.parent)
 
 
 if __name__ == "__main__":

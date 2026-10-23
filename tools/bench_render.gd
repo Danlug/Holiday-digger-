@@ -1,8 +1,8 @@
 extends Node
 ## Замер стоимости кадра мира в настоящей сцене (CPU, без GPU): WorldView.render,
-## DeepBackdrop.update, AmbientFx.update на разных глубинах — с кэшем клеток и без
-## него (кэш выключается обнулением массива, get_tile тогда считает каждую клетку заново,
-## как было до кэша). Запуск:
+## DeepBackdrop.update, AmbientFx.update на разных глубинах. render — три случая: неподвижный кадр
+## (кэш окна), шаг камеры на клетку и полная перекраска окна с тёплым кэшем клеток мира и с холодным
+## (кэш get_tile обнулён: каждая клетка считается заново, как первый показ места). Запуск:
 ##   XDG_DATA_HOME=$PWD/.godot/xdg godot --headless --path . res://tools/bench_render.tscn
 
 const DEPTHS := [10, 1200, 3000, 4300, 6000, 9000]
@@ -15,7 +15,7 @@ func _ready() -> void:
 	add_child(main)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	print("мкс на кадр: render мира | стена | ambient (кэш)  /  render без кэша")
+	print("мкс на кадр: render неподвижный | шаг камеры на клетку | перекраска окна тёплая | холодная || стена | ambient")
 	for d in DEPTHS:
 		var p = main.player
 		p.x = 20.5
@@ -44,13 +44,26 @@ func _ready() -> void:
 			t_render += t1 - t0
 			t_wall += t2 - t1
 			t_amb += t3 - t2
+		var t_scroll := 0
+		for i in range(n):
+			var t4 := Time.get_ticks_usec()
+			main.world_view.render(cam + Vector2(float(i % 2), 0.0))
+			t_scroll += Time.get_ticks_usec() - t4
+		main.world_view.render(cam)
+		var t_warm := 0
+		for i in range(10):
+			main.world_view._win_ok = false
+			var t5 := Time.get_ticks_usec()
+			main.world_view.render(cam)
+			t_warm += Time.get_ticks_usec() - t5
 		var saved: PackedByteArray = main.world._cells
 		main.world._cells = PackedByteArray()
-		var t_nocache := 0
-		for i in range(10):
-			var t4 := Time.get_ticks_usec()
-			main.world_view.render(cam)
-			t_nocache += Time.get_ticks_usec() - t4
+		main.world._cells.resize(saved.size())
+		main.world._cells.fill(255)
+		main.world_view._win_ok = false
+		var t6 := Time.get_ticks_usec()
+		main.world_view.render(cam)
+		var t_cold := Time.get_ticks_usec() - t6
 		main.world._cells = saved
-		print("  y=%5d: %5d | %4d | %4d   /  %6d" % [d, t_render / n, t_wall / n, t_amb / n, t_nocache / 10])
+		print("  y=%5d: %5d | %5d | %6d | %6d || %4d | %4d" % [d, t_render / n, t_scroll / n, t_warm / 10, t_cold, t_wall / n, t_amb / n])
 	get_tree().quit(0)

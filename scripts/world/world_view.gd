@@ -30,6 +30,11 @@ var _white_tex: Texture2D
 var _slot_wx: PackedInt32Array = PackedInt32Array()
 var _slot_wy: PackedInt32Array = PackedInt32Array()
 var _slot_lava: PackedByteArray = PackedByteArray()
+var _slot_epoch: PackedInt32Array = PackedInt32Array()   # какой «эпохе перекраски» принадлежит рисунок слота
+var _paint_epoch: int = 0
+var _stale_active: bool = false
+var _stale_k: int = 0
+var _stale_col: int = 0
 var _win_ok: bool = false       # окно нарисовано и версии ниже актуальны
 var _win_x: int = 0             # левый верхний угол нарисованного окна (с запасом в клетку)
 var _win_y: int = 0
@@ -49,6 +54,11 @@ var _frame_no: int = 0
 ## WorldGen.version: прямая запись в diffs, динамический overlay вроде ворот арены). 0 — не
 ## перепроверять (тесты точности явной инвалидации).
 var validate_every: int = 2
+## Сколько микросекунд кадр может потратить на перекраску окна после события «менялось всё»
+## (обвал, землетрясение, загрузка). Кэш клеток мира тогда пуст, и пересчёт всех 300-500 клеток
+## разом — десятки миллисекунд на глубине (на телефоне в разы больше): окно обновляется строками от
+## центра наружу за несколько кадров, пока на экране прежняя картинка и пыль обвала.
+var stale_budget_us: int = 4000
 ## Тест: такт лавы вместо часов (<0 — по часам).
 var lava_tick_override: int = -1
 ## Счётчики для замеров и тестов: сколько клеток перекрашено и сколько раз перерисован overlay.
@@ -149,6 +159,9 @@ func _rebuild_pool() -> void:
 	_slot_wy.fill(-1073741824)
 	_slot_lava.resize(_pool.size())
 	_slot_lava.fill(0)
+	_slot_epoch.resize(_pool.size())
+	_slot_epoch.fill(-1)
+	_stale_active = false
 	_lava_list_dirty = true
 	_win_ok = false
 
@@ -222,14 +235,21 @@ func render(cam: Vector2) -> void:
 	var full := not _win_ok or sig != _style_sig or world != _seen_world or fog != _seen_fog
 	var world_changes: Variant = null
 	var fog_changes: Variant = null
+	var stale_all := false
 	if not full:
 		if world.version != _world_ver:
 			world_changes = world.changes_since(_world_ver)
-			full = world_changes == null
-		if not full and fog.version != _fog_ver:
+			stale_all = world_changes == null
+		if fog.version != _fog_ver:
 			fog_changes = fog.changed_since(_fog_ver)
-			full = fog_changes == null
+			stale_all = stale_all or fog_changes == null
 	var world_dirty := full or world.version != _world_ver
+	if stale_all:
+		# «Менялось всё»: перекрасим окно по частям (см. stale_budget_us), а не одним кадром.
+		_paint_epoch += 1
+		_stale_active = true
+		_stale_k = 0
+		_stale_col = 0
 
 	if full:
 		_paint_rect(x0, y0, cols, rows)
@@ -268,6 +288,8 @@ func render(cam: Vector2) -> void:
 	_win_ok = true
 	_win_x = x0
 	_win_y = y0
+	if _stale_active:
+		_paint_stale(x0, y0)
 	_world_ver = world.version
 	_fog_ver = fog.version
 	_seen_world = world
@@ -301,11 +323,46 @@ func _paint_rect(rx: int, ry: int, rw: int, rh: int) -> void:
 				_slot_wx[si] = wx
 				_slot_wy[si] = wy
 				s.position = Vector2(wx * TILE, wy * TILE)
+			_slot_epoch[si] = _paint_epoch
 			var lava: int = 1 if _paint_cell(s, wx, wy) else 0
 			if _slot_lava[si] != lava:
 				_slot_lava[si] = lava
 				_lava_list_dirty = true
 	stat_cells_painted += rw * rh
+
+
+## Перекраска окна по бюджету времени: строки от центра наружу (0, +1, -1, +2, -2, …). Слоты, уже
+## перекрашенные в этой «эпохе» (входящие полосы, копки), пропускаем.
+func _paint_stale(x0: int, y0: int) -> void:
+	var cols := _pool_cols
+	var rows := _pool_rows
+	var t0 := Time.get_ticks_usec()
+	var center := rows / 2
+	while _stale_k < 2 * rows:
+		var k := _stale_k
+		var off := ((k + 1) / 2) * (1 if k % 2 == 1 else -1)
+		var r := center + off
+		if r < 0 or r >= rows:
+			_stale_k += 1
+			continue
+		var wy := y0 + r
+		var row_base := posmod(wy, rows) * cols
+		while _stale_col < cols:
+			var wx := x0 + _stale_col
+			if _slot_epoch[row_base + posmod(wx, cols)] != _paint_epoch:
+				_paint_rect(wx, wy, 1, 1)
+			_stale_col += 1
+			if (_stale_col & 3) == 0 and Time.get_ticks_usec() - t0 > stale_budget_us:
+				return
+		_stale_col = 0
+		_stale_k += 1
+	# Проход кончился; окно могло сдвинуться посреди него — проверяем, не остались ли слоты прежней эпохи.
+	for si in range(_slot_epoch.size()):
+		if _slot_epoch[si] != _paint_epoch:
+			_stale_k = 0
+			_stale_col = 0
+			return
+	_stale_active = false
 
 
 func _paint_at(wx: int, wy: int) -> void:

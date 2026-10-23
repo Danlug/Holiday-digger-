@@ -149,22 +149,33 @@ func _probes_part() -> void:
 			hd.overlay.show_hint(Rect2(60, 200, 40, 24), false, null, "Копай", [], ""))
 		hd.overlay.hide_hint(true)
 		await _frame()
-	# обвал и землетрясение на разведанной шахте
-	for i in range(60):
-		for k in range(40):
-			world.dig_cell(15 + (k % 17), 40 + i * 2 + k / 17)
-	_place(20, 80)
-	await _frame()
-	await _probe("обвал (apply_planned + CollapseFx.impact)", func():
-		var plan := CollapseEvents.plan_chunk_collapse(world, null, 60)
-		if not plan.is_empty():
-			var rect := CollapseEvents.apply_planned(world, fog, plan)
-			main.collapse_fx.impact(rect)
-			GameState.emit_event(&"collapse", {"rect": rect}))
-	await _probe("землетрясение", func():
-		CollapseEvents.trigger_earthquake(world, fog)
-		main.collapse_fx.impact({"x0": 14, "y0": 1, "w": 8, "h": 15})
-		GameState.emit_event(&"quake", {}))
+	# обвал и землетрясение на разведанной шахте: у поверхности и глубоко (там генерация клетки дороже,
+	# а обвал сбрасывает весь кэш клеток мира — окно перекрашивается на холодном кэше)
+	for base_y in [80, 6000]:
+		for i in range(60):
+			for k in range(40):
+				world.dig_cell(15 + (k % 17), base_y - 40 + i * 2 + k / 17)
+		_place(20, base_y)
+		fog.reveal_around(player.x, player.y, 9, 7)
+		main._process(0.016)
+		await _frame()
+		await _probe("обвал на глубине %d (apply_planned + impact)" % base_y, func():
+			var plan := CollapseEvents.plan_chunk_collapse(world, null, base_y - 20)
+			if not plan.is_empty():
+				var rect := CollapseEvents.apply_planned(world, fog, plan)
+				main.collapse_fx.impact(rect)
+				GameState.emit_event(&"collapse", {"rect": rect}))
+		# хвост: окно доперекрашивается по частям, каждый кадр в пределах бюджета
+		var worst_tail := 0.0
+		for i in range(30):
+			var t3 := Time.get_ticks_usec()
+			main._process(0.016)
+			worst_tail = maxf(worst_tail, float(Time.get_ticks_usec() - t3) / 1000.0)
+		check("после обвала на %d кадры хвоста не дороже порога (худший %.1f мс)" % [base_y, worst_tail], worst_tail < HITCH_LIMIT_MS * 0.4)
+		await _probe("землетрясение на глубине %d" % base_y, func():
+			CollapseEvents.trigger_earthquake(world, fog)
+			main.collapse_fx.impact({"x0": 14, "y0": 1, "w": 8, "h": 15})
+			GameState.emit_event(&"quake", {}))
 	# пояса: идём через каждую границу по клетке за кадр — как падает или копает герой; самый дорогой
 	# кадр на пути и есть «подвис перехода». Холодный телепорт (кэш мира пуст) — отдельной строкой.
 	var edges: Array = []

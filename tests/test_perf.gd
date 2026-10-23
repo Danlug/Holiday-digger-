@@ -26,6 +26,7 @@ func _ready() -> void:
 	test_lava_animation()
 	test_direct_diff_is_healed_by_validation()
 	test_idle_frame_does_no_work()
+	test_stale_repaint_is_budgeted()
 	test_overlay_redraw_gating()
 	await test_no_node_growth()
 	print("=== Итог: %d проверок, %d провалов ===" % [checks, failures])
@@ -303,6 +304,7 @@ func _make_view(w: WorldGen, f: FogOfWar, p: Node, backdrop: bool) -> Node2D:
 	v.deep_backdrop_active = backdrop
 	v.set_view_size(7, 14)
 	v.validate_every = 0   # проверяем явную инвалидацию, без страховки
+	v.stale_budget_us = 1000000000   # окно после «менялось всё» красим сразу; по частям — отдельный тест
 	return v
 
 
@@ -540,6 +542,51 @@ func test_idle_frame_does_no_work() -> void:
 	v.render(cam + Vector2(2.0, 2.0))
 	check("шаг героя на клетку при больших радиусах: перекрашен серп (%d клеток), а не всё окно" % (v.stat_cells_painted - n4),
 		v.stat_cells_painted - n4 < v._pool_cols * v._pool_rows / 3)
+	p.queue_free()
+	v.queue_free()
+
+
+func test_stale_repaint_is_budgeted() -> void:
+	print("-- После «менялось всё» окно красится по бюджету, а не одним кадром --")
+	var w := WorldGen.new(4242)
+	var f := FogOfWar.new()
+	var p := FakePlayer.new()
+	add_child(p)
+	f.reveal_around(p.x, p.y, 8, 6)
+	var v := _make_view(w, f, p, true)
+	v.stale_budget_us = 1   # каждый кадр — не больше горстки клеток
+	var cam := Vector2(12.0, 46.0)
+	v.render(cam)
+	var total: int = v._pool_cols * v._pool_rows
+	var before: int = v.stat_cells_painted
+	w.apply_global_event(5)
+	v.render(cam)
+	var first: int = v.stat_cells_painted - before
+	check("землетрясение: первый кадр красит малую часть окна (%d из %d)" % [first, total], first > 0 and first < total / 4)
+	# на полпути копка и сдвиг камеры: всё равно сойдётся к эталону
+	_dig_any(w, 14, 49)
+	var frames := 0
+	while v._stale_active and frames < 600:
+		frames += 1
+		v.render(cam + Vector2(1.0 if frames > 20 else 0.0, 0.0))
+	check("окно перекрашено за конечное число кадров (%d)" % frames, not v._stale_active and frames < 600)
+	var cam_end := cam + Vector2(1.0, 0.0)
+	v.render(cam_end)
+	var fresh := _make_view(w, f, p, true)
+	fresh.render(cam_end)
+	check("после перекраски по частям окно совпадает с эталоном (%d расхождений)" % _same_window(v, fresh, cam_end),
+		_same_window(v, fresh, cam_end) == 0)
+	fresh.free()
+	# первые клетки — вокруг центра окна (там герой)
+	var v2 := _make_view(w, f, p, true)
+	v2.stale_budget_us = 1
+	v2.render(cam)
+	w.apply_chunk_event(14, 48, 8, 8, 11)
+	v2.render(cam)
+	var center_row: int = int(cam.y) - 1 + v2._pool_rows / 2
+	var center_slot: int = posmod(center_row, v2._pool_rows) * v2._pool_cols + posmod(int(cam.x) - 1, v2._pool_cols)
+	check("перекраска идёт от центральной строки окна", v2._slot_epoch[center_slot] == v2._paint_epoch)
+	v2.free()
 	p.queue_free()
 	v.queue_free()
 

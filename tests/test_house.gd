@@ -694,7 +694,9 @@ func _test_outdoor_enter_hotspot() -> void:
 	player.y = 0.5
 	house._update_outdoor_hotspot()
 	check("«Зайти» видна у окна веранды", house._outdoor_button.visible)
-	check("подпись — «Зайти» (не «Дом»)", house._outdoor_button.text == "Зайти")
+	# Подписи на кнопке больше нет (пузырь-значок): «Зайти» — заголовок её подсказки Tip.
+	check("подсказка — «Зайти» (не «Дом»)",
+		String((house._outdoor_button.get_meta(Tip.META) as Dictionary).get("title", "")) == "Зайти")
 
 	player.x = door.x + 20.0
 	house._update_outdoor_hotspot()

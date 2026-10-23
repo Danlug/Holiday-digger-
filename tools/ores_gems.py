@@ -973,35 +973,29 @@ def _cinder_ash():
     }
     bumps = {5: 1.0, 7: -0.5, 9: 1.0, 12: -1.0, 14: 0.5, 17: -0.5, 20: 1.0, 23: -1.0, 25: 0.5}
     mound = np.zeros((G, G), dtype=bool)
+    hts = {}
     for x in range(2, 30):
         u = (x - 15.5) / 14.0
-        h = 15.0 * max(0.0, 1 - u * u) ** 0.62 + bumps.get(x, 0.0)
-        mound[int(round(27 - h)):28, x] = True
+        hts[x] = 15.0 * max(0.0, 1 - u * u) ** 0.62 + bumps.get(x, 0.0)
+        mound[int(round(25 - hts[x])):26, x] = True
     tones = [P["deep"], P["shade"], P["base"], P["light"], P["hi"]]
     for y, x in zip(*np.nonzero(mound)):
-        d = (x - 9.0) * 0.42 + (y - 12.0) * 0.95
-        t = 0 if d > 16.5 else (1 if d > 12 else (2 if d > 6 else (3 if d > 2.5 else 4)))
-        j = t + (1 if cv.rng.random() < 0.16 else (-1 if cv.rng.random() < 0.1 else 0))
+        # купол: склон слева освещён, справа в тени; глубже под поверхностью — темнее
+        slope = (hts.get(x - 1, 0.0) - hts.get(x + 1, 0.0)) / 2.0
+        depth = (y - (25 - hts[x])) / 15.0
+        v = 2.2 + slope * 0.55 - depth * 2.4 + (0.6 if y < 25 - hts[x] + 1.6 else 0.0)
+        j = int(round(v + (cv.rng.random() - 0.5) * 0.9))
         cv.put(x, y, tones[min(max(j, 0), 4)])
-    brands = ([(17, 9), (21, 7), (23, 11), (20, 14)], [(9, 12), (12, 10), (14, 13), (11, 16)])
-    both = np.zeros((G, G), dtype=bool)
-    for pts in brands:
-        w = poly_mask(pts)
-        both |= w
-        cv.fill(w, P["wood"])
-        cv.fill(w & poly_mask([pts[0], pts[1], (pts[2][0], pts[2][1] - 3)]), P["wood2"])
-        cv.rim(w, P["shade"], None, 0.5)
-        cv.ring(w, P["out"])
     cv.rim(mound, P["hi"], P["shade"], 0.5, 0.4)
-    cv.ring(mound & ~both, P["out"])
-    for (x, y) in ((12, 22), (17, 19), (21, 24), (8, 24), (15, 25), (24, 21)):
+    cv.ring(mound, P["out"])
+    for (x, y) in ((12, 20), (17, 17), (21, 22), (8, 22), (15, 23), (24, 19)):
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             if cv.a[y + dy, x + dx, 3]:
                 cv.put(x + dx, y + dy, mix(tuple(cv.a[y + dy, x + dx][:3]), P["red"], 0.8))
         cv.put(x, y, P["ember"])
-    for (x, y) in ((17, 19), (12, 22), (21, 24)):
+    for (x, y) in ((17, 17), (12, 20), (21, 22)):
         cv.put(x, y, P["ember2"])
-    for (x, y, c) in ((14, 9, "light"), (15, 6, "base"), (13, 11, "shade"), (18, 4, "shade"), (6, 10, "base"), (26, 7, "shade")):
+    for (x, y, c) in ((14, 7, "light"), (15, 4, "base"), (13, 9, "shade"), (18, 2, "shade"), (6, 8, "base"), (26, 5, "shade")):
         cv.put(x, y, P[c], 200)
     cv.shadow()
     return cv.sprite()
@@ -1108,7 +1102,7 @@ def _mimic_geode():
     cv = Cv("mimic_geode")
     P = {
         "out": lch(14, 8, 60), "rock0": lch(26, 8, 62), "rock1": lch(40, 9, 66), "rock2": lch(54, 9, 70), "rock3": lch(67, 8, 76),
-        "band": lch(84, 12, 250), "band2": lch(66, 16, 262), "cav": lch(12, 36, 305),
+        "band": lch(80, 10, 80), "band2": lch(58, 12, 72), "cav": lch(12, 36, 305),
         "a0": lch(26, 58, 308), "a1": lch(42, 68, 308), "a2": lch(58, 62, 306), "a3": lch(78, 40, 300),
         "c0": lch(46, 40, 218), "c1": lch(62, 38, 214), "c2": lch(78, 30, 208), "c3": lch(92, 12, 205), "spec": lch(98, 4, 250),
     }
@@ -1224,12 +1218,12 @@ def _abyss_core():
     """Индиго-чёрный шар с голубыми вихрями: спиральные рукава к центру, холодный ободок."""
     cv = Cv("abyss_core")
     P = {
-        "out": lch(3, 18, 290), "t0": lch(2, 12, 290), "t1": lch(5, 22, 290), "t2": lch(8, 30, 290), "t3": lch(13, 36, 289),
-        "w0": lch(46, 60, 248), "w1": lch(66, 52, 232), "w2": lch(90, 22, 215), "rim": lch(52, 60, 252),
+        "out": lch(2, 14, 292), "t0": lch(1, 8, 292), "t1": lch(3, 18, 292), "t2": lch(6, 26, 292), "t3": lch(11, 34, 291),
+        "w0": lch(44, 58, 240), "w1": lch(64, 52, 226), "w2": lch(88, 24, 214), "rim": lch(40, 56, 262),
     }
     cx = cy = 15.5
     r = 12.0
-    m = sphere(cv, cx, cy, r, [P["t0"], P["t1"], P["t2"], P["t3"]], light=(-0.45, -0.55), bias=0.2)
+    m = sphere(cv, cx, cy, r, [P["t0"], P["t1"], P["t2"], P["t3"]], light=(-0.45, -0.55), bias=0.5)
     for arm in range(3):
         a0 = arm * (math.tau / 3) + 0.4
         prev = None

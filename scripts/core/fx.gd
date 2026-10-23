@@ -14,12 +14,21 @@ extends RefCounted
 const GROUP := &"svc_fx"
 
 
-static func burst(kind: String, world_pos: Vector2, amount: float = 1.0) -> void:
-	_call("burst", [kind, world_pos, amount])
+## tint — необязательный акцент (для руды: цвет её вкраплений); прозрачный
+## (по умолчанию) — краски вида по умолчанию.
+static func burst(kind: String, world_pos: Vector2, amount: float = 1.0, tint: Color = Color(0, 0, 0, 0)) -> void:
+	# Четвёртый аргумент передаём, только если он задан: заглушки сервиса в
+	# старых тестах знают ровно три.
+	_call("burst", [kind, world_pos, amount] if tint.a <= 0.0 else [kind, world_pos, amount, tint])
 
 
 static func float_text(world_pos: Vector2, text: String, color: Color = Color.WHITE) -> void:
 	_call("float_text", [world_pos, text, color])
+
+
+## Всплывающая иконка с числом/словом (+1 с картинкой предмета).
+static func float_icon(world_pos: Vector2, icon: Texture2D, text: String = "", color: Color = Color.WHITE) -> void:
+	_call("float_icon", [world_pos, icon, text, color])
 
 
 static func shake(strength: float = 4.0, duration: float = 0.2) -> void:

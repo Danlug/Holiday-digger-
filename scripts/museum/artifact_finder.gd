@@ -43,6 +43,8 @@ func claim_at(x: int, y: int) -> String:
 	if id.is_empty():
 		return ""
 	var was_first := GameState.collected_artifacts.is_empty()
+	# Глубину пишем до выдачи: подписчики artifact_collected (музей) уже должны её видеть.
+	HeroData.record_find(id, y)
 	GameState.collect_artifact(id)
 	_announce(id, was_first)
 	artifact_found.emit(id)
@@ -53,25 +55,23 @@ func _on_dig_finished(x: int, y: int, _tile_type: int, _mineral_id: String, _was
 	claim_at(x, y)
 
 
+## «Сочный» момент находки: карточка-вспышка с иконкой, звук, вибро и искры
+## на герое. Длинного текста нет — название и описание смотрят в музее.
 func _announce(artifact_id: String, was_first: bool) -> void:
-	var a := Balance.get_artifact(artifact_id)
-	var name_ru := String(a.get("name_ru", artifact_id))
-	var xp := Balance.get_artifact_find_xp(artifact_id)
-	var coins := Balance.get_artifact_find_coins(artifact_id)
-	if _hud != null and _hud.has_method("toast"):
-		_hud.toast("Артефакт: %s. +%d опыта, +%d монет. Встал в музей." % [name_ru, xp, coins], 4.5)
-	# ГДД п.9: на первой же находке игроку показывают коллекцию из пяти
-	# веток — иначе он не понимает, что именно только что открыл.
-	if was_first:
-		ProgressScreen.open("museum")
+	Fx.burst("levelup", _hero_pos())
+	# ГДД п.9: на первой же находке игроку показывают коллекцию — иначе он не
+	# понимает, что именно только что открыл. Музей откроется, когда карточка уйдёт.
+	ArtifactCard.show_find(artifact_id, was_first)
 
 
 func _on_branch_completed(branch_num: int) -> void:
-	if _hud == null or not _hud.has_method("toast"):
-		return
-	var branch_name := "ветка %d" % branch_num
-	for b in Balance.artifacts.get("branches", []):
-		if int(b.get("branch", -1)) == branch_num:
-			branch_name = String(b.get("name_ru", branch_name))
-			break
-	_hud.toast("Ветка «%s» собрана целиком. Награда в кошельке." % branch_name, 4.5)
+	Fx.burst("levelup", _hero_pos(), 1.6)
+	# GameState.collect_artifact шлёт branch_completed ещё до возврата в claim_at:
+	# откладываем, чтобы карточка ветки встала в очередь ПОСЛЕ карточки предмета.
+	ArtifactCard.show_branch.call_deferred(branch_num)
+
+
+func _hero_pos() -> Vector2:
+	if _player is Node2D:
+		return (_player as Node2D).global_position
+	return Vector2.ZERO

@@ -1,30 +1,44 @@
 class_name MuseumPanel
 extends Control
-## Музей в доме (ГДД раздел 10): витрина из пяти веток по пять предметов,
-## пустые места под ненайденное и ультимативный сет из пятых предметов.
+## Музей в доме (ГДД раздел 10): витрины-сетка 5 веток × 5 артефактов и
+## центральная витрина ультимативного сета с гнёздами Перчатки Мироздания.
 ##
-## ПОЧЕМУ слот рисуется сам, а не через готовый спрайт: спрайтов артефактов
-## ещё не существует. Слот спрашивает картинку у ArtifactArt и, если её нет,
-## рисует заглушку с инициалами названия. Когда художник положит файлы в
-## art/artifacts/, картинки встанут на место сами — правок кода не будет.
+## Найденные артефакты — яркие, с мягким сиянием; ненайденные — силуэты с «?».
+## Название, описание и глубина находки — только в подсказке Tip (у
+## ненайденных — лишь намёк). Закрытая ветка обводится золотом, по ряду бежит
+## блик, а в момент закрытия вспыхивают искры.
 ##
 ## Панель самодостаточна: её можно показать и как вкладку общего экрана, и
 ## вставить в комнату музея, которую строит дом (см. ProgressScreen.open).
+## Картинки берутся у ArtifactArt (art/artifacts/<id>.png); нет картинки —
+## ячейка рисует заглушку с инициалами.
 
-const SLOT := 38.0
-const ICON := 32.0
+const SLOT := ArtifactSlot.SIZE
+const ICON := ArtifactSlot.ICON
+const ROMAN := ["I", "II", "III", "IV", "V"]
 
-var _found_label: Label
-var _found_fill: ColorRect
+## Хранилище рекордов — для гнёзд Перчатки (выкопанные материалы).
+var store: RecordsStore = null:
+	set(value):
+		store = value
+		if _showcase != null:
+			_showcase.store = value
+			_showcase.refresh()
+
 var _column: VBoxContainer
-# branch -> Label с описанием выбранного в этой ветке предмета
-var _detail_labels: Dictionary = {}
+var _showcase: SetShowcase
+var _branch_panels: Dictionary = {}     # номер ветки -> PanelContainer
 
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
-	GameState.artifact_collected.connect(func(_id): refresh())
+	GameState.artifact_collected.connect(_on_artifact_collected)
+	GameState.branch_completed.connect(celebrate_branch)
+	refresh()
+
+
+func _on_artifact_collected(_id: String) -> void:
 	refresh()
 
 
@@ -44,201 +58,171 @@ func _build() -> void:
 
 func refresh() -> void:
 	for c in _column.get_children():
+		_column.remove_child(c)
 		c.queue_free()
-	_detail_labels.clear()
+	_branch_panels.clear()
+	_showcase = null
 
+	_column.add_child(_make_header())
+	for branch: Dictionary in Balance.artifacts.get("branches", []):
+		var case_panel := _make_branch_case(branch)
+		_column.add_child(case_panel)
+		_branch_panels[int(branch.get("branch", 0))] = case_panel
+
+	_showcase = SetShowcase.new()
+	_showcase.store = store
+	_column.add_child(_showcase)
+
+
+# ---------------------------------------------------------------------------
+# Шапка
+# ---------------------------------------------------------------------------
+
+func _make_header() -> Control:
 	var total: int = Balance.artifacts.get("artifacts", []).size()
 	var found: int = GameState.collected_artifacts.size()
-
 	var head := ProgressUiKit.make_panel()
-	_column.add_child(head)
-	var head_box := VBoxContainer.new()
-	head_box.add_theme_constant_override("separation", 2)
-	head.add_child(head_box)
-	var head_row := HBoxContainer.new()
-	head_box.add_child(head_row)
-	var title := ProgressUiKit.make_label("Музей", 13, ProgressUiKit.GOLD)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head_row.add_child(title)
-	_found_label = ProgressUiKit.make_label("%d / %d" % [found, total], 11, ProgressUiKit.MUTED)
-	head_row.add_child(_found_label)
-	_found_fill = ProgressUiKit.make_bar(head_box, 190, 5, ProgressUiKit.GOLD)
-	_found_fill.size.x = 188.0 * (float(found) / float(maxi(total, 1)))
-
-	for branch in Balance.artifacts.get("branches", []):
-		_column.add_child(_make_branch_panel(branch))
-
-	_column.add_child(_make_ultimate_panel())
+	head.mouse_filter = Control.MOUSE_FILTER_STOP
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 5)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(row)
+	row.add_child(HeroIcons.make("tab_museum", 16.0))
+	var count := ProgressUiKit.make_label("%d/%d" % [found, total], 12, ProgressUiKit.GOLD)
+	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(count)
+	var bar := HeroUi.make_mini_bar(float(found) / float(maxi(total, 1)), ProgressUiKit.GOLD, 7.0)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(bar)
+	Tip.bind(head, "Музей", "Находки из шахты встают на витрины. Закрой ветку целиком — получишь награду.",
+		"Собрано %d из %d" % [found, total])
+	return head
 
 
-func _make_branch_panel(branch: Dictionary) -> Control:
+# ---------------------------------------------------------------------------
+# Витрина ветки
+# ---------------------------------------------------------------------------
+
+func _make_branch_case(branch: Dictionary) -> Control:
 	var branch_num := int(branch.get("branch", 0))
 	var items := Balance.get_artifacts_in_branch(branch_num)
 	var found := 0
-	for a in items:
+	for a: Dictionary in items:
 		if GameState.collected_artifacts.has(String(a.get("id", ""))):
 			found += 1
-
 	var complete := GameState.completed_branches.has(branch_num)
-	var panel := ProgressUiKit.make_panel(
-		ProgressUiKit.PANEL_BG,
-		ProgressUiKit.GOLD if complete else ProgressUiKit.BORDER)
+
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _case_box(branch_num, complete))
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 3)
 	panel.add_child(box)
 
-	var title_row := HBoxContainer.new()
-	box.add_child(title_row)
-	var name_label := ProgressUiKit.make_label(
-		"%d — %s" % [branch_num, String(branch.get("name_ru", ""))], 11,
-		ProgressUiKit.GOLD if complete else ProgressUiKit.MUTED)
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(name_label)
-	title_row.add_child(ProgressUiKit.make_label("%d/5" % found, 9, ProgressUiKit.DIM))
-
-	var depth_range: Array = branch.get("depth_range", [0, 0])
-	box.add_child(ProgressUiKit.make_label(
-		"глубина %d–%d" % [int(Balance.unwrap(depth_range[0])), int(Balance.unwrap(depth_range[1]))],
-		9, ProgressUiKit.DIM))
+	box.add_child(_make_case_header(branch, branch_num, found, items.size(), complete))
 
 	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", 2)
+	slots.alignment = BoxContainer.ALIGNMENT_CENTER
+	slots.add_theme_constant_override("separation", 4)
 	box.add_child(slots)
-	for a in items:
-		slots.add_child(_make_slot(a, branch_num))
+	for a: Dictionary in items:
+		var slot := ArtifactSlot.new()
+		slots.add_child(slot)
+		slot.setup(a)
 
-	var detail := ProgressUiKit.make_wrapped_label(_default_hint(items), 9, ProgressUiKit.DIM)
-	box.add_child(detail)
-	_detail_labels[branch_num] = detail
+	if complete:
+		var shimmer := _Shimmer.new()
+		panel.add_child(shimmer)
 	return panel
 
 
-## Подсказка по умолчанию: первый ненайденный предмет ветки и его глубина —
-## игроку нужно знать, куда копать, а не просто видеть пустой слот.
-func _default_hint(items: Array) -> String:
-	for a in items:
-		if not GameState.collected_artifacts.has(String(a.get("id", ""))):
-			var range_cells := ArtifactSpawn.depth_range(a)
-			return "Следующий: пусто. Ищи на глубине %d–%d." % [range_cells.x, range_cells.y]
-	return "Ветка собрана целиком."
+func _case_box(branch_num: int, complete: bool) -> StyleBoxFlat:
+	var tint: Color = ArtifactSlot.TINTS.get(branch_num, ProgressUiKit.GOLD)
+	var sb := HeroUi.box(Color(0.085, 0.07, 0.06).lerp(tint.darkened(0.78), 0.35),
+		ProgressUiKit.GOLD if complete else ProgressUiKit.BORDER, 5, 2 if complete else 1)
+	sb.content_margin_left = 4
+	sb.content_margin_right = 4
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 4
+	return sb
 
 
-func _make_slot(artifact: Dictionary, branch_num: int) -> Control:
-	var id := String(artifact.get("id", ""))
-	var name_ru := String(artifact.get("name_ru", id))
-	var is_found: bool = GameState.collected_artifacts.has(id)
-
-	var slot := Button.new()
-	slot.custom_minimum_size = Vector2(SLOT, SLOT)
-	slot.tooltip_text = name_ru
-	slot.pressed.connect(_on_slot_pressed.bind(artifact, branch_num))
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.09, 0.075, 0.06, 1.0) if is_found else Color(0.05, 0.043, 0.035, 1.0)
-	sb.border_color = ProgressUiKit.GOLD if is_found else ProgressUiKit.BORDER
-	sb.set_border_width_all(1)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		slot.add_theme_stylebox_override(state, sb)
-	slot.add_child(_make_slot_content(artifact, is_found))
-	return slot
-
-
-func _make_slot_content(artifact: Dictionary, is_found: bool) -> Control:
-	var id := String(artifact.get("id", ""))
-	var holder := CenterContainer.new()
-	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	if not is_found:
-		# Пустое место: силуэт есть, содержимого нет. Номер слота показывает,
-		# какой по счёту предмет ветки тут не хватает.
-		var q := ProgressUiKit.make_label("?", 14, ProgressUiKit.DIM)
-		holder.add_child(q)
-		return holder
-
-	var tex := ArtifactArt.texture_for(id)
-	if tex != null:
-		var icon := TextureRect.new()
-		icon.texture = tex
-		icon.custom_minimum_size = Vector2(ICON, ICON)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		holder.add_child(icon)
-		return holder
-
-	var initials := ProgressUiKit.make_label(
-		ArtifactArt.placeholder_initials(String(artifact.get("name_ru", id))), 12, ProgressUiKit.GOLD)
-	holder.add_child(initials)
-	return holder
-
-
-func _on_slot_pressed(artifact: Dictionary, branch_num: int) -> void:
-	var label: Label = _detail_labels.get(branch_num, null)
-	if label == null:
-		return
-	var id := String(artifact.get("id", ""))
-	var name_ru := String(artifact.get("name_ru", id))
-	var range_cells := ArtifactSpawn.depth_range(artifact)
-	if GameState.collected_artifacts.has(id):
-		var text := "%s — найден на глубине %d–%d. +%d опыта, +%d монет." % [
-			name_ru, range_cells.x, range_cells.y,
-			Balance.get_artifact_find_xp(id), Balance.get_artifact_find_coins(id)]
-		if bool(artifact.get("is_ultimate_set_piece", false)):
-			text += " Часть ультимативного сета: %s." % \
-				ArtifactArt.set_piece_name_ru(String(artifact.get("equip_slot", "")))
-		label.text = text
-	else:
-		label.text = "Пусто. Здесь будет: %s. Глубина %d–%d." % [name_ru, range_cells.x, range_cells.y]
-
-
-func _make_ultimate_panel() -> Control:
-	var set_data: Dictionary = Balance.artifacts.get("ultimate_set", {})
-	var pieces: Array = set_data.get("pieces", [])
-	var have := 0
-
-	var panel := ProgressUiKit.make_panel()
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 3)
-	panel.add_child(box)
-	box.add_child(ProgressUiKit.make_label("Ультимативный сет", 11, ProgressUiKit.GOLD))
-
+func _make_case_header(branch: Dictionary, branch_num: int, found: int, total: int, complete: bool) -> Control:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
-	box.add_child(row)
-	for piece in pieces:
-		var artifact := _artifact_for_piece(String(piece))
-		var id := String(artifact.get("id", ""))
-		var is_found: bool = GameState.collected_artifacts.has(id)
-		if is_found:
-			have += 1
-		var cell := VBoxContainer.new()
-		cell.custom_minimum_size = Vector2(SLOT, 0)
-		cell.add_theme_constant_override("separation", 1)
-		row.add_child(cell)
-		cell.add_child(_make_slot(artifact, int(artifact.get("branch", 0))))
-		var caption := ProgressUiKit.make_label(
-			ArtifactArt.set_piece_name_ru(String(piece)), 7,
-			ProgressUiKit.GOLD if is_found else ProgressUiKit.DIM)
-		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		caption.custom_minimum_size = Vector2(SLOT, 0)
-		cell.add_child(caption)
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	box.add_child(ProgressUiKit.make_wrapped_label(
-		"Собрано %d из 5. Без полного комплекта глубже 4000 против монстров не выстоять." % have,
-		9, ProgressUiKit.MUTED if have > 0 else ProgressUiKit.DIM))
+	var numeral := ProgressUiKit.make_label(ROMAN[clampi(branch_num - 1, 0, ROMAN.size() - 1)], 10,
+		ProgressUiKit.GOLD if complete else ProgressUiKit.MUTED)
+	numeral.custom_minimum_size = Vector2(18, 0)
+	numeral.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(numeral)
 
-	var sockets: Array = set_data.get("glove_sockets", [])
-	if not sockets.is_empty():
-		var socket_names: Array = []
-		for s in sockets:
-			socket_names.append(String(Balance.get_mineral(String(s)).get("name_ru", s)).to_lower())
-		box.add_child(ProgressUiKit.make_wrapped_label(
-			"Перчатка Мироздания: пять сокетов под %s." % ", ".join(socket_names), 9, ProgressUiKit.DIM))
-	return panel
+	for i in range(total):
+		var pip := ColorRect.new()
+		pip.custom_minimum_size = Vector2(8, 6)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pip.color = ProgressUiKit.GOLD if i < found else Color(0.2, 0.17, 0.13)
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(pip)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(spacer)
+
+	var reward: Dictionary = branch.get("completion_reward", {})
+	var coins := int(Balance.unwrap(reward.get("coins", 0)))
+	var dollars := int(Balance.unwrap(reward.get("premium_currency", 0)))
+	var chip := HBoxContainer.new()
+	chip.add_theme_constant_override("separation", 2)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(chip)
+	chip.add_child(HeroIcons.make("ui_check" if complete else "ui_chest", 14.0))
+	var coin_label := ProgressUiKit.make_label(HeroUi.short_num(coins), 9,
+		ProgressUiKit.DIM if complete else ProgressUiKit.GOLD)
+	coin_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(coin_label)
+
+	var range_cells: Array = branch.get("depth_range", [0, 0])
+	Tip.bind(row, ArtifactText.branch_name(branch),
+		"Глубина %d–%d. Найдено %d из %d." % [int(Balance.unwrap(range_cells[0])),
+			int(Balance.unwrap(range_cells[1])), found, total],
+		("Награда получена: %d монет, %d долларов" if complete else "Награда за всю ветку: %d монет, %d долларов")
+			% [coins, dollars])
+	return row
 
 
-func _artifact_for_piece(piece: String) -> Dictionary:
-	for a in Balance.artifacts.get("artifacts", []):
-		if String(a.get("equip_slot", "")) == piece:
-			return a
-	return {}
+## Момент славы: ветка закрыта — рамка вспыхивает, летят искры.
+func celebrate_branch(branch_num: int) -> void:
+	var panel: Control = _branch_panels.get(branch_num, null)
+	if panel == null or not is_visible_in_tree():
+		return
+	HeroUi.bounce(panel, 1.04)
+	HeroUi.burst_particles(panel, panel.size * 0.5, ProgressUiKit.GOLD, 32, 120.0)
+	Sfx.play("quest_done")
+	Haptics.buzz(80)
+
+
+## Блик, пробегающий по закрытой ветке. Не ловит нажатия.
+class _Shimmer extends Control:
+	var _t: float = randf() * 3.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		visibility_changed.connect(func() -> void: set_process(is_visible_in_tree()))
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var k := fmod(_t / 3.2, 1.0)
+		if k > 0.45 or HeroUi.calm():
+			return
+		var x := lerpf(-16.0, size.x + 16.0, k / 0.45)
+		var w := 9.0
+		var pts := PackedVector2Array([Vector2(x, 0), Vector2(x + w, 0), Vector2(x + w - 8.0, size.y), Vector2(x - 8.0, size.y)])
+		draw_colored_polygon(pts, Color(1, 0.95, 0.7, 0.16))

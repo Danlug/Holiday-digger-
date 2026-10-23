@@ -19,13 +19,18 @@ const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	# house_npc_show/house_npc_walk — сюжетный NPC (не герой) в открытой
 	# комнате (Роберт, докладывающий об окончании тоннеля и уходящий за
 	# дверь — data/story.json:robert).
-	"house_enter", "house_sleep", "house_npc_show", "house_npc_walk"]
+	"house_enter", "house_sleep", "house_npc_show", "house_npc_walk",
+	# Сюжет после старта: звук, музыка и вспышка/вибро из сцены (ГДД раздел 2).
+	"sfx", "music", "fx"]
 const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
-	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook"]
+	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook", "sfx"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
 const REQUIRED_SCENES := ["intro_grandpa", "intro_boy", "autodig_start",
 	"autodig_done", "dud_treasure", "workshop", "death", "backpack", "robert",
-	"sleep_lesson_1", "sleep_lesson_2"]
+	"sleep_lesson_1", "sleep_lesson_2",
+	# Сюжет после старта (ГДД раздел 2, «Сюжет после старта»).
+	"grave_call", "diary_first", "first_artifact", "depth_100", "fever_500",
+	"grandma_returns", "whisper_1200", "abyss_warning", "bottom_near", "ending", "credits"]
 
 var failures := 0
 var total := 0

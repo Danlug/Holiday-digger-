@@ -134,6 +134,7 @@ func _ready() -> void:
 	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
 	ProgressScreen.attach(self)  # прокачка, музей, артефакты, рекорды
 	view_root.add_child(HouseSystem.new())  # дом: сон, еда, переходы дом↔огород↔шахта
+	Juice.attach(self)  # «сок»: звук, музыка, частицы, тряска, вибро (scripts/fx/)
 	# --- конец блока подключения ---
 
 	# --- сюжет --- подключение одной строкой: режиссёр сам находит игрока,
@@ -147,6 +148,7 @@ func _ready() -> void:
 	story.name = "StoryDirector"
 	add_child(story)
 	# --- конец блока сюжета ---
+	MetaService.attach(self)  # мета-слой: ежедневная награда, задания, достижения, дорога трофеев
 
 	# Скважина работала, пока игрока не было (решение владельца): показываем
 	# отчёт сразу при заходе, до всякого приветствия.
@@ -307,7 +309,7 @@ func _on_collapse_tick() -> void:
 				_planned_left = COLLAPSE_WARN_SECONDS
 				collapse_fx.warn(plan, COLLAPSE_WARN_SECONDS)
 				Fx.shake(1.6, COLLAPSE_WARN_SECONDS)
-				Sfx.play("quake")
+				Sfx.play("quake", 1.25, -9.0)   # глухой гул до удара; сам удар озвучивает JuiceDirector по событию
 	elif randf() < 0.03:
 		# Полный ресет не может застать героя в земле (решение владельца):
 		# запоминаем событие и применяем, когда он выберется. Тост — в момент
@@ -336,9 +338,8 @@ func _tick_planned_collapse(dt: float) -> void:
 		return
 	var rect := CollapseEvents.apply_planned(world, fog, plan)
 	collapse_fx.impact(rect)
-	Fx.shake(5.0, 0.45)
+	# дрожь, звук и вибро удара — у JuiceDirector по событию «collapse»; пыль в зоне — наша
 	Fx.burst("poof", Vector2((rect.x0 + rect.w * 0.5) * TILE, (rect.y0 + rect.h * 0.5) * TILE), 2.0)
-	Sfx.play("collapse")
 	GameState.emit_event(&"collapse", {"rect": rect})
 	hud.toast("Где-то в шахте прогремел обвал.", 3.0)
 
@@ -355,10 +356,8 @@ func _apply_pending_earthquake_if_safe() -> bool:
 	GameState.pending_earthquake = false
 	var cam := _camera()
 	collapse_fx.impact({"x0": int(floor(cam.x)), "y0": 1, "w": _view_w() + 1, "h": _view_h()})
-	Fx.shake(4.0, 1.3)
-	Sfx.play("quake")
-	GameState.emit_event(&"quake", {})
 	hud.toast("Земля вздрогнула — копальню тряхнуло целиком.", 3.6)
+	GameState.emit_event(&"quake", {})  # дрожь и звук — JuiceDirector («сок»)
 	return true
 
 

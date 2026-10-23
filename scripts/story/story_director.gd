@@ -21,6 +21,16 @@ const MANUAL_DIGS_BEFORE_AUTODIG := 3
 ## огород и обучение; всё, что ниже, — уже игра.
 const FOUNDATION_DEPTH := 5
 
+## --- сюжет после старта (ГДД раздел 2) ---
+## С какой глубины бабка звонит про могилу (первая вылазка, а не обучение).
+const GRAVE_CALL_DEPTH := 10
+## Рейдбосс сидит на дне: его смерть глубже этой отметки — концовка, даже если
+## ветка боя назвала босса не так, как ждёт сюжет.
+const FINAL_BOSS_DEPTH := 9000
+const FINAL_BOSS_IDS := ["final_boss", "raid_boss", "abyss_boss"]
+const FIRST_ARTIFACT_SKIP := "antiquity_1"   # никчёмный клад играет dud_treasure
+const DIARY_NEWS_PERIOD_MS := 700
+
 ## Чужие системы. Подключаются одной строкой из main.gd, когда появятся:
 ##   $StoryDirector.house = $House
 ##   $StoryDirector.shop = $Shop
@@ -33,6 +43,16 @@ var hud: Control = null
 
 var cutscene: CutscenePlayer
 var auto_dig: AutoDigTutorial
+## Могила во дворе и экран дневника (создаются в boot, если есть мир-родитель).
+var grave: GraveSite = null
+var diary_ui: DiaryUI = null
+
+## Сцена сюжета после старта ждёт, пока герой спокойно стоит, но не дольше
+## этого времени: иначе постоянно летящий или копающий игрок не увидел бы её
+## никогда. Тесты ставят 0.
+var arc_calm_wait_ms: int = 15000
+var _arc_wait_since: Dictionary = {}   # id сцены -> метка времени первого ожидания
+var _news_next_ms: int = 0
 
 var _playing: bool = false
 var _manual_digs: int = 0
@@ -78,6 +98,7 @@ func boot() -> void:
 	add_child(auto_dig)
 
 	_connect_signals()
+	_build_grave()
 	_find_gauges()
 	_sync_pre_autodig_lock()
 	_queue_intro_if_new_game()
@@ -104,10 +125,12 @@ func _sync_pre_autodig_lock() -> void:
 		world.lock_pre_autodig_garden()
 
 
-## Локаль берём системную, но файла перевода может ещё не быть — StoryText
-## сам откатится на русский, поэтому проверять здесь нечего.
+## Язык сюжета — язык, выбранный в настройках игры (Settings.language), а не
+## язык телефона: остальной интерфейс следует настройкам, и английская сказка
+## при русских кнопках была бы хуже русской. Нет файла перевода — StoryText сам
+## откатится на русский.
 func _pick_locale() -> String:
-	var loc := OS.get_locale_language()
+	var loc := String(Settings.language)
 	return loc if not loc.is_empty() else StoryText.DEFAULT_LOCALE
 
 
@@ -145,6 +168,10 @@ func _connect_signals() -> void:
 	# обычной игре она умеет только расти. Свои сигналы GameState не отдаёт, а
 	# трогать чужой код ради этого нельзя, см. границы задачи.
 	GameState.max_depth_changed.connect(_on_max_depth_changed)
+	# Концовку зовёт ветка боя событием boss_defeated; запасные пути — для
+	# проверки без боя (см. trigger_ending).
+	GameState.game_event.connect(_on_game_event)
+	GameState.debug_action_triggered.connect(_on_debug_action)
 
 
 ## Три полоски выживания до сцены смерти не показываются вовсе: понятие
@@ -172,6 +199,7 @@ func _process(_dt: float) -> void:
 		return
 	_apply_no_fatigue_period()
 	_update_quests()
+	_check_diary_news()
 	if _playing:
 		return
 	# Пока крутится автокопка, новые триггеры не собираем: ролик и так держит
@@ -249,6 +277,8 @@ func _update_quests() -> void:
 				StoryState.set_flag("food_ordered")
 				continue
 			text = StoryText.get_text("quest.food")
+		elif StoryState.is_seen("grave_call") and not StoryState.has_flag("diary_found"):
+			text = StoryText.get_text("quest.grave")
 		break  # ни одно задание не закрылось на этом проходе — состояние устоялось
 
 	if text != _objective:
@@ -317,6 +347,8 @@ func _check_triggers() -> void:
 			StoryState.enqueue("sleep_lesson_2")
 			return
 
+	_check_arc_triggers()
+
 
 func _player_underground() -> bool:
 	return player != null and player.cell_y() > 0
@@ -327,7 +359,9 @@ func _play_next_if_idle() -> void:
 		return
 	if auto_dig != null and auto_dig.running and not auto_dig.paused:
 		return
-	var next := StoryState.next_queued()
+	if diary_ui != null and diary_ui.is_open:
+		return
+	var next := _next_playable()
 	if next.is_empty():
 		return
 	play(next)
@@ -342,6 +376,11 @@ func play(id: String) -> void:
 		StoryState.mark_seen(id)
 		return
 	_playing = true
+	_sync_locale()
+	# Принудительный запуск (отладка, чужая система) поверх открытой тетради:
+	# дневник под катсценой не оставляем — после неё он бы висел забытым окном.
+	if diary_ui != null and diary_ui.is_open:
+		diary_ui.close_diary()
 	_take_control()
 	# Сцены режима "мир" (data/story.json: scenes[].world == true, сейчас
 	# только intro_grandpa) работают на живой карте — катсцене нужны ссылки
@@ -366,6 +405,9 @@ func _on_cutscene_finished(id: String) -> void:
 	StoryState.mark_seen(id)
 	_playing = false
 	_after_scene(id)
+	# Шина событий: ветка заданий и достижений считает сюжетные вехи, а звуковая
+	# по этому событию возвращает фоновую музыку после mus_story.
+	GameState.emit_event(&"story_beat", {"id": id})
 	_play_next_if_idle()
 
 
@@ -388,6 +430,15 @@ func _after_scene(id: String) -> void:
 				auto_dig.resume()
 			else:
 				_release_control()
+		"diary_first":
+			# Тетрадь взята: страницы, открытые к этому моменту, не объявляем
+			# тостом по одной — игрок сейчас сам их прочтёт.
+			StoryDiary.announce_all_quietly()
+			_release_control()
+			open_diary()
+		"ending":
+			_release_control()
+			StoryState.enqueue("credits")
 		_:
 			_release_control()
 
@@ -405,6 +456,216 @@ func _on_autodig_finished() -> void:
 	_release_control()
 	StoryState.enqueue("autodig_done")
 	_play_next_if_idle()
+
+
+# ---------------------------------------------------------------------------
+# Сюжет после старта (ГДД раздел 2): триггеры, могила, дневник, концовка
+# ---------------------------------------------------------------------------
+
+## Могилу рисует мир, поэтому узел встаёт в ViewRoot — между домом и героем
+## (дом и плита позади героя, как и всё, что на земле). Без мира-родителя
+## (тесты режиссёра в одиночку) могилы нет, а остальное работает.
+func _build_grave() -> void:
+	diary_ui = DiaryUI.new()
+	diary_ui.name = "DiaryUI"
+	diary_ui.closed.connect(_on_diary_closed)
+	add_child(diary_ui)
+
+	var parent := get_parent()
+	var view_root: Node = parent.get("view_root") if parent != null and "view_root" in parent else null
+	if view_root == null or player == null:
+		return
+	grave = GraveSite.new()
+	grave.player = player
+	grave.hud = hud
+	grave.pressed.connect(_on_grave_pressed)
+	view_root.add_child(grave)
+	view_root.move_child(grave, mini(player.get_index(), view_root.get_child_count() - 1))
+
+
+## Язык сцены мог смениться в настройках после запуска.
+func _sync_locale() -> void:
+	var want := _pick_locale()
+	if StoryText.locale() != want and StoryText.has_locale_file(want):
+		StoryText.load_locale(want)
+
+
+func _is_arc_scene(id: String) -> bool:
+	return bool(StoryData.scene(id).get("arc", false))
+
+
+## Триггеры арки. Работают по состоянию, а не по событиям — как задания: игрок
+## мог выйти из игры в любой момент, и после загрузки веха находится сама.
+func _check_arc_triggers() -> void:
+	# Пока Роберт не построил тоннель, игра ещё учит, и арке рано.
+	if not StoryState.is_seen("robert"):
+		return
+	if not StoryState.is_seen("grave_call") and GameState.max_depth_reached >= GRAVE_CALL_DEPTH:
+		StoryState.enqueue("grave_call")
+	if not StoryState.is_seen("first_artifact") and _has_real_artifact():
+		StoryState.enqueue("first_artifact")
+	if not StoryState.is_seen("grandma_returns") and GameState.owns_tool("drill_rig"):
+		StoryState.enqueue("grandma_returns")
+	_enqueue_depth_scene()
+	if StoryState.has_flag("story_ending_debug"):
+		StoryState.set_flag("story_ending_debug", false)
+		trigger_ending(true)
+
+
+## Настоящий артефакт — любой, кроме никчёмного клада: тот и так показан
+## сценой dud_treasure.
+func _has_real_artifact() -> bool:
+	for id in GameState.collected_artifacts:
+		if String(id) != FIRST_ARTIFACT_SKIP:
+			return true
+	return false
+
+
+## Сцены глубины. Если порог пройден сразу у нескольких (загрузка глубокого
+## сейва, перелёт), играет только самая глубокая, а остальные помечаются
+## просмотренными тихо: пять катсцен подряд на входе в игру — хуже, чем
+## пропущенная реплика. Дневник от этого не страдает — его страницы открывают
+## и сами глубины.
+func _enqueue_depth_scene() -> void:
+	var due: Array = []
+	for entry in StoryData.depth_scenes():
+		var id := String(entry.id)
+		if not StoryState.is_seen(id) and GameState.max_depth_reached >= int(entry.depth):
+			due.append(id)
+	if due.is_empty():
+		return
+	for i in range(due.size() - 1):
+		StoryState.mark_seen(due[i])
+	StoryState.enqueue(due.back())
+
+
+## Первая в очереди сцена, которую можно играть сейчас. Сцены арки ждут
+## «герой стоит спокойно» (не копает, не летит), но не дольше arc_calm_wait_ms;
+## жёсткие условия (не в доме, жив, на поверхности для сцен со "surface")
+## таймаутом не обходятся — иначе бабка вышла бы к герою на дне шахты.
+func _next_playable() -> String:
+	for id in GameState.story_queue:
+		var sid := String(id)
+		if not _is_arc_scene(sid) or _arc_ready(sid):
+			return sid
+	return ""
+
+
+func _arc_ready(id: String) -> bool:
+	if GameState.house_is_indoors or not GameState.is_alive or _modal_open():
+		return false
+	var data := StoryData.scene(id)
+	if bool(data.get("surface", false)) and player != null and player.cell_y() > 0:
+		return false
+	if _hero_calm():
+		_arc_wait_since.erase(id)
+		return true
+	var now := Time.get_ticks_msec()
+	if not _arc_wait_since.has(id):
+		_arc_wait_since[id] = now
+	if now - int(_arc_wait_since[id]) >= arc_calm_wait_ms:
+		_arc_wait_since.erase(id)
+		return true
+	return false
+
+
+## Открыт ли какой-то экран поверх игры (магазин, прокачка, меню «•••»):
+## катсцена, начавшаяся под ним, оставила бы его висеть после себя.
+func _modal_open() -> bool:
+	if ShopUI.instance != null and ShopUI.instance.is_open():
+		return true
+	if ProgressScreen.is_open():
+		return true
+	return hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open()
+
+
+func _hero_calm() -> bool:
+	if player == null:
+		return true
+	if player.get("digging") != null or not bool(player.get("on_ground")):
+		return false
+	return String(player.get("rig_transition")) == "" and String(player.get("thrust")) == ""
+
+
+## Запустить концовку. Ветка боя зовёт её событием boss_defeated, но для
+## проверки без боя есть запасные пути: этот метод, событие story_ending_debug,
+## флаг story_ending_debug и отладочное действие "story_ending". force
+## разрешает пересмотр уже виденной концовки.
+func trigger_ending(force: bool = false) -> bool:
+	if StoryState.is_seen("ending"):
+		if not force:
+			return false
+		GameState.story_seen.erase("ending")
+		GameState.story_seen.erase("credits")
+	StoryState.enqueue("ending")
+	_play_next_if_idle()
+	return true
+
+
+func _on_game_event(id: StringName, data: Dictionary) -> void:
+	match String(id):
+		"boss_defeated":
+			if _is_final_boss(data):
+				trigger_ending()
+		"story_ending_debug":
+			trigger_ending(true)
+
+
+func _on_debug_action(action: String) -> void:
+	if action == "story_ending":
+		trigger_ending(true)
+
+
+func _is_final_boss(data: Dictionary) -> bool:
+	return FINAL_BOSS_IDS.has(String(data.get("id", ""))) or GameState.max_depth_reached >= FINAL_BOSS_DEPTH
+
+
+func _on_grave_pressed() -> void:
+	if _playing or (diary_ui != null and diary_ui.is_open):
+		return
+	if StoryState.has_flag("diary_found"):
+		open_diary()
+	elif StoryState.is_seen("grave_call"):
+		StoryState.enqueue("diary_first")
+		_play_next_if_idle()
+	elif hud != null:
+		hud.toast(StoryText.get_text("grave.epitaph"), 3.4)
+
+
+## Экран дневника. Герой на это время заморожен и ввод HUD отключён —
+## джойстик слушает _input мимо фильтров Control и тянул бы героя из-под окна.
+func open_diary() -> void:
+	if diary_ui == null or diary_ui.is_open:
+		return
+	_take_control(false)
+	diary_ui.open_diary()
+
+
+func _on_diary_closed() -> void:
+	if not _playing:
+		_release_control()
+	_play_next_if_idle()
+
+
+## Новые страницы объявляются тостом и звуком, но только когда сцены не идут
+## (HUD спрятан — тост пропал бы) и дневник уже у героя.
+func _check_diary_news() -> void:
+	var now := Time.get_ticks_msec()
+	if now < _news_next_ms:
+		return
+	_news_next_ms = now + DIARY_NEWS_PERIOD_MS
+	if not StoryState.has_flag("diary_found"):
+		StoryDiary.announce_all_quietly()
+		return
+	if _playing or (diary_ui != null and diary_ui.is_open) or hud == null:
+		return
+	var fresh := StoryDiary.take_unannounced()
+	if fresh.is_empty():
+		return
+	hud.toast(StoryText.get_text("diary.new_pages"), 3.6)
+	Sfx.play("reward")
+	for id in fresh:
+		GameState.emit_event(&"diary_page", {"id": id})
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +737,8 @@ func _apply_effects(effects: Array) -> void:
 			"toast":
 				if hud != null:
 					hud.toast(StoryText.get_text(String(e.get("text", ""))), float(e.get("sec", 3.0)))
+			"sfx":
+				Sfx.play(String(e.get("id", "")))
 			"hook":
 				_call_hook(String(e.get("target", "")), String(e.get("method", "")))
 
@@ -569,6 +832,9 @@ func _on_max_depth_changed(depth: int) -> void:
 	if world != null:
 		world.lock_pre_autodig_garden()
 	StoryState.clear_all()
+	_arc_wait_since.clear()
+	if diary_ui != null and diary_ui.is_open:
+		diary_ui.close_diary()
 	_manual_digs = 0
 	_objective = ""
 	_quest_cells = []

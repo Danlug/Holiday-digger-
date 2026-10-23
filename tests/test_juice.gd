@@ -58,6 +58,11 @@ func _test_sfx_service() -> void:
 	check("пул голосов создан", sfx.pool_size() == SfxService.POOL_SIZE)
 	check("шины SFX и Music существуют", AudioServer.get_bus_index(Settings.BUS_SFX) != -1
 			and AudioServer.get_bus_index(Settings.BUS_MUSIC) != -1)
+	var limiters := 0
+	for i in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter:
+			limiters += 1
+	check("на мастер-шине стоит ровно один лимитер", limiters == 1)
 	var missing: Array = []
 	for id in CORE_IDS:
 		if not sfx.has_sfx(id):

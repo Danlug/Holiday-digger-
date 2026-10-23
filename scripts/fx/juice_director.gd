@@ -183,8 +183,6 @@ func _tick_player(delta: float) -> void:
 			if _thrust_prev != "":
 				Sfx.play("fly_stop")
 		_thrust_prev = thrust
-	if thrust != "" and int(_clock * 60.0) % 4 == 0:
-		Fx.burst("poof", _feet() + Vector2(randf_range(-4.0, 4.0), 6.0), 0.12)
 
 	# удары по породе, пока копка идёт
 	var d = player.digging
@@ -312,8 +310,9 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			Fx.shake(6.0, 0.4)
 			Haptics.buzz(140)
 		&"collapse":
-			Sfx.play("collapse")
-			Fx.shake(3.5, 0.5)
+			# обвал случается «где-то в шахте», не рядом с героем — глуше и слабее
+			Sfx.play("collapse", 1.0, -5.0)
+			Fx.shake(2.0, 0.4)
 			Haptics.thud()
 		&"quake":
 			Sfx.play("quake")

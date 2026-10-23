@@ -53,6 +53,7 @@ func _ready() -> void:
 	add_to_group(Sfx.GROUP)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	Settings.ensure_buses()
+	_ensure_limiter()
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = Settings.BUS_SFX
@@ -66,6 +67,20 @@ func _ready() -> void:
 		add_child(m)
 		_music.append(m)
 	_load_catalog()
+
+
+## Мастер-шина без ограничителя клиппует, когда копка, подбор и монеты звучат
+## разом. Жёсткий лимитер у потолка -1 дБ — страховка, обычный звук его не трогает.
+func _ensure_limiter() -> void:
+	var master := AudioServer.get_bus_index("Master")
+	if master < 0:
+		return
+	for i in AudioServer.get_bus_effect_count(master):
+		if AudioServer.get_bus_effect(master, i) is AudioEffectHardLimiter:
+			return
+	var lim := AudioEffectHardLimiter.new()
+	lim.ceiling_db = -1.0
+	AudioServer.add_bus_effect(master, lim)
 
 
 func _load_catalog() -> void:

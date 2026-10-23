@@ -145,6 +145,26 @@ def build_music(only):
     return catalog, total, problems
 
 
+def header_ids():
+    """id из шапки scripts/core/sfx.gd (каталог событий — договорённость веток)."""
+    ids = []
+    on = False
+    with open(os.path.join(ROOT, "scripts", "core", "sfx.gd"), encoding="utf-8") as f:
+        for line in f:
+            if "Каталог событий" in line:
+                on = True
+                continue
+            if not on:
+                continue
+            if not line.startswith("##"):
+                break
+            body = line[2:].strip()
+            if ":" in body:
+                body = body.split(":", 1)[1]
+            ids += body.split()
+    return ids
+
+
 def dir_size(path):
     s = 0
     for r, _, fs in os.walk(path):
@@ -175,6 +195,14 @@ def main():
     problems = []
     if a.check:
         import audio_music
+        have = set(catalog["sfx"]) | set(catalog["music"])
+        for i in header_ids():
+            if i not in have:
+                problems.append("id из шапки sfx.gd без звука: " + i)
+        for name, e in catalog["sfx"].items():
+            for fl in e["files"]:
+                if not os.path.exists(os.path.join(OUT, fl)):
+                    problems.append("в каталоге есть %s, файла нет" % fl)
         for name in audio_music.TRACKS:
             p = os.path.join(OUT, "music", name + ".ogg")
             if not os.path.exists(p):

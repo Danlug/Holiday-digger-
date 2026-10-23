@@ -69,6 +69,11 @@ func _ready() -> void:
 		await _frames(3)
 		if _want("inventory"):
 			await _shot("inventory")
+		if _want("inventory"):
+			_hud._inv_sheet._slot_buttons["energy_bar"].pressed.emit()
+			await _frames(2)
+			await _shot("inventory_sel")
+			_hud._inv_sheet._slot_buttons["energy_bar"].pressed.emit()
 		if _want("drop"):
 			_hud._open_drop("gold", 5)
 			await _frames(3)

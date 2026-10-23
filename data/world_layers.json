@@ -362,5 +362,313 @@
 			"y_max": 200,
 			"density": 0.02
 		}
-	]
+	],
+	"biomes": {
+		"_comment": "Пояса глубины (docs/GDD.md §4.2). Каждый ~1000-1500 клеток; границы совпадают с рубежами ГДД (1000 уголь/ртуть, 2000 самоцветы, 3000 лава и геокристалл, 4000 жанровый поворот). Внутри пояса земля ОДНОЙ светлоты (ГДД §15.1), от пояса к поясу меняется оттенок. transition — ширина зоны вокруг границы, где тайлы двух поясов перемешиваются по хешу клетки (ровной линии нет). soil — цель в Lab (L,a,b) для tools/gen_tiles_deep.py; ambient/wall читают scripts/world/ambient_fx.gd и deep_backdrop.gd.",
+		"transition": 70,
+		"list": [
+			{
+				"id": "roots",
+				"name_ru": "Корни",
+				"y_from": 1,
+				"y_to": 999,
+				"soil": [
+					28.6,
+					6.8,
+					13.6
+				],
+				"aura_relief": "EAC598",
+				"aura_res": "E0A93B",
+				"gray_solid": "2C241B",
+				"gray_empty": "100D0A",
+				"ambient": "dust_drip",
+				"wall": "roots"
+			},
+			{
+				"id": "caves",
+				"name_ru": "Пещеры",
+				"y_from": 1000,
+				"y_to": 1999,
+				"soil": [
+					27.0,
+					0.5,
+					6.5
+				],
+				"aura_relief": "A9D6C0",
+				"aura_res": "C6E04A",
+				"gray_solid": "20261F",
+				"gray_empty": "0C100E",
+				"ambient": "drip_firefly",
+				"wall": "caves"
+			},
+			{
+				"id": "crystal",
+				"name_ru": "Кристаллы",
+				"y_from": 2000,
+				"y_to": 2999,
+				"soil": [
+					26.0,
+					8.0,
+					-9.0
+				],
+				"aura_relief": "C9A8F0",
+				"aura_res": "6FE0D8",
+				"gray_solid": "261D33",
+				"gray_empty": "0E0A14",
+				"ambient": "glint",
+				"wall": "crystal"
+			},
+			{
+				"id": "magma_upper",
+				"name_ru": "Недра",
+				"y_from": 3000,
+				"y_to": 3999,
+				"soil": [
+					23.0,
+					13.0,
+					8.0
+				],
+				"aura_relief": "F0B488",
+				"aura_res": "FF8A3C",
+				"gray_solid": "2E1D18",
+				"gray_empty": "120A08",
+				"ambient": "ember_dust",
+				"wall": "bedrock"
+			},
+			{
+				"id": "ruins",
+				"name_ru": "Руины",
+				"y_from": 4000,
+				"y_to": 5499,
+				"soil": [
+					31.0,
+					3.0,
+					17.0
+				],
+				"aura_relief": "F0DCA0",
+				"aura_res": "E8B32E",
+				"gray_solid": "2E281C",
+				"gray_empty": "100D09",
+				"ambient": "dust_fall",
+				"wall": "ruins"
+			},
+			{
+				"id": "hell",
+				"name_ru": "Преисподняя",
+				"y_from": 5500,
+				"y_to": 6999,
+				"soil": [
+					18.0,
+					16.0,
+					6.0
+				],
+				"aura_relief": "FF7A5A",
+				"aura_res": "FFB347",
+				"gray_solid": "2A1414",
+				"gray_empty": "0F0606",
+				"ambient": "ember",
+				"wall": "hell"
+			},
+			{
+				"id": "void",
+				"name_ru": "Пустота",
+				"y_from": 7000,
+				"y_to": 8499,
+				"soil": [
+					15.0,
+					2.0,
+					-14.0
+				],
+				"aura_relief": "8FA8FF",
+				"aura_res": "D2C2EE",
+				"gray_solid": "161A2E",
+				"gray_empty": "07080F",
+				"ambient": "wisp",
+				"wall": "void"
+			},
+			{
+				"id": "heaven",
+				"name_ru": "Небесное ядро",
+				"y_from": 8500,
+				"y_to": 10000,
+				"soil": [
+					31.0,
+					5.0,
+					-4.0
+				],
+				"aura_relief": "FFF4C2",
+				"aura_res": "FFE066",
+				"gray_solid": "2B2838",
+				"gray_empty": "0F0E16",
+				"ambient": "gold_mote",
+				"wall": "heaven"
+			}
+		]
+	},
+	"formations": {
+		"_comment": "Особые образования (ГДД §4.3): каверны, провалы, кристаллические гроты, руины глубже 4000, жилы. Мир режется на слоты по slot_h рядов; в слоте — не больше одного образования, целиком внутри слота (проверка клетки — один поиск в кэше слотов). Есть оно с шансом slot_chance, вид — по весам weight среди подходящих по глубине. Геометрия зависит только от сида (каверны и стены руин переживают обвалы и землетрясения), добыча внутри — ещё и от соли события: после сброса клад выпадает заново, как руда. В сохранение идут только диффы раскопок. Все числа — предложение (proposed).",
+		"proposed": true,
+		"slot_h": 36,
+		"slot_chance": 0.8,
+		"kinds": {
+			"cavern": {
+				"y_min": 700,
+				"weight": 0.34,
+				"rx": [
+					3,
+					7
+				],
+				"ry": [
+					2,
+					4
+				],
+				"treasure_chance": 0.28,
+				"rim_ore_chance": 0.22
+			},
+			"pit": {
+				"y_min": 800,
+				"weight": 0.12,
+				"w": [
+					2,
+					3
+				],
+				"h": [
+					6,
+					12
+				]
+			},
+			"grotto": {
+				"y_min": 2000,
+				"y_max": 3400,
+				"weight": 0.45,
+				"rx": [
+					4,
+					8
+				],
+				"ry": [
+					3,
+					5
+				],
+				"rim_gem_chance": 0.3
+			},
+			"ruin": {
+				"y_min": 4000,
+				"ramp": 400,
+				"weight": 0.9,
+				"w": [
+					9,
+					15
+				],
+				"h": [
+					6,
+					9
+				],
+				"decay": 0.12
+			},
+			"vein": {
+				"y_min": 150,
+				"weight": 0.55,
+				"len": [
+					8,
+					18
+				],
+				"thick": [
+					2,
+					3
+				],
+				"fill": 0.88
+			}
+		},
+		"vein_exclude": [
+			"coal",
+			"peat",
+			"scrap"
+		],
+		"treasure": [
+			{
+				"tile": "GOLD_ORE",
+				"y_min": 700,
+				"w": 3.0
+			},
+			{
+				"tile": "DIAMOND",
+				"y_min": 700,
+				"w": 2.0
+			},
+			{
+				"tile": "PLATINUM_ORE",
+				"y_min": 1000,
+				"w": 2.0
+			},
+			{
+				"tile": "URANIUM_ORE",
+				"y_min": 1500,
+				"w": 0.6
+			},
+			{
+				"tile": "RUBY",
+				"y_min": 2000,
+				"w": 2.0
+			},
+			{
+				"tile": "EMERALD",
+				"y_min": 2000,
+				"w": 2.0
+			},
+			{
+				"tile": "GEOCRYSTAL",
+				"y_min": 3000,
+				"w": 1.5
+			}
+		],
+		"gems": [
+			{
+				"tile": "DIAMOND",
+				"y_min": 2000,
+				"w": 1.0
+			},
+			{
+				"tile": "RUBY",
+				"y_min": 2000,
+				"w": 2.0
+			},
+			{
+				"tile": "EMERALD",
+				"y_min": 2000,
+				"w": 2.0
+			}
+		],
+		"ruin_loot": [
+			{
+				"tile": "ANCIENT_METAL",
+				"y_min": 4000,
+				"w": 3.0
+			},
+			{
+				"tile": "GEOCRYSTAL",
+				"y_min": 4000,
+				"w": 1.0
+			},
+			{
+				"tile": "OBSIDIAN",
+				"y_min": 4000,
+				"w": 1.5
+			},
+			{
+				"tile": "HELLSTONE",
+				"y_min": 4000,
+				"w": 2.0
+			},
+			{
+				"tile": "DARK_MATTER",
+				"y_min": 4300,
+				"w": 1.0
+			},
+			{
+				"tile": "UNIVERSALIUM",
+				"y_min": 4700,
+				"w": 0.6
+			}
+		]
+	}
 }

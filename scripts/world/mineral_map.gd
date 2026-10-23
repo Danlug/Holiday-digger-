@@ -33,6 +33,8 @@ static var _tile_to_mineral: Dictionary = {
 	TileTypes.Type.UNIVERSALIUM: "universum",
 	TileTypes.Type.ANGEL_STONE: "angelstone",
 	TileTypes.Type.DIVINE_HEART: "divine_heart",
+	# кладка руин копается и бурится как камень (10 с), добычей не считается
+	TileTypes.Type.RUIN_BRICK: "stone",
 	# FOUNDATION и STAIRCASE сознательно не отражены — фундамент не лут
 	# (капает 0 монет, у него нет статьи в minerals.json), лестница вообще
 	# не копается.
@@ -46,6 +48,7 @@ static var NOT_LOOT: Array = [
 	TileTypes.Type.FOUNDATION,
 	TileTypes.Type.STAIRCASE,
 	TileTypes.Type.EMPTY,
+	TileTypes.Type.RUIN_BRICK,
 ]
 
 static func mineral_id_for(type: int) -> String:

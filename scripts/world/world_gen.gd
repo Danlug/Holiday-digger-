@@ -53,6 +53,11 @@ var world_seed: int = 0
 var layers: Dictionary = {}
 var max_depth: int = 6500
 
+## Предикат «эту клетку нельзя превращать в пустоту образованием» (x, y) -> bool.
+## Ставит тот, кто знает про артефакты (main.gd): артефакт выдаётся при РАСКОПКЕ
+## клетки, а в каверне копать нечего. Без предиката образования не знают о них.
+var protect_cell: Callable = Callable()
+
 var diffs: Dictionary = {}      # int key -> true (клетка выкопана)
 var events: Array = []          # [{x0:int, y0:int, w:int, h:int, salt:int}, ...]
 
@@ -61,6 +66,17 @@ var _shallow_layers: Array = []
 var _deep: Dictionary = {}
 var _ores: Array = []
 var _label_ids: Dictionary = {}
+# ---- особые образования (formations.gd): конфиг и кэш слотов ----
+var _form_cfg: Dictionary = {}
+var _form_slot_h: int = 36
+var _form_min_y: int = 1 << 30
+var _slot_cache: Dictionary = {}
+# ---- кэш клеток: get_tile зовут на каждую клетку экрана каждый кадр ----
+# Плоский массив 32 x (глубина+64) байт, 255 = ещё не считали. Сбрасывается при
+# смене сида/событий — сама генерация остаётся чистой функцией. Один массив, а не
+# словарь чанков: запись в PackedByteArray из словаря копировала бы чанк целиком.
+var _cells: PackedByteArray = PackedByteArray()
+var _cache_sig: int = -1
 var _staircase_x_start: int = GARDEN_X_MIN
 var _staircase_y_max: int = 4
 # Граница гейта "до автокопки — только правее лестницы" (решение владельца,
@@ -208,6 +224,14 @@ func _apply_layers() -> void:
 	_deep = layers.get("deep", {})
 	_ores = layers.get("ores", [])
 
+	_form_cfg = layers.get("formations", {})
+	_form_slot_h = maxi(8, int(_form_cfg.get("slot_h", 36)))
+	_form_min_y = 1 << 30
+	for k in _form_cfg.get("kinds", {}).values():
+		_form_min_y = mini(_form_min_y, int(k.get("y_min", 1 << 30)))
+	_slot_cache.clear()
+	_cache_reset()
+
 
 # ============================== ПУБЛИЧНОЕ API ==============================
 
@@ -230,8 +254,7 @@ func get_tile(x: int, y: int) -> int:
 	if diffs.has(_key(x, y)):
 		return TileTypes.Type.EMPTY
 
-	var salt := _active_event_salt(x, y)
-	return _generate_layered(x, y, salt)
+	return _cached_layered(x, y)
 
 
 ## Игрок выкапывает клетку. Возвращает false, если копать нечего/нельзя
@@ -528,6 +551,7 @@ func apply_chunk_event(x0: int, y0: int, w: int, h: int, salt: int) -> void:
 	if cx1 <= cx0 or cy1 <= cy0:
 		return
 	_clear_diffs_in_rect(cx0, cy0, cx1 - cx0, cy1 - cy0)
+	_cache_reset()
 	events.append({"x0": cx0, "y0": cy0, "w": cx1 - cx0, "h": cy1 - cy0, "salt": salt})
 
 
@@ -537,6 +561,7 @@ func apply_chunk_event(x0: int, y0: int, w: int, h: int, salt: int) -> void:
 func apply_global_event(salt: int) -> void:
 	events.clear()
 	_clear_diffs_in_rect(0, 1, WIDTH, max_depth)
+	_cache_reset()
 	events.append({"x0": 0, "y0": 1, "w": WIDTH, "h": max_depth, "salt": salt})
 
 
@@ -553,6 +578,7 @@ func load_save_data(data: Dictionary) -> void:
 	for k in data.get("dug", []):
 		diffs[int(k)] = true
 	events = (data.get("events", []) as Array).duplicate(true)
+	_cache_reset()
 	# Замок огорода хранится вместе с миром, а не берётся из флага дома:
 	# тоннель — часть карты, и он обязан быть на месте ещё до того, как
 	# система дома успеет что-либо синхронизировать.
@@ -639,7 +665,46 @@ func _active_event_salt(x: int, y: int) -> int:
 	return 0
 
 
+## Клетка из кэша или свежепосчитанная (с учётом событий и образований).
+func _cached_layered(x: int, y: int) -> int:
+	var sig := world_seed * 31 + 7
+	if sig != _cache_sig:
+		_cache_reset()
+		_cache_sig = sig
+	var idx := y * WIDTH + x
+	if idx >= _cells.size():
+		return _generate_layered(x, y, _active_event_salt(x, y))
+	var v: int = _cells[idx]
+	if v != 255:
+		return v
+	var t := _generate_layered(x, y, _active_event_salt(x, y))
+	_cells[idx] = t
+	return t
+
+
+func _cache_reset() -> void:
+	var n := (max_depth + 64) * WIDTH
+	if _cells.size() != n:
+		_cells.resize(n)
+	_cells.fill(255)
+	_slot_cache.clear()
+
+
+## Поставить предикат защиты клеток (см. protect_cell) и сбросить кэш.
+func set_protect_cell(c: Callable) -> void:
+	protect_cell = c
+	_cache_reset()
+
+
+## База (слои, руды, камень) + особые образования поверх.
 func _generate_layered(x: int, y: int, salt: int) -> int:
+	var base := _generate_base(x, y, salt)
+	if y < _form_min_y:
+		return base
+	return Formations.apply(self, x, y, salt, base)
+
+
+func _generate_base(x: int, y: int, salt: int) -> int:
 	for band: Dictionary in _shallow_layers:
 		if y >= int(band.get("y_min", 0)) and y <= int(band.get("y_max", 0)):
 			var stone_chance: float = band.get("stone_chance", 0.0)

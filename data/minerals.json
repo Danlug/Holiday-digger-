@@ -231,7 +231,8 @@
 				"fall_width": 900,
 				"tail_percent": 1.25,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": 1.0,
 			"max_stack": 99,
@@ -411,7 +412,8 @@
 				"fall_width": 1500,
 				"tail_percent": 5.7,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 2.8,
@@ -444,7 +446,8 @@
 				"fall_width": 1600,
 				"tail_percent": 2.85,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 4.0,
@@ -477,7 +480,8 @@
 				"fall_width": 1600,
 				"tail_percent": 4.9875,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 1.8,
@@ -509,7 +513,8 @@
 				"fall_width": 1600,
 				"tail_percent": 4.9875,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 0.3,
@@ -542,7 +547,8 @@
 				"fall_width": 1500,
 				"tail_percent": 3.5625,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": 4.0,
 			"max_stack": 1,
@@ -571,11 +577,12 @@
 				"type": "parabola",
 				"depth_min": 1500,
 				"peak_depth": 2600,
-				"peak_percent": 4.75,
+				"peak_percent": 2.1,
 				"fall_width": 1800,
-				"tail_percent": 3.5625,
+				"tail_percent": 1.58,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": 10.0,
 			"max_stack": 1,
@@ -608,7 +615,8 @@
 				"fall_width": 2000,
 				"tail_percent": 2.85,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 1.5,
@@ -637,11 +645,12 @@
 				"type": "parabola",
 				"depth_min": 3000,
 				"peak_depth": 4000,
-				"peak_percent": 3.8,
+				"peak_percent": 3.2,
 				"fall_width": 2000,
-				"tail_percent": 2.85,
+				"tail_percent": 2.4,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 3.0,
@@ -670,11 +679,12 @@
 				"type": "parabola",
 				"depth_min": 3000,
 				"peak_depth": 4200,
-				"peak_percent": 5.7,
+				"peak_percent": 2.6,
 				"fall_width": 2000,
-				"tail_percent": 4.275,
+				"tail_percent": 1.95,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 2.0,
@@ -707,7 +717,8 @@
 				"fall_width": 1800,
 				"tail_percent": 2.565,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": 0.1,
 			"max_stack": 99,
@@ -736,7 +747,8 @@
 				"fall_width": 1800,
 				"tail_percent": 2.565,
 				"proposed": true,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
+				"rise": "zero"
 			},
 			"weight_kg": 0.1,
 			"max_stack": 99,
@@ -1188,6 +1200,6 @@
 			"notes": "ожоги наносят урон HP при контакте; также источник перегрева бура (см. balance.json -> tools)"
 		}
 	],
-	"_legend_density_parabola": "до depth_min минерала нет; от depth_min к peak_depth плотность растёт по параболе до peak_percent; глубже peak_depth спадает по параболе с полушириной fall_width, но никогда не ниже tail_percent — минералы не заканчиваются, а редко встречаются на любой глубине.",
+	"_legend_density_parabola": "до depth_min минерала нет; от depth_min к peak_depth плотность растёт по параболе до peak_percent (rise=zero — начиная с нуля; без rise — не ниже tail_percent, как у ранних руд); глубже peak_depth спадает по параболе с полушириной fall_width, но не ниже tail_percent",
 	"_legend_drill": "drill_seconds — время бурения одной клетки в секундах. База копки лопатой/киркой — 3 с (balance.json digging), бур тратит своё время."
 }

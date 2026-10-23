@@ -18,6 +18,9 @@ signal dig_blocked(tile_type: int)  # инструмент не берёт эт�
 ## (обучение: сперва золото, потом фундамент). Текст даёт сюжет, не игрок.
 signal dig_refused_by_story(reason: String)
 signal tool_auto_switched(tool_id: String)
+## Клетка лавы убила бы героя на месте — копка не начинается, лава для него стена
+## (ГДД п.13). cost_hp — сколько HP стоила бы клетка. Реакцию (звук, тост) даёт TechSystem.
+signal dig_refused_by_lava(cost_hp: float)
 signal gear_unlocked(gear_id: String)
 signal jumped
 signal died_in_place
@@ -179,10 +182,6 @@ var _announced_rig: bool = false
 ## отсюда узнаём момент выезда на поверхность (см. _check_rig_surface_exit),
 ## а не пересчитываем его из типа тайла каждый раз.
 var _was_underground: bool = false
-## Дробный остаток расхода топлива (blocks_per_cell меньше единицы — блок
-## тратится не на каждой клетке). Не сохраняется между сессиями: точность в
-## доли блока никто не заметит, а хранить её ради этого не стоит.
-var _rig_fuel_progress: float = 0.0
 ## Тост «кончилось топливо» при попытке копать без брикетов уже показан для
 ## текущего удержания копки — _start_dig вызывается каждый кадр физики, пока
 ## держится направление копки, и без этого флага тост эмитился бы 60 раз в
@@ -360,11 +359,10 @@ func is_in_rig() -> bool:
 	return GameState.current_tool == "drill_rig"
 
 
-## Хватает ли топлива на бурмобиль прямо сейчас. Топливо — брикеты угля
-## (fuel_block), а не сам уголь: уголь ещё нужно спрессовать на верстаке
-## (см. ShopCatalog._recipe_fuel_block_coal).
+## Хватает ли топлива на бурмобиль прямо сейчас. Топливо живёт в баке
+## (scripts/tech/fuel_tank.gd), а блоки заливают на станции или из рюкзака.
 func _has_rig_fuel() -> bool:
-	return GameState.get_item_count("fuel_block") > 0
+	return FuelTank.has_fuel("drill_rig")
 
 
 ## Публичная обёртка — HouseSystem (владелец кнопки «В бурмобиль») спрашивает
@@ -515,7 +513,7 @@ func start_rig_boarding() -> bool:
 	if rig_transition != "" or not GameState.is_rig_parked() or is_in_rig():
 		return false
 	if not _has_rig_fuel():
-		rig_fuel_warning.emit("Нет брикетов — сделай на верстаке из угля")
+		rig_fuel_warning.emit("Бак пуст — заправься у станции")
 		return false
 	rig_transition = "enter"
 	_rig_setup_transition(true)
@@ -576,20 +574,11 @@ func _finish_rig_transition() -> void:
 
 
 ## Тратит топливо бурмобиля за одну прокопанную клетку (расход —
-## balance.json -> fuel_consumption.blocks_per_cell.drill_rig, дробный:
-## блок уходит не на каждый удар). Вызывается из _finish_dig ТОЛЬКО когда
-## клетка реально прокопана — попытка по несокрушимому топливо не тратит.
+## balance.json -> fuel_consumption.blocks_per_cell.drill_rig, дробный).
+## Вызывается из _finish_dig ТОЛЬКО когда клетка реально прокопана — попытка по
+## несокрушимому топливо не тратит.
 func _consume_rig_fuel() -> void:
-	var rate := Balance.get_drill_rig_fuel_per_cell()
-	if rate <= 0.0:
-		return
-	_rig_fuel_progress += rate
-	# Эпсилон против дрейфа плавающей точки: 0.1 десять раз подряд даёт
-	# 0.999999999999999..., а не ровно 1.0, и без запаса блок списывался бы
-	# на одиннадцатой клетке вместо десятой.
-	while _rig_fuel_progress >= 1.0 - 0.0001 and GameState.get_item_count("fuel_block") > 0:
-		_rig_fuel_progress -= 1.0
-		GameState.remove_item("fuel_block", 1)
+	FuelTank.burn_cell("drill_rig")
 
 
 func _check_gear_unlocks() -> void:
@@ -1009,6 +998,9 @@ func _can_dig(type: int) -> bool:
 ## тестируется вместе с игрой: та дублировала бы это число своим, другим).
 func _tool_speed_multiplier() -> float:
 	var mult := Balance.get_tool_speed_multiplier(GameState.current_tool)
+	# Пустой бак ручного бура: бур вхолостую, герой копает лучшей киркой.
+	if GameState.current_tool == "hand_drill" and not FuelTank.has_fuel("hand_drill"):
+		mult = minf(mult, Balance.get_best_pickaxe_speed_multiplier())
 	if GameState.current_tool == "rusty_pickaxe" and rusty_pickaxe_cracked:
 		var broken := float(Balance.unwrap(Balance.get_tool("rusty_pickaxe").get("broken_speed_multiplier", 0.75)))
 		mult *= broken
@@ -1067,7 +1059,7 @@ func _start_dig(tx: int, ty: int) -> void:
 		# одного раза за попытку (сбрасывается там же, когда ввод отпущен).
 		if not _rig_dig_stall_warned:
 			_rig_dig_stall_warned = true
-			rig_fuel_warning.emit("Кончилось топливо")
+			rig_fuel_warning.emit("Бак пуст — заправься у станции")
 		return
 
 	# Запечатанный Робертом огород (уровни 1..4 вне ствола тоннеля) не
@@ -1087,6 +1079,11 @@ func _start_dig(tx: int, ty: int) -> void:
 			and StoryState.is_seen("workshop") and not StoryState.has_flag("gold_taken"):
 		digging = null
 		dig_refused_by_story.emit("gold_first")
+		return
+
+	if type == TileTypes.Type.LAVA and not Heat.can_dig_lava():
+		digging = null
+		dig_refused_by_lava.emit(Heat.lava_cell_cost_hp())
 		return
 
 	if GameState.current_tool == "shovel":
@@ -1138,6 +1135,10 @@ func _start_dig(tx: int, ty: int) -> void:
 		# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
 		total /= GameState.get_speed_multiplier()
 		total = maxf(total, 0.05)
+		if type == TileTypes.Type.LAVA:
+			# Лава — 5 с вне зависимости от инструмента (решение владельца): цена в HP
+			# считается из этого времени (Heat.lava_cell_cost_hp).
+			total = Heat.lava_dig_seconds()
 
 	digging = {"x": tx, "y": ty, "t": 0.0, "total": total, "type": type}
 	dig_started.emit(tx, ty, type)
@@ -1158,6 +1159,8 @@ func _finish_dig() -> void:
 	# тем же правилом, что и опыт ниже.
 	if is_in_rig():
 		_consume_rig_fuel()
+	elif GameState.current_tool == "hand_drill":
+		FuelTank.burn_cell("hand_drill")
 
 	var mineral_id := MineralMap.mineral_id_for(d.type)
 	var price := Balance.get_mineral_price(mineral_id) if not mineral_id.is_empty() else 0

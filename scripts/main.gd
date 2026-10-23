@@ -12,6 +12,10 @@ var world_view: Node2D
 var sky_view: SkyView
 var backdrop: Backdrop
 var clouds_view: CloudsView
+var deep_backdrop: DeepBackdrop   # подземная стена пояса, видна сквозь пустоту (ветка «world»)
+var ambient_fx: AmbientFx         # капли, пыль, светлячки, блики по поясам (ветка «world»)
+var surface_life: SurfaceLife     # трава, бабочки, птицы, светлячки на поверхности (ветка «world»)
+var collapse_fx: CollapseFx       # предупреждение и пыль обвала/землетрясения (ветка «world»)
 var hud: Control
 var view_root: Node2D
 
@@ -63,18 +67,40 @@ func _ready() -> void:
 	clouds_view.name = "CloudsView"
 	view_root.add_child(clouds_view)
 
+	deep_backdrop = DeepBackdrop.new()
+	deep_backdrop.name = "DeepBackdrop"
+	view_root.add_child(deep_backdrop)
+
 	world_view = preload("res://scripts/world/world_view.gd").new()
 	world_view.name = "WorldView"
+	world_view.deep_backdrop_active = true
 	world_view.world = world
 	world_view.fog = fog
 	view_root.add_child(world_view)
 	sky_view.sky_color_source = world_view
+
+	surface_life = SurfaceLife.new()
+	surface_life.name = "SurfaceLife"
+	view_root.add_child(surface_life)
 
 	player = preload("res://scripts/player/player.gd").new()
 	player.name = "Player"
 	player.world = world
 	view_root.add_child(player)
 	world_view.player = player
+
+	ambient_fx = AmbientFx.new()
+	ambient_fx.name = "AmbientFx"
+	ambient_fx.world = world
+	ambient_fx.fog = fog
+	ambient_fx.player = player
+	view_root.add_child(ambient_fx)
+	# Образования не вырывают воздух из клеток-кандидатов артефактов: артефакт
+	# выдаётся при раскопке клетки, а в каверне копать нечего.
+	world.set_protect_cell(_is_artifact_candidate)
+	collapse_fx = CollapseFx.new()
+	collapse_fx.name = "CollapseFx"
+	view_root.add_child(collapse_fx)
 
 	var char_holder := preload("res://scripts/player/character_view.gd").new()
 	char_holder.name = "CharacterView"
@@ -107,6 +133,7 @@ func _ready() -> void:
 	# --- подключение модулей (одна строка на модуль) ---
 	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
 	ProgressScreen.attach(self)  # прокачка, музей, артефакты, рекорды
+	TechSystem.attach(self)  # техника: бак и заправка, жара и лава, скважина и окно отчёта
 	view_root.add_child(HouseSystem.new())  # дом: сон, еда, переходы дом↔огород↔шахта
 	Juice.attach(self)  # «сок»: звук, музыка, частицы, тряска, вибро (scripts/fx/)
 	# --- конец блока подключения ---
@@ -139,6 +166,22 @@ func _ready() -> void:
 	_apply_saved_earthquake_on_start()
 
 	GameState.debug_action_triggered.connect(_on_debug_action)
+
+
+var _artifact_cells: Dictionary = {}
+
+
+## Клетка — кандидат на артефакт (ArtifactSpawn) при текущем сиде. Множество
+## строится один раз, из тех же функций, что и сама раскладка артефактов.
+func _is_artifact_candidate(x: int, y: int) -> bool:
+	if _artifact_cells.is_empty():
+		for a in Balance.artifacts.get("artifacts", []):
+			if ArtifactSpawn.is_scripted_row(a):
+				continue
+			for c: Vector2i in ArtifactSpawn.candidate_cells(a, GameState.world_seed):
+				_artifact_cells[c.y * WorldGen.WIDTH + c.x] = true
+		_artifact_cells[-1] = false
+	return _artifact_cells.has(y * WorldGen.WIDTH + x)
 
 
 func _view_w() -> int:
@@ -196,6 +239,11 @@ func _process(delta: float) -> void:
 	hud.set_camera(cam)
 
 	world_view.render(cam)
+	deep_backdrop.update(cam, _view_w(), _view_h())
+	ambient_fx.update(cam, _view_w(), _view_h(), dt)
+	surface_life.update(cam, _view_w(), _view_h(), dt)
+	collapse_fx.update(cam, _view_w(), _view_h(), dt)
+	_tick_planned_collapse(dt)
 	# Солнце/месяц — экранно-относительные (DayCycle.sun_t()/moon_t() отдают
 	# долю ШИРИНЫ ЭКРАНА, не всей карты, см. sky_view.gd) — без этого вызова
 	# они почти всегда стояли бы за пределами узкого 7-клеточного окна камеры.
@@ -257,16 +305,48 @@ func _on_collapse_tick() -> void:
 		# Обвал случается только НИЖЕ героя (решение владельца), поэтому тик
 		# отдаёт его клетку. Если под ним места не нашлось, обвала не было —
 		# и тоста тоже: пугать сообщением о том, чего не произошло, нечестно.
-		var rect := CollapseEvents.trigger_chunk_collapse(world, fog, null, player.cell_y())
-		if not rect.is_empty():
-			hud.toast("Где-то в шахте прогремел обвал.", 3.0)
-			GameState.emit_event(&"collapse", {})  # для звука и тряски («сок»)
+		# Зону выбираем сразу, а бьём через COLLAPSE_WARN_SECONDS: дрожь, звук и
+		# пыль в зоне — предупреждение (правила и частота те же).
+		if _planned_collapse.is_empty():
+			var plan := CollapseEvents.plan_chunk_collapse(world, null, player.cell_y())
+			if not plan.is_empty():
+				_planned_collapse = plan
+				_planned_left = COLLAPSE_WARN_SECONDS
+				collapse_fx.warn(plan, COLLAPSE_WARN_SECONDS)
+				Fx.shake(1.6, COLLAPSE_WARN_SECONDS)
+				Sfx.play("quake", 1.25, -9.0)   # глухой гул до удара; сам удар озвучивает JuiceDirector по событию
 	elif randf() < 0.03:
 		# Полный ресет не может застать героя в земле (решение владельца):
 		# запоминаем событие и применяем, когда он выберется. Тост — в момент
 		# РЕАЛЬНОГО применения, иначе игрок услышит грохот, которого не было.
 		GameState.pending_earthquake = true
 		_apply_pending_earthquake_if_safe()
+
+
+const COLLAPSE_WARN_SECONDS := 1.6   # ПРЕДЛОЖЕНО: сколько дрожит земля до удара
+var _planned_collapse: Dictionary = {}
+var _planned_left := 0.0
+
+
+## Предупреждение отыграло — бьём по зоне, если герой не оказался в ней или ниже
+## её верха (правило «обвал не бывает выше или на уровне героя» держится и тут).
+func _tick_planned_collapse(dt: float) -> void:
+	if _planned_collapse.is_empty():
+		return
+	_planned_left -= dt
+	if _planned_left > 0.0:
+		return
+	var plan := _planned_collapse
+	_planned_collapse = {}
+	if player.cell_y() >= int(plan.y0):
+		collapse_fx.cancel_warning()
+		return
+	var rect := CollapseEvents.apply_planned(world, fog, plan)
+	collapse_fx.impact(rect)
+	# дрожь, звук и вибро удара — у JuiceDirector по событию «collapse»; пыль в зоне — наша
+	Fx.burst("poof", Vector2((rect.x0 + rect.w * 0.5) * TILE, (rect.y0 + rect.h * 0.5) * TILE), 2.0)
+	GameState.emit_event(&"collapse", {"rect": rect})
+	hud.toast("Где-то в шахте прогремел обвал.", 3.0)
 
 
 ## Отложенное землетрясение: полный ресет копальни не может случиться, пока
@@ -279,8 +359,10 @@ func _apply_pending_earthquake_if_safe() -> bool:
 			player.cell_y(), GameState.house_is_indoors):
 		return false
 	GameState.pending_earthquake = false
+	var cam := _camera()
+	collapse_fx.impact({"x0": int(floor(cam.x)), "y0": 1, "w": _view_w() + 1, "h": _view_h()})
 	hud.toast("Земля вздрогнула — копальню тряхнуло целиком.", 3.6)
-	GameState.emit_event(&"quake", {})  # для звука и тряски («сок»)
+	GameState.emit_event(&"quake", {})  # дрожь и звук — JuiceDirector («сок»)
 	return true
 
 

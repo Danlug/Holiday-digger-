@@ -42,6 +42,10 @@ static func load_locale(locale: String = DEFAULT_LOCALE) -> void:
 	_locale = locale
 
 
+static func has_locale_file(locale: String) -> bool:
+	return FileAccess.file_exists(DIR + "story_" + locale + ".json")
+
+
 static func ensure_loaded() -> void:
 	if _locale.is_empty():
 		load_locale(DEFAULT_LOCALE)

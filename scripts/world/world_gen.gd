@@ -39,6 +39,8 @@ const TUNNEL_X := 17            # колонка пустоты — единст
 const TUNNEL_WALL_LEFT := 16    # левая стена, железобетон
 const TUNNEL_WALL_RIGHT := 18   # правая стена, железобетон
 const TUNNEL_DEPTH := 4         # уровни 1..4, до самого фундамента
+const FUEL_STATION_X := 22      # левая клетка станции заправки (data/tech.json → fuel.station_x_cells)
+const WELL_X := 26              # левая клетка буровой скважины (две клетки шириной)
 # Площадка под пробитым фундаментом: на сколько уровней ниже фундамента
 # расчищается приямок шириной со стены тоннеля (см. build_robert_tunnel).
 const TUNNEL_LANDING_HEIGHT := 2
@@ -481,6 +483,9 @@ const GARDEN_DECOR_DENSITY := 0.55
 func garden_decor_at(x: int) -> String:
 	if x < GARDEN_X_MIN or x == TUNNEL_X:
 		return ""
+	# Площадки под станцию заправки и скважину (ветка «Техника») — по две клетки без декора.
+	if (x >= FUEL_STATION_X and x < FUEL_STATION_X + 2) or (x >= WELL_X and x < WELL_X + 2):
+		return ""
 	if _roll(x, 0, "garden_decor_has", 0) > GARDEN_DECOR_DENSITY:
 		return ""
 	var list: Array = GARDEN_DECOR_GRANDPA if era == "grandpa" \
@@ -652,6 +657,10 @@ func _generate_layered(x: int, y: int, salt: int) -> int:
 	if _roll(x, y, "void", salt) < void_chance:
 		return TileTypes.Type.EMPTY
 
+	# Лава (ГДД п.13): озёра с глубины 3000, форму решает LavaField (ветка «Техника»).
+	if y >= LavaField.min_depth() and LavaField.is_lava(world_seed, x, y, salt):
+		return TileTypes.Type.LAVA
+
 	for ore: Dictionary in _ores:
 		if y < int(ore.get("y_min", 0)):
 			continue
@@ -669,6 +678,21 @@ func _generate_layered(x: int, y: int, salt: int) -> int:
 		return TileTypes.Type.STONE
 
 	return TileTypes.Type.DIRT
+
+
+## Какие руды лежат на глубине y и с какой плотностью: [{id, density}]. Читает
+## скважина (scripts/world/idle_well.gd), чтобы её добыча повторяла состав породы,
+## а не придумывалась отдельно. Плотность — до вычета тех, кто выиграл бросок раньше
+## в списке, то есть верхняя оценка.
+func ore_densities_at(y: int) -> Array:
+	var out: Array = []
+	for ore: Dictionary in _ores:
+		if y < int(ore.get("y_min", 0)):
+			continue
+		if ore.has("y_max") and y > int(ore.get("y_max")):
+			continue
+		out.append({"id": String(ore.get("id", "")), "density": _ore_density(ore, y)})
+	return out
 
 
 ## Плотность руды на глубине y. Три профиля:

@@ -33,6 +33,8 @@ static var _tile_to_mineral: Dictionary = {
 	TileTypes.Type.UNIVERSALIUM: "universum",
 	TileTypes.Type.ANGEL_STONE: "angelstone",
 	TileTypes.Type.DIVINE_HEART: "divine_heart",
+	# Остывшая лава оставляет обсидиан (data/tech.json → heat.lava.drop).
+	TileTypes.Type.LAVA: "obsidian",
 	# FOUNDATION и STAIRCASE сознательно не отражены — фундамент не лут
 	# (капает 0 монет, у него нет статьи в minerals.json), лестница вообще
 	# не копается.

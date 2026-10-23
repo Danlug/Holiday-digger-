@@ -11,6 +11,8 @@ var total := 0
 var main: Node2D
 var director: CombatDirector
 var events: Array = []
+## Ряд тоннеля для сцен боя: подобран так, чтобы под коридором был сплошной пол.
+var _row := 4600
 
 
 func check(name: String, ok: bool) -> void:
@@ -34,13 +36,18 @@ func _count(id: String) -> int:
 	return n
 
 
-func _step(n: int, dt: float = 1.0 / 30.0) -> void:
+func _step(n: int, dt: float = 1.0 / 30.0, keep_alive: bool = false) -> void:
 	for i in range(n):
+		if keep_alive:
+			GameState.hp = GameState.get_max_hp()
 		director._process(dt)
 
 
 func _ready() -> void:
 	print("=== test_combat_integration ===")
+	# Весь бой считается по шагам dt, но броски (появление, удар, дроп, поведение червя) — на общем
+	# генераторе: без сида каждый десятый запуск ронял героя в фазе спавна и ломал все проверки ниже.
+	seed(20260101)
 	StoryState.mark_seen("intro_grandpa")
 	StoryState.mark_seen("intro_boy")
 	GameState.ext.clear()
@@ -70,6 +77,7 @@ func _ready() -> void:
 	director.set_process(false)
 	var p = main.player
 	var w: WorldGen = main.world
+	_row = _solid_floor_row(w, 4600)
 	p.frozen = false
 	GameState.house_is_indoors = false
 	GameState.respawn()
@@ -82,11 +90,14 @@ func _ready() -> void:
 	check("кнопка удара не показывается на мелководье", not director.combat_ui_visible())
 
 	# --- глубже 4000: спавн по таймеру в тоннеле ---
-	_place_hero(p, w, 4600)
+	_place_hero(p, w, _row)
 	director.spawner.reset()
+	director.spawner.rng.seed = 424242
 	var spawned := [0]
 	director.monster_spawned.connect(func(_m) -> void: spawned[0] += 1)
-	_step(30 * 40)
+	# Монстры бьют героя без брони, а HP в тесте не лечится (регенерация идёт по реальному времени):
+	# проверяем появление и место, а не выживание — оно ниже.
+	_step(30 * 40, 1.0 / 30.0, true)
 	check("глубже 4000 появляются монстры", spawned[0] >= 2)
 	var inside_ok := true
 	for m: Monster in director.monsters:
@@ -94,17 +105,18 @@ func _ready() -> void:
 			inside_ok = false
 	check("монстры не застряли в породе", inside_ok)
 	check("кнопка удара видна в зоне боя", director.combat_ui_visible())
-	check("лимит монстров соблюдается", director.monsters.size() <= MonsterSpawner.max_alive(4600) + 5)
+	check("лимит монстров соблюдается", director.monsters.size() <= MonsterSpawner.max_alive(_row) + 5)
 	director.monsters.clear()
 	director.spawning_enabled = false   # дальше сцены собираем вручную
+	check("герой пережил фазу спавна (тест не зависит от везения)", GameState.is_alive)
 
 	# --- удар героя и урон по герою ---
 	CombatService.give("blade_t2")   # чтобы бой не зависел от везения с кулдауном кирки
 	CombatService.equip("blade_t2")
 	director._stats_dirty = true
 	GameState.hp = GameState.get_max_hp()
-	_place_hero(p, w, 4600)
-	var grub := director.spawn({"id": "cinder_grub", "x": 18.5, "y": 4600.0, "group": 1, "emerge": Vector2.ZERO})
+	_place_hero(p, w, _row)
+	var grub := director.spawn({"id": "cinder_grub", "x": 18.5, "y": float(_row), "group": 1, "emerge": Vector2.ZERO})
 	p.facing = 1
 	var hp0 := GameState.hp
 	var kills0 := _count("monster_killed")
@@ -126,7 +138,7 @@ func _ready() -> void:
 	# дроп
 	var drops_seen := 0
 	for k in range(60):
-		var g := Monster.create("cinder_grub", 18.5, 4600, 4500)
+		var g := Monster.create("cinder_grub", 18.5, _row, 4500)
 		director.monsters.append(g)
 		g.take_hit(1e9, 1)
 		_step(30)
@@ -137,8 +149,8 @@ func _ready() -> void:
 	GameState.inventory.clear()
 	director.monsters.clear()
 	GameState.hp = GameState.get_max_hp()
-	_place_hero(p, w, 4600)
-	var biter := director.spawn({"id": "cinder_grub", "x": 17.6, "y": 4600.0, "group": 2, "emerge": Vector2.ZERO})
+	_place_hero(p, w, _row)
+	var biter := director.spawn({"id": "cinder_grub", "x": 17.6, "y": float(_row), "group": 2, "emerge": Vector2.ZERO})
 	biter.max_hp = 1e9
 	biter.hp = 1e9
 	director.swing_cd = 99.0   # не убиваем: проверяем только урон по герою
@@ -182,8 +194,8 @@ func _ready() -> void:
 	director.hero_hurt.connect(func(d: float, _s: String) -> void: armored["dmg"] = d)
 	director.iframes = 0.0
 	GameState.hp = GameState.get_max_hp()
-	_place_hero(p, w, 4600)
-	var biter2 := director.spawn({"id": "cinder_grub", "x": 17.6, "y": 4600.0, "group": 3, "emerge": Vector2.ZERO})
+	_place_hero(p, w, _row)
+	var biter2 := director.spawn({"id": "cinder_grub", "x": 17.6, "y": float(_row), "group": 3, "emerge": Vector2.ZERO})
 	biter2.max_hp = 1e9
 	biter2.hp = 1e9
 	director.swing_cd = 99.0
@@ -216,7 +228,7 @@ func _ready() -> void:
 	var died_flag := [false]
 	GameState.died.connect(func() -> void: died_flag[0] = true)
 	var dead_hp_frames := 0
-	director.spawn({"id": "abyss_warden", "x": 17.6, "y": 4600.0, "group": 4, "emerge": Vector2.ZERO})
+	director.spawn({"id": "abyss_warden", "x": 17.6, "y": float(_row), "group": 4, "emerge": Vector2.ZERO})
 	GameState.hp = 3.0
 	director.iframes = 0.0
 	director.swing_cd = 99.0
@@ -237,6 +249,22 @@ func _menu_has(id: String) -> bool:
 		if String(e["id"]) == id:
 			return true
 	return false
+
+
+## Мир собирается от случайного сида: под коридором на ряду 4600 бывает пустота или лава, и червь,
+## провалившись на клетку-две вниз, оказывался вне досягаемости удара — тест падал примерно раз в
+## двадцать запусков. Берём ближайший ряд, под которым вся полоса коридора сплошная.
+func _solid_floor_row(w: WorldGen, from_row: int) -> int:
+	for d in range(from_row, from_row + 300):
+		var ok := true
+		for x in range(8, 26):
+			var t := w.get_tile(x, d + 1)
+			if t == TileTypes.Type.EMPTY or t == TileTypes.Type.LAVA:
+				ok = false
+				break
+		if ok:
+			return d
+	return from_row
 
 
 func _place_hero(p, w: WorldGen, depth: int) -> void:

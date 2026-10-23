@@ -9,10 +9,13 @@ class_name IdleWell
 ## Добытое складывается НА СКЛАД, а не в рюкзак: рюкзак — это то, что герой
 ## несёт на себе, а скважина стоит у дома (ГДД п.14).
 ##
-## Доход в час = база(balance.json) × (1 + глубина/100) × множитель ступени,
-## где глубина — min(рекорд игрока, глубина ступени). Ступени (data/tech.json →
-## well.levels) поднимают три вещи разом: на какой глубине копает скважина,
-## множитель дохода и офлайн-кап. Расчёт окупаемости — tools/sim_tech.py.
+## Доход в час = клеток в час (ступень, data/tech.json → well.levels) × ожидаемая
+## выручка клетки на глубине скважины (плотность руды × цена по настоящей породе).
+## Глубина — min(рекорд игрока, глубина ступени). Ступени поднимают три вещи разом:
+## на какой глубине копает скважина, сколько клеток в час и офлайн-кап. Так доход
+## сам повторяет кривую ценности породы (она растёт до ~2000 и падает: глубже
+## ценное несчитаемо, цены у него нет), а не линейную придуманную формулу.
+## Расчёт окупаемости и сравнение с активной игрой — tools/sim_tech.py.
 ##
 ## Часы телефона: накопление считается по реальному времени, поэтому от
 ## перемотки есть защита — отметка «видел время» и офлайн-кап (см. pending_seconds).
@@ -48,9 +51,9 @@ static func level_row(level: int) -> Dictionary:
 	return rows[level - 1] if level >= 1 and level <= rows.size() else {}
 
 
-static func mult(level: int = -1) -> float:
+static func cells_per_hour(level: int = -1) -> float:
 	var l := GameState.well_level if level < 0 else level
-	return float(level_row(l).get("mult", 1.0))
+	return float(level_row(l).get("cells_per_hour", 0.0))
 
 
 static func depth_cap(level: int = -1) -> int:
@@ -68,16 +71,20 @@ static func effective_depth(level: int = -1) -> int:
 	return mini(GameState.max_depth_reached, depth_cap(level))
 
 
-static func base_income() -> float:
-	var w: Dictionary = Balance.balance.get("idle_well", {})
-	return float(Balance.unwrap(w.get("base_income_coins_per_hour", 50)))
+## Ожидаемая выручка одной прокопанной клетки на глубине (монеты): сумма
+## «доля клеток × цена» по продаваемым рудам. Делится на «монеты-меру» — платят рудой.
+static func coins_per_cell(depth: int) -> float:
+	var total := 0.0
+	for r in _composition(depth):
+		total += float(r["w"])
+	return total
 
 
 ## Монет-эквивалента в час (мера дохода; платят рудой).
 static func income_per_hour(level: int = -1) -> float:
 	if not is_built() and level < 0:
 		return 0.0
-	return base_income() * (1.0 + float(effective_depth(level)) / 100.0) * mult(level)
+	return cells_per_hour(level) * coins_per_cell(maxi(effective_depth(level), 1))
 
 
 ## Цена следующей ступени или null (максимум / не построена).
@@ -152,10 +159,12 @@ static func fill_fraction(now: int = -1) -> float:
 
 ## Забрать накопленное: кладёт добычу на склад и возвращает отчёт
 ## {seconds, raw_seconds, capped, cap_hours, items:{id:n}, coins_value, per_hour, level}.
-## Пустой словарь — забирать нечего (не построена, откат часов, нет добычи).
-## Отметка забора ставится ДО выплаты: убитое посреди окна отчёта приложение не
-## выплатит дважды.
-static func collect(now: int = -1) -> Dictionary:
+## Пустой словарь — забирать нечего: не построена, откат часов, накопилось меньше
+## min_seconds (по умолчанию well.report_min_seconds; 0 — забрать как есть) или
+## выручка не тянет даже на одну штуку; тогда отметка забора НЕ двигается и
+## накопленное копится дальше. Отметка ставится в одном шаге с выплатой: убитое
+## посреди окна отчёта приложение не выплатит дважды.
+static func collect(now: int = -1, min_seconds: float = -1.0) -> Dictionary:
 	var t := now_unix() if now < 0 else now
 	if not is_built():
 		return {}
@@ -171,16 +180,19 @@ static func collect(now: int = -1) -> Dictionary:
 			GameState.well_last_collect_unix = mini(GameState.well_last_collect_unix, t)
 		return {}
 	var raw := pending_seconds(t)
+	var floor_s := report_min_seconds() if min_seconds < 0.0 else min_seconds
+	if raw < floor_s:
+		note_time(t)
+		return {}
 	var secs := minf(raw, cap_hours() * 3600.0)
+	var value := income_coins_for_seconds(secs)
+	var items := _basket_for_value(value) if value > 0 else {}
+	if items.is_empty():
+		note_time(t)
+		return {}
 	# Якорь не уходит назад, даже если часы чуть отстали (в пределах допуска).
 	GameState.well_last_collect_unix = maxi(GameState.well_last_collect_unix, t)
 	note_time(t)
-	var value := income_coins_for_seconds(secs)
-	if value <= 0:
-		return {}
-	var items := _basket_for_value(value)
-	if items.is_empty():
-		return {}
 	for id in items.keys():
 		HouseStorage.store_directly(String(id), int(items[id]))
 	GameState.emit_event(&"well_collected", {"value": value, "seconds": secs})
@@ -194,6 +206,10 @@ static func collect(now: int = -1) -> Dictionary:
 		"per_hour": int(income_per_hour()),
 		"level": GameState.well_level,
 	}
+
+
+static func report_min_seconds() -> float:
+	return float(TechData.v(TechData.well().get("report_min_seconds", 300)))
 
 
 static func _forgive_seconds() -> int:
@@ -239,13 +255,13 @@ static func upgrade() -> Dictionary:
 # ---------------------------------------------------------------------------
 
 ## Корзина руды на заданную сумму. Состав повторяет породу на глубине скважины:
-## доля ценности руды ∝ плотность × цена; берём MAX_KINDS самых весомых, золото
-## обязательно (владелец назвал его отдельно, и оно же — узнаваемая строка в
-## отчёте). Продаваемое только: экзотика с глубины 3000 (цены нет) нужна на
-## ступени костюма и скважины, и её добывает рука игрока, а не простаивающая
-## установка — иначе незачем идти к лаве.
+## доля ценности руды ∝ доля клеток × цена; берём MAX_KINDS самых весомых, золото
+## обязательно (владелец назвал его отдельно, и оно же — узнаваемая строка в отчёте).
+## Продаваемое только: экзотика с глубины 3000 (цены нет) нужна на ступени костюма и
+## скважины, и её добывает рука игрока, а не простаивающая установка — иначе
+## незачем идти к лаве.
 static func _basket_for_value(value: int) -> Dictionary:
-	var rows := _composition()
+	var rows := _top_kinds(_composition(maxi(effective_depth(), 1)))
 	if rows.is_empty():
 		return {}
 	var total_w := 0.0
@@ -256,18 +272,19 @@ static func _basket_for_value(value: int) -> Dictionary:
 		var id := String(r["id"])
 		var price: int = maxi(1, int(r["price"]))
 		var share: float = float(value) * float(r["w"]) / maxf(total_w, 0.0001)
-		out[id] = maxi(1, int(round(share / float(price))))
+		var n := int(round(share / float(price)))
+		if n >= 1:
+			out[id] = n
 	return out
 
 
-## [{id, price, w}] самых весомых руд на глубине скважины, золото — всегда.
-static func _composition() -> Array:
+## [{id, price, w}] — все продаваемые добываемые руды на глубине, w — выручка клетки.
+static func _composition(depth: int) -> Array:
 	var world: WorldGen = GameState.world_ref
 	if world == null:
 		if _probe_world == null:
 			_probe_world = WorldGen.new(1)
 		world = _probe_world
-	var depth: int = maxi(effective_depth(), 1)
 	var rows: Array = []
 	for d in world.ore_densities_at(depth):
 		var id := String(d["id"])
@@ -282,14 +299,20 @@ static func _composition() -> Array:
 		if String(m.get("category", "")) == "crafted" or m.get("density", null) == null:
 			continue
 		rows.append({"id": id, "price": price, "w": float(d["density"]) * float(price)})
-	rows.sort_custom(func(a, b): return float(a["w"]) > float(b["w"]))
-	var out: Array = rows.slice(0, MAX_KINDS)
+	return rows
+
+
+## Самые весомые MAX_KINDS руд, золото — всегда.
+static func _top_kinds(rows: Array) -> Array:
+	var sorted_rows := rows.duplicate()
+	sorted_rows.sort_custom(func(a, b): return float(a["w"]) > float(b["w"]))
+	var out: Array = sorted_rows.slice(0, MAX_KINDS)
 	var has_gold := false
 	for r in out:
 		if String(r["id"]) == "gold":
 			has_gold = true
-	if not has_gold:
-		for r in rows:
+	if not has_gold and not out.is_empty():
+		for r in sorted_rows:
 			if String(r["id"]) == "gold":
 				out[out.size() - 1] = r
 				break

@@ -1436,82 +1436,18 @@ func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 
 
 ## Отчёт скважины при возвращении в игру (решение владельца): показать, что
-## накопала за время отсутствия. Карточка со списком и одной кнопкой —
-## закрывается ею же и тапом мимо, как остальные меню.
+## накопала за время отсутствия. Окно рисует ветка «Техника»
+## (scripts/tech/well_report.gd): плитки-иконки, ссыпание на склад, «×2».
 func show_well_report(report: Dictionary) -> void:
-	if report.is_empty() or _well_panel != null:
-		return
-	_well_panel = Control.new()
-	_well_panel.name = "WellReport"
-	_well_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_well_panel)
-
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_well_panel.add_child(dim)
-
-	var card := PanelContainer.new()
-	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	card.custom_minimum_size = Vector2(200, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.set_border_width_all(1)
-	sb.set_content_margin_all(8)
-	card.add_theme_stylebox_override("panel", sb)
-	_well_panel.add_child(card)
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 5)
-	card.add_child(box)
-
-	var title := Label.new()
-	title.text = "Скважина работала без тебя"
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-	box.add_child(title)
-
-	var since := Label.new()
-	since.text = "За %s накопала:" % _humanize_seconds(float(report.get("seconds", 0.0)))
-	since.add_theme_font_size_override("font_size", 10)
-	box.add_child(since)
-
-	for id in report.get("items", {}).keys():
-		var row := HBoxContainer.new()
-		var name_label := Label.new()
-		name_label.text = String(Balance.get_mineral(String(id)).get("name_ru", id))
-		name_label.add_theme_font_size_override("font_size", 10)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_label)
-		var count_label := Label.new()
-		count_label.text = "×%d" % int(report["items"][id])
-		count_label.add_theme_font_size_override("font_size", 10)
-		count_label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
-		row.add_child(count_label)
-		box.add_child(row)
-
-	var note := Label.new()
-	note.text = "Всё сложено на склад в мастерской."
-	note.add_theme_font_size_override("font_size", 9)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	note.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
-	box.add_child(note)
-
-	var ok := Button.new()
-	ok.text = "Хорошо"
-	ok.add_theme_font_size_override("font_size", 10)
-	ok.pressed.connect(close_well_report)
-	box.add_child(ok)
+	var w := get_tree().get_first_node_in_group("well_report")
+	if w != null and not report.is_empty():
+		w.call("show_report", report)
 
 
 func close_well_report() -> void:
-	if _well_panel == null:
-		return
-	_well_panel.queue_free()
-	_well_panel = null
+	var w := get_tree().get_first_node_in_group("well_report")
+	if w != null:
+		w.call("close")
 
 
 static func _humanize_seconds(seconds: float) -> String:
@@ -1900,14 +1836,9 @@ func _sync_tool() -> void:
 func _sync_fuel() -> void:
 	if _fuel_label == null:
 		return
-	var in_rig := GameState.current_tool == "drill_rig"
-	_fuel_label.visible = in_rig
-	if not in_rig:
-		return
-	var n := GameState.get_item_count("fuel_block")
-	_fuel_label.text = "Топливо %d" % n
-	_fuel_label.add_theme_color_override("font_color",
-		Color8(0xB8, 0x5A, 0x52) if n <= 0 else Color8(0x9D, 0x8B, 0x73))
+	# Топливо теперь в баке и показывает его значок ветки «Техника» (TechHud);
+	# число блоков в рюкзаке — не то, чем копает бур.
+	_fuel_label.visible = false
 
 
 ## На полосе — один значок: то, что надето. Тёмная иконка недоступного
@@ -2259,7 +2190,7 @@ func _input(event: InputEvent) -> void:
 	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
 	if _dismiss_on_outside_press(event):
 		return
-	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
 		return
 
 	# Тестовая панель (debug_panel.gd) плавает НАД нижней полосой, то есть
@@ -2426,7 +2357,7 @@ func _handle_hold_input(event: InputEvent) -> void:
 ## клавиатура, потом палец: клавиша главнее, иначе лежащий на стекле палец
 ## перебивал бы её каждый кадр.
 func update_input_intent() -> void:
-	if player == null or ProgressScreen.is_open() or is_more_menu_open():
+	if player == null or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
 		return
 	if _apply_keyboard():
 		return

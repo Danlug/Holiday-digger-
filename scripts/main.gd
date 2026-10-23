@@ -107,6 +107,7 @@ func _ready() -> void:
 	# --- подключение модулей (одна строка на модуль) ---
 	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
 	ProgressScreen.attach(self)  # прокачка, музей, артефакты, рекорды
+	TechSystem.attach(self)  # техника: бак и заправка, жара и лава, скважина и окно отчёта
 	view_root.add_child(HouseSystem.new())  # дом: сон, еда, переходы дом↔огород↔шахта
 	# --- конец блока подключения ---
 

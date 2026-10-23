@@ -18,6 +18,9 @@ signal dig_blocked(tile_type: int)  # инструмент не берёт эт�
 ## (обучение: сперва золото, потом фундамент). Текст даёт сюжет, не игрок.
 signal dig_refused_by_story(reason: String)
 signal tool_auto_switched(tool_id: String)
+## Клетка лавы убила бы героя на месте — копка не начинается, лава для него стена
+## (ГДД п.13). cost_hp — сколько HP стоила бы клетка. Реакцию (звук, тост) даёт TechSystem.
+signal dig_refused_by_lava(cost_hp: float)
 signal gear_unlocked(gear_id: String)
 signal jumped
 signal died_in_place
@@ -1076,6 +1079,11 @@ func _start_dig(tx: int, ty: int) -> void:
 			and StoryState.is_seen("workshop") and not StoryState.has_flag("gold_taken"):
 		digging = null
 		dig_refused_by_story.emit("gold_first")
+		return
+
+	if type == TileTypes.Type.LAVA and not Heat.can_dig_lava():
+		digging = null
+		dig_refused_by_lava.emit(Heat.lava_cell_cost_hp())
 		return
 
 	if GameState.current_tool == "shovel":

@@ -40,7 +40,7 @@ const TUNNEL_WALL_LEFT := 16    # левая стена, железобетон
 const TUNNEL_WALL_RIGHT := 18   # правая стена, железобетон
 const TUNNEL_DEPTH := 4         # уровни 1..4, до самого фундамента
 const FUEL_STATION_X := 22      # левая клетка станции заправки (data/tech.json → fuel.station_x_cells)
-const WELL_X := 26              # левая клетка буровой скважины (две клетки шириной)
+const WELL_X := 27              # левая клетка буровой скважины (две клетки шириной)
 # Площадка под пробитым фундаментом: на сколько уровней ниже фундамента
 # расчищается приямок шириной со стены тоннеля (см. build_robert_tunnel).
 const TUNNEL_LANDING_HEIGHT := 2
@@ -483,8 +483,9 @@ const GARDEN_DECOR_DENSITY := 0.55
 func garden_decor_at(x: int) -> String:
 	if x < GARDEN_X_MIN or x == TUNNEL_X:
 		return ""
-	# Площадки под станцию заправки и скважину (ветка «Техника») — по две клетки без декора.
-	if (x >= FUEL_STATION_X and x < FUEL_STATION_X + 2) or (x >= WELL_X and x < WELL_X + 2):
+	# Площадки под станцию заправки и скважину (ветка «Техника») — по две клетки и по
+	# одной запасной с каждой стороны: деревья шире клетки и залезли бы на объект.
+	if (x >= FUEL_STATION_X - 1 and x < FUEL_STATION_X + 3) or (x >= WELL_X - 1 and x < WELL_X + 3):
 		return ""
 	if _roll(x, 0, "garden_decor_has", 0) > GARDEN_DECOR_DENSITY:
 		return ""
@@ -680,18 +681,22 @@ func _generate_layered(x: int, y: int, salt: int) -> int:
 	return TileTypes.Type.DIRT
 
 
-## Какие руды лежат на глубине y и с какой плотностью: [{id, density}]. Читает
-## скважина (scripts/world/idle_well.gd), чтобы её добыча повторяла состав породы,
-## а не придумывалась отдельно. Плотность — до вычета тех, кто выиграл бросок раньше
-## в списке, то есть верхняя оценка.
+## Какие руды лежат на глубине y и какую ДОЛЮ клеток занимают: [{id, density}].
+## Доля честная: руды проверяются по списку и первая совпавшая забирает клетку, а
+## десятая часть породы — пустоты, поэтому каждая следующая получает остаток. Читает
+## скважина (scripts/world/idle_well.gd), чтобы её добыча и доход повторяли
+## настоящий состав породы, а не придумывались отдельно.
 func ore_densities_at(y: int) -> Array:
 	var out: Array = []
+	var left: float = 1.0 - float(_deep.get("void_chance", 0.0))
 	for ore: Dictionary in _ores:
 		if y < int(ore.get("y_min", 0)):
 			continue
 		if ore.has("y_max") and y > int(ore.get("y_max")):
 			continue
-		out.append({"id": String(ore.get("id", "")), "density": _ore_density(ore, y)})
+		var d := _ore_density(ore, y)
+		out.append({"id": String(ore.get("id", "")), "density": left * d})
+		left *= (1.0 - d)
 	return out
 
 

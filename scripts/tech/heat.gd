@@ -114,6 +114,13 @@ static func lava_cell_cost_hp(tier: int = -1) -> float:
 	return lava_dps(tier) * lava_dig_seconds()
 
 
+## Хватит ли здоровья на клетку лавы целиком. Нет — копка не начинается, лава для
+## героя стена (владелец: «до прокачки лава — стена, а не препятствие»), а не
+## мгновенная смерть от одного неверного касания.
+static func can_dig_lava() -> bool:
+	return GameState.debug_invincible or lava_cell_cost_hp() < GameState.hp
+
+
 ## Пока герой копает лаву — жжём. dt — секунды кадра. Возвращает нанесённый урон.
 static func burn_digger(dt: float) -> float:
 	var dmg := lava_dps() * dt

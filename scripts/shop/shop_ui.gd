@@ -568,7 +568,7 @@ static func wallet_text(n: int, compact_from: int = 1000000) -> String:
 	return ShopArt.full(n) if n < compact_from else ShopArt.compact(n)
 
 
-func _chip_fmt(which: String, n: int) -> String:
+func _chip_fmt(n: int, which: String) -> String:
 	return wallet_text(n, 1000000 if which == "coins" else 10000)
 
 
@@ -594,7 +594,7 @@ func _set_chip_value(which: String, value: int, animate: bool) -> void:
 		_wallet_tween[which] = ShopFx.count_up(self, label, shown, value, 0.45, 0.0, _chip_fmt.bind(which))
 		ShopFx.pop(chip["root"], 0.12, 0.2)
 	else:
-		label.text = _chip_fmt(which, value)
+		label.text = _chip_fmt(value, which)
 	if which == "coins":
 		_shown_coins = value
 	else:
@@ -1365,7 +1365,7 @@ func _do_sell(remote: bool) -> void:
 		arrived += 1
 		Sfx.play("coin", 1.0 + 0.04 * float(arrived % 6))
 		var part := coins_before + int(round(float(gained) * float(arrived) / float(n_total)))
-		(_chips["coins"]["label"] as Label).text = _chip_fmt("coins", mini(part, coins_before + gained))
+		(_chips["coins"]["label"] as Label).text = _chip_fmt(mini(part, coins_before + gained), "coins")
 		ShopFx.pop(_chips["coins"]["root"], 0.1, 0.12)
 	var spawned := 0
 	for t in sold_tiles:

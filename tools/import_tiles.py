@@ -418,6 +418,20 @@ def mean_lab(img):
     return [sum(v[i] for v in labs) / len(labs) for i in range(3)]
 
 
+def _owned_by_sprites():
+    """Руды, перерисованные спрайтами (tools/ores_metals.py, tools/ores_gems.py): их плитки пишет gen_tiles_deep.py,
+    нарезка авторского листа их не трогает."""
+    import importlib
+    names = set()
+    for mod_name in ("ores_metals", "ores_gems"):
+        try:
+            names |= set(getattr(importlib.import_module(mod_name), "TILES", {}))
+        except ModuleNotFoundError as e:
+            if e.name != mod_name:
+                raise
+    return names
+
+
 def main(sheet_path):
     sheet = Image.open(sheet_path).convert("RGB")
     print("лист:", sheet.size)
@@ -461,9 +475,13 @@ def main(sheet_path):
 
     worst = (0.0, "")
     bgs = []
+    owned = _owned_by_sprites()
     for (r, c), name in sorted(MAP.items()):
         if (r, c) not in grid:
             print(f"  !! ячейка {r},{c} пуста, {name} не записан")
+            continue
+        if name in owned:
+            print(f"  {name:16s} пропущен: перерисован спрайтом (tools/ores_*.py, собирается gen_tiles_deep.py)")
             continue
         img, bg, weights = prepare(flat[(r, c)].copy(), name, ref)
         img.save(os.path.join(ROOT, "art", "tiles", name + ".png"))

@@ -292,6 +292,9 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			Sfx.play("boss_roar")
 			Fx.shake(5.0, 0.6)
 			Haptics.buzz(120)
+		&"boss_failed":
+			# герой погиб на арене: музыка босса не должна пережить бой (ветка combat)
+			_boss_active = false
 		&"boss_defeated":
 			_boss_active = false
 			Sfx.play("levelup")

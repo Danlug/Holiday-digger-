@@ -83,6 +83,9 @@ func refresh() -> void:
 
 
 func _is_gem_lit(mineral_id: String) -> bool:
+	# Гнездо горит и когда материал уже вставлен в Перчатку (экран «Снаряжение»), и когда он просто добыт.
+	if CombatService.socket_filled(mineral_id):
+		return true
 	return store != null and store.discovered_minerals.has(mineral_id)
 
 

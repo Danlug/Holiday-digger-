@@ -678,7 +678,9 @@ func _clear_diffs_in_rect(x0: int, y0: int, w: int, h: int) -> void:
 		var packed: int = key
 		var x: int = packed % WIDTH
 		var y: int = packed / WIDTH
-		if x >= x0 and x < x1 and y >= y0 and y < y1 and not is_permanent_feature(x, y):
+		# Глубже _perm_max_y зафиксированных структур нет (то же условие в _permanent_feature_type):
+		# землетрясение на 20 000 диффах не зовёт функцию на каждую клетку шахты.
+		if x >= x0 and x < x1 and y >= y0 and y < y1 and (y > _perm_max_y or not is_permanent_feature(x, y)):
 			diffs.erase(key)
 
 

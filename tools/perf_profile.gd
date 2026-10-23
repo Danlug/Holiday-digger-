@@ -60,7 +60,7 @@ func _ready() -> void:
 			st[0], total / 1000.0, res.nodes, res.objects,
 			(", draw calls %d, объектов рендера %d, примитивов %d" % [res.draw_calls, res.render_objects, res.primitives]) if real else ""])
 		for row in res.top:
-			print("    %7.0f мкс  x%-3d %s" % [row[1], row[2], row[0]])
+			print("    %7.0f мкс (худший кадр %6.0f)  x%-3d %s" % [row[1], row[3], row[2], row[0]])
 		print("  main._process по частям (мкс): ", res.main_segments)
 		if real:
 			print("  draw calls / объектов рендера, которые даёт поддерево (разность при скрытии): ", res.draw_by_subtree)
@@ -139,8 +139,9 @@ func _manual_frames(main: Node) -> Dictionary:
 			var dt := Time.get_ticks_usec() - t0
 			var key: String = n.get_script().resource_path if n.get_script() != null else n.get_class()
 			if not per_script.has(key):
-				per_script[key] = {"us": 0.0, "nodes": {}}
+				per_script[key] = {"us": 0.0, "max": 0.0, "nodes": {}}
 			per_script[key].us += float(dt) / float(FRAMES)
+			per_script[key].max = maxf(float(per_script[key].max), float(dt))
 			per_script[key].nodes[n.get_instance_id()] = true
 	for n in nodes:
 		n.set_process(true)
@@ -203,6 +204,6 @@ func _collect(root: Node, into: Array) -> void:
 func _top(per_script: Dictionary, n: int) -> Array:
 	var rows: Array = []
 	for k in per_script:
-		rows.append([String(k).trim_prefix("res://scripts/"), float(per_script[k].us), per_script[k].nodes.size()])
+		rows.append([String(k).trim_prefix("res://scripts/"), float(per_script[k].us), per_script[k].nodes.size(), float(per_script[k].max)])
 	rows.sort_custom(func(a, b): return a[1] > b[1])
 	return rows.slice(0, n)

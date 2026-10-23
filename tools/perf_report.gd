@@ -69,6 +69,19 @@ func _world_numbers() -> void:
 	_out["get_tile_us_with_8000_diffs"] = _bench(20000, func(i): w.get_tile(i % WorldGen.WIDTH, 6 + (i / 32) % 470))
 	var fog := FogOfWar.new()
 	_out["fog_get_state_us"] = _bench(20000, func(i): fog.get_state(i % 32, 6 + i % 400))
+	# События мира на большой шахте (20 000 выкопанных клеток): разовые подвисы кадра.
+	var ev := WorldGen.new(778)
+	for i in range(20000):
+		ev.diffs[(6 + i / 17) * WorldGen.WIDTH + WorldGen.GARDEN_X_MIN + i % 17] = true
+	var t1 := Time.get_ticks_usec()
+	ev.apply_chunk_event(18, 300, 8, 8, 5)
+	_out["event_collapse_ms_20k_diffs"] = float(Time.get_ticks_usec() - t1) / 1000.0
+	t1 = Time.get_ticks_usec()
+	ev.apply_global_event(6)
+	_out["event_earthquake_ms_20k_diffs"] = float(Time.get_ticks_usec() - t1) / 1000.0
+	t1 = Time.get_ticks_usec()
+	fog.reset_all()
+	_out["event_fog_reset_all_ms"] = float(Time.get_ticks_usec() - t1) / 1000.0
 
 
 # ---------------------------------------------------------------------------

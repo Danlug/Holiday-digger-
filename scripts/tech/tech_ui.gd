@@ -36,8 +36,10 @@ static func item_icon(id: String) -> Texture2D:
 	var key := "item:" + id
 	if _cache.has(key):
 		return _cache[key]
-	var t: Texture2D = null
-	if id == FuelTank.block_item():
+	var t: Texture2D = ShopArt.tex("item_" + id)   # нарисованный значок ресурса (art/ui/shop/item_<id>.png)
+	if t != null:
+		pass
+	elif id == FuelTank.block_item():
 		t = tex("fuel_block")
 	else:
 		var tile_type := MineralMap.tile_type_for(id)

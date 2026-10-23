@@ -305,7 +305,9 @@ func _test_skip_button() -> void:
 	btn.release()
 	check("отпускание до срока пропуск отменяет", _confirmed == 2)
 	btn.reset_state()
-	await get_tree().create_timer(0.7).timeout  # окно двойного тапа закрылось
+	# Окно двойного тапа закрылось. Ждать по таймеру сцены нельзя: окно меряется Time.get_ticks_msec(),
+	# а таймер сцены под нагрузкой CPU отстаёт от него — раз в сотню запусков второй тап считался двойным.
+	btn._last_tap_ms = Time.get_ticks_msec() - SkipButton.DOUBLE_MS - 100
 	btn.press()
 	btn.release()
 	check("касания вразнос — два одиночных, а не двойной", _confirmed == 2)

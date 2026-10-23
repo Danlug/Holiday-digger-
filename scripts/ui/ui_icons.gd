@@ -29,6 +29,10 @@ static func tex(icon_name: String) -> Texture2D:
 ## Иконка предмета рюкзака: у руд — тайл из мира, у еды и топлива — свои
 ## значки, остальное — общий камешек.
 static func item(id: String) -> Texture2D:
+	# нарисованный значок предмета (art/ui/shop/item_<id>.png, tools/gen_ore_icons.py) важнее плитки мира с грунтом
+	var drawn := ShopArt.tex("item_" + id)
+	if drawn != null:
+		return drawn
 	var t := TileArt.texture_for(MineralMap.tile_type_for(id), 0, 0) if MineralMap.tile_type_for(id) >= 0 else null
 	if t != null:
 		return t

@@ -175,6 +175,12 @@ func _process(delta: float) -> void:
 	boss_flash = maxf(0.0, boss_flash - dt)
 	_tick_blink()
 	_tick_slashes(dt)
+	# анимация смерти босса идёт и под концовкой сюжета (герой тогда заморожен)
+	if boss_death_t >= 0.0:
+		boss_death_t += dt
+		if boss_death_t > 3.0:
+			boss_death_t = -1.0
+			boss = null
 
 	if not can_fight():
 		return
@@ -369,7 +375,7 @@ func _do_swing(dir: int, st: Dictionary) -> void:
 		if bd > 0.0:
 			hits += 1
 			boss_flash = 0.1
-			var boss_id := String(CombatData.section("boss").get("id", "abyss_idol"))
+			var boss_id := String(CombatData.section("boss").get("id", "abyss_boss"))
 			if boss.vulnerable():
 				GameState.emit_event(&"monster_hit", {"id": boss_id, "pos": bpos + Vector2(float(-dir) * 20.0, 0.0), "damage": bd})
 			else:
@@ -472,10 +478,6 @@ func boss_fight_active() -> bool:
 
 func _tick_boss(dt: float) -> void:
 	if boss_death_t >= 0.0:
-		boss_death_t += dt
-		if boss_death_t > 3.0:
-			boss_death_t = -1.0
-			boss = null
 		return
 	if boss == null:
 		if CombatService.boss_defeated():
@@ -504,7 +506,7 @@ func start_boss_fight(seed_value: int = 0) -> void:
 	if fog != null:
 		fog.reveal_around(BossArena.center_x(), float(BossArena.floor_y() - BossArena.height() / 2), 10, 10)
 	# рёв, тряска, вибро и музыка арены — у JuiceDirector по событию
-	GameState.emit_event(&"boss_started", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
+	GameState.emit_event(&"boss_started", {"id": String(CombatData.section("boss").get("id", "abyss_boss"))})
 	boss_started.emit()
 
 
@@ -519,7 +521,7 @@ func abort_boss_fight() -> void:
 	cw.invalidate()
 	for m: Monster in monsters:
 		m.take_hit(1e9, 1)
-	GameState.emit_event(&"boss_failed", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
+	GameState.emit_event(&"boss_failed", {"id": String(CombatData.section("boss").get("id", "abyss_boss"))})
 	boss_finished.emit(false)
 
 
@@ -569,7 +571,7 @@ func _boss_strike_fx(kind: String) -> void:
 
 
 func _boss_defeated() -> void:
-	var boss_id := String(CombatData.section("boss").get("id", "abyss_idol"))
+	var boss_id := String(CombatData.section("boss").get("id", "abyss_boss"))
 	CombatService.boss_claim_rewards()
 	BossArena.sealed = false
 	cw.invalidate()
@@ -606,7 +608,7 @@ func _on_hero_died() -> void:
 		BossArena.sealed = false
 		if cw != null:
 			cw.invalidate()
-		GameState.emit_event(&"boss_failed", {"id": String(CombatData.section("boss").get("id", "abyss_idol"))})
+		GameState.emit_event(&"boss_failed", {"id": String(CombatData.section("boss").get("id", "abyss_boss"))})
 		boss_finished.emit(false)
 	if spawner != null:
 		spawner.reset()

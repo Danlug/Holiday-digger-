@@ -796,7 +796,7 @@
 				"res_pct": 10,
 				"regen": 1.0
 			},
-			"trophy": "abyss_idol",
+			"trophy": "abyss_boss",
 			"proposed": true
 		},
 		"ult_helmet": {
@@ -952,7 +952,8 @@
 	},
 	"boss": {
 		"proposed": true,
-		"id": "abyss_idol",
+		"id": "abyss_boss",
+		"sprite": "abyss_idol",
 		"name": "Идол Бездны",
 		"arena": {
 			"floor_y": 10000,

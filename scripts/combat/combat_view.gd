@@ -99,7 +99,7 @@ func _sync_boss() -> void:
 		_boss_sprite.centered = true
 		_boss_sprite.region_enabled = true
 		add_child(_boss_sprite)
-	var id := String(CombatData.section("boss").get("id", "abyss_idol"))
+	var id := String(CombatData.section("boss").get("sprite", "abyss_idol"))
 	var sheet := MonsterSheet.get_sheet(id)
 	if sheet.texture == null:
 		_boss_sprite.visible = false

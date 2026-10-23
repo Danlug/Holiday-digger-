@@ -355,18 +355,19 @@ func _test_boss(p, w: WorldGen) -> void:
 	check("босс побеждён: событие boss_defeated с id", _count("boss_defeated") == 1)
 	var id_ok := false
 	for e in events:
-		if e[0] == "boss_defeated" and String(e[1].get("id")) == "abyss_idol":
+		if e[0] == "boss_defeated" and String(e[1].get("id")) == "abyss_boss":
 			id_ok = true
-	check("id босса — abyss_idol", id_ok)
+	check("id босса — abyss_boss (его ждёт финал сюжета)", id_ok)
 	check("монстр убит: monster_killed на босса", _count("monster_killed") >= 1)
 	check("ворота снова открыты", not BossArena.sealed and w.get_tile(16, BossArena.top_y()) == TileTypes.Type.EMPTY)
 	check("награда на складе: ядро и осколки", HouseStorage.count("abyss_core") == 1 and HouseStorage.count("idol_shard") == 4)
 	check("трофей — Венец Идола", CombatService.is_owned("idol_crown"))
 	check("опыт за босса", GameState.xp + GameState.level * 1000000 > xp_before)
 	check("прогресс: босс побеждён", CombatService.boss_defeated())
-	_step(30 * 4)
+	_step(30 * 4)   # концовка сюжета могла заморозить героя — анимация смерти всё равно доигрывается
 	check("после победы босс убран, спавн в арене не идёт", director.boss == null and director.monsters.is_empty())
 	# повторно бой не начинается
+	p.frozen = false
 	p.y = float(floor_y) - 1.5
 	_step(5)
 	check("побеждённый босс не возрождается", director.boss == null)

@@ -43,7 +43,7 @@ static func is_busy() -> bool:
 
 
 static func _cutscene_or_autodig(tree: SceneTree) -> bool:
-	var director := tree.root.find_child("StoryDirector", true, false)
+	var director := HintConditions.find("StoryDirector")
 	if director == null:
 		return false
 	var cs = director.get("cutscene")

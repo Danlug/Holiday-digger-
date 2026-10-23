@@ -134,14 +134,41 @@ static func tree() -> SceneTree:
 	return Engine.get_main_loop() as SceneTree
 
 
+## Узел сцены по имени. find_child обходит всё дерево, а подсказки спрашивают про героя и
+## режиссёра каждый кадр, пока подсказка висит, — поэтому находку помним, пока узел жив.
+static var _nodes: Dictionary = {}
+static var _nodes_hooked: bool = false
+
+
+static func find(node_name: String) -> Node:
+	var cached = _nodes.get(node_name, null)
+	if cached != null and is_instance_valid(cached) and (cached as Node).is_inside_tree():
+		return cached
+	var t := tree()
+	var n := t.root.find_child(node_name, true, false) if t != null else null
+	if n != null:
+		_nodes[node_name] = n
+		if not _nodes_hooked:
+			_nodes_hooked = true
+			t.root.tree_exiting.connect(_on_tree_exiting)
+	else:
+		_nodes.erase(node_name)
+	return n
+
+
+static func _on_tree_exiting() -> void:
+	_nodes.clear()
+	latched.clear()
+	_nodes_hooked = false
+
+
 static func hud() -> Control:
 	var t := tree()
 	return t.get_first_node_in_group("hud") as Control if t != null else null
 
 
 static func player() -> Node:
-	var t := tree()
-	return t.root.find_child("Player", true, false) if t != null else null
+	return find("Player")
 
 
 static func menu_entry_visible(entry: String) -> bool:
@@ -234,7 +261,7 @@ static func screen_open(name: String) -> bool:
 			var h3 := hud()
 			return h3 != null and h3.has_method("is_more_menu_open") and h3.is_more_menu_open()
 		"diary":
-			var d := tree().root.find_child("StoryDirector", true, false) if tree() != null else null
+			var d := find("StoryDirector")
 			var ui = d.get("diary_ui") if d != null else null
 			return ui != null and bool(ui.get("is_open"))
 		"meta":

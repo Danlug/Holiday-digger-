@@ -162,7 +162,7 @@ static func _of_world(name: String, spec: String) -> Dictionary:
 	if r.size == Vector2.ZERO:
 		return {}
 	var t := HintConditions.tree()
-	var vr := t.root.find_child("ViewRoot", true, false) as Node2D if t != null else null
+	var vr := HintConditions.find("ViewRoot") as Node2D if t != null else null
 	var h := HintConditions.hud()
 	if vr == null or h == null:
 		return {}

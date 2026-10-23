@@ -41,6 +41,7 @@ func _ready() -> void:
 	await _test_sfx_service()
 	await _test_fx_service()
 	await _test_director()
+	await _test_integration()
 	await _test_attach()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
@@ -582,6 +583,45 @@ func _test_director() -> void:
 	story.queue_free()
 	rec.queue_free()
 	await _frames(2)
+
+
+# ---------------------------------------------------------------------------
+# Настоящая сцена Main: сок подключён и реагирует на настоящие сигналы
+# ---------------------------------------------------------------------------
+
+func _test_integration() -> void:
+	StoryState.mark_seen("intro_grandpa")
+	StoryState.mark_seen("intro_boy")
+	var main: Node2D = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	await _frames(8)
+	var sfx := get_tree().get_first_node_in_group(Sfx.GROUP) as SfxService
+	var fx := get_tree().get_first_node_in_group(Fx.GROUP) as FxService
+	check("в настоящей сцене Main поднялись сервисы сока", sfx != null and fx != null and main.get_node_or_null("JuiceDirector") != null)
+	check("FxService живёт в ViewRoot рядом с героем", fx != null and fx.get_parent() == main.view_root)
+	if sfx == null or fx == null:
+		return
+	sfx.require_gesture = false
+	sfx.unlocked = true
+	sfx._last_ms.clear()
+	var played0: int = sfx.stats["played"]
+	GameState.inventory.clear()
+	GameState.add_item("gold", 1)
+	check("настоящий picked: звук и всплывающая иконка", sfx.stats["played"] > played0 and fx.stats["popups"] > 0)
+	var bursts0: int = fx.stats["bursts"]
+	var pos := Vector2(float(main.player.cell_x()) * 32.0 + 16.0, float(main.player.cell_y() + 1) * 32.0 + 16.0)
+	GameState.emit_event(&"dug", {"cell": Vector2i(main.player.cell_x(), main.player.cell_y() + 1),
+			"tile": TileTypes.Type.DIRT, "mineral": "earth", "loot": false, "pos": pos})
+	check("настоящий dug: частицы породы", fx.stats["bursts"] > bursts0)
+	var played1: int = sfx.stats["played"]
+	sfx._last_ms.clear()
+	GameState.take_damage(20.0, "test")
+	check("настоящий урон: звук и красная вспышка", sfx.stats["played"] > played1 and fx._flash.color.a > 0.0)
+	GameState.heal(100.0)
+	await get_tree().create_timer(0.7).timeout
+	check("музыка по контексту включилась сама (%s)" % sfx.current_music(), sfx.current_music() != "")
+	main.queue_free()
+	await get_tree().create_timer(0.3).timeout
 
 
 # ---------------------------------------------------------------------------

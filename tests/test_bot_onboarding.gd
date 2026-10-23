@@ -628,19 +628,30 @@ func _phase_soak(minutes: float) -> void:
 		if c - int(last_coins[0]) >= 100:
 			_soak_log.append("монеты +%d на %.0f с, глубина %d" % [c - int(last_coins[0]), _sim, player.cell_y()])
 		last_coins[0] = c)
+	var branches: Array = []
+	var last_circle_sim := _sim
+	var stalled := 0
 	while _sim < end and not _dead and circles < 400:
-		circles += 1
 		if director.cutscene.is_playing or director.auto_dig.running:
 			await _step()
 			continue
-		if GameState.house_is_indoors:
-			await _soak_home(end)
-		elif player.cell_y() <= 1:
-			await _soak_to_tunnel_and_descend()
-		elif _soak_should_go_up():
-			await _soak_ascend()
-		else:
-			await _soak_mine(end)
+		circles += 1
+		var branch := "дом" if GameState.house_is_indoors else ("устье" if player.cell_y() <= 1 else ("подъём" if _soak_should_go_up() else "копка"))
+		branches.append(branch)
+		if branches.size() > 12:
+			branches.pop_front()
+		# Круг, который не двинул игровое время, — холостой: так бот крутился бы вхолостую, а не застревал.
+		stalled = stalled + 1 if _sim - last_circle_sim < 0.01 else 0
+		last_circle_sim = _sim
+		if stalled > 20:
+			check("не застряли: бот крутится вхолостую", false, "последние ветки: %s\n%s" % [str(branches), _dump()])
+			_dead = true
+			break
+		match branch:
+			"дом": await _soak_home(end)
+			"устье": await _soak_to_tunnel_and_descend()
+			"подъём": await _soak_ascend()
+			_: await _soak_mine(end)
 	bot.release_all()
 	if _dead:
 		return

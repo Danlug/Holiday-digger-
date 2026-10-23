@@ -193,6 +193,8 @@ func _scene_lava() -> void:
 	GameState.hp = 100.0
 	GameState.is_alive = true
 	await _frames(40)
+	var ts := TechSystem.instance()
+	print("haze visible=", ts._haze_rect.visible, " strength=", ts._haze_strength)
 	await _shot("lava_cave")
 	await _frames(30)
 	await _shot("lava_cave_2")

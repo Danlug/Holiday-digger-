@@ -28,7 +28,6 @@ var player: Node = null
 var hud: Control = null
 var world: WorldGen = null
 
-var _screen: TechScreen = null
 var _tech_hud: TechHud = null
 var _tech_world: TechWorld = null
 var _hot_layer: CanvasLayer = null
@@ -43,7 +42,6 @@ var _refuse_cd: float = 0.0
 var _note_t: float = 0.0
 var _warned: Dictionary = {}
 var _zone_seen: int = 0
-var _last_empty_msg: float = -10.0
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +78,7 @@ func _setup(host: Node) -> void:
 	world = host.get("world")
 	var view_root: Node = host.get("view_root")
 
-	_screen = TechScreen.attach(host, player)
+	TechScreen.attach(host, player)
 	WellReport.attach(host)
 
 	var hud_layer := CanvasLayer.new()

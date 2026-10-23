@@ -361,9 +361,12 @@ def melody_phrase(rng, scale, progs, rhythms, start_idx, strong=(0, 4, 8, 12), r
 # --------------------------------------------------------------------------
 
 def master(x, target_rms=0.085, ceiling=0.72):
+    """Громкость меряем выше 110 Гц: телефонный динамик низов не играет, а
+    тяжёлый саб в измерении иначе приглушал бы всё слышимое."""
     x = x - np.mean(x)
-    x = fft_filter(x, SR, lo=28.0, hi=9500.0, order=2, circular=True)
-    x = x / (np.sqrt(np.mean(x ** 2)) + 1e-9) * target_rms
+    x = fft_filter(x, SR, lo=35.0, hi=9500.0, order=2, circular=True)
+    ref = fft_filter(x, SR, lo=110.0, order=2, circular=True)
+    x = x / (np.sqrt(np.mean(ref ** 2)) + 1e-9) * target_rms
     return ceiling * np.tanh(x / ceiling)
 
 
@@ -565,8 +568,9 @@ def _render_deep():
     # каждый аккорд — два такта
     _pad_track(m, prog, voic, gain=0.26, attack=2.4, rel=2.6, harm=5, warmth=0.55, bars_per_chord=2)
     total = m.g.sec(16 * 16)
-    m.add("drone", i_sub(float(mtof(30)), total - 1.5, attack=0.4, rel=1.5), 0, 0, 0.6)
-    m.add("drone", i_sub(float(mtof(37)), total - 1.5, attack=0.4, rel=1.5), 0, 0, 0.25)
+    m.add("drone", i_sub(float(mtof(42)), total - 1.5, attack=0.4, rel=1.5), 0, 0, 0.42)
+    m.add("drone", i_sub(float(mtof(49)), total - 1.5, attack=0.4, rel=1.5), 0, 0, 0.22)
+    m.add("drone", i_sub(float(mtof(30)), total - 1.5, attack=0.4, rel=1.5), 0, 0, 0.25)
     # далёкие стеклянные колокола, F#-минорная пентатоника
     pent = scale_list(Fs, [0, 3, 5, 7, 10], 66, 90)
     t_steps = 0
@@ -620,7 +624,7 @@ def _render_boss():
                 m.add("perc", i_snare(rng, 0.7), bar, s, 0.2 + 0.03 * (s - 12))
     # пульсирующий бас
     for bar, (root, kind) in enumerate(prog):
-        b = bass_note(root, 33)
+        b = bass_note(root, 40)
         for s in range(0, 16, 2):
             note = b + (12 if s in (6, 14) else 0)
             m.add("bass", i_bass(float(mtof(note)), 0.12, tau=0.18), bar, s, 0.6 if s % 4 == 0 else 0.45)

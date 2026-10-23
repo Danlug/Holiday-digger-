@@ -9,7 +9,7 @@
   skip_sleep    24x24  «пропустить сон за ролик»
   courier       32x32  курьер на скутере с коробом; knock — кулак у двери
   put_all, take_all    24x24 «сложить рюкзак» / «забрать всё»
-  glyph_minus   16x16  «минус» окна количества
+  glyph_minus   16x16  «минус» окна количества; calendar — номер дня
   bubble_tail   11x6   хвостик пузыря (тело и рамка пузыря — tile_body/tile_rim магазина)
 
 Стиль и палитра — как у art/ui/shop (tools/gen_shop_icons.py): чёткий пиксель, тёмная
@@ -418,6 +418,21 @@ def glyph_minus():
     cv.save("glyph_minus")
 
 
+def calendar():
+    cv = Cv(16, 16)
+    cv.rect(2, 3, 13, 14, WHITE)
+    cv.rect(2, 3, 13, 6, RED)
+    cv.rect(2, 3, 13, 3, RED_L)
+    cv.rect(2, 13, 13, 14, rgba("#C8C8D8"))
+    cv.rect(4, 1, 5, 4, STEEL_D)
+    cv.rect(10, 1, 11, 4, STEEL_D)
+    for x in (4, 7, 10):
+        for y in (8, 11):
+            cv.rect(x, y, x + 1, y + 1, rgba("#6A6A80"))
+    cv.outline()
+    cv.save("calendar")
+
+
 def bubble_tail():
     # хвостик пузыря: тёмное тело и белая рамка — красится так же, как tile_rim
     cv = Cv(11, 6)
@@ -472,6 +487,7 @@ def main():
     put_all()
     take_all()
     glyph_minus()
+    calendar()
     bubble_tail()
     print("записано %d файлов в %s" % (len(SAVED), OUTDIR))
     if "--sheet" in sys.argv:

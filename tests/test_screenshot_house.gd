@@ -12,7 +12,8 @@ extends Node
 ## Снимки: hall_door hall_delivery hall_exit bedroom workshop workshop_pick
 ## outdoor outdoor_rig forced_sleep forced_bar sleep_1 sleep_2 sleep_3 sleep_wake
 ## delivery_ring delivery_knock storage_empty storage_full storage_remote
-## storage_qty storage_bignum storage_poor_bag header_low.
+## storage_qty storage_qty_limit storage_bignum storage_poor_bag header_low
+## delivery_hall_pack door_package delivery_far.
 ## Состояние выставляется только в памяти — на диск (user://) тест не пишет.
 
 var _out_dir := "/tmp/house_shots"
@@ -71,12 +72,16 @@ func _ready() -> void:
 	await _scene("sleep_wake", _s_sleep_wake)
 	await _scene("delivery_ring", _s_delivery_ring)
 	await _scene("delivery_knock", _s_delivery_knock)
+	await _scene("delivery_hall_pack", _s_delivery_hall_pack)
+	await _scene("door_package", _s_door_package)
+	await _scene("delivery_far", _s_delivery_far)
 	await _scene("storage_empty", _s_storage_empty)
 	await _scene("storage_full", _s_storage_full)
 	await _scene("storage_remote", _s_storage_remote)
 	await _scene("storage_qty", _s_storage_qty)
 	await _scene("storage_bignum", _s_storage_bignum)
 	await _scene("storage_poor_bag", _s_storage_poor_bag)
+	await _scene("storage_qty_limit", _s_storage_qty_limit)
 	await _scene("header_low", _s_header_low)
 	print("test_screenshot_house: снимки -> " + _out_dir)
 	get_tree().quit(0)
@@ -112,6 +117,8 @@ func _reset() -> void:
 
 func _cleanup() -> void:
 	Tip.hide_all()
+	_house._pending.clear()
+	_house._delivery_badge.reset()
 	if _house._storage_view != null and _house._storage_view.visible:
 		_house._storage_view.close_panel()
 	if _house._prompt != null and _house._prompt.visible:
@@ -163,7 +170,8 @@ func _s_workshop() -> void:
 
 
 func _s_workshop_pick() -> void:
-	StoryState.clear_all()
+	# Не clear_all(): режиссёр видит пустую память и начинает сюжет заново.
+	GameState.story_seen.erase("workshop")
 	_enter("workshop", "mops_wall")
 
 
@@ -206,6 +214,7 @@ func _s_sleep_1() -> void:
 
 func _s_sleep_2() -> void:
 	await _s_sleep_1()
+
 	_house._view.call("debug_sleep_progress", 0.5)
 
 
@@ -234,6 +243,29 @@ func _s_delivery_knock() -> void:
 	await _frames(2)
 	_house.call("debug_deliver_now")
 	await _frames(2)
+
+
+func _s_delivery_hall_pack() -> void:
+	_enter("hall", "front_door")
+	HouseFood.deliver("food_buldak")
+	_house._view.set_hero_x_fraction(_px("hall", "front_door") + 0.1)
+	await _frames(3)
+
+
+func _s_door_package() -> void:
+	HouseFood.deliver("food_buldak")
+	var door := HouseConfig.door_cell()
+	_main.player.x = door.x + 1.5
+	_main.player.y = 0.5
+	await _frames(3)
+
+
+func _s_delivery_far() -> void:
+	var door := HouseConfig.door_cell()
+	_main.player.x = door.x - 4.0
+	_main.player.y = 0.5
+	HouseSystem.order_food("food_buldak")
+	await _wait(2.2)
 
 
 # --- склад ------------------------------------------------------------------
@@ -291,6 +323,15 @@ func _s_storage_poor_bag() -> void:
 	_house.open_storage()
 	await _frames(3)
 	_house._storage_view.call("debug_open_qty", "iron_ore", false)
+
+
+func _s_storage_qty_limit() -> void:
+	GameState.house_storage["iron_ore"] = 80
+	GameState.inventory["scrap"] = 40
+	_enter("workshop", "chest")
+	_house.open_storage()
+	await _frames(3)
+	_house._storage_view.call("debug_open_qty", "iron_ore", true)
 
 
 func _s_header_low() -> void:

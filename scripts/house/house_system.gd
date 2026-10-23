@@ -57,6 +57,9 @@ const SKY_HEIGHT: int = preload("res://scripts/world/world_view.gd").SKY_HEIGHT
 ## Батончик, которым система учит есть при втором истощении (ГДД п.9).
 const TUTORIAL_FOOD := "energy_bar"
 
+## Рекламная награда «проснуться сразу» (balance.json -> ads.daily_limits).
+const SKIP_SLEEP_AD := "skip_sleep_at_home"
+
 static var instance: HouseSystem = null
 
 var player: Node = null
@@ -64,6 +67,10 @@ var hud: Node = null
 var world: WorldGen = null
 
 var _view: CanvasLayer = null
+var _delivery_badge: HouseDeliveryBadge = null
+var _door_pack: Sprite2D = null     # пакет у входной двери снаружи
+var _delivery_seq: int = 0
+var _pending: Dictionary = {}       # номер заказа -> id блюда, пока курьер в пути
 var _prompt: CanvasLayer = null
 var _storage_view: CanvasLayer = null
 var _exterior: Sprite2D = null
@@ -92,6 +99,9 @@ var _rig_button: Button = null
 ## буквально 10 секунд, показывая анимацию»). Гейт от повторного нажатия,
 ## пока таймер не истёк.
 var _sleeping: bool = false
+## Номер ролика сна: таймер отменённого (пропущенного) ролика не должен
+## закончить следующий.
+var _sleep_seq: int = 0
 
 ## Устье тоннеля втягивает в дом при касании (решение владельца), но только
 ## после того, как от него отошли. Без этой защёлки спуск превращается в
@@ -168,6 +178,14 @@ func _build_world_props() -> void:
 	add_child(_exterior)
 	_update_exterior_sprite()
 
+	# Пакет с едой у входной двери: виден снаружи, пока заказ не забрали.
+	_door_pack = Sprite2D.new()
+	_door_pack.name = "DoorPackage"
+	_door_pack.centered = false
+	_door_pack.texture = HouseArt.tex("act_package")
+	_door_pack.visible = false
+	add_child(_door_pack)
+
 
 ## Домик на поверхности переключается лачуга ⇄ богатый дом по GameState.era
 ## (см. заголовок SHACK_SPRITE) — вызывается каждый кадр из _process, но
@@ -225,6 +243,10 @@ func _build_scenes() -> void:
 	add_child(_storage_view)
 	_storage_view.closed.connect(_on_storage_closed)
 
+	_delivery_badge = HouseDeliveryBadge.new()
+	_delivery_badge.name = "DeliveryBadge"
+	add_child(_delivery_badge)
+
 
 ## Плавающая кнопка «Зайти» у окна веранды (решение владельца, 2026-09-16:
 ## «Дом» отменён как контекстная кнопка внизу экрана — вместо этого над
@@ -278,6 +300,7 @@ func _process(_dt: float) -> void:
 	_update_hud_button()
 	_update_outdoor_hotspot()
 	_update_rig_hotspot()
+	_update_door_package()
 	if _view != null and _view.visible:
 		_view.refresh()
 	if _storage_view != null and _storage_view.visible:
@@ -425,6 +448,8 @@ func near_hatch() -> bool:
 ## cutscene_player.gd:"house_enter") — сцена ставит героя прямо у кровати
 ## или верстака, а не куда попало.
 func enter_house(room: String = "hall", enter_x: float = -1.0) -> void:
+	if not GameState.house_is_indoors:
+		Sfx.play("door")
 	GameState.house_is_indoors = true
 	GameState.house_room = room
 	_freeze_player(true)
@@ -527,6 +552,8 @@ func exit_through_hatch() -> bool:
 
 
 func _leave_house(world_pos: Vector2) -> void:
+	if GameState.house_is_indoors:
+		Sfx.play("door")
 	GameState.house_is_indoors = false
 	if _view != null:
 		_view.close()
@@ -657,6 +684,8 @@ func _on_view_action(action: String, arg: String) -> void:
 			take_starting_pickaxe()
 		"forced_confirm":
 			_finish_forced_sleep()
+		"sleep_skip":
+			_skip_sleep_for_ad()
 
 
 ## Ровно эффект сна (не меняется — см. HouseSleep.sleep_now): числа считает
@@ -664,13 +693,16 @@ func _on_view_action(action: String, arg: String) -> void:
 ## (обучающий форс-сон, _finish_forced_sleep), либо по концу анимации у
 ## кровати (_finish_sleep_sequence).
 func _sleep() -> void:
-	var before := GameState.stamina
+	var stamina_before := GameState.stamina
+	var hunger_before := GameState.hunger
 	var result := HouseSleep.sleep_now()
 	if not bool(result["ok"]):
 		_toast(String(result["reason"]), 3.4)
 		return
-	_toast("Проспал %d игровых часов. Бодрость +%d%%." % [
-		int(round(float(result["hours"]))), int(round(GameState.stamina - before))], 3.0)
+	# Итог сна — вспышками на полосках шапки, а не строкой текста.
+	if _view != null and _view.has_method("flash_bars"):
+		_view.flash_bars({"stamina": GameState.stamina - stamina_before,
+			"hunger": GameState.hunger - hunger_before})
 
 
 ## Кнопка «Спать» у кровати (ГДД, решение владельца: «спит быстро, буквально
@@ -687,17 +719,40 @@ func _start_sleep_sequence() -> void:
 		return
 	_sleeping = true
 	_view.set_locked(true)
-	_view.play_sleep_animation(HouseConfig.sleep_animation_seconds())
+	_view.play_sleep_animation(HouseConfig.sleep_animation_seconds(), float(plan["hours"]), true)
+	_sleep_seq += 1
+	var seq := _sleep_seq
 	var timer := get_tree().create_timer(HouseConfig.sleep_animation_seconds())
-	timer.timeout.connect(_finish_sleep_sequence)
+	timer.timeout.connect(func():
+		if seq == _sleep_seq:
+			_finish_sleep_sequence())
 
 
 func _finish_sleep_sequence() -> void:
+	# Сон пропустили за ролик, а таймер ролика ещё тикает: второй раз не спим.
+	if not _sleeping:
+		return
 	_sleeping = false
+	_sleep_seq += 1
 	if _view != null:
 		_view.stop_sleep_animation()
 		_view.set_locked(false)
 	_sleep()
+
+
+## «Проснуться сразу» за ролик (ГДД п.15, лимит skip_sleep_at_home в день).
+## Рекламной сети в сборке нет, поэтому, как и награды магазина
+## (ShopService.claim_ad), пропуск засчитывается без показа видео — когда
+## появится SDK, здесь вместо мгновенной выдачи ждать AdManager.ad_reward_earned.
+func _skip_sleep_for_ad() -> void:
+	if not _sleeping:
+		return
+	if not GameState.try_use_ad_reward(SKIP_SLEEP_AD):
+		Sfx.play("ui_deny")
+		if _view != null:
+			_view.refresh_skip_counter()
+		return
+	_finish_sleep_sequence()
 
 
 ## Мастерская (верстак и «Заказать» в салоне открывают одну и ту же витрину —
@@ -775,11 +830,52 @@ static func order_food(id: String) -> Dictionary:
 ## п.7). Таймер именно здесь: заказ из шахты иначе телепортировал бы обед
 ## прямо в руки, и «сбегать домой» перестало бы быть решением игрока.
 func _start_delivery(id: String) -> void:
+	_delivery_seq += 1
+	var seq := _delivery_seq
+	_pending[seq] = id
+	if _delivery_badge != null:
+		_delivery_badge.track(id, HouseConfig.delivery_seconds())
 	var timer := get_tree().create_timer(HouseConfig.delivery_seconds())
-	timer.timeout.connect(func():
-		HouseFood.deliver(id)
-		_toast("Доставка у двери: %s." % HouseConfig.food_name(id), 3.0)
-	)
+	timer.timeout.connect(func(): _complete_delivery(seq))
+
+
+func _complete_delivery(seq: int) -> void:
+	if not _pending.has(seq):
+		return
+	var id := String(_pending[seq])
+	_pending.erase(seq)
+	HouseFood.deliver(id)
+	if _delivery_badge != null:
+		_delivery_badge.arrive(id)
+	# Курьер стучит. В салоне ролик у двери сам играет три удара; в других
+	# комнатах и снаружи — один глухой стук, чтобы игрок понял: приехали.
+	var knocked: bool = _view != null and GameState.house_is_indoors and _view.play_knock()
+	if not knocked:
+		Sfx.play("door", 1.0, -4.0)
+	var door := HouseConfig.door_cell()
+	Fx.burst("poof", Vector2((door.x + 0.5) * TILE, float(TILE)), 0.8)
+
+
+## Для снимков экрана: курьер доехал сейчас, не дожидаясь таймера.
+func debug_deliver_now() -> void:
+	for seq in _pending.keys():
+		_complete_delivery(int(seq))
+		return
+
+
+## Пакет у входной двери снаружи: стоит, пока еда не забрана (берут её дома,
+## в салоне — кнопка «Забрать»), и слегка подпрыгивает, чтобы бросаться в глаза.
+func _update_door_package() -> void:
+	if _door_pack == null:
+		return
+	var show := HouseFood.food_at_door_count() > 0 and GameState.era != "grandpa" \
+		and not GameState.house_is_indoors
+	_door_pack.visible = show
+	if not show:
+		return
+	var door := HouseConfig.door_cell()
+	var bob := 0.0 if Settings.reduce_motion else absf(sin(float(Time.get_ticks_msec()) * 0.004)) * 3.0
+	_door_pack.position = Vector2((float(door.x) + 0.5) * TILE + 6.0, float(TILE) - 24.0 - bob)
 
 
 ## Заказ и доставка еды (HouseFood.pay_for_order/deliver) больше не ведутся
@@ -791,9 +887,14 @@ func _start_delivery(id: String) -> void:
 func _take_delivery() -> void:
 	var taken := HouseFood.take_from_door()
 	if taken <= 0:
+		Sfx.play("ui_deny")
 		_toast("Забрать нечего — либо у двери пусто, либо рюкзак переполнен.", 3.2)
 		return
-	_toast("Забрал порций: %d." % taken)
+	Sfx.play("pickup")
+	if _view != null and _view.visible and _view.has_method("float_at_hero"):
+		_view.float_at_hero("+%d" % taken, ShopArt.COL_GOOD)
+	else:
+		_toast("Забрал порций: %d." % taken)
 
 
 # ---------------------------------------------------------------------------
@@ -827,17 +928,20 @@ func _start_forced_sleep() -> void:
 	if GameState.house_is_indoors and _view != null and _view.forced_mode() == "sleep":
 		return
 	enter_house("bedroom")
+	# Объяснение правил — в подсказке значка (Tip), на экране его нет.
 	_view.set_forced("sleep",
-		"Ты вымотался. Пустая полоска бодрости жжёт HP, пока не выспишься.\n\n"
-		+ "Спать можно только дома, в кровати: 8 игровых часов проходят за один реальный, "
-		+ "а кровать отматывает их сразу — 12.5% бодрости за каждый игровой час.",
-		"Лечь спать")
+		"Пустая бодрость жжёт HP, пока не выспишься. Спать можно только дома, в кровати: "
+		+ "8 игровых часов проходят за один реальный, а кровать отматывает их сразу — "
+		+ "12.5% бодрости за каждый игровой час.",
+		"Лечь спать", "Ты вымотался", "act_bed")
 
 
 func _finish_forced_sleep() -> void:
+	var stamina_before := GameState.stamina
 	HouseSleep.sleep_now(true)
 	GameState.house_tutorial_stage = 1
 	_view.set_forced("")
+	_view.flash_bars({"stamina": GameState.stamina - stamina_before})
 	_toast("Выспался. Дальше кровать работает так же, но за сон тратится сытость.", 4.2)
 
 
@@ -846,15 +950,15 @@ func _start_forced_bar() -> void:
 	give_energy_bar()
 	_freeze_player(true)
 	_prompt.show_prompt(
-		"Полоска кончилась прямо в шахте. Домой отсюда не добежать.\n\n"
-		+ "В портфеле нашёлся энергетический батончик: 100% бодрости и 50% сытости. "
-		+ "Такие продаются в магазине — отдел допингов теперь открыт.",
-		"Съесть батончик")
+		"Домой отсюда не добежать. В портфеле нашёлся энергетический батончик: "
+		+ "100% бодрости и 50% сытости. Такие продаются в магазине — отдел допингов теперь открыт.",
+		"Съесть батончик", "Полоска кончилась", HouseArt.food_icon(TUTORIAL_FOOD))
 
 
 func _on_prompt_confirmed() -> void:
 	if _prompt_action == "eat_bar":
 		HouseFood.eat(TUTORIAL_FOOD)
+		Sfx.play("eat")
 		GameState.house_tutorial_stage = 2
 		GameState.house_dopings_shop_unlocked = true
 	_prompt_action = ""

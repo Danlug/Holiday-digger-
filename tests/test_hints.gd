@@ -225,6 +225,9 @@ func _scenarios() -> Dictionary:
 	var gear_id := String(Balance.get_gear_ids()[0])
 	var recipe := ShopCatalog.recipe("hand_drill")
 	var hot := _deepest_hot_depth()
+	var forge_id := String(CombatData.craftable_ids()[0])
+	var forge := CombatData.recipe(forge_id)
+	var wear_id := _first_wearable()
 	return {
 		"skill_points": {
 			"on": func() -> void: GameState.skill_points_available = 2,
@@ -310,10 +313,36 @@ func _scenarios() -> Dictionary:
 				GameState.hunger = 10.0
 				GameState.inventory[food_id] = 2,
 			"off": func() -> void: GameState.hunger = 100.0},
+		"menu_equipment": {
+			"on": func() -> void: MenuRegistry.add("equipment", {"title": "Снаряжение"}),
+			"off": func() -> void: HintState.mark_entry_opened("equipment")},
+		"combat_forge": {
+			"on": func() -> void:
+				(CombatService.state()["owned"] as Dictionary).erase(forge_id)
+				GameState.coins = int(forge.get("coins", 0))
+				for id in (forge["inputs"] as Dictionary).keys():
+					GameState.house_storage[String(id)] = int(forge["inputs"][id]),
+			"off": func() -> void:
+				CombatService.give(forge_id)
+				GameState.coins = 0
+				GameState.house_storage.clear()},
+		"combat_wear": {
+			"on": func() -> void:
+				CombatService.give(wear_id)
+				(CombatService.state()["equipped"] as Dictionary).clear(),
+			"off": func() -> void: CombatService.equip(wear_id)},
 		"gear_new": {
 			"on": func() -> void: GameState.owned_gear.append(gear_id),
 			"off": func() -> void: GameState.owned_gear.clear()},
 	}
+
+
+## Первый собранный предмет с одним слоем-слотом (броня, шлем, оружие), не аксессуар.
+func _first_wearable() -> String:
+	for id in CombatData.gear_ids():
+		if CombatData.slot_keys_for(String(id)).size() == 1:
+			return String(id)
+	return ""
 
 
 func _check_every_rule() -> void:
@@ -552,6 +581,23 @@ func _check_busy() -> void:
 	GameState.ext_set("combat", {"active": true})
 	check("бой: ext[combat].active — занят", HintBusy.is_busy())
 	GameState.ext_set("combat", {"active": false})
+	# Ветка боя: пока рядом живые монстры или идёт босс, подсказок нет.
+	var fake := Node.new()
+	var gd := GDScript.new()
+	gd.source_code = "extends Node\nvar monsters: Array = []\nvar boss = null\n"
+	gd.reload()
+	fake.set_script(gd)
+	add_child(fake)
+	CombatService.director = fake
+	check("бой: директор без монстров — свободен", not HintBusy.is_busy())
+	fake.set("monsters", [1])
+	check("бой: есть живой монстр рядом — занят", HintBusy.is_busy())
+	fake.set("monsters", [])
+	fake.set("boss", RefCounted.new())
+	check("бой: идёт рейдбосс — занят", HintBusy.is_busy())
+	fake.set("boss", null)
+	CombatService.director = null
+	fake.free()
 	var screen := Control.new()
 	screen.add_to_group("hint_block")
 	_layer.add_child(screen)

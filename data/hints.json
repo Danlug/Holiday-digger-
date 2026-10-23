@@ -36,7 +36,7 @@
 	},
 
 	"menu_new": {
-		"entries": ["tech", "meta_rewards"],
+		"entries": ["tech", "meta_rewards", "equipment"],
 		"note": "пункты меню «•••» с красным ярлыком «new», пока игрок не открыл их ни разу; новые подсистемы дописывают свой id сюда."
 	},
 
@@ -203,6 +203,33 @@
 			"done": {"fn": "screen_open", "name": "backpack"},
 			"toast": {"icon": "ui:eat", "text": "голод"},
 			"tip": ["Проголодался", "Открой рюкзак и тапни по еде: сытость вернётся."]
+		},
+		{
+			"id": "menu_equipment",
+			"prio": 44,
+			"when": {"fn": "menu_new", "entry": "equipment"},
+			"target": ["menu:equipment"],
+			"toast": {"icon": "gear:ui_equip", "text": "броня"},
+			"tip": ["Снаряжение", "Броня, оружие и ковка из глубинных материалов: глубже четырёх тысяч метров водятся монстры."],
+			"sfx": "reward"
+		},
+		{
+			"id": "combat_forge",
+			"prio": 46,
+			"when": {"fn": "combat_craftable"},
+			"target": ["menu:equipment"],
+			"toast": {"icon": "gear:ui_equip", "text": "ковка"},
+			"tip": ["Можно сковать", "Материалов хватает на новое снаряжение: верстак в мастерской, вкладки экрана «Снаряжение»."],
+			"sfx": "reward"
+		},
+		{
+			"id": "combat_wear",
+			"prio": 48,
+			"when": {"fn": "combat_unworn"},
+			"target": ["menu:equipment"],
+			"done": {"fn": "screen_open", "name": "equipment"},
+			"toast": {"icon": "gear:ui_equip", "text": "надень"},
+			"tip": ["Есть лучше надетого", "В экране «Снаряжение» тапни по предмету, чтобы надеть: броня снижает урон монстров."]
 		},
 		{
 			"id": "gear_new",

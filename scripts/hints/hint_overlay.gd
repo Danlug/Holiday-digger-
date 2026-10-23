@@ -153,8 +153,12 @@ func track(rect: Rect2) -> void:
 	if rect.position.distance_to(_rect.position) < 0.4 and rect.size.distance_to(_rect.size) < 0.4:
 		return
 	_rect = rect
+	var before := _toward
 	_layout()
-	_restart_tap()
+	# Мир едет каждый кадр — твин «тапа» не трогаем, он гонит смещение bob поверх позиции;
+	# перезапускаем, только когда палец перепрыгнул на другую сторону цели.
+	if before != _toward:
+		_restart_tap()
 
 
 func set_paused(on: bool) -> void:
@@ -189,6 +193,7 @@ func _kill_tweens() -> void:
 			tw.kill()
 	_tween = null
 	_tap_tween = null
+	bob = Vector2.ZERO
 	_root.modulate.a = 1.0
 	_ring.stop()
 
@@ -197,6 +202,13 @@ func _kill_tweens() -> void:
 # Раскладка
 # ---------------------------------------------------------------------------
 
+## Смещение «тапа» к цели: его гонит твин, а позиции указателей считаются от места покоя.
+var bob: Vector2 = Vector2.ZERO:
+	set(v):
+		bob = v
+		if _finger != null:
+			_finger.position = _finger_rest + v
+			_arrow.position = _arrow_rest + v
 var _finger_rest: Vector2 = Vector2.ZERO
 var _toward: Vector2 = Vector2.UP   # от указателя к цели
 var _arrow_rest: Vector2 = Vector2.ZERO
@@ -231,7 +243,7 @@ func _place_finger(view: Rect2) -> void:
 		var tip2 := Vector2(cx, _rect.position.y + 4.0)
 		_finger_rest = tip2 - Vector2(FINGER_TIP.x, fs.y - FINGER_TIP.y)
 		_toward = Vector2.DOWN
-	_finger.position = _finger_rest
+	_finger.position = _finger_rest + bob
 
 
 ## Стрелка над объектом мира (сверху нет места — под ним).
@@ -246,7 +258,7 @@ func _place_arrow(view: Rect2) -> void:
 	else:
 		_arrow_rest = Vector2(cx - asz.x * 0.5, _rect.end.y + 4.0)
 		_toward = Vector2.UP
-	_arrow.position = _arrow_rest
+	_arrow.position = _arrow_rest + bob
 
 
 func _place_chip(view: Rect2, occupied: Array[Rect2]) -> void:
@@ -302,21 +314,20 @@ func _start_animation(use_finger: bool, use_arrow: bool) -> void:
 
 
 func _restart_tap() -> void:
-	if Settings.reduce_motion or not is_inside_tree() or not _shown:
-		return
 	if _tap_tween != null and _tap_tween.is_valid():
 		_tap_tween.kill()
-	var node: Control = _finger if _finger.visible else (_arrow if _arrow.visible else null)
-	if node == null:
+	_tap_tween = null
+	bob = Vector2.ZERO
+	if Settings.reduce_motion or not is_inside_tree() or not _shown:
 		return
-	var rest := _finger_rest if node == _finger else _arrow_rest
+	if not _finger.visible and not _arrow.visible:
+		return
 	# Палец «давит» в цель, стрелка покачивается к ней: оба двигаются к цели.
 	var push := _toward * 4.0
-	node.position = rest
 	_tap_tween = create_tween().set_loops()
-	_tap_tween.tween_property(node, "position", rest + push, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tap_tween.tween_property(self, "bob", push, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_tap_tween.tween_interval(0.08)
-	_tap_tween.tween_property(node, "position", rest, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tap_tween.tween_property(self, "bob", Vector2.ZERO, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tap_tween.tween_interval(0.45)
 
 

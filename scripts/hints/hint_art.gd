@@ -1,7 +1,7 @@
 class_name HintArt
 extends RefCounted
 ## Значки подсказок (art/hints/*.png, рисует tools/gen_hint_icons.py) и значки
-## для тоста: «ui:plus», «tech:icon_tank», «meta:gift», «story:icon_diary»,
+## для тоста: «ui:plus», «tech:icon_tank», «meta:gift», «story:icon_diary», «gear:ui_equip»,
 ## «hint:bang». Без префикса — сначала общие значки интерфейса, потом наши.
 ## Нет файла — null, и тост рисуется без картинки, а не падает.
 
@@ -10,6 +10,7 @@ const PREFIX_DIRS := {
 	"tech": "res://art/tech/%s.png",
 	"meta": "res://art/meta/%s.png",
 	"story": "res://art/story/%s.png",
+	"gear": "res://art/gear/%s.png",
 }
 ## Файл вдвое больше рисунка: на экране один пиксель рисунка = одна единица.
 const SCALE := 0.5

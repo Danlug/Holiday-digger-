@@ -18,6 +18,7 @@ const FUNCTIONS := [
 	"skill_points", "artifacts", "menu_new", "daily_ready", "quest_claimable", "achievement_unseen",
 	"station_ready", "tank_empty", "heat_over", "well_ready", "grave_news", "diary_unread",
 	"load_high", "sellable", "craft_ready", "tool_affordable", "hungry_food", "has_gear",
+	"combat_craftable", "combat_unworn",
 	"on_surface", "flag", "scene_seen", "depth", "event", "ext_true", "screen_open", "near_world",
 ]
 
@@ -101,6 +102,11 @@ static func _fn(name: String, p: Dictionary) -> bool:
 			return GameState.hunger <= _num(p, "pct", 35.0) and has_food()
 		"has_gear":
 			return not GameState.owned_gear.is_empty()
+		# --- снаряжение и бой (ветка боя) ---
+		"combat_craftable":
+			return combat_craftable() != ""
+		"combat_unworn":
+			return combat_unworn() != ""
 		# --- общие ---
 		"on_surface":
 			return not GameState.house_is_indoors and GameState.player_depth <= int(_num(p, "max", 0))
@@ -242,6 +248,33 @@ static func affordable_upgrade() -> String:
 	return best
 
 
+## Предмет боевого снаряжения, на который уже хватает материалов и монет (верстак дома, но
+## подсказка нужна раньше). "" — нет такого.
+static func combat_craftable() -> String:
+	for id in CombatData.craftable_ids():
+		var chk := CombatService.check_craft(String(id))
+		if (chk["missing"] as Dictionary).is_empty() and int(chk["missing_coins"]) == 0 \
+				and not CombatService.is_owned(String(id)):
+			return String(id)
+	return ""
+
+
+## Собранный предмет, который лучше надетого в его слоте (или слот пуст) — но не надет.
+static func combat_unworn() -> String:
+	for id in CombatService.owned_ids():
+		if CombatService.slot_of(String(id)) != "":
+			continue
+		var keys := CombatData.slot_keys_for(String(id))
+		if keys.is_empty():
+			continue
+		var tier := int(CombatData.gear(String(id)).get("tier", 0))
+		for k in keys:
+			var worn := CombatService.equipped(String(k))
+			if worn == "" or int(CombatData.gear(worn).get("tier", 0)) < tier:
+				return String(id)
+	return ""
+
+
 static func screen_open(name: String) -> bool:
 	match name:
 		"progress":
@@ -264,6 +297,10 @@ static func screen_open(name: String) -> bool:
 			var d := find("StoryDirector")
 			var ui = d.get("diary_ui") if d != null else null
 			return ui != null and bool(ui.get("is_open"))
+		"equipment":
+			var cd = CombatService.director
+			var es = cd.get("equip_screen") if cd != null and is_instance_valid(cd) else null
+			return es != null and bool(es.call("is_open"))
 		"meta":
 			var m := MetaService.instance
 			return m != null and (m.hub.is_open() or m.popup.is_open())

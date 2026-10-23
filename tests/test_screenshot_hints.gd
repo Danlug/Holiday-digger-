@@ -102,7 +102,17 @@ func _ready() -> void:
 	_finish()
 	GameState.set_current_tool("shovel")
 
-	# 7. Настройки: лампочка и «показать заново».
+	# 7. Снаряжение (ветка боя): пункт появляется с глубины 3500.
+	GameState.max_depth_reached = 3600
+	await _show_hint("menu_equipment", "08b_equipment_closed")
+	_main.hud.call("_toggle_more_menu")
+	await _wait(0.7)
+	await _shot("08c_equipment_open")
+	_main.hud.call("close_more_menu")
+	_finish()
+	GameState.max_depth_reached = 150
+
+	# 8. Настройки: лампочка и «показать заново».
 	_main.hud.open_settings()
 	await _wait(0.5)
 	await _shot("09_settings")

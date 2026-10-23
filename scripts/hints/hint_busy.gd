@@ -8,8 +8,9 @@ extends RefCounted
 ##
 ## is_busy() — игрок занят чем-то другим: катсцена и автокопка, шторка или экран
 ## (мастерская, герой, техника, настройки, рюкзак, меню, мета-хаб, дневник), интерьер
-## дома, смерть, бой. Бой ветка боя объявляет сама — любой из способов:
-## GameState.in_combat = true, узел в группе "in_combat" или ext["combat"]["active"].
+## дома, смерть, бой. Бой: живые монстры у CombatDirector (или рейдбосс); любая другая
+## система боя может объявить его сама — GameState.in_combat = true, узел в группе
+## "in_combat" или ext["combat"]["active"].
 ## Любой другой экран может запретить подсказки, добавив свой видимый узел в группу
 ## "hint_block" — править этот файл ради этого не надо.
 
@@ -65,7 +66,7 @@ static func _modal_open(tree: SceneTree) -> bool:
 	var m := MetaService.instance
 	if m != null and is_instance_valid(m) and (m.hub.is_open() or m.popup.is_open()):
 		return true
-	for name in ["settings", "backpack", "diary"]:
+	for name in ["settings", "backpack", "diary", "equipment"]:
 		if HintConditions.screen_open(name):
 			return true
 	var hud := HintConditions.hud()
@@ -75,6 +76,15 @@ static func _modal_open(tree: SceneTree) -> bool:
 
 
 static func _in_combat(tree: SceneTree) -> bool:
+	# Ветка боя: есть живые монстры рядом с героем (CombatDirector тикает только тех, что
+	# ближе active_dist) или идёт бой с рейдбоссом.
+	var cd = CombatService.director
+	if cd != null and is_instance_valid(cd):
+		var mobs = cd.get("monsters")
+		if typeof(mobs) == TYPE_ARRAY and not (mobs as Array).is_empty():
+			return true
+		if cd.get("boss") != null:
+			return true
 	var flag = GameState.get("in_combat")
 	if flag != null and bool(flag):
 		return true

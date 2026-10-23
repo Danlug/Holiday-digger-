@@ -347,7 +347,7 @@
 			"id": "scrap",
 			"tile": "SCRAP_METAL",
 			"y_min": 1,
-			"y_max": 200,
+			"y_max": 500,
 			"density": 0.02
 		}
 	]

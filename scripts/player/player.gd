@@ -1115,7 +1115,7 @@ func _start_dig(tx: int, ty: int) -> void:
 			dig_refused_by_story.emit("gold_needs_pickaxe")
 			return
 		stun_until_msec = Time.get_ticks_msec() + float(Balance.unwrap(
-			Balance.balance.get("digging", {}).get("shovel_stun_on_stone_or_gold_seconds", 60))) * 1000.0
+			Balance.balance.get("digging", {}).get("shovel_stun_on_stone_or_gold_seconds", 1.0))) * 1000.0
 		digging = null
 		dig_blocked.emit(type)
 		return

@@ -36,6 +36,18 @@ const SAFE_SURFACE_CELL_Y := 1
 ## клетки. Иначе порода смыкается прямо на нём, и ход теряется не по его вине.
 static func trigger_chunk_collapse(world: WorldGen, fog: FogOfWar,
 		rng: RandomNumberGenerator = null, player_cell_y: int = -1) -> Dictionary:
+	var plan := plan_chunk_collapse(world, rng, player_cell_y)
+	if plan.is_empty():
+		return {}
+	return apply_planned(world, fog, plan)
+
+
+## Выбрать зону обвала, ничего не меняя: {x0, y0, w, h, salt} или {}. Правила те же,
+## что у trigger_chunk_collapse (ниже героя, мимо дома, внутри копальни) — это та
+## же функция, разрезанная надвое, чтобы между выбором и ударом успело сыграть
+## предупреждение (CollapseFx, дрожь и звук). Порядок бросков rng прежний.
+static func plan_chunk_collapse(world: WorldGen, rng: RandomNumberGenerator = null,
+		player_cell_y: int = -1) -> Dictionary:
 	var r := _rng(rng)
 	var shape: Dictionary = CHUNK_SHAPES[r.randi_range(0, CHUNK_SHAPES.size() - 1)]
 	var h: int = shape.h
@@ -63,13 +75,17 @@ static func trigger_chunk_collapse(world: WorldGen, fog: FogOfWar,
 	var y0 := r.randi_range(y_min, y_max)
 
 	var salt := r.randi()
-	world.apply_chunk_event(x0, y0, w, h, salt)
-	# Туман гасится ТОЛЬКО в зоне обвала (решение владельца: "не надо
-	# закрывать всю карту, только там где случился обвал"). Раздел 8 ГДД
-	# требует закрывать туманом изменившийся рельеф — изменился он ровно
-	# здесь, в этом прямоугольнике.
-	fog.reset_rect(x0, y0, w, h)
-	return {"x0": x0, "y0": y0, "w": w, "h": h}
+	return {"x0": x0, "y0": y0, "w": w, "h": h, "salt": salt}
+
+
+## Ударить по плану из plan_chunk_collapse. Туман гасится ТОЛЬКО в зоне обвала
+## (решение владельца: "не надо закрывать всю карту, только там где случился
+## обвал"). Раздел 8 ГДД требует закрывать туманом изменившийся рельеф —
+## изменился он ровно здесь. Возвращает затронутый прямоугольник {x0, y0, w, h}.
+static func apply_planned(world: WorldGen, fog: FogOfWar, plan: Dictionary) -> Dictionary:
+	world.apply_chunk_event(plan.x0, plan.y0, plan.w, plan.h, plan.salt)
+	fog.reset_rect(plan.x0, plan.y0, plan.w, plan.h)
+	return {"x0": plan.x0, "y0": plan.y0, "w": plan.w, "h": plan.h}
 
 
 ## Землетрясение: перегенерирует все незафиксированные клетки всей копальни

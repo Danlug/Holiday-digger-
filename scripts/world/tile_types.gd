@@ -40,6 +40,7 @@ enum Type {
 	DIVINE_HEART,        # божественное сердце
 	SCRAP_METAL,         # металлолом
 	LAVA,                # лава (с глубины 3000): копается 5 с и жжёт, см. scripts/tech/heat.gd
+	RUIN_BRICK,          # кладка древних руин (глубже 4000): как камень — помеха, не добыча
 }
 
 ## Свойства клетки: можно ли копать лопатой/киркой и фиксирована ли она
@@ -106,6 +107,8 @@ static func _build_props() -> Dictionary:
 	# лава: лопатой не берётся (на её глубине лопаты нет), всё остальное — берётся,
 	# а сколько это стоит здоровья, решает Heat (стойкость костюма)
 	d[Type.LAVA] = Props.new(false, true, false)
+	# кладка руин: как камень — только кирка, не ресурс
+	d[Type.RUIN_BRICK] = Props.new(false, true, false)
 	return d
 
 static func can_dig_with_shovel(type: Type) -> bool:
@@ -130,7 +133,7 @@ static func type_name(type: Type) -> String:
 ## не служебные типы). Опирается на порядок enum: все руды объявлены одним
 ## блоком после служебных типов (EMPTY..REINFORCED).
 static func is_ore(type: Type) -> bool:
-	return type >= Type.IRON_ORE and type != Type.LAVA
+	return type >= Type.IRON_ORE and type != Type.LAVA and type != Type.RUIN_BRICK
 
 ## Тип по имени ключа enum (используется world_gen.gd при чтении world_layers.json,
 ## где типы заданы строками). Enum в GDScript ведёт себя как Dictionary,

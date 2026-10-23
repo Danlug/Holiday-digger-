@@ -48,6 +48,14 @@ const COLOR_FALLBACK_EMPTY := Color8(0x0F, 0x0C, 0x09)
 
 var _overlay: Node2D  # дочерний узел с кастомным _draw() поверх тайлов
 
+## Подземный фон-стена (DeepBackdrop) лежит позади тайлов: пустые клетки не рисуем,
+## сквозь них видна стена пояса. Включает main.gd — без стены (тесты, сцены без
+## неё) пустота рисуется как раньше, иначе в дырах просвечивало бы небо.
+var deep_backdrop_active: bool = false
+# Цвета «серой» разведанной породы по поясам (ГДД §4.2): считаются один раз.
+var _gray_solid: PackedColorArray = PackedColorArray()
+var _gray_empty: PackedColorArray = PackedColorArray()
+
 
 func _ready() -> void:
 	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
@@ -55,6 +63,9 @@ func _ready() -> void:
 	_white_tex = ImageTexture.create_from_image(img)
 
 	_build_sky_colors()
+	for i in range(Biomes.count()):
+		_gray_solid.append(Biomes.color_of(i, "gray_solid", COLOR_GRAY_SOLID))
+		_gray_empty.append(Biomes.color_of(i, "gray_empty", COLOR_GRAY_EMPTY))
 
 	_overlay = Node2D.new()
 	_overlay.name = "Overlay"
@@ -82,10 +93,20 @@ func _rebuild_pool() -> void:
 	move_child(_overlay, get_child_count() - 1)
 
 
+# Свойства спрайта пула ставим только при изменении: render() идёт каждый кадр на
+# каждую клетку, а сеттеры Node2D/CanvasItem обновляют трансформ и перерисовку
+# даже при том же значении.
+const _SCALE_COLOR := Vector2(TILE, TILE)
+const _SCALE_ART := Vector2(1.0 / 3.0, 1.0 / 3.0)
+
+
 func _set_color(s: Sprite2D, color: Color) -> void:
-	s.texture = _white_tex
-	s.scale = Vector2(TILE, TILE)
-	s.modulate = color
+	if s.texture != _white_tex:
+		s.texture = _white_tex
+	if s.scale != _SCALE_COLOR:
+		s.scale = _SCALE_COLOR
+	if s.modulate != color:
+		s.modulate = color
 
 
 ## Тайл на диске в ART_SCALE раз крупнее клетки (см. tools/import_art.py):
@@ -95,9 +116,12 @@ const ART_SCALE := 3.0
 
 
 func _set_texture(s: Sprite2D, tex: Texture2D) -> void:
-	s.texture = tex
-	s.scale = Vector2(1.0 / ART_SCALE, 1.0 / ART_SCALE)
-	s.modulate = Color.WHITE
+	if s.texture != tex:
+		s.texture = tex
+	if s.scale != _SCALE_ART:
+		s.scale = _SCALE_ART
+	if s.modulate != Color.WHITE:
+		s.modulate = Color.WHITE
 
 
 var _cam_bx: int = 0    # левый край окна камеры в клетках — overlay рисует по нему декор огорода
@@ -174,9 +198,11 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 	# неба рисует SkyView (первый слой ViewRoot) — тем же _sky_color(wy),
 	# чтобы цвета и затемнение DayCycle остались в одном месте.
 	if wy < 0:
-		s.visible = false
+		if s.visible:
+			s.visible = false
 		return
-	s.visible = true
+	if not s.visible:
+		s.visible = true
 	if wy == 0:
 		var grass := TileArt.grass_texture(wx)
 		if grass != null:
@@ -204,10 +230,18 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> void:
 	var type := world.get_tile(wx, wy)
 	if state == FogOfWar.State.GRAY:
 		var solid := type != TileTypes.Type.EMPTY
-		_set_color(s, COLOR_GRAY_SOLID if solid else COLOR_GRAY_EMPTY)
+		var bi := Biomes.index_at(wy)
+		if not solid and deep_backdrop_active:
+			# известная, но не разведанная пустота: стена пояса, притушенная
+			_set_color(s, Color(_gray_empty[bi], 0.55))
+			return
+		_set_color(s, _gray_solid[bi] if solid else _gray_empty[bi])
 		return
 
 	# FULL — ресурс виден
+	if type == TileTypes.Type.EMPTY and deep_backdrop_active:
+		s.visible = false   # сквозь пустоту видна стена пояса
+		return
 	var tex := TileArt.texture_for(type, wx, wy)
 	if tex != null:
 		_set_texture(s, tex)
@@ -325,8 +359,12 @@ func _on_overlay_draw() -> void:
 	if Settings.show_vision_radius:
 		var relief_r: float = FogOfWar.vision_radius(GameState.get_vision_terrain_radius()) * TILE
 		var res_r: float = FogOfWar.vision_radius(GameState.get_vision_resource_radius()) * TILE
-		_overlay.draw_arc(Vector2(pcx, pcy), relief_r, 0, TAU, 48, Color(0.918, 0.867, 0.776, 0.16), 1.0)
-		_overlay.draw_arc(Vector2(pcx, pcy), res_r, 0, TAU, 48, Color(0.878, 0.663, 0.231, 0.3), 1.0)
+		# цвет колец — по поясу глубины героя (ГДД §4.2); на поверхности — прежний
+		var pb := Biomes.index_at(int(floor(player.y)))
+		var c_relief := Biomes.color_of(pb, "aura_relief", Color(0.918, 0.867, 0.776))
+		var c_res := Biomes.color_of(pb, "aura_res", Color(0.878, 0.663, 0.231))
+		_overlay.draw_arc(Vector2(pcx, pcy), relief_r, 0, TAU, 48, Color(c_relief, 0.2), 1.0)
+		_overlay.draw_arc(Vector2(pcx, pcy), res_r, 0, TAU, 48, Color(c_res, 0.34), 1.0)
 
 	# Клетки обучающего задания (пять самородков золота): пульсирующая рамка,
 	# чтобы их было видно среди породы. Задание висит строкой в интерфейсе, но

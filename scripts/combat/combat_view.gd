@@ -153,10 +153,11 @@ func _draw_slashes() -> void:
 		if _slash_tex != null:
 			var f := int(k * SLASH_FRAMES)
 			var src := Rect2(f * SLASH_SIZE.x * 3.0, 0.0, SLASH_SIZE.x * 3.0, SLASH_SIZE.y * 3.0)
-			var dst := Rect2(cx - SLASH_SIZE.x / 2.0, cy - SLASH_SIZE.y / 2.0, SLASH_SIZE.x, SLASH_SIZE.y)
-			if dir < 0:
-				dst = Rect2(dst.position.x + dst.size.x, dst.position.y, -dst.size.x, dst.size.y)
-			draw_texture_rect_region(_slash_tex, dst, src)
+			# разворот — масштабом по x вокруг точки взмаха (отрицательный размер
+			# прямоугольника у draw_texture_rect_region ведёт себя не так, как кажется)
+			draw_set_transform(Vector2(cx, cy), 0.0, Vector2(float(dir), 1.0))
+			draw_texture_rect_region(_slash_tex, Rect2(-SLASH_SIZE.x / 2.0, -SLASH_SIZE.y / 2.0, SLASH_SIZE.x, SLASH_SIZE.y), src)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		else:
 			var a := 1.0 - k
 			draw_arc(Vector2(cx, cy), 20.0, -1.0 if dir > 0 else PI - 1.0 + 0.0, 1.0 if dir > 0 else PI + 1.0, 12,

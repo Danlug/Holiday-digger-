@@ -11,7 +11,7 @@ const BTN := 46.0
 const MARGIN := 8.0
 const STRIP_H := 40.0
 const BOTTOM_PAD := 28.0          # над отладочной кнопкой слева внизу
-const BAR_W := 150.0
+const BAR_W := 58.0
 const BAR_H := 9.0
 
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
@@ -49,7 +49,7 @@ func _ready() -> void:
 	_bar = Control.new()
 	_bar.name = "BossBar"
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bar.size = Vector2(BAR_W + 26.0, 22.0)
+	_bar.size = Vector2(BAR_W + 26.0, 22.0)   # влезает между кнопкой удара и джойстиком
 	_bar.draw.connect(_draw_bar)
 	_bar.visible = false
 	add_child(_bar)
@@ -61,7 +61,8 @@ func _ready() -> void:
 func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_attack.position = Vector2(MARGIN, vp.y - STRIP_H - BOTTOM_PAD - BTN)
-	_bar.position = Vector2((vp.x - _bar.size.x) / 2.0, 110.0)
+	# внизу между кнопкой удара и джойстиком: сверху теснятся кошелёк, жара и кнопки
+	_bar.position = Vector2(_attack.position.x + BTN + 4.0, vp.y - STRIP_H - 40.0)
 
 
 func _process(dt: float) -> void:
@@ -142,17 +143,17 @@ func _draw_bar() -> void:
 	_last_boss_hp = b.hp
 	_hp_shown = lerpf(_hp_shown, frac, 0.2)
 	var vul := b.vulnerable()
-	_bar.draw_rect(Rect2(x0, 6, BAR_W - 6.0, BAR_H), Color(0.06, 0.04, 0.03, 0.95))
-	_bar.draw_rect(Rect2(x0, 6, (BAR_W - 6.0) * _hp_shown, BAR_H), Color(0.85, 0.85, 0.85, 0.5))
+	_bar.draw_rect(Rect2(x0, 6, BAR_W, BAR_H), Color(0.06, 0.04, 0.03, 0.95))
+	_bar.draw_rect(Rect2(x0, 6, BAR_W * _hp_shown, BAR_H), Color(0.85, 0.85, 0.85, 0.5))
 	var fill := Color8(0xE0, 0xA9, 0x3B) if vul else RED
 	if _hit_flash > 0.0:
 		fill = Color(1, 1, 1)
-	_bar.draw_rect(Rect2(x0, 6, (BAR_W - 6.0) * frac, BAR_H), fill)
+	_bar.draw_rect(Rect2(x0, 6, BAR_W * frac, BAR_H), fill)
 	# метки фаз на 66% и 33%
 	for t in [0.66, 0.33]:
-		var mx: float = x0 + (BAR_W - 6.0) * float(t)
+		var mx: float = x0 + BAR_W * float(t)
 		_bar.draw_rect(Rect2(mx, 5, 1, BAR_H + 2), Color(0, 0, 0, 0.9))
-	_bar.draw_rect(Rect2(x0, 6, BAR_W - 6.0, BAR_H), GOLD if vul else BORDER, false, 1.0)
+	_bar.draw_rect(Rect2(x0, 6, BAR_W, BAR_H), GOLD if vul else BORDER, false, 1.0)
 	# три фишки фаз под полоской
 	for i in range(3):
 		var on: bool = i < director.boss_phase_shown

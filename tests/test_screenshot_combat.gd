@@ -158,6 +158,17 @@ func _scene_swing() -> void:
 	await _frames(3)
 	await _shot("combat_swing")
 	director.monsters.clear()
+	await _frames(20)   # старый взмах догорел
+	# и в другую сторону: взмах влево по червю слева
+	var g2 := director.spawn({"id": "cinder_grub", "x": 13.0, "y": float(depth), "group": 1, "emerge": Vector2.ZERO})
+	g2.hp = 1e9
+	g2.max_hp = 1e9
+	director.swing_cd = 0.0
+	await _frames(2)
+	director.try_swing(-1)
+	await _frames(3)
+	await _shot("combat_swing_left")
+	director.monsters.clear()
 
 
 func _scene_hurt() -> void:

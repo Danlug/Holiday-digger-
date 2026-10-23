@@ -334,6 +334,9 @@ func _is_rare(item: String) -> bool:
 
 
 func _item_icon(item: String) -> Texture2D:
+	var drawn := ShopArt.tex("item_" + item)   # нарисованный значок ресурса
+	if drawn != null:
+		return drawn
 	var tile := MineralMap.tile_type_for(item)
 	if tile >= 0:
 		return TileArt.texture_for(tile, 0, 0)

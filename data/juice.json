@@ -1,0 +1,34 @@
+{
+	"_comment": "Параметры «сока» (звук, частицы, тряска). Числа, которых владелец не задавал, помечены proposed: true — это подбор по ощущениям, а не решение из GDD.",
+	"music": {
+		"mine_from": { "value": 5, "proposed": true, "note": "с этой глубины (клетка под фундаментом) играет шахта, а не поверхность" },
+		"mine2_from": { "value": 1500, "proposed": true, "note": "mus_mine_2 — вторая половина «камня сквозным фоном» (GDD раздел 4)" },
+		"deep_from": { "value": 4000, "proposed": true, "note": "mus_deep — глубокие слои; порог из задания ветки звука" },
+		"switch_delay_s": { "value": 1.2, "proposed": true, "note": "новый трек должен продержаться столько секунд, прежде чем сменить прежний: на границе глубин музыка не мигает" },
+		"fade_s": { "value": 2.5, "proposed": true },
+		"fade_story_s": { "value": 1.5, "proposed": true },
+		"fade_boss_s": { "value": 0.6, "proposed": true }
+	},
+	"dig": {
+		"hit_period_s": { "value": 0.38, "proposed": true, "note": "удары по породе, пока идёт копка (звук + мелкие частицы)" },
+		"hit_db": { "value": -7.0, "proposed": true },
+		"heavy_shake_px": { "value": 2.5, "proposed": true },
+		"heavy_shake_s": { "value": 0.12, "proposed": true }
+	},
+	"steps": {
+		"distance_cells": { "value": 0.85, "proposed": true, "note": "шаг звучит каждые столько клеток пути (при WALK=4.2 — около 5 шагов в секунду, как в анимации ходьбы)" },
+		"land_min_speed": { "value": 3.0, "proposed": true, "note": "клеток/с: слабее — приземления не слышно" }
+	},
+	"fx": {
+		"max_particles": { "value": 220, "proposed": true, "note": "одновременный потолок частиц на сцене; веб и слабые телефоны" },
+		"emitters": { "value": 14, "proposed": true },
+		"max_fliers": { "value": 24, "proposed": true },
+		"max_popups": { "value": 10, "proposed": true },
+		"web_density": { "value": 0.7, "proposed": true, "note": "в вебе частиц меньше" }
+	},
+	"damage": {
+		"hurt_min_hp": { "value": 1.5, "proposed": true, "note": "потеря HP от этого порога — «ой»; меньше (голод) копится" },
+		"drip_hp": { "value": 3.0, "proposed": true }
+	},
+	"rare_price": { "value": 100, "proposed": true, "note": "добыча дороже этого (и самоцветы) звучит как pickup_rare" }
+}

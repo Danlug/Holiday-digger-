@@ -108,6 +108,7 @@ func _ready() -> void:
 	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
 	ProgressScreen.attach(self)  # прокачка, музей, артефакты, рекорды
 	view_root.add_child(HouseSystem.new())  # дом: сон, еда, переходы дом↔огород↔шахта
+	Juice.attach(self)  # «сок»: звук, музыка, частицы, тряска, вибро (scripts/fx/)
 	# --- конец блока подключения ---
 
 	# --- сюжет --- подключение одной строкой: режиссёр сам находит игрока,
@@ -255,6 +256,7 @@ func _on_collapse_tick() -> void:
 		var rect := CollapseEvents.trigger_chunk_collapse(world, fog, null, player.cell_y())
 		if not rect.is_empty():
 			hud.toast("Где-то в шахте прогремел обвал.", 3.0)
+			GameState.emit_event(&"collapse", {})  # для звука и тряски («сок»)
 	elif randf() < 0.03:
 		# Полный ресет не может застать героя в земле (решение владельца):
 		# запоминаем событие и применяем, когда он выберется. Тост — в момент
@@ -274,6 +276,7 @@ func _apply_pending_earthquake_if_safe() -> bool:
 		return false
 	GameState.pending_earthquake = false
 	hud.toast("Земля вздрогнула — копальню тряхнуло целиком.", 3.6)
+	GameState.emit_event(&"quake", {})  # для звука и тряски («сок»)
 	return true
 
 

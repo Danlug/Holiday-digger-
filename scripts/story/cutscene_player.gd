@@ -183,6 +183,24 @@ var _world_reveal_seen: bool = false
 ## нет (см. GDD-контракт DayCycle в задании, узел параллельного агента).
 var current_clock_hour: float = -1.0
 
+## Сцена режима «мир» из середины игры (сюжет после старта) играет там, где герой
+## стоит ПО-НАСТОЯЩЕМУ, и обязана оставить его там же и не трогать туман:
+## старый выход (_exit_world_mode) возвращает героя на старт обучения (20.5; 0.5)
+## и закрывает туман вокруг пути камеры — для интро это верно (карта ещё
+## нетронутая), а для героя на глубине 500 телепортировало бы его в огород и
+## стирало бы его разведку. Поле сцены "world_exit" включает бережный выход:
+## "actor" — герой остаётся там, где кончил камера-актёр; "keep" — где был до
+## сцены. Без поля поведение прежнее.
+var _world_exit: String = ""
+var _world_entry_pos: Vector2 = Vector2.ZERO
+var _last_camera_pos: Vector2 = Vector2.INF
+## Твин затемнения. Тап посреди «fade» переключает кадр, не дожидаясь конца
+## твина, а тот дотягивал бы чёрный до конца и закрывал бы всё последующее
+## (в «ending» после затемнения идут титры) — поэтому смена кадра/настроения его гасит.
+var _fade_tween: Tween = null
+var _view_root: Node = null
+var _flash: ColorRect = null
+
 
 func _init() -> void:
 	layer = LAYER
@@ -508,6 +526,7 @@ func play(id: String, opts: Dictionary = {}) -> void:
 	# как world_mode уже давно не наследуется (_clear_stage() выше).
 	if house_mode:
 		_exit_house_mode()
+	_kill_fade_tween()
 	_fade.color = Color(0, 0, 0, 0)
 	_skip_btn.text = StoryText.get_text("ui.skip")
 	is_playing = true
@@ -530,8 +549,12 @@ func play(id: String, opts: Dictionary = {}) -> void:
 		set_backdrop_era("")
 
 	_layout()
+	_world_exit = String(scene_data.get("world_exit", ""))
 	if bool(opts.get("world", false)):
 		_enter_world_mode(String(scene_data.get("era", "now")))
+	var music_id := String(scene_data.get("music", ""))
+	if not music_id.is_empty():
+		Sfx.music(music_id, 0.8)
 	_advance()
 
 
@@ -784,6 +807,15 @@ func _run_beat(beat: Dictionary) -> bool:
 		"clock":
 			_do_clock(beat)
 			return false
+		"sfx":
+			Sfx.play(String(beat.get("id", "")), float(beat.get("pitch", 1.0)))
+			return false
+		"music":
+			Sfx.music(String(beat.get("id", "")), float(beat.get("fade", 1.0)))
+			return false
+		"fx":
+			_do_fx(beat)
+			return false
 		"house_enter":
 			_house_enter(beat)
 			return false
@@ -861,10 +893,18 @@ func _show_tap_target(beat: Dictionary) -> void:
 func _start_fade(dir: String, sec: float) -> void:
 	_hide_text()
 	var to_black := dir == "out"
+	_kill_fade_tween()
 	var tween := create_tween()
+	_fade_tween = tween
 	_fade.color = Color(0, 0, 0, 0.0 if to_black else 1.0)
 	tween.tween_property(_fade, "color", Color(0, 0, 0, 1.0 if to_black else 0.0), sec)
 	_beat_timer = sec
+
+
+func _kill_fade_tween() -> void:
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = null
 
 
 func _start_move(beat: Dictionary) -> void:
@@ -1210,6 +1250,40 @@ func _tick_shake(dt: float) -> void:
 		return
 	_shake_left -= dt
 	_stage.position.x = randf_range(-2.5, 2.5) if _shake_left > 0.0 else 0.0
+	# В режиме «мир» сцена не рисует свою декорацию, трясти нечего — трясём
+	# саму карту. main.gd переписывает view_root.position каждый кадр ДО нас
+	# (он родитель StoryDirector), так что смещение живёт ровно один кадр
+	# и возвращать его на место не нужно.
+	if world_mode and _shake_left > 0.0:
+		if _view_root == null or not is_instance_valid(_view_root):
+			_view_root = get_tree().root.find_child("ViewRoot", true, false)
+		if _view_root != null:
+			_view_root.position += Vector2(randf_range(-3.0, 3.0), randf_range(-2.0, 2.0))
+
+
+## Кадр "fx": вспышка/удар. kind: "flash" (color, sec), "thud" (вибро-удар),
+## "buzz" (долгая вибрация). В классической сцене небо непрозрачное и
+## вспышка сервиса Fx пряталась бы под ним — там рисуем её сами; в режиме
+## «мир» корень прозрачен, и общий сервис виден поверх живой карты.
+func _do_fx(beat: Dictionary) -> void:
+	match String(beat.get("kind", "flash")):
+		"flash":
+			var col := Color(String(beat.get("color", "#fff1c0")))
+			var sec: float = float(beat.get("sec", 0.35))
+			if world_mode:
+				Fx.flash(Color(col.r, col.g, col.b, 0.6), sec)
+			if _flash == null:
+				_flash = ColorRect.new()
+				_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+				_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				_root.add_child(_flash)
+				_root.move_child(_flash, _fade.get_index())
+			_flash.color = Color(col.r, col.g, col.b, 0.75)
+			create_tween().tween_property(_flash, "color:a", 0.0, sec)
+		"thud":
+			Haptics.thud()
+		"buzz":
+			Haptics.buzz(int(beat.get("ms", 120)))
 
 
 ## Ускоренные сутки в сцене смерти: небо гонит день-ночь втрое быстрее
@@ -1268,6 +1342,7 @@ func _set_mood(id: String) -> void:
 	_apply_mood_colors(id)
 	# Смена обстановки — это новая сцена, а затемнение от предыдущей на ней
 	# уже не нужно: иначе титр после "fade out" рисовался бы под чёрным.
+	_kill_fade_tween()
 	_fade.color = Color(0, 0, 0, 0)
 
 
@@ -1333,6 +1408,9 @@ func _enter_world_mode(era: String = "now") -> void:
 		_exit_house_mode()
 	world_mode = true
 	_world_reveal_seen = false
+	_last_camera_pos = Vector2.INF
+	if player != null:
+		_world_entry_pos = Vector2(player.x, player.y)
 	# Небо/земля катсцены прячутся — живая карта показывается КАК ЕСТЬ, её
 	# рисует main.gd/world_view.gd под этим CanvasLayer, а не мы.
 	_sky.visible = false
@@ -1395,8 +1473,17 @@ func _exit_world_mode() -> void:
 	# main.gd:_position_from_save_or_start() — единственную позицию, с
 	# которой начинается игра.
 	if player != null:
-		player.x = 20.5
-		player.y = 0.5
+		match _world_exit:
+			"actor":
+				if _last_camera_pos != Vector2.INF:
+					player.x = _last_camera_pos.x
+					player.y = _last_camera_pos.y
+			"keep":
+				player.x = _world_entry_pos.x
+				player.y = _world_entry_pos.y
+			_:
+				player.x = 20.5
+				player.y = 0.5
 		player.vx = 0.0
 		player.vy = 0.0
 
@@ -1415,7 +1502,7 @@ func _exit_world_mode() -> void:
 	# карту разом (reset_all() стёр бы настоящую разведку игрока, если
 	# режим "мир" сработает посреди обычной игры — "death"/"backpack"/
 	# "intro_boy" тоже проходят через _enter_world_mode/_exit_world_mode).
-	if _world_reveal_seen and GameState.fog_ref != null:
+	if _world_reveal_seen and GameState.fog_ref != null and _world_exit.is_empty():
 		# Паддинг — радиус ауры обзора (та же формула, что и у настоящего
 		# раскрытия, см. main.gd:_reveal_around_player и fog.gd:vision_radius),
 		# с запасом в одну клетку на округление: иначе кромка ауры вокруг
@@ -1766,6 +1853,7 @@ func _tick_world(dt: float) -> void:
 		var cam_a: WorldActor = _world_actors[_camera_actor_id]
 		player.x = cam_a.x
 		player.y = cam_a.y
+		_last_camera_pos = Vector2(cam_a.x, cam_a.y)
 		_track_world_reveal_bounds(cam_a.x, cam_a.y)
 
 

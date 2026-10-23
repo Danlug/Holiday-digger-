@@ -537,39 +537,54 @@ ICONS["diamond"] = lambda: _diamond("icon")
 
 # ── рубин: овальные и грушевидные огранённые камни, глубокий красный, глянец ──
 
-def _gem_oval(cv, cx, cy, rx, ry, rot, P, pear=False):
-    """Круглая/овальная огранка: корона из 8 секторов-граней (свет сверху-слева), стол-эллипс, глянцевый блик.
-    pear=True — «груша»: узкий кончик вниз по длинной оси."""
-    m = ell_mask(cx, cy, rx, ry, rot)
-    if pear:
-        r = math.radians(rot)
-        ux, uy = math.cos(r), math.sin(r)
-        vx, vy = -math.sin(r), math.cos(r)
-        tip = (cx + ux * rx * 1.45, cy + uy * rx * 1.45)
-        m |= poly_mask([(cx + vx * ry * 0.9, cy + vy * ry * 0.9), (cx - vx * ry * 0.9, cy - vy * ry * 0.9), tip])
-    tones = [P["deep"], P["shade"], P["base"], P["light"]]
-    for y, x in zip(*np.nonzero(m)):
-        dx, dy = x - cx, y - cy
-        ang = math.atan2(dy, dx)
-        sector = int(((ang + math.pi) / (math.pi / 4)) % 8)
-        lam = math.cos(ang - math.atan2(-1, -1))                   # к свету: сверху-слева
-        v = 1.5 + lam * 1.3 + (0.5 if sector % 2 else -0.5)         # чередование граней
-        cv.put(x, y, tones[min(max(int(round(v)), 0), 3)])
-    # стол: меньший эллипс, смещённый к свету, разделён диагональю
-    tb = ell_mask(cx - 0.18 * rx, cy - 0.2 * ry, rx * 0.5, ry * 0.5, rot)
-    tb &= m
-    for y, x in zip(*np.nonzero(tb)):
-        cv.put(x, y, P["hi"] if (x - cx) * 0.9 + (y - cy) < -0.8 else P["light"])
+def _gem_cut(cv, cx, cy, rx, ry, rot, P, n=10, pear=False):
+    """Огранённый овал сверху: стол-многоугольник в середине и n граней короны вокруг него; тон грани — по
+    направлению к свету (сверху-слева), соседние грани чередуются (игра света). Контур, ободок и блик."""
+    r = math.radians(rot)
+    co, si = math.cos(r), math.sin(r)
+
+    def T(u, v):
+        return (cx + u * co - v * si, cy + u * si + v * co)
+
+    ang = [2 * math.pi * i / n for i in range(n)]
+    outer, ext, table = [], [], []
+    for a in ang:
+        u, v = rx * math.cos(a), ry * math.sin(a)
+        if pear:
+            c = max(0.0, math.cos(a))
+            u *= 1.0 + 0.5 * c * c
+            v *= 1.0 - 0.45 * c ** 3
+        outer.append(T(u, v))
+        ext.append(T(1.35 * u, 1.35 * v))
+        table.append(T(0.5 * u - 0.05 * rx, 0.5 * v - 0.05 * ry))
+    mask = poly_mask(outer) if pear else ell_mask(cx, cy, rx, ry, rot)
+    tones = [P["deep"], P["shade"], P["base"], P["light"], P["hi"]]
+    for i in range(n):
+        j = (i + 1) % n
+        quad = [ext[i], ext[j], table[j], table[i]]
+        mx = (outer[i][0] + outer[j][0]) / 2 - cx
+        my = (outer[i][1] + outer[j][1]) / 2 - cy
+        d = math.hypot(mx, my) or 1.0
+        lam = -(mx + my) / (d * math.sqrt(2))
+        k = int(round(1.7 + lam * 1.5 + (0.6 if i % 2 else -0.6)))
+        cv.fill(poly_mask(quad) & mask, tones[min(max(k, 0), 3)])
+    tb = poly_mask(table) & mask
+    ys, xs = np.nonzero(tb)
+    for y, x in zip(ys, xs):
+        d = (x - cx) + (y - cy)
+        cv.put(x, y, P["spec"] if d < -0.55 * rx else (P["hi"] if d < 0.1 * rx else P["light"]))
     if rx > 4.5:
-        cv.ring(tb, tone(P["shade"], 2))
-    cv.rim(m, P["hi"], P["reflex"], 0.55, 0.65, bottom=True)
-    cv.ring(m, P["out"])
-    # глянец
-    gx, gy = cx - 0.45 * rx, cy - 0.5 * ry
-    cv.put(gx, gy, (255, 255, 255))
-    cv.put(gx + 1, gy, P["spec"])
-    cv.put(gx, gy + 1, P["spec"])
-    return m
+        cv.poly_line(table + [table[0]], P["shade"])
+    cv.rim(mask, P["hi"], P["reflex"], 0.55, 0.65, bottom=True)
+    cv.ring(mask, P["out"])
+    if rx > 4.5:
+        gx, gy = cx - 0.32 * rx, cy - 0.32 * ry
+        cv.put(round(gx), round(gy), (255, 255, 255))
+        cv.put(round(gx) + 1, round(gy), P["spec"])
+        cv.put(round(gx), round(gy) + 1, P["spec"])
+    else:
+        cv.put(round(cx - 0.4 * rx), round(cy - 0.4 * ry), (255, 255, 255))
+    return mask
 
 
 def _ruby(mode):
@@ -579,18 +594,11 @@ def _ruby(mode):
         "light": lch(53, 76, 34), "hi": lch(70, 56, 28), "spec": lch(90, 22, 20), "reflex": lch(60, 70, 34),
     }
     if mode == "tile":
-        gems = [(8.5, 9.5, 3.7, 4.5, -128, True), (17.5, 18.5, 7.0, 5.2, 16, False), (7.5, 23.5, 3.4, 3.4, 0, False)]
+        gems = [(7.5, 8.5, 4.4, 3.0, 52, 8, True), (24.5, 25.5, 3.2, 3.0, 0, 8, False), (16.5, 17.0, 9.8, 7.4, -24, 12, False)]
     else:
-        gems = [(8, 8.5, 4.6, 5.6, -128, True), (18, 18.5, 8.8, 6.5, 16, False), (7, 25, 4.2, 4.2, 0, False)]
-    for cx, cy, rx, ry, rot, pear in gems:
-        _gem_oval(cv, cx, cy, rx, ry, rot, P, pear)
-    if mode == "tile":
-        cv.spark(21, 11, (255, 235, 240), P["hi"], 1)
-        cv.put(26, 24, P["base"])
-        cv.put(27, 24, P["out"])
-        cv.put(15, 5, P["shade"])
-    else:
-        cv.spark(22, 9, (255, 235, 240), P["hi"], 2)
+        gems = [(6.5, 7.0, 5.0, 3.4, 52, 8, True), (26.5, 26.5, 3.8, 3.6, 0, 8, False), (16.0, 16.5, 12.0, 9.0, -24, 12, False)]
+    for cx, cy, rx, ry, rot, n, pear in gems:
+        _gem_cut(cv, cx, cy, rx, ry, rot, P, n, pear)
     return cv.sprite()
 
 
@@ -900,46 +908,50 @@ def _erode(m, n=1):
     return m
 
 
+def _heart_mask(cx, cy, k):
+    left = ell_mask(cx - 5.2 * k, cy - 4.6 * k, 6.4 * k, 6.0 * k, -20)
+    right = ell_mask(cx + 5.2 * k, cy - 4.6 * k, 6.4 * k, 6.0 * k, 20)
+    body = poly_mask([(cx - 10.8 * k, cy - 2.6 * k), (cx + 10.8 * k, cy - 2.6 * k), (cx + 1.0 * k, cy + 11.4 * k), (cx - 1.0 * k, cy + 11.4 * k)])
+    return left | right | body
+
+
 def _divine_heart(mode):
+    """Огранённое хрустальное сердце: 12 граней короны вокруг светлого стола-сердечка, золотая искра в центре,
+    блик на левой доле, пульсирующий ореол из двух колец."""
     cv = Cv("divine_heart")
     P = {
-        "out": lch(28, 58, 356), "deep": lch(42, 72, 1), "shade": lch(52, 80, 3), "base": lch(62, 80, 5),
-        "light": lch(74, 64, 3), "hi": lch(88, 30, 0), "spec": lch(97, 6, 0),
+        "out": lch(26, 58, 356), "deep": lch(40, 74, 1), "shade": lch(52, 82, 3), "base": lch(62, 82, 5),
+        "light": lch(74, 66, 3), "hi": lch(88, 32, 0), "spec": lch(97, 6, 0),
+        "core": lch(92, 28, 4), "core2": lch(80, 54, 2),
         "gold": lch(84, 76, 88), "gold2": lch(68, 68, 80), "goldhi": lch(96, 32, 96),
     }
     k = 0.86 if mode == "tile" else 1.06
     cx, cy = 16.0, 16.5
-    left = ell_mask(cx - 5.2 * k, cy - 4.6 * k, 6.4 * k, 6.0 * k, -20)
-    right = ell_mask(cx + 5.2 * k, cy - 4.6 * k, 6.4 * k, 6.0 * k, 20)
-    body = poly_mask([(cx - 10.8 * k, cy - 2.6 * k), (cx + 10.8 * k, cy - 2.6 * k), (cx + 1.0 * k, cy + 11.4 * k), (cx - 1.0 * k, cy + 11.4 * k)])
-    m = left | right | body
-    cv.fill(m, P["base"])
-    # грани: левая половина светлее, правая в тени, нижнее остриё темнее; центральный шов
-    ys, xs = np.nonzero(m)
-    for y, x in zip(ys, xs):
-        d = (x - cx) * 0.55 + (y - cy) * 0.35
-        if x < cx - 0.5:
-            cv.put(x, y, P["light"] if d < -3.2 else P["base"])
-        elif x > cx + 0.5:
-            cv.put(x, y, P["shade"] if d > 2.2 else P["base"])
-    lower = poly_mask([(cx - 9 * k, cy + 3 * k), (cx + 9 * k, cy + 3 * k), (cx, cy + 12 * k)]) & m
-    for y, x in zip(*np.nonzero(lower)):
-        if x > cx - 1 + (cy + 3 * k - y) * 0.3:
-            cv.put(x, y, P["deep"] if x > cx + 1 else P["shade"])
+    m = _heart_mask(cx, cy, k)
+    fy = cy - 1.0 * k
+    tones = [P["deep"], P["shade"], P["base"], P["light"], P["hi"]]
+    for y, x in zip(*np.nonzero(m)):
+        dx, dy = x + 0.5 - cx, y + 0.5 - fy
+        d = math.hypot(dx, dy) or 1.0
+        sector = int(((math.atan2(dy, dx) + math.pi) / (2 * math.pi)) * 12) % 12
+        lam = -(dx + dy) / (d * math.sqrt(2))
+        v = 2.0 + lam * 1.4 + (0.6 if sector % 2 else -0.6) - (0.5 if y > cy + 5 * k else 0.0)
+        cv.put(x, y, tones[min(max(int(round(v)), 0), 4)])
+    # стол: меньшее сердце, светлее и с диагональным бликом
+    t = _heart_mask(cx, cy - 0.3 * k, 0.44 * k) & m
+    for y, x in zip(*np.nonzero(t)):
+        d = (x - cx) + (y - cy)
+        cv.put(x, y, P["spec"] if d < -2.8 * k else (P["core"] if d < 0.2 * k else P["core2"]))
+    cv.ring(t, tone(P["shade"], 2, 0.9))
     cv.rim(m, P["hi"], P["light"], 0.75, 0.55, bottom=True)
     cv.ring(m, P["out"])
-    # золотая филигрань: пунктир по внутренней кромке, центральная нить и завитки
+    # золотая искра в столе и пунктир филиграни по краю
     inner = _erode(m, 2) & ~_erode(m, 3)
-    for i, (y, x) in enumerate(zip(*np.nonzero(inner))):
-        if (x + y) % 2 == 0:
+    for y, x in zip(*np.nonzero(inner)):
+        if (x + y) % 3 == 0:
             cv.put(x, y, P["gold"])
-    jx, jy = round(cx), round(cy - 3.5 * k)
-    cv.line((jx, jy + 2), (jx, cy + 8 * k), P["gold2"])
-    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        cv.put(jx + dx, jy + dy, P["gold"])
-    cv.put(jx, jy, P["goldhi"])
-    for dy, dx in ((1, -3), (1, 3), (4, -2), (4, 2)):
-        cv.put(jx + dx * k, jy + 2 + dy * k, P["gold"])
+    cv.spark(round(cx), round(cy - 0.8 * k), P["goldhi"], P["gold"], 1)
+    cv.put(round(cx), round(cy + 2.4 * k), P["gold2"])
     # глянец на левой доле
     gx, gy = cx - 6 * k, cy - 7 * k
     cv.put(gx, gy, P["spec"])
@@ -948,7 +960,8 @@ def _divine_heart(mode):
     cv.put(gx - 1, gy + 1, P["hi"])
     cv.put(gx + 1, gy - 1, P["hi"])
     cv.shadow()
-    cv.halo(lch(78, 74, 12), 2.6, 0.7, lch(64, 70, 4))
+    cv.halo(lch(66, 70, 8), 4.4, 0.5, lch(56, 66, 4))
+    cv.halo(lch(78, 74, 12), 2.4, 0.78, lch(64, 70, 4))
     for (x, y) in ((4, 5), (28, 6), (27, 26), (5, 27)):
         if cv.a[y, x, 3] < 100:
             cv.spark(x, y, P["goldhi"], P["gold"], 1 if (x + y) % 2 == 0 else 0)
@@ -962,39 +975,60 @@ ICONS["divine_heart"] = lambda: _divine_heart("icon")
 # ── добыча монстров (только значки): один предмет по центру, крупный, жирный контур ──
 
 def _cinder_ash():
-    """Куча золы с тлеющими угольками и обломками обугленного дерева."""
+    """Куча золы: высокий неровный курган, слои светлого и тёмного пепла, тлеющая трещина с жаром и головёшка."""
     cv = Cv("cinder_ash")
     P = {
-        "out": lch(14, 8, 40), "deep": lch(22, 6, 50), "shade": lch(34, 6, 55), "base": lch(48, 5, 60),
-        "light": lch(64, 4, 70), "hi": lch(78, 3, 80), "ember": lch(62, 92, 52), "ember2": lch(84, 78, 84),
-        "red": lch(40, 78, 40), "wood": lch(18, 10, 50), "wood2": lch(30, 14, 50),
+        "out": lch(10, 8, 40), "deep": lch(16, 6, 48), "shade": lch(30, 6, 54), "base": lch(46, 5, 60),
+        "light": lch(64, 4, 70), "hi": lch(82, 3, 80), "ember": lch(64, 94, 52), "ember2": lch(88, 76, 88),
+        "red": lch(42, 80, 40), "wood": lch(12, 10, 50), "wood2": lch(26, 14, 50), "wood3": lch(42, 16, 52),
     }
-    bumps = {5: 1.0, 7: -0.5, 9: 1.0, 12: -1.0, 14: 0.5, 17: -0.5, 20: 1.0, 23: -1.0, 25: 0.5}
-    mound = np.zeros((G, G), dtype=bool)
+    base_y = 27
+    bumps = {5: 1, 7: -1, 9: 1, 12: -1, 14: 1, 17: -1, 19: 1, 22: -1, 24: 1, 26: -1}
     hts = {}
-    for x in range(2, 30):
-        u = (x - 15.5) / 14.0
-        hts[x] = 15.0 * max(0.0, 1 - u * u) ** 0.62 + bumps.get(x, 0.0)
-        mound[int(round(25 - hts[x])):26, x] = True
+    mound = np.zeros((G, G), dtype=bool)
+    for x in range(3, 30):
+        u = (x - 12.5) / (10.0 if x < 12.5 else 17.0)
+        h = 19.0 * max(0.0, 1 - abs(u) ** 1.6) ** 0.7 + bumps.get(x, 0) * 0.9
+        hts[x] = max(h, 1.0)
+        mound[int(round(base_y - hts[x])):base_y + 1, x] = True
     tones = [P["deep"], P["shade"], P["base"], P["light"], P["hi"]]
+    yy, xx = np.mgrid[0:G, 0:G]
     for y, x in zip(*np.nonzero(mound)):
-        # купол: склон слева освещён, справа в тени; глубже под поверхностью — темнее
-        slope = (hts.get(x - 1, 0.0) - hts.get(x + 1, 0.0)) / 2.0
-        depth = (y - (25 - hts[x])) / 15.0
-        v = 2.2 + slope * 0.55 - depth * 2.4 + (0.6 if y < 25 - hts[x] + 1.6 else 0.0)
-        j = int(round(v + (cv.rng.random() - 0.5) * 0.9))
-        cv.put(x, y, tones[min(max(j, 0), 4)])
-    cv.rim(mound, P["hi"], P["shade"], 0.5, 0.4)
+        slope = (hts.get(x + 1, 1.0) - hts.get(x - 1, 1.0)) / 2.0
+        depth = (y - (base_y - hts[x])) / max(hts[x], 1.0)
+        layer = 0.7 if int(depth * 9 + x * 0.35) % 3 == 0 else 0.0
+        v = 2.5 + slope * 0.55 - depth * 2.0 - layer + (BAYER[y % 4, x % 4] - 0.5) * 1.0
+        cv.put(x, y, tones[min(max(int(round(v)), 0), 4)])
+    cv.speckle(mound, [P["deep"], P["wood2"]], 14)
+    cv.speckle(mound, [P["hi"], P["light"]], 10)
+    # головёшка справа: обугленная ветка, торчит из кучи
+    log = poly_mask([(20, 14), (28, 10), (30, 13), (22, 19)])
+    cv.fill(log, P["wood2"])
+    cv.fill(poly_mask([(20, 14), (28, 10), (28, 12), (21, 16)]) & log, P["wood3"])
+    cv.fill(poly_mask([(22, 19), (30, 13), (29, 15)]) & log, P["wood"])
+    cv.ring(log, P["out"])
+    cv.rim(mound, P["hi"], P["shade"], 0.55, 0.4)
     cv.ring(mound, P["out"])
-    for (x, y) in ((12, 20), (17, 17), (21, 22), (8, 22), (15, 23), (24, 19)):
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            if cv.a[y + dy, x + dx, 3]:
-                cv.put(x + dx, y + dy, mix(tuple(cv.a[y + dy, x + dx][:3]), P["red"], 0.8))
+    # тлеющая трещина: жар, красное свечение в соседних клетках золы
+    crack = [(12, 13), (12, 15), (13, 17), (12, 19), (14, 21), (13, 23), (15, 25)]
+    crack2 = [(18, 19), (19, 21), (18, 23)]
+    for pts in (crack, crack2):
+        for (x, y) in pts:
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if mound[ny, nx] and (nx, ny) not in pts:
+                    cv.put(nx, ny, mix(tuple(cv.a[ny, nx][:3]), P["red"], 0.75))
+    for (x, y) in crack + crack2:
         cv.put(x, y, P["ember"])
-    for (x, y) in ((17, 17), (12, 20), (21, 22)):
+    for (x, y) in ((12, 15), (12, 19), (13, 23), (19, 21)):
         cv.put(x, y, P["ember2"])
-    for (x, y, c) in ((14, 7, "light"), (15, 4, "base"), (13, 9, "shade"), (18, 2, "shade"), (6, 8, "base"), (26, 5, "shade")):
-        cv.put(x, y, P[c], 200)
+    for (x, y) in ((8, 22), (24, 23), (16, 12), (10, 26)):
+        cv.put(x, y, P["ember"])
+    # искры над кучей и тонкий дымок
+    for (x, y, c) in ((11, 8, "ember"), (14, 5, "ember2"), (9, 4, "ember"), (17, 7, "ember")):
+        cv.put(x, y, P[c])
+    for (x, y, c) in ((13, 2, "base"), (14, 1, "shade"), (12, 3, "shade")):
+        cv.put(x, y, P[c], 150)
     cv.shadow()
     return cv.sprite()
 
@@ -1096,45 +1130,50 @@ def _blob(cx, cy, radii, rot=0.0):
 
 
 def _mimic_geode():
-    """Расколотая жеода: бугристая серая корка, светлая агатовая полоска и пещерка с аметистом и голубыми кристаллами."""
+    """Расколотая жеода: бугристая серая корка, светлая агатовая кайма и тёмная пещерка, из которой торчат крупные
+    кристаллы аметиста и голубые кристаллы — они выходят за край корки, поэтому силуэт не «кольцо»."""
     cv = Cv("mimic_geode")
     P = {
         "out": lch(14, 8, 60), "rock0": lch(26, 8, 62), "rock1": lch(40, 9, 66), "rock2": lch(54, 9, 70), "rock3": lch(67, 8, 76),
-        "band": lch(80, 10, 80), "band2": lch(58, 12, 72), "cav": lch(12, 36, 305),
-        "a0": lch(26, 58, 308), "a1": lch(42, 68, 308), "a2": lch(58, 62, 306), "a3": lch(78, 40, 300),
-        "c0": lch(46, 40, 218), "c1": lch(62, 38, 214), "c2": lch(78, 30, 208), "c3": lch(92, 12, 205), "spec": lch(98, 4, 250),
+        "band": lch(82, 10, 80), "band2": lch(58, 12, 72), "cav": lch(10, 38, 305),
+        "a0": lch(24, 60, 308), "a1": lch(40, 72, 308), "a2": lch(58, 66, 306), "a3": lch(80, 40, 300), "aout": lch(12, 44, 306),
+        "c0": lch(44, 42, 218), "c1": lch(62, 40, 214), "c2": lch(80, 30, 208), "c3": lch(94, 12, 205), "cout": lch(16, 40, 230),
+        "spec": lch(98, 4, 250),
     }
-    outer = poly_mask(_blob(15.5, 17, [13.5, 12, 13, 12.5, 13.8, 12.3, 12.8, 13.6, 12.2, 13.2], 8))
+    outer = poly_mask(_blob(16, 21.5, [13.2, 12.0, 12.6, 12.2, 13.4, 12.0, 12.4, 13.2, 12.0, 12.8], 8)) & (np.mgrid[0:G, 0:G][0] >= 12)
     cv.fill(outer, P["rock2"])
     for y, x in zip(*np.nonzero(outer)):
-        d = (x - 8) * 0.55 + (y - 7) * 0.8
-        cv.put(x, y, P["rock3"] if d < 3 else (P["rock2"] if d < 13 else (P["rock1"] if d < 20 else P["rock0"])))
-    cv.speckle(outer, [P["rock1"], P["rock3"], P["rock0"]], 26)
+        d = (x - 6) * 0.5 + (y - 11) * 0.85
+        cv.put(x, y, P["rock3"] if d < 4 else (P["rock2"] if d < 13 else (P["rock1"] if d < 19 else P["rock0"])))
+    cv.speckle(outer, [P["rock1"], P["rock3"], P["rock0"]], 24)
     cv.rim(outer, P["spec"], P["rock0"], 0.5, 0.4, bottom=True)
     cv.ring(outer, P["out"])
-    band = poly_mask(_blob(15.5, 17.4, [10.6, 9.4, 10.2, 9.8, 10.8, 9.6, 10.0, 10.6, 9.4, 10.4], 14))
-    cv.fill(band, P["band"])
-    cv.fill(band & ~ell_mask(14.5, 16.4, 9.2, 8.6), P["band2"])
-    cav = poly_mask(_blob(15.5, 17.6, [8.6, 7.4, 8.2, 7.8, 8.8, 7.5, 8.0, 8.6, 7.4, 8.4], 20))
+    face = ell_mask(16, 21.6, 12.0, 7.8)
+    cv.fill(face, P["band"])
+    cv.fill(face & ~ell_mask(15.2, 21.0, 11.4, 7.2), P["band2"])
+    cav = ell_mask(16, 21.8, 10.0, 5.8)
     cv.fill(cav, P["cav"])
     cv.ring(cav, P["band2"])
 
-    def spike(bx, by, ln, w, ang, c0, c1, c2):
+    def spike(bx, by, ln, w, ang, c0, c1, c2, out):
         b = blade(bx, by, ln, w, ang, 0.0, 0.7, 0.5, 0.05)
-        sil = poly_mask([b["BL"], b["KL"], b["T"], b["KR"], b["BR"]]) & cav
+        sil = poly_mask([b["BL"], b["KL"], b["T"], b["KR"], b["BR"]])
+        sil &= (np.mgrid[0:G, 0:G][0] <= 24)
         cv.fill(sil, c1)
         cv.fill(poly_mask([b["BL"], b["KL"], b["T"], b["M"]]) & sil, c2)
         cv.fill(poly_mask([b["KR"], b["BR"], b["M"], b["T"]]) & sil, c0)
-        cv.put(b["T"][0], b["T"][1] + 1, P["spec"])
+        cv.line((b["T"][0], b["T"][1] + 1), (b["KL"][0] + 0.5, b["KL"][1]), P["spec"])
+        cv.ring(sil, out)
 
-    spike(19, 24, 13, 5.2, 14, P["a0"], P["a1"], P["a2"])
-    spike(13, 25, 11, 4.8, -16, P["a0"], P["a1"], P["a3"])
-    spike(23, 22, 7, 4.0, 42, P["a0"], P["a1"], P["a2"])
-    spike(8.5, 22, 8, 3.8, -46, P["c0"], P["c1"], P["c2"])
-    spike(16, 25, 6, 3.6, 3, P["c0"], P["c1"], P["c3"])
-    cv.spark(21, 12, P["spec"], P["a3"], 1)
-    cv.put(11, 13, P["c3"])
+    spike(23.5, 24, 9, 4.6, 40, P["c0"], P["c1"], P["c2"], P["cout"])
+    spike(9.5, 24, 10, 5.0, -34, P["a0"], P["a1"], P["a2"], P["aout"])
+    spike(20.0, 24, 14, 6.0, 13, P["a0"], P["a1"], P["a2"], P["aout"])
+    spike(14.0, 24, 18, 7.0, -6, P["a0"], P["a1"], P["a3"], P["aout"])
+    spike(18.0, 25, 7, 4.2, 4, P["c0"], P["c1"], P["c3"], P["cout"])
+    cv.spark(11, 10, P["spec"], P["a3"], 1)
+    cv.put(23, 14, P["c3"])
     cv.shadow()
+    cv.halo(lch(62, 62, 305), 1.8, 0.4)
     return cv.sprite()
 
 

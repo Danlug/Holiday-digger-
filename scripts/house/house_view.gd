@@ -515,6 +515,10 @@ func _load_hero_sheets() -> void:
 func open(room: String, enter_x: float = -1.0) -> void:
 	visible = true
 	_sleeping = false
+	# Замок сна снимается вместе с самим сном: тап посреди ролика «house_sleep»
+	# пролистывал сцену мимо stop_sleep_animation(), и комната оставалась
+	# запертой навсегда (бот-прохождение, tests/test_bot_onboarding.gd).
+	_locked = false
 	if _sleep_overlay != null:
 		_sleep_overlay.visible = false
 	go_to_room(room, enter_x)
@@ -523,6 +527,7 @@ func open(room: String, enter_x: float = -1.0) -> void:
 func close() -> void:
 	visible = false
 	_sleeping = false
+	_locked = false
 	if _sleep_overlay != null:
 		_sleep_overlay.visible = false
 	hide_npc()

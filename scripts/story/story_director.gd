@@ -426,11 +426,15 @@ func _take_control(hide_hud: bool = true) -> void:
 
 
 func _release_control() -> void:
+	# Сцена может кончиться внутри дома (смерть, Роберт): там герой остаётся
+	# «на паузе», а интерфейс шахты спрятан — иначе клавиши A/D в комнате
+	# одновременно водили бы живого героя по огороду (бот: tests/test_bot_onboarding).
+	var indoors := GameState.house_is_indoors
 	if player != null:
-		player.frozen = false
+		player.frozen = indoors
 		player.release_control()
 	if hud != null:
-		hud.visible = true
+		hud.visible = not indoors
 		hud.set_process_input(true)
 
 

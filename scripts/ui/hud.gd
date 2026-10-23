@@ -121,8 +121,9 @@ var _tool_name_label: Label
 var _tool_name_timer: Timer
 var _gear_pack: TextureRect
 var _gear_jet: TextureRect
-var _mode_button: Button
 var _inv_button: Button
+## id → узел, центр которого отдаёт get_anchor() (кошелёк, рюкзак, полоски…).
+var _anchors: Dictionary = {}
 var _inv_sheet: Control
 var _inv_list: VBoxContainer
 var _inv_load_label: Label
@@ -157,6 +158,9 @@ var _restore_purchases_btn: Button
 
 
 func _ready() -> void:
+	# Группа "hud": по ней Fx.fly_to и пункты меню находят HUD, не зная его пути.
+	add_to_group("hud")
+	HudMenuEntries.register()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Якоря корня намеренно не растягивающие: размер выставляется вручную в
 	# _update_layout (Control под CanvasLayer не наследует размер вьюпорта).
@@ -181,6 +185,32 @@ func set_gauges_visible(v: bool) -> void:
 
 func are_gauges_visible() -> bool:
 	return _gauges_box != null and _gauges_box.visible
+
+
+## Экранная позиция (проектные единицы вьюпорта) центра элемента HUD — её
+## берёт Fx.fly_to, чтобы монеты и предметы летели ровно в кошелёк/рюкзак.
+## id: "coins", "dollars", "backpack", "hp", "hunger", "stamina", "menu",
+## "depth". Неизвестный id — центр экрана.
+##
+## Назван не get_anchor: у Control такой метод уже есть (get_anchor(Side) ->
+## float), и GDScript не даёт его переопределить. Снаружи удобнее статический
+## HudAnchors.get_anchor(id) — он сам находит HUD по группе "hud".
+func anchor_of(id: String) -> Vector2:
+	var node: Control = null
+	match id:
+		"backpack":
+			node = _inv_button
+		"menu":
+			node = _more_button
+		"depth":
+			node = _depth_box
+		_:
+			node = _anchors.get(id, null)
+	if id == "depth" and (node == null or not node.visible):
+		return Vector2(size.x - 23.0, stage_rect.size.y * 0.4)
+	if node == null or not is_instance_valid(node):
+		return size * 0.5
+	return node.get_global_rect().get_center()
 
 
 func set_player(p: Node) -> void:
@@ -235,9 +265,9 @@ func _build_gauges(parent: Control) -> void:
 	_gauges_box = box
 
 	_build_xp_row(box)
-	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
-	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
-	_stamina_fill = _make_gauge_row(box, Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
+	_hp_fill = _make_gauge_row(box, Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png", "hp")
+	_hunger_fill = _make_gauge_row(box, Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png", "hunger")
+	_stamina_fill = _make_gauge_row(box, Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png", "stamina")
 	_build_hero_button(box)
 
 
@@ -320,7 +350,7 @@ func _build_quest_button(parent: Control) -> void:
 	parent.add_child(_quest_button)
 
 
-func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> ColorRect:
+func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String, anchor_id: String = "") -> ColorRect:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 5)
@@ -333,6 +363,8 @@ func _make_gauge_row(parent: Control, fill_color: Color, icon_path: String) -> C
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture = load(icon_path)
 		row.add_child(icon)
+		if anchor_id != "":
+			_anchors[anchor_id] = icon
 
 	var track := Panel.new()
 	track.custom_minimum_size = Vector2(72, 8)
@@ -373,8 +405,8 @@ func _build_purse(parent: Control) -> void:
 	_clock_label.add_theme_font_size_override("font_size", 9)
 	box.add_child(_clock_label)
 
-	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B), "res://art/ui/icon_coin.png")
-	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B), "res://art/ui/icon_dollar.png")
+	_coins_label = _make_purse_row(box, Color8(0xE0, 0xA9, 0x3B), "res://art/ui/icon_coin.png", "coins")
+	_dollars_label = _make_purse_row(box, Color8(0x7F, 0xB8, 0x6B), "res://art/ui/icon_dollar.png", "dollars")
 	_load_label = _make_purse_row(box, Color8(0x8F, 0xA3, 0x5C), "res://art/ui/icon_inventory.png")
 
 	# Кнопка «Магазин» под кошельком (решение владельца): премиум-витрина
@@ -392,7 +424,7 @@ func _build_purse(parent: Control) -> void:
 	shop_row.add_child(shop_btn)
 
 
-func _make_purse_row(parent: Control, color: Color, icon_path: String) -> Label:
+func _make_purse_row(parent: Control, color: Color, icon_path: String, anchor_id: String = "") -> Label:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_END
@@ -412,6 +444,8 @@ func _make_purse_row(parent: Control, color: Color, icon_path: String) -> Label:
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture = load(icon_path)
 		row.add_child(icon)
+		if anchor_id != "":
+			_anchors[anchor_id] = icon
 	return l
 
 
@@ -1130,7 +1164,10 @@ func _apply_drop() -> void:
 
 
 var _more_panel: PanelContainer
+var _more_grid: GridContainer
 var _more_button: Button
+var _menu_armed_id: String = ""
+var _menu_armed_until_msec: int = 0
 
 
 func _build_strip() -> void:
@@ -1163,7 +1200,7 @@ func _build_strip() -> void:
 	# нужна ли кнопка ВО ВРЕМЯ КОПКИ: инвентарь, склад, инструмент и
 	# снаряжение остаются на виду, всё остальное уходит под «⋯». Прятать
 	# по важности, а не по алфавиту: игрок сидит в шахте, а не в меню.
-	var more_menu := _build_more_menu()
+	_build_more_menu()
 	_build_tool_name_popup()
 	_build_objective_line()
 
@@ -1213,25 +1250,8 @@ func _build_strip() -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	strip.add_child(spacer)
 
-	# --- экономика: кнопка мастерской (scripts/shop/) ---
-	# Одна кнопка на всю экономику: шторка внутри сама делится на продажу,
-	# верстак и лавку. Из комнаты мастерской она же открывается вызовом
-	# ShopUI.open_shop() — верстак в мастерской теперь экипировка, а магазин
-	# живёт у входной двери; эта кнопка — запасной вход, пока дом как сцена
-	# не доделан.
-	var shop_btn := _make_chip("")
-	if ResourceLoader.exists("res://art/ui/icon_coin.png"):
-		shop_btn.icon = load("res://art/ui/icon_coin.png")
-		shop_btn.expand_icon = true
-		shop_btn.custom_minimum_size = Vector2(24, STRIP_H)
-	else:
-		shop_btn.text = "Лавка"
-	shop_btn.tooltip_text = "Мастерская: продажа, верстак, лавка"
-	shop_btn.pressed.connect(func(): ShopUI.open_shop())
-	shop_btn.text = "Мастерская"
-	shop_btn.custom_minimum_size = Vector2(0, STRIP_H)
-	more_menu.add_child(shop_btn)
-	# --- конец блока экономики ---
+	# Мастерская, режим управления, настройки и сброс живут в реестре меню
+	# (scripts/ui/menu_entries.gd), а не в полосе.
 
 	# --- прокачка и музей (scripts/progress/) ---
 	# Кнопки «Герой» в «⋯» больше нет: экран героя открывается кнопкой под
@@ -1258,48 +1278,15 @@ func _build_strip() -> void:
 	strip.add_child(storage_btn)
 	# --- конец блока дома ---
 
-	_mode_button = _make_chip("")
-	_mode_button.pressed.connect(_on_mode_button_pressed)
-	more_menu.add_child(_mode_button)
-
-	# --- настройки (задание владельца, 2026-09-21: «в 3 точки снизу справа
-	# добавь кнопку "Настройки"») ---
-	var settings_btn := _make_chip("Настройки")
-	settings_btn.pressed.connect(open_settings)
-	more_menu.add_child(settings_btn)
-	# --- конец блока настроек ---
-
-	# Стрелка ↺ (U+21BA) отсутствует в шрифте темы по умолчанию и рисуется
-	# пустым квадратом — подписываем словом.
-	var reset_btn := _make_chip("Сброс")
-	reset_btn.pressed.connect(_on_reset_pressed)
-	more_menu.add_child(reset_btn)
-
-	# Метка сборки. Владелец несколько раз открывал игру и не видел изменений,
-	# и по переписке нельзя было отличить «раздача отстала» от «браузер отдал
-	# старую копию из кэша». Теперь версия видна на экране, и один взгляд
-	# отвечает на вопрос. Пишется tools/make_build_info.py перед экспортом.
-	var build_label := Label.new()
-	build_label.text = _build_stamp()
-	build_label.add_theme_font_size_override("font_size", 7)
-	build_label.add_theme_color_override("font_color", Color8(0x6B, 0x5D, 0x4C))
-	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	more_menu.add_child(build_label)
-
-	# «⋯» встаёт последним, чтобы контекстная кнопка дома, появляясь и
+	# «•••» встаёт последним, чтобы контекстная кнопка дома, появляясь и
 	# исчезая, не сдвигала его под пальцем.
-	_more_button = _make_chip("•••")
-	_more_button.tooltip_text = "Ещё"
+	_more_button = _make_chip("")
+	_more_button.icon = UiIcons.tex("more")
+	_more_button.expand_icon = true
 	_more_button.custom_minimum_size = Vector2(26, STRIP_H)
+	Tip.bind(_more_button, "Меню")
 	_more_button.pressed.connect(_toggle_more_menu)
 	strip.add_child(_more_button)
-
-	# Любой пункт меню закрывает меню: иначе шторка мастерской открывается
-	# поверх ещё раскрытого списка, и он ждёт игрока под ней.
-	for item in more_menu.get_children():
-		if item is Button:
-			(item as Button).pressed.connect(close_more_menu)
 
 	# Схема управления — сохранённая настройка игрока (Settings.control_mode),
 	# а не всегда "stick" по умолчанию (задание владельца: «Управление —
@@ -1329,21 +1316,28 @@ func _build_debug_panel() -> void:
 	add_child(_debug_panel)
 
 
-## Меню «⋯»: то, что нужно на поверхности, а не в шахте.
+## Меню «•••»: плитки-иконки из реестра MenuRegistry (мастерская, настройки,
+## задания, достижения…) — каждая подсистема кладёт свой пункт у себя, а HUD
+## их не знает. Название и описание — в подсказке Tip, на плитке только
+## иконка и красный бейдж.
 ##
 ## Всплывает НАД полосой и прижато к правому краю, к своей кнопке. Пока оно
 ## открыто, ввод в мир глушится (см. _input и update_input_intent) — иначе
 ## палец, метящий в пункт меню, попадает в джойстик под ним и герой копает
-## под открытым меню.
-func _build_more_menu() -> VBoxContainer:
+## под открытым меню. Собирается заново при каждом открытии: подсистемы
+## регистрируются позже HUD, а видимость и бейджи меняются по ходу игры.
+func _build_more_menu() -> void:
 	_more_panel = PanelContainer.new()
 	_more_panel.name = "MoreMenu"
 	_more_panel.visible = false
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.bg_color = Color8(0x1A, 0x14, 0x0F, 0xF5)
+	sb.border_color = Color8(0x52, 0x40, 0x2D)
 	sb.set_border_width_all(1)
-	sb.set_content_margin_all(4)
+	sb.set_corner_radius_all(7)
+	sb.set_content_margin_all(5)
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	sb.shadow_size = 3
 	_more_panel.add_theme_stylebox_override("panel", sb)
 	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_more_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -1355,7 +1349,62 @@ func _build_more_menu() -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 3)
 	_more_panel.add_child(box)
-	return box
+
+	_more_grid = GridContainer.new()
+	_more_grid.add_theme_constant_override("h_separation", 4)
+	_more_grid.add_theme_constant_override("v_separation", 4)
+	box.add_child(_more_grid)
+
+	# Метка сборки. Владелец несколько раз открывал игру и не видел изменений,
+	# и по переписке нельзя было отличить «раздача отстала» от «браузер отдал
+	# старую копию из кэша». Версия видна в меню, и один взгляд отвечает на
+	# вопрос. Пишется tools/make_build_info.py перед экспортом.
+	var build_label := Label.new()
+	build_label.text = _build_stamp()
+	build_label.add_theme_font_size_override("font_size", 7)
+	build_label.add_theme_color_override("font_color", Color8(0x6B, 0x5D, 0x4C))
+	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(build_label)
+
+
+func _rebuild_more_menu() -> void:
+	for c in _more_grid.get_children():
+		_more_grid.remove_child(c)
+		c.queue_free()
+	_menu_armed_id = ""
+	var entries := MenuRegistry.entries()
+	_more_grid.columns = 3 if entries.size() <= 6 else 4
+	for e: Dictionary in entries:
+		_more_grid.add_child(_make_menu_button(e))
+	_more_panel.reset_size()
+
+
+func _make_menu_button(e: Dictionary) -> Button:
+	var id := String(e["id"])
+	var confirm := bool(e.get("confirm", false))
+	var b := UiBtn.icon_button(MenuRegistry.icon_of(e), Vector2(30, 30),
+		UiBtn.Kind.DANGER if confirm else UiBtn.Kind.NORMAL)
+	Tip.bind(b, MenuRegistry.text_of(e, "title"), MenuRegistry.text_of(e, "body"))
+	UiBtn.set_badge(b, MenuRegistry.badge_of(e))
+	b.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		# Опасный пункт срабатывает со второго нажатия в течение трёх секунд.
+		if confirm and not (_menu_armed_id == id and Time.get_ticks_msec() < _menu_armed_until_msec):
+			_menu_armed_id = id
+			_menu_armed_until_msec = Time.get_ticks_msec() + 3000
+			b.modulate = Color(1.0, 0.7, 0.65)
+			Tip.set_text(b, MenuRegistry.text_of(e, "title"), "Нажми ещё раз — точно сбросить")
+			Tip.show_now(b)
+			Haptics.buzz(30)
+			Sfx.play("ui_toggle")
+			return
+		close_more_menu()
+		var cb = e.get("on_press", null)
+		if cb is Callable:
+			(cb as Callable).call())
+	return b
 
 
 ## Всплывающая надпись над выкопанной клеткой: «Золото +1». Живёт секунду,
@@ -1593,20 +1642,28 @@ func _show_tool_name() -> void:
 
 
 func _toggle_more_menu() -> void:
-	_more_panel.visible = not _more_panel.visible
 	if _more_panel.visible:
-		# Иначе палец, уже «зажавший» мир, остаётся зажатым под открытым меню:
-		# в режиме стика — ручка, в режиме пальца — удержание.
-		_release_stick()
-		_touch_pointer = -100
-		_has_touch = false
-		if player != null:
-			player.release_control()
-			player.digging = null
+		close_more_menu()
+		return
+	_rebuild_more_menu()
+	_more_panel.visible = true
+	UiAnim.appear(_more_panel, 0.85, 0.14)
+	_more_panel.pivot_offset = Vector2(_more_panel.size.x, _more_panel.size.y)
+	Sfx.play("ui_open")
+	# Иначе палец, уже «зажавший» мир, остаётся зажатым под открытым меню:
+	# в режиме стика — ручка, в режиме пальца — удержание.
+	_release_stick()
+	_touch_pointer = -100
+	_has_touch = false
+	if player != null:
+		player.release_control()
+		player.digging = null
 
 
 func close_more_menu() -> void:
 	if _more_panel != null:
+		if _more_panel.visible:
+			Sfx.play("ui_close")
 		_more_panel.visible = false
 
 
@@ -2137,6 +2194,11 @@ const MODES: Array[String] = ["stick", "hold", "arrows"]
 
 
 func _on_mode_button_pressed() -> void:
+	cycle_mode()
+
+
+## Следующий режим управления по кругу — пункт «Управление» в меню «•••».
+func cycle_mode() -> void:
 	var i := MODES.find(mode)
 	_set_mode(MODES[(i + 1) % MODES.size()])
 
@@ -2149,10 +2211,6 @@ func _set_mode(m: String) -> void:
 	_arrows_held.clear()
 	if player != null:
 		player.release_control()
-	# Одна подпись на все три режима: название текущего («Стик»/«Палец»/
-	# «Стрелки») игроку ничего не говорило — кнопка читалась как состояние, а
-	# не как переключатель. Что именно включено, видно на экране.
-	_mode_button.text = "Управление"
 	_stick.visible = mode == "stick"
 	_hold_hint.visible = mode == "hold"
 	if _arrows_panel != null:
@@ -2177,6 +2235,10 @@ func _set_mode(m: String) -> void:
 ## трогает, поэтому её ещё и reset_progress() явно (иначе цифры в памяти
 ## пережили бы стёртый файл). Рекорды (records.json) НЕ трогаем —
 ## RecordsStore задуман как трофеи поперёк забегов, а не часть прогресса.
+func reset_game() -> void:
+	_on_reset_pressed()
+
+
 func _on_reset_pressed() -> void:
 	close_more_menu()
 	close_inventory()

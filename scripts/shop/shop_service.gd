@@ -355,7 +355,7 @@ static func max_craft(recipe_id: String) -> int:
 		var fit := held_for(recipe_id, String(id)) / maxi(1, int(r["inputs"][id]))
 		most = fit if most < 0 else mini(most, fit)
 	var coins := int(r["coins"])
-	if coins > 0 and not GameState.debug_free_shop:
+	if coins > 0:
 		most = GameState.coins / coins if most < 0 else mini(most, GameState.coins / coins)
 	return maxi(most, 0)
 

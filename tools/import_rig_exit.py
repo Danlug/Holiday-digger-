@@ -46,6 +46,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import ART_SCALE, BODY_H, TILE, shrink, tone_match  # noqa: E402
+from defringe import defringe  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -273,7 +274,7 @@ def main(path):
     car_piece7 = cut(sheet, mask, car_box7, exclude=CAPTION_RECTS[7])
     ctw7 = max(1, round(car_piece7.size[0] * k_rig))
     cth7 = max(1, round(car_piece7.size[1] * k_rig))
-    parked = shrink(car_piece7, (ctw7, cth7), colors=32)
+    parked = defringe(shrink(car_piece7, (ctw7, cth7), colors=32), bg=None)
     parked.save(os.path.join(env_dir, "drill_mobile_parked.png"))
     print("записано art/env/drill_mobile_parked.png,", parked.size)
 

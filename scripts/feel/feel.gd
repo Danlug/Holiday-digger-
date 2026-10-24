@@ -123,7 +123,7 @@ static func axis(left: bool, right: bool, last: int) -> int:
 
 ## Порог «момента»: дорогая находка, а не повседневная руда.
 static func is_epic_price(price: int) -> bool:
-	return float(price) >= num("loot.epic_price", 600.0)
+	return float(price) >= num("loot.epic_price", 500.0)
 
 
 ## Куда класть наезд камеры: статическая очередь, которую подбирает CameraRig в

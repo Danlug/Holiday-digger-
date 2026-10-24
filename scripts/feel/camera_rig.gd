@@ -95,7 +95,19 @@ func step(p, vw: float, vh: float, sky_height: int, dt: float) -> Vector2:
 	var ky := 1.0 - exp(-dt / maxf(Feel.num("camera.lead_y_tau_s", 0.22), 0.001))
 	_lead_x = lerpf(_lead_x, lead_t.x, kx)
 	_lead_y = lerpf(_lead_y, lead_t.y, ky)
-	var target := classic(float(p.x) + _lead_x, float(p.y) + _lead_y, vw, vh, sky_height)
+	# Упреждение скорости: без него демпфер вечно отставал бы на v·τ (ходьба — 0.4 клетки,
+	# падение — 2.2), и «взгляд вперёд» съедался бы лагом. С ним установившееся смещение камеры
+	# равно ровно упреждению, а рывки героя всё равно сглажены.
+	var ff := Vector2.ZERO
+	if not rigid:
+		# дискретный шаг сглаживания отстаёт ровно на v·dt/(e^(dt/τ)−1) — не на v·τ: берём точную поправку,
+		# чтобы смещение не зависело от частоты кадров
+		var tx := maxf(Feel.num("camera.follow_tau_x_s", 0.10), 0.001)
+		var ty := maxf(Feel.num("camera.follow_tau_y_s", 0.07), 0.001)
+		ff = Vector2(
+			clampf(float(p.vx) * dt / maxf(exp(dt / tx) - 1.0, 1.0e-6), -3.0, 3.0),
+			clampf(float(p.vy) * dt / maxf(exp(dt / ty) - 1.0, 1.0e-6), -3.0, 3.0))
+	var target := classic(float(p.x) + _lead_x + ff.x, float(p.y) + _lead_y + ff.y, vw, vh, sky_height)
 
 	if rigid or not _has or pos.distance_to(target) > Feel.num("camera.snap_cells", 6.0):
 		pos = target

@@ -8,7 +8,7 @@
 	"camera": {
 		"follow_tau_x_s": { "value": 0.10, "proposed": true, "note": "постоянная времени сглаживания камеры по X" },
 		"follow_tau_y_s": { "value": 0.07, "proposed": true },
-		"lead_x_cells": { "value": 0.55, "proposed": true, "note": "упреждение по взгляду героя, пока он идёт" },
+		"lead_x_cells": { "value": 0.7, "proposed": true, "note": "упреждение по взгляду героя, пока он идёт" },
 		"lead_x_tau_s": { "value": 0.30, "proposed": true },
 		"fall_look_gain": { "value": 0.10, "proposed": true, "note": "при падении камера смотрит вниз: клеток на каждую клетку/с выше порога" },
 		"fall_look_from": { "value": 6.0, "proposed": true, "note": "клеток/с, с которых начинается взгляд вниз" },
@@ -38,7 +38,7 @@
 	"loot": {
 		"stack_window_s": { "value": 0.75, "proposed": true, "note": "подряд добытое одно и то же сливается в одно «+N»" },
 		"fly_min_price": { "value": 20, "proposed": true, "note": "добыча дороже этого летит в рюкзак иконкой" },
-		"epic_price": { "value": 600, "proposed": true, "note": "дороже этого — «момент»: вспышка, наезд камеры, вибро" },
+		"epic_price": { "value": 500, "proposed": true, "note": "дороже этого — «момент»: вспышка, наезд камеры, вибро" },
 		"epic_hitstop_s": { "value": 0.07, "proposed": true }
 	},
 	"death": {

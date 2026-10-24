@@ -20,6 +20,7 @@ var hud: Control
 var view_root: Node2D
 
 var _collapse_timer: Timer
+var _quake_timer: Timer
 var _cam_rig := CameraRig.new()     # плавная камера с упреждением и наездом (scripts/feel/)
 
 
@@ -125,11 +126,20 @@ func _ready() -> void:
 
 	_reveal_around_player()
 
+	# Частота обвала и землетрясения — решение владельца (ГДД §8, data/balance.json → reset_events):
+	# обвал проверяется раз в 5 минут с шансом 7%, землетрясение раз в 10 минут с шансом 3%. Раньше
+	# здесь стояло «раз в 90 с, 35%» (числа ещё не были заданы) — обвалы шли в 16 раз чаще, чем решено.
+	var reset_events: Dictionary = Balance.balance.get("reset_events", {})
 	_collapse_timer = Timer.new()
-	_collapse_timer.wait_time = 90.0  # ПРЕДЛОЖЕНО: частота обвалов не задана в GDD числом ("средняя")
+	_collapse_timer.wait_time = float(reset_events.get("chunk_collapse", {}).get("check_every_seconds", 300))
 	_collapse_timer.autostart = true
 	_collapse_timer.timeout.connect(_on_collapse_tick)
 	add_child(_collapse_timer)
+	_quake_timer = Timer.new()
+	_quake_timer.wait_time = float(reset_events.get("mine_earthquake", {}).get("check_every_seconds", 600))
+	_quake_timer.autostart = true
+	_quake_timer.timeout.connect(_on_quake_tick)
+	add_child(_quake_timer)
 
 	# --- подключение модулей (одна строка на модуль) ---
 	add_child(preload("res://scenes/shop.tscn").instantiate())  # мастерская: продажа, верстак, лавка
@@ -310,11 +320,9 @@ func _handle_death() -> void:
 
 
 func _on_collapse_tick() -> void:
-	# Частота ("средняя"/"очень редко", ГДД раздел 8) числом не задана —
-	# ПРЕДЛОЖЕНО: обвал чанка раз в ~90 сек с вероятностью 35%, землетрясение
-	# на порядок реже. Реальный игрок не должен стоять и смотреть, как мир
-	# рушится каждую минуту — обвалы должны быть редким сюрпризом.
-	if randf() < 0.35:
+	# Шанс — из data/balance.json (reset_events.chunk_collapse.chance_percent, 7%).
+	var chance := float(Balance.balance.get("reset_events", {}).get("chunk_collapse", {}).get("chance_percent", 7))
+	if randf() * 100.0 < chance:
 		# Обвал случается только НИЖЕ героя (решение владельца), поэтому тик
 		# отдаёт его клетку. Если под ним места не нашлось, обвала не было —
 		# и тоста тоже: пугать сообщением о том, чего не произошло, нечестно.
@@ -328,7 +336,12 @@ func _on_collapse_tick() -> void:
 				collapse_fx.warn(plan, COLLAPSE_WARN_SECONDS)
 				Fx.shake(1.6, COLLAPSE_WARN_SECONDS)
 				Sfx.play("quake", 1.25, -9.0)   # глухой гул до удара; сам удар озвучивает JuiceDirector по событию
-	elif randf() < 0.03:
+
+
+## Землетрясение: проверка раз в 10 минут, шанс 3% (reset_events.mine_earthquake).
+func _on_quake_tick() -> void:
+	var chance := float(Balance.balance.get("reset_events", {}).get("mine_earthquake", {}).get("chance_percent", 3))
+	if randf() * 100.0 < chance:
 		# Полный ресет не может застать героя в земле (решение владельца):
 		# запоминаем событие и применяем, когда он выберется. Тост — в момент
 		# РЕАЛЬНОГО применения, иначе игрок услышит грохот, которого не было.

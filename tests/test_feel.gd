@@ -282,7 +282,7 @@ func _test_camera() -> void:
 	# упреждение
 	check("упреждение: стоим — нет", CameraRig.lead_target(_fake(10, 10), false) == Vector2.ZERO)
 	var walk := CameraRig.lead_target(_fake(10, 10, 4.2, 0, 1), false)
-	check("упреждение: идём вправо — камера вперёд", is_equal_approx(walk.x, 0.55) and walk.y == 0.0)
+	check("упреждение: идём вправо — камера вперёд", is_equal_approx(walk.x, 0.7) and walk.y == 0.0)
 	check("упреждение: идём влево — назад", CameraRig.lead_target(_fake(10, 10, -4.2, 0, -1), false).x < 0.0)
 	var fall := CameraRig.lead_target(_fake(10, 10, 0, 20), false)
 	check("упреждение: падаем — камера смотрит вниз", fall.y > 1.0 and fall.y <= 3.0)
@@ -318,6 +318,23 @@ func _test_camera() -> void:
 	for i in 60:
 		rb.step(ha, 7.0, 14.0, sky, 1.0 / 120.0)
 	check("камера: за 0.5 с одинаково при 30 и 120 к/с (|Δ| < 0.05)", absf(ra.pos.x - rb.pos.x) < 0.05)
+	# установившийся режим: камера не отстаёт от идущего героя, а смотрит вперёд ровно на упреждение
+	var rig_w := CameraRig.new()
+	var hw := _fake(4.0, 30.0, 4.2, 0.0, 1)
+	rig_w.step(hw, 7.0, 14.0, sky, 1.0 / 60.0)
+	for i in 200:
+		hw.x += hw.vx / 60.0
+		rig_w.step(hw, 7.0, 14.0, sky, 1.0 / 60.0)
+	var off_x: float = rig_w.pos.x - CameraRig.classic(hw.x, hw.y, 7.0, 14.0, sky).x
+	check("камера на ходу: смещение вперёд = упреждение 0.7 клетки (%.2f)" % off_x, absf(off_x - 0.7) < 0.06)
+	var rig_f := CameraRig.new()
+	var hf := _fake(10.0, 30.0, 0.0, 32.0, 1)
+	rig_f.step(hf, 7.0, 14.0, sky, 1.0 / 60.0)
+	for i in 300:
+		hf.y += hf.vy / 60.0
+		rig_f.step(hf, 7.0, 14.0, sky, 1.0 / 60.0)
+	var off_y: float = rig_f.pos.y - CameraRig.classic(hf.x, hf.y, 7.0, 14.0, sky).y
+	check("камера при падении 32 кл/с: смотрит вниз на упреждение 2.6 клетки (%.2f), герой не уходит под шапку HUD" % off_y, absf(off_y - 2.6) < 0.05 and off_y < 3.1)
 	# телепорт
 	h.x = 3.0
 	h.y = 2.0

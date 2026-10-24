@@ -126,6 +126,64 @@ func stars_alpha() -> float:
 	return 0.0
 
 
+## --- Небо (читает scripts/world/sky_view.gd и clouds_view.gd): только чистая математика часов,
+## ничего не рисует и не хранит, поэтому её можно проверять без окна. ---
+
+const MOON_PHASES := 8
+
+## Темнота неба 0 (день) .. 1 (ночь) — рампа 18–20 и 4–6, та же, что у sky_dark()/grade().
+func night_amount() -> float:
+	return _phase()
+
+
+## Плавная видимость звёзд для неба: первые яркие звёзды зажигаются в сумерках (около 18:50), все — к 19:55;
+## утром гаснут тем же путём к 05:10. stars_alpha() выше — прежняя резкая рампа в 10 минут, её читают тесты.
+func star_glow() -> float:
+	var p := _phase()
+	var t := clampf((p - 0.40) / 0.55, 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+
+## Сила тёплой полосы зари: 0 днём и в глубокой ночи, пик в середине рампы (19:00 и 05:00).
+func twilight() -> float:
+	return pow(sin(PI * _phase()), 1.4)
+
+
+func is_dawn() -> bool:
+	return hour < 12.0
+
+
+## Номер ночи: одна ночь 20:00→06:00 переваливает через полночь, а счётчик дней меняется в 00:00 —
+## фаза луны должна держаться всю ночь, поэтому утренние часы считаем к предыдущему дню.
+func night_day() -> int:
+	return day if hour >= 12.0 else day - 1
+
+
+## Фаза луны текущей ночи, 0..7: новолуние, молодой, первая четверть, прибывающая, полнолуние, убывающая,
+## последняя четверть, старый. Первая ночь игры — молодой месяц, четвёртая — полная.
+func moon_phase() -> int:
+	return posmod(night_day(), MOON_PHASES)
+
+
+## Освещённая доля диска 0..1 (для свечения вокруг луны).
+func moon_illumination(phase: int = -1) -> float:
+	var k := float(moon_phase() if phase < 0 else phase) / float(MOON_PHASES)
+	return (1.0 - cos(TAU * k)) * 0.5
+
+
+## Высота светила над горизонтом 0..1 (синус дуги): 0 у кромки, 1 в зените; -1 пока светила нет на небе.
+func sun_alt() -> float:
+	if hour < SUN_START or hour > SUN_END:
+		return -1.0
+	return sin(PI * (hour - SUN_START) / (SUN_END - SUN_START))
+
+
+func moon_alt() -> float:
+	if hour > SUN_START and hour < MOON_START:
+		return -1.0
+	return sin(PI * fmod(hour - MOON_START + 24.0, 24.0) / MOON_SPAN)
+
+
 ## Доля ширины экрана (-0.1..1.1, за кадром по краям) для солнца. Вне окна
 ## 06:00–20:00 солнца на небе нет — SkyView такое значение не рисует.
 func sun_t() -> float:

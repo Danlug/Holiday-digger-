@@ -160,32 +160,44 @@ func _check_drift() -> void:
 
 
 func _check_visibility_by_hour() -> void:
+	# Облака больше не пропадают ночью (раньше: альфа 0 с 20:00 до 06:00 и рывок в 19:45): их рампа — та же
+	# сумеречная, что у неба, а ночью они редеют до NIGHT_ALPHA и темнеют (подсветка луны — set_moon_light).
 	var clouds := preload("res://scripts/world/clouds_view.gd").new()
 	add_child(clouds)
 	DayCycle.set_hour(12.0)
 	check("облака видны днём (12:00): alpha=1", absf(clouds.debug_visibility_alpha() - 1.0) < 0.001)
+	check("днём облака белые (без тонировки)", clouds._time_tint().is_equal_approx(Color.WHITE))
+
+	DayCycle.set_hour(19.0)
+	var dusk: Color = clouds._time_tint()
+	check("на закате (19:00) облака розовеют: синего меньше, чем красного (%s)" % dusk, dusk.b < dusk.r - 0.1)
 
 	DayCycle.set_hour(2.0)
-	check("облаков не видно глубокой ночью (02:00): alpha=0", clouds.debug_visibility_alpha() < 0.001)
+	check("глубокой ночью (02:00) облака редеют до NIGHT_ALPHA, а не исчезают (%.2f)" % clouds.debug_visibility_alpha(),
+		absf(clouds.debug_visibility_alpha() - CloudsView.NIGHT_ALPHA) < 0.001)
+	var night: Color = clouds._time_tint()
+	check("ночью облака тёмные и синеватые (%s)" % night, night.b > night.r and night.b < 0.8)
 
-	DayCycle.set_hour(6.0)
-	check("на границе видимости (06:00) alpha=0 (плавный вход ещё не начался)",
-		clouds.debug_visibility_alpha() < 0.001)
-	DayCycle.set_hour(6.25)
-	check("через 15 игровых минут после 06:00 alpha=1 (плавный вход завершён)",
-		absf(clouds.debug_visibility_alpha() - 1.0) < 0.01)
+	# Сплошной проход 17:00 -> 07:00 шагом 3 игровые минуты: ни одного скачка альфы и цвета.
+	var prev_a: float = -1.0
+	var prev_c: Color = Color.WHITE
+	var max_da: float = 0.0
+	var max_dc: float = 0.0
+	for i in range(0, 281):
+		DayCycle.set_hour(fmod(17.0 + float(i) * 0.05, 24.0))
+		var a: float = clouds.debug_visibility_alpha()
+		var c: Color = clouds._time_tint()
+		if prev_a >= 0.0:
+			max_da = maxf(max_da, absf(a - prev_a))
+			max_dc = maxf(max_dc, absf(c.r - prev_c.r) + absf(c.g - prev_c.g) + absf(c.b - prev_c.b))
+		prev_a = a
+		prev_c = c
+	check("альфа облаков меняется плавно весь вечер/рассвет (макс. шаг %.3f)" % max_da, max_da < 0.03)
+	check("цвет облаков меняется плавно (макс. шаг %.3f)" % max_dc, max_dc < 0.08)
 
-	DayCycle.set_hour(19.875)
-	var mid_out: float = clouds.debug_visibility_alpha()
-	check("на середине выходного затухания (19:52) alpha примерно 0.5 (%.2f)" % mid_out,
-		absf(mid_out - 0.5) < 0.05)
-	DayCycle.set_hour(20.0)
-	check("ровно в 20:00 alpha=0 (плавное затухание, начавшееся в 19:45, завершено)",
-		clouds.debug_visibility_alpha() < 0.001)
-
-	DayCycle.set_hour(6.125)
-	var mid_in: float = clouds.debug_visibility_alpha()
-	check("на середине входного затухания (06:07) alpha примерно 0.5 (%.2f)" % mid_in,
-		absf(mid_in - 0.5) < 0.05)
+	# Лунная подсветка: ближайшее к луне облако светлее далёкого.
+	clouds.set_moon_light(Vector2(100.0, 60.0), 1.0)
+	check("set_moon_light запоминает положение и силу", clouds._moon_strength == 1.0
+		and clouds._moon_screen == Vector2(100.0, 60.0))
 
 	clouds.queue_free()

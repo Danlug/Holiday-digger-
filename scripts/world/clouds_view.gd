@@ -37,13 +37,16 @@ const ART_SCALE_TEX := 3.0
 const CLOUD_COUNT := 12
 const CLOUD_TEX_DIR := "res://art/env/clouds/"
 
-## Видимость: облака "видны днём, с 6 утра до 8 вечера" (задание владельца).
-## Резкая граница мигала бы при переходе через ровно 6:00/20:00 — плавный
-## переход за FADE_HOURS игровых часов (15 игровых минут = 0.25 часа) убирает
-## мигание, как и у stars_alpha()/sky_dark() в day_cycle.gd.
-const VISIBLE_START := 6.0
-const VISIBLE_END := 20.0
-const FADE_HOURS := 0.25
+## Ночью облака не исчезают, а темнеют и редеют до NIGHT_ALPHA, а лунный свет слегка подсвечивает ближние
+## к луне (SkyView.set_moon_light). Раньше облака были видны только с 6 до 20 и гасли рывком в 19:45, когда
+## небо уже темнело, — белые кучевые висели на тёмном небе, а потом пропадали. Теперь всё идёт одной рампой
+## сумерек DayCycle.night_amount(), как небо и звёзды.
+const NIGHT_ALPHA := 0.32
+const DUSK_CLOUD := Color(1.0, 0.70, 0.60)
+const DAWN_CLOUD := Color(1.0, 0.80, 0.68)
+const NIGHT_CLOUD := Color(0.36, 0.42, 0.68)
+const MOONLIT_CLOUD := Color(1.10, 1.14, 1.30)
+const MOON_LIGHT_RADIUS := 120.0
 
 ## Облачность по ДНЯМ — не по кадрам: "делай случайно, не слишком
 ## повторяющимися", но детерминированно на один день (иначе будет мигать/
@@ -98,6 +101,8 @@ var _clouds: Array = []          # [{"tex","x","y","scale","alpha"}, ...]
 var _last_day: int = -1
 var _last_coverage: float = 0.0
 var _last_cam: Vector2 = Vector2.ZERO
+var _moon_screen: Vector2 = Vector2.ZERO
+var _moon_strength: float = 0.0
 
 
 func _ready() -> void:
@@ -191,26 +196,44 @@ func _process(dt: float) -> void:
 	queue_redraw()
 
 
+var _dc_node: Node = null
+
+
+func _dc() -> Node:
+	if _dc_node == null:
+		_dc_node = get_node_or_null("/root/DayCycle")
+	return _dc_node
+
+
 func _visibility_alpha() -> float:
-	var dc := get_node_or_null("/root/DayCycle")
+	var dc := _dc()
 	if dc == null:
 		return 1.0
-	var hour: float = float(dc.hour)
-	if hour < VISIBLE_START or hour > VISIBLE_END:
-		return 0.0
-	if hour < VISIBLE_START + FADE_HOURS:
-		return (hour - VISIBLE_START) / FADE_HOURS
-	if hour > VISIBLE_END - FADE_HOURS:
-		return (VISIBLE_END - hour) / FADE_HOURS
-	return 1.0
+	return lerpf(1.0, NIGHT_ALPHA, smoothstep(0.0, 1.0, float(dc.night_amount())))
+
+
+## Цвет облаков по времени суток: на закате розовеют, к ночи уходят в синеву.
+func _time_tint() -> Color:
+	var dc := _dc()
+	if dc == null:
+		return Color.WHITE
+	var warm: float = float(dc.twilight())
+	var c := Color.WHITE.lerp(DAWN_CLOUD if dc.is_dawn() else DUSK_CLOUD, warm * 0.85)
+	return c.lerp(NIGHT_CLOUD, smoothstep(0.35, 1.0, float(dc.night_amount())))
+
+
+## SkyView сообщает, где луна на экране и сколько света она даёт (0 — луны нет/новолуние).
+func set_moon_light(screen_pos: Vector2, strength: float) -> void:
+	_moon_screen = screen_pos
+	_moon_strength = strength
 
 
 func _draw() -> void:
 	if _textures.is_empty():
 		return
 	var vis: float = _visibility_alpha()
-	if vis <= 0.0:
-		return
+	var tint := _time_tint()
+	var cam_px := _last_cam * TILE
 	for cloud in _clouds:
 		var tex: Texture2D = _textures[cloud.tex_index] if cloud.tex_index < _textures.size() else null
 		if tex == null:
@@ -218,8 +241,14 @@ func _draw() -> void:
 		var w: float = tex.get_width() / ART_SCALE_TEX * cloud.scale
 		var h: float = tex.get_height() / ART_SCALE_TEX * cloud.scale
 		var pos := Vector2(cloud.x - w * 0.5, cloud.y - h * 0.5)
-		draw_texture_rect(tex, Rect2(pos, Vector2(w, h)), false,
-			Color(1.0, 1.0, 1.0, cloud.alpha * vis))
+		var c := tint
+		if _moon_strength > 0.0:
+			# Облако на экране: x гасит параллакс слоя, y — сдвиг камеры (слой по Y едет с миром).
+			var sp := Vector2(cloud.x - CLOUDS_PARALLAX_X * cam_px.x, cloud.y - cam_px.y)
+			var near: float = clampf(1.0 - sp.distance_to(_moon_screen) / MOON_LIGHT_RADIUS, 0.0, 1.0)
+			c = c.lerp(MOONLIT_CLOUD, near * near * _moon_strength * 0.8)
+		c.a = cloud.alpha * vis
+		draw_texture_rect(tex, Rect2(pos, Vector2(w, h)), false, c)
 
 
 # ---------------------------------------------------------------------------

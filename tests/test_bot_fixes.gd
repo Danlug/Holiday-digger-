@@ -8,6 +8,7 @@ extends Node
 ##  2. Джойстик после катсцены/окна: HUD теряет ввод, отпускание пальца не доходит —
 ##     первое касание после этого всё равно ведёт героя (и в режиме «палец» тоже).
 ##  3. Кнопка «Тест» — только в отладочной сборке и без флага --no-debug-panel.
+##  4. Яма деда — шесть клеток (решение владельца): так копает сцена, так говорят тексты.
 ## Сцену «Заправка» (только когда бур в собственности) проверяет tests/test_fuel_station.
 
 var failures := 0
@@ -31,6 +32,7 @@ func _ready() -> void:
 	await _test_skip_backpack()
 	await _test_stick_after_lock()
 	_test_debug_panel_gate()
+	_test_grandpa_pit()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -214,3 +216,23 @@ func _test_debug_panel_gate() -> void:
 		not DebugPanel.allowed_for(true, PackedStringArray([DebugPanel.NO_PANEL_FLAG])))
 	check("«Тест»: этот прогон — отладочный, и ворота смотрят на OS.is_debug_build()",
 		DebugPanel.allowed() == (OS.is_debug_build() and not OS.get_cmdline_user_args().has(DebugPanel.NO_PANEL_FLAG)))
+
+
+# ---------------------------------------------------------------------------
+# 4. Яма деда — шесть клеток
+# ---------------------------------------------------------------------------
+
+func _test_grandpa_pit() -> void:
+	StoryData.ensure_loaded()
+	var deepest := 0
+	for beat in StoryData.beats("intro_grandpa"):
+		if String(beat.get("t", "")) in ["world_dig", "world_dig_row"] and String(beat.get("actor", "")) == "grandpa":
+			deepest = maxi(deepest, int(beat.get("y", 0)))
+	check("яма деда: сцена копает ровно шесть клеток вглубь", deepest == 6, "глубина %d" % deepest)
+	for loc in ["ru", "en"]:
+		StoryText.load_locale(loc)
+		var trapped := StoryText.get_text("intro_grandpa.n_trapped").to_lower()
+		var hundred := StoryText.get_text("depth_100.s1").to_lower()
+		var six := "шест" if loc == "ru" else "six"
+		check("яма деда (%s): «в ловушке» и «на сотне» говорят «шесть»" % loc, trapped.contains(six) and hundred.contains(six))
+	StoryText.load_locale("ru")

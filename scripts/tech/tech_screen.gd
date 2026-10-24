@@ -456,7 +456,7 @@ func _build_refinery() -> void:
 	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 14))
 	rate.add_child(TechUi.label("1", 10, TechUi.MUTED))
-	Tip.bind(rate, "Курс перегонки", "%d × %s = 1 топливный блок" % [per, TechUi.item_name(_raw_sel)])
+	Tip.bind(rate, "Курс перегонки", "%s: %d шт. = 1 топливный блок" % [TechUi.item_name(_raw_sel), per])
 
 	# Превращение: сырьё -> куб -> блоки. Куб — кнопка «перегнать».
 	var conv := _hbox(v, 3)
@@ -585,7 +585,7 @@ func _update_refine_numbers() -> void:
 		reason = "Перегонка — у станции заправки в огороде"
 	elif n <= 0:
 		reason = "Мало: нужно %d на блок, есть %d" % [per, FuelRefinery.held(_raw_sel)]
-	Tip.bind(still, "Перегнать", "%d × %s -> %d топл. блоков" % [n * per, TechUi.item_name(_raw_sel), n], reason)
+	Tip.bind(still, "Перегнать", "%s: уйдёт %d, блоков выйдет %d" % [TechUi.item_name(_raw_sel), n * per, n], reason)
 	still.modulate = Color(1, 1, 1, 1.0 if reason == "" else 0.6)
 
 

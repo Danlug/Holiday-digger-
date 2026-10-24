@@ -6,7 +6,7 @@ extends Node
 ##       res://tests/test_screenshot_station.tscn --rendering-driver opengl3 \
 ##       --resolution 448x960 -- /каталог [сцена ...]
 ##
-## Сцены: world before refine coal menu empty. На диск (user://) тест не пишет.
+## Сцены: world before refine coal menu empty tip. На диск (user://) тест не пишет.
 
 var _out_dir := "/tmp/station_shots"
 var _only: Array[String] = []
@@ -51,6 +51,8 @@ func _ready() -> void:
 		await _scene_menu()
 	if _want("empty"):
 		await _scene_empty()
+	if _want("tip"):
+		await _scene_tip()
 	print("test_screenshot_station: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -169,5 +171,23 @@ func _scene_empty() -> void:
 	TechScreen.open(TechScreen.TAB_TANK, true)
 	await _frames(4)
 	await _shot("st_10_not_enough")
+	TechScreen.close_screen()
+	await _frames(2)
+
+
+func _scene_tip() -> void:
+	Settings.reduce_motion = true
+	_stock()
+	TechScreen.open(TechScreen.TAB_TANK, true)
+	await _frames(4)
+	var s := TechScreen.instance()
+	Tip.show_now(s._content.find_child("Still", true, false) as Control)
+	await _frames(4)
+	await _shot("st_11_tip_still")
+	Tip.hide_all()
+	Tip.show_now(s._content.find_child("Raw_peat", true, false) as Control)
+	await _frames(4)
+	await _shot("st_12_tip_peat")
+	Tip.hide_all()
 	TechScreen.close_screen()
 	await _frames(2)

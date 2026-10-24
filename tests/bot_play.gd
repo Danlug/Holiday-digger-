@@ -217,6 +217,8 @@ func _ready() -> void:
 		C["skills"] = _skill_order(G["skills"])
 	if _short:
 		C["trip_max"] = 150.0   # короткий прогон обязан успеть круг «шахта → дом → шахта»
+		if goal_name != "":
+			C["trip_max"] = 35.0   # тест стратегий: за ~1,3 игровой минуты — домой, прокачка и покупки по цели
 	if _out.is_empty():
 		_out = OS.get_user_data_dir().path_join("bot_run")
 	DirAccess.make_dir_recursive_absolute(_out)
@@ -1138,7 +1140,22 @@ func _needs_home() -> bool:
 			return true
 	if GameState.hunger < float(C["eat_below"]) or GameState.stamina < float(C["sleep_below"]):
 		return true
+	if GameState.skill_points_available > 0 and _skill_affordable():
+		return true   # очки навыков тратятся дома — игрок с новым уровнем идёт качаться
 	return GameState.hp < GameState.get_max_hp() * 0.5 and _can_heal()
+
+
+## Есть ли ветка по порядку цели, на которую хватает очков (копим — не повод бегать домой).
+func _skill_affordable() -> bool:
+	for b in C["skills"]:
+		var br := Balance.get_upgrade_branch(String(b))
+		if br.is_empty() or GameState.get_skill_stage(String(b)) >= int(br.get("stages", 0)):
+			continue
+		var cost := Balance.get_upgrade_stage_cost(String(b), GameState.get_skill_stage(String(b)) + 1)
+		if cost < 0:
+			continue
+		return cost <= GameState.skill_points_available
+	return false
 
 
 func _visit_grave() -> void:
@@ -1180,9 +1197,11 @@ func _descend() -> void:
 		return
 	bot.hold([KEY_D])
 	var t0 := _sim
-	while player.y <= 1.6 and _sim - t0 < 8.0 and not _stop:
+	while player.y <= 1.6 and _sim - t0 < 8.0 and not _stop and not _busy_story():
 		await _step()
 	bot.release_all()
+	if player.y <= 1.6 and _busy_story():
+		return   # у устья началась сцена сюжета (зов к могиле): ждём её в общем цикле, это не баг тоннеля
 	if player.y <= 1.6:
 		T.finding("P1", "tunnel_drop", "герой не проваливается в устье тоннеля", _sim, {"dump": _dump()})
 		await _wait(1.0)
@@ -1645,7 +1664,7 @@ func _home_visit() -> void:
 	_heal_at_home()
 	if bool(G.get("quests", false)):
 		await _do_quests()
-	if bool(G.get("screens", false)) and _home_visits % 5 == 2:
+	if bool(G.get("screens", false)) and (_home_visits % 5 == 2 or (_short and _home_visits == 1)):
 		await _visit_screens()
 	if GameState.hunger < float(C["eat_below"]) or _food_in_pack() < int(C["food_stock"]):
 		await _order_and_take_food(GameState.hunger < float(C["eat_below"]))
@@ -2285,6 +2304,7 @@ func _spend_skills() -> void:
 				continue
 			if GameState.skill_points_available < cost:
 				if cost <= GameState.skill_points_available + 3:
+					T.mark("skill_saving:" + String(b), _sim)
 					break   # копим на приоритетную
 				continue
 			if GameState.spend_skill_point(String(b)):

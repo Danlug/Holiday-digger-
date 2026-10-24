@@ -56,6 +56,7 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import ART_SCALE, shrink  # noqa: E402
+from defringe import defringe, params_for  # noqa: E402
 
 SRC = os.path.join(ROOT, "art", "_source", "sky_clouds_sun_moon_sheet.jpg")
 OUT_CLOUDS_DIR = os.path.join(ROOT, "art", "env", "clouds")
@@ -201,6 +202,9 @@ def _save_shape(name: str, im_source: Image.Image, box, ref: np.ndarray,
     target_w_px = target_logical_w * ART_SCALE
     target_h_px = max(1, round(ch * target_w_px / cw))
     out = shrink(cut, (target_w_px, target_h_px))
+    # голубая кайма неба вокруг контура (tools/defringe.py; подложка и
+    # глубина — из его реестра по имени файла)
+    out = defringe(out, **params_for(os.path.relpath(out_path, ROOT)))
     out.save(out_path)
     report.append(f"{name}: bbox_src={box} -> вырезано {cw}x{ch} -> сохранено "
                    f"{out.size[0]}x{out.size[1]} ({target_logical_w} логич. px шириной) "

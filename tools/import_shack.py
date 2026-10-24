@@ -28,6 +28,7 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_move import background_mask, cut  # noqa: E402 — своя заливка/вырезка, серый фон
+from defringe import BG_SHACK, defringe  # noqa: E402
 
 SRC = os.path.join(ROOT, "art", "_source", "shack.jpg")
 OUT = os.path.join(ROOT, "art", "env", "shack.png")
@@ -59,7 +60,7 @@ def main() -> None:
 
     k = TARGET_H / content.size[1]
     target_w = max(1, round(content.size[0] * k))
-    out = content.resize((target_w, TARGET_H), Image.LANCZOS)
+    out = defringe(content.resize((target_w, TARGET_H), Image.LANCZOS), bg=BG_SHACK)
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     out.save(OUT)

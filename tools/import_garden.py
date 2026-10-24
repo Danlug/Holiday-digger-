@@ -43,6 +43,7 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import ART_SCALE, shrink  # noqa: E402
+from defringe import BG_GARDEN, defringe  # noqa: E402
 
 SRC = os.path.join(ROOT, "art", "_source", "garden_assets_sheet.jpg")
 OUT_DIR = os.path.join(ROOT, "art", "env", "garden")
@@ -269,7 +270,7 @@ def main():
     for name, idxs in GROUPS.items():
         ids = [comps[i]["id"] for i in idxs]
         raw = _cut_by_labels(sheet, labels, w, ids)
-        img = _to_grid(raw, name)
+        img = defringe(_to_grid(raw, name), bg=BG_GARDEN)   # светлая кайма подложки
         written.append(save(img, name))
 
     print(f"записано файлов: {len(written)}")

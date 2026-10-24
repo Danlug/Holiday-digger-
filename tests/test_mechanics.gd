@@ -433,6 +433,17 @@ func _test_director() -> void:
 	await _frames(1)
 	check("журнал закрыт, герой снова ходит", not d.journal.is_open() and not p.frozen)
 
+	# испорченный сейв: мусор в ext["mechanics"] не роняет ни чтение, ни копку
+	for junk in ["мусор", 42, [1, 2], {"chests": 5, "mastery": {"n": [1], "stars": "x"}, "stats": null},
+			{"chests": {"opened": {"1,2": 3.5, "a,b": "gold"}, "left": {"3,4": "x", "5,6": {"iron_ore": "много"}}}}]:
+		GameState.ext["mechanics"] = junk
+		var ok := MechState.opened_count() >= 0 and MechState.opened_count("gold") >= 0 \
+			and MechState.mastery_count("iron_ore") >= 0 and MechState.unseen_count() >= 0 \
+			and MechState.chests_with_loot() is Array and MechState.chest_left(Vector2i(5, 6)).is_empty()
+		_dug(Vector2i(9, 65), "iron_ore", true)
+		d.step(0.3)
+		check("мусор в сейве (%s) не ломает механики" % str(junk).left(24), ok)
+
 	# сброс игры стирает механики
 	GameState.reset_progress()
 	check("сброс прогресса стирает механики", not GameState.ext.has("mechanics") or MechState.opened_count() == 0)

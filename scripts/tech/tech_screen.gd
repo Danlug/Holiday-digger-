@@ -449,33 +449,33 @@ func _build_refinery() -> void:
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(gap)
-	var rate := _hbox(top, 2)
+	var rate := _hbox(top, 1)
 	rate.mouse_filter = Control.MOUSE_FILTER_STOP
-	rate.add_child(TechUi.icon_rect(TechUi.item_icon_small(_raw_sel, 16), 16))
+	rate.add_child(TechUi.icon_rect(TechUi.item_icon_small(_raw_sel, 14), 14))
 	rate.add_child(TechUi.label(str(per), 10, TechUi.MUTED))
-	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 12))
-	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 16))
+	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
+	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 14))
 	rate.add_child(TechUi.label("1", 10, TechUi.MUTED))
 	Tip.bind(rate, "Курс перегонки", "%d × %s = 1 топливный блок" % [per, TechUi.item_name(_raw_sel)])
 
 	# Превращение: сырьё -> куб -> блоки. Куб — кнопка «перегнать».
-	var conv := _hbox(v, 4)
+	var conv := _hbox(v, 3)
 	var raw_ic := TechUi.icon_rect(TechUi.item_icon(_raw_sel), 24)
 	conv.add_child(raw_ic)
 	var used_lbl := TechUi.label("", 11, TechUi.MUTED)
-	used_lbl.custom_minimum_size = Vector2(30, 0)
+	used_lbl.custom_minimum_size = Vector2(26, 0)
 	conv.add_child(used_lbl)
-	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 14))
+	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	var still := UiBtn.icon_button(TechUi.tex("icon_refine") if can_here else TechUi.tex("icon_lock"),
-		Vector2(52, 42), UiBtn.Kind.ACCENT if can_here else UiBtn.Kind.NORMAL, 30)
+		Vector2(46, 40), UiBtn.Kind.ACCENT if can_here else UiBtn.Kind.NORMAL, 30)
 	still.name = "Still"
 	still.pressed.connect(_on_refine_pressed)
 	conv.add_child(still)
-	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 14))
+	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	var out_ic := TechUi.icon_rect(TechUi.tex("fuel_block"), 24)
 	conv.add_child(out_ic)
 	var made_lbl := TechUi.label("", 11, TechUi.GOLD)
-	made_lbl.custom_minimum_size = Vector2(30, 0)
+	made_lbl.custom_minimum_size = Vector2(26, 0)
 	conv.add_child(made_lbl)
 
 	# Сколько: «−», ползунок, «+», «до максимума» — как окно «сколько» склада.
@@ -512,11 +512,13 @@ func _build_refinery() -> void:
 	_ref = {"slider": slider, "used": used_lbl, "made": made_lbl, "still": still,
 		"raw_icon": raw_ic, "out_icon": out_ic}
 	var most := FuelRefinery.max_blocks(_raw_sel)
-	slider.max_value = maxi(most, 1)
+	# Сырья нет — ручка слева на нуле, а не «полная» на единице, которой нет.
+	slider.min_value = 1 if most > 0 else 0
+	slider.max_value = maxi(most, 1) if most > 0 else 1
 	slider.editable = most > 1
 	for b in [minus, plus, maxb]:
 		(b as Button).disabled = most <= 1
-	slider.value = most if _refine_n < 0 else clampi(_refine_n, 1, maxi(most, 1))
+	slider.value = (most if _refine_n < 0 else clampi(_refine_n, 1, most)) if most > 0 else 0
 	slider.value_changed.connect(func(val: float) -> void:
 		_refine_n = int(val) if int(val) < int(slider.max_value) else -1
 		Sfx.play("ui_slider")
@@ -529,7 +531,7 @@ func _build_refinery() -> void:
 func _raw_tile(raw: String) -> Control:
 	var unlocked := FuelRefinery.is_unlocked(raw)
 	var kind := UiBtn.Kind.ACCENT if raw == _raw_sel else UiBtn.Kind.NORMAL
-	var b := UiBtn.icon_button(TechUi.item_icon(raw), Vector2(46, 40), kind, 26)
+	var b := UiBtn.icon_button(TechUi.item_icon(raw), Vector2(44, 40), kind, 26)
 	b.name = "Raw_" + raw
 	b.modulate = Color(1, 1, 1, 1.0 if unlocked else 0.5)
 	var held := FuelRefinery.held(raw)
@@ -544,7 +546,7 @@ func _raw_tile(raw: String) -> Control:
 		b.add_child(n)
 	else:
 		var lk := TechUi.icon_rect(TechUi.tex("icon_lock"), 14)
-		lk.position = Vector2(30, 24)
+		lk.position = Vector2(28, 24)
 		b.add_child(lk)
 	var tip: Array = RAW_TIPS.get(raw, [TechUi.item_name(raw), ""])
 	var extra := "рюкзак %d · склад %d" % [FuelRefinery.in_pack(raw), FuelRefinery.in_storage(raw)] if unlocked \
@@ -598,6 +600,11 @@ func _on_refine_pressed() -> void:
 	# Точки полёта снимаем ДО пересборки экрана: после refresh() узлы новые, а раскладка та же.
 	var from_raw := (_ref["raw_icon"] as Control).get_global_rect().get_center()
 	var at_still := still.get_global_rect().get_center()
+	var targets := {}
+	for src in _src_icons.keys():
+		var t := _src_icons[src] as Control
+		if t != null and is_instance_valid(t):
+			targets[src] = t.get_global_rect().get_center()
 	var raw := _raw_sel
 	var res := FuelRefinery.refine(raw, n)
 	if not bool(res["ok"]):
@@ -606,11 +613,11 @@ func _on_refine_pressed() -> void:
 	SaveSystem.save_game()
 	_refine_n = -1
 	refresh()
-	_play_refine(raw, res, from_raw, at_still)
+	_play_refine(raw, res, from_raw, at_still, targets)
 
 
 ## Сочный отклик: сырьё летит в куб, куб вспыхивает, блоки летят в рюкзак/на склад.
-func _play_refine(raw: String, res: Dictionary, from_raw: Vector2, at_still: Vector2) -> void:
+func _play_refine(raw: String, res: Dictionary, from_raw: Vector2, at_still: Vector2, targets: Dictionary) -> void:
 	Sfx.play("lava_hiss")
 	Haptics.thud()
 	var raw_tex := TechUi.item_icon(raw)
@@ -624,8 +631,7 @@ func _play_refine(raw: String, res: Dictionary, from_raw: Vector2, at_still: Vec
 		var cnt := int(res["to_" + src])
 		if cnt <= 0:
 			continue
-		var target := _src_icons.get(src, null) as Control
-		var to := target.get_global_rect().get_center() if target != null and is_instance_valid(target) else at_still
+		var to: Vector2 = targets.get(src, at_still)
 		var flights := mini(cnt, 5)
 		for i in range(flights):
 			var last := i == flights - 1

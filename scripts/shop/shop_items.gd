@@ -257,7 +257,7 @@ static func drill_offers() -> Array:
 # Техника: рецепты из материалов
 # ---------------------------------------------------------------------------
 
-const RECIPE_TIER := {"bronze": 0, "fuel_block": 0, "fuel_block_coal": 1, "hand_drill": 3,
+const RECIPE_TIER := {"bronze": 0, "hand_drill": 3,
 	"drill_rig": 4, "well": 5}
 
 

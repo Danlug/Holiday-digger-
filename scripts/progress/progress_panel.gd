@@ -69,7 +69,7 @@ func _build() -> void:
 	_points_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip_row.add_child(_points_label)
 	Tip.bind(_points_chip, "Очки навыков", points_rule_text(),
-		"К сотому уровню — %d очков, всё дерево стоит %d" % [Balance.skill_points_total(100),
+		"К сотому уровню — %d оч., всё дерево — %d оч." % [Balance.skill_points_total(100),
 			Balance.get_upgrade_tree_total_cost()])
 
 	var spacer := Control.new()

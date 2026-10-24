@@ -92,7 +92,7 @@ func _register_menu() -> void:
 	MenuRegistry.add("journal", {
 		"icon": Mechanics.tex("journal"),
 		"title": "Журнал добытчика",
-		"body": "Мастерство руд: звёзды за добычу дают опыт и шанс двойной добычи. Найденные тайники и лихорадки.",
+		"body": "Мастерство руд: звёзды за добычу дают опыт и шанс двойной добычи. Найденные тайники и сколько раз была жадность.",
 		"order": 40,
 		"visible": func() -> bool: return MechData.gate_open(),
 		"badge": func() -> int: return MechState.unseen_count() if MechData.gate_open() else 0,

@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_dig_ore()
 	_test_dig_earth()
 	_test_full_backpack()
+	_test_achievement()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -170,3 +171,28 @@ func _test_full_backpack() -> void:
 	check("событие показывает реально полученное", _events.is_empty() and got == 1
 			or (_events.size() == 1 and int(_events[0]["mult"]) == got))
 	p.queue_free()
+
+
+## «Удачник»: счётчик lucky копится по событию lucky_find, ступени 100/200/500/2000/5000.
+func _test_achievement() -> void:
+	GameState.reset_progress()
+	MetaState.root()["unlocked"] = true
+	var ids := []
+	for a in MetaData.achievements():
+		if String(a["counter"]) == "lucky":
+			ids.append([String(a["id"]), int(a["target"])])
+	check("у «Удачника» 5 ступеней: 100, 200, 500, 2000, 5000",
+			ids.map(func(r): return r[1]) == [100, 200, 500, 2000, 5000])
+	check("значок клевера есть", ResourceLoader.exists("res://art/meta/clover.png"))
+	for i in range(99):
+		MetaEvents.apply(&"lucky_find", {"mineral": "", "mult": 2})
+	check("99 удач — ещё не «Удачник»", not Achievements.is_done("lucky_100") and MetaState.counter("lucky") == 99)
+	var coins0 := GameState.coins
+	var got: Array = MetaEvents.apply(&"lucky_find", {"mineral": "iron_ore", "mult": 2})["ach"]
+	check("сотая удача открывает «Удачника» и даёт награду", Achievements.is_done("lucky_100")
+			and got.size() == 1 and String(got[0]["id"]) == "lucky_100" and GameState.coins > coins0)
+	for i in range(100):
+		MetaEvents.apply(&"lucky_find", {"mineral": "", "mult": 2})
+	check("двухсотая — вторая ступень, третья ещё закрыта", Achievements.is_done("lucky_200")
+			and not Achievements.is_done("lucky_500"))
+	GameState.reset_progress()

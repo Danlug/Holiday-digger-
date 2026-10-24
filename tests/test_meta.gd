@@ -365,7 +365,7 @@ func _test_daily_reward() -> void:
 
 func _test_achievements() -> void:
 	_fresh()
-	check("в данных 30–40 достижений", MetaData.achievements().size() >= 30 and MetaData.achievements().size() <= 40)
+	check("в данных 30–50 достижений", MetaData.achievements().size() >= 30 and MetaData.achievements().size() <= 50)
 	check("у каждого достижения есть название, описание, значок и награда", _ach_data_ok())
 	check("пустой прогресс — ничего не получено", Achievements.evaluate().is_empty())
 	MetaEvents.apply(&"picked", {"item": "gold", "count": 1})

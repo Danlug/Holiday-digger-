@@ -561,6 +561,27 @@ def g_chest_open(img):
     return img
 
 
+
+@icon
+def g_clover(img):
+    """«Удачник»: четырёхлистный клевер — срабатывания удачи (ГДД §11).
+    Листья-сердечки по диагоналям, стебель уходит вниз в просвет между ними."""
+    dark = shade(C("emerald_base"), 0.7)
+    line(img, [(15, 16), (15, 23), (17, 27), (21, 29)], dark, 2)
+    cx, cy = 15.5, 13.5
+    for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+        lx, ly = cx + dx * 6.0, cy + dy * 6.0
+        px, py = -dy * 2.6, dx * 2.6          # поперёк листа: две доли сердечка
+        for sx in (-1, 1):
+            ell(img, lx + px * sx + dx * 1.2, ly + py * sx + dy * 1.2, 3.6, 3.6, C("emerald_base"))
+        poly(img, [(lx + px * 1.9, ly + py * 1.9), (lx - px * 1.9, ly - py * 1.9),
+                   (cx + dx * 0.8, cy + dy * 0.8)], C("emerald_base"))
+        ell(img, lx + px * 0.9 + dx * 1.6, ly + py * 0.9 + dy * 1.6, 1.4, 1.4, C("emerald_light"))
+        line(img, [(cx + dx * 1.5, cy + dy * 1.5), (lx + dx * 2.5, ly + dy * 2.5)], dark)
+    ell(img, cx, cy, 1.5, 1.5, C("gold_light"))
+    sparkle(img, 27, 4, C("gold_light"))
+    return img
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     for name, fn in ICONS.items():

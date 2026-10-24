@@ -252,7 +252,7 @@ def pick_far(rng, i):
 
 def pick_mid(rng, i):
     prof = prof_dot2() if rng.random() < 0.55 else prof_dot2_soft()
-    peak = rng.uniform(150, 225) if prof is not None else 200
+    peak = rng.uniform(175, 245)
     return prof, peak, pick_temp(rng)
 
 

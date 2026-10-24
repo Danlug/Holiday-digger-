@@ -141,7 +141,8 @@ static func _locked(o: Dictionary, text: String, pill: Dictionary = {}) -> void:
 ## Вне двери и без роликов: плитка тускнеет, в правом углу замок, причина — в Tip
 ## (state «away», а не «locked»: «заперто» — это про глубину, и такие плитки
 ## не считаются виденными, а эти должны остаться «как были» для двери).
-## Купленное, запертое по глубине и всё, что вне правила, не трогаем.
+## Купленное, запертое по глубине и всё, что вне правила (в том числе любые
+## плитки за доллары — их можно купить где угодно), не трогаем.
 static func apply_purchase_rules(offers: Array) -> void:
 	for o in offers:
 		var gate := ShopService.can_buy(o)
@@ -311,6 +312,11 @@ static func recipe_offers() -> Array:
 			o["extra"] = reason
 			if reason != "Не хватает материалов":
 				o["corner"] = "cross"
+		# Переработка (ползунок в карточке): на плитке — на сколько штук хватает.
+		if o["state"] == "ready" and ShopService.is_batch(rid):
+			var most := ShopService.max_craft(rid)
+			o["pill"] = {"pips": pips, "text": "×" + ShopArt.compact(most), "color": COL_GOOD}
+			o["extra"] = "Хватит на %s" % ShopArt.full(most)
 		out.append(o)
 	_flag_new(out)
 	return out

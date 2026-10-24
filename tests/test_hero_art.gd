@@ -114,7 +114,9 @@ func _test_sheet(rel: String, inf: Dictionary) -> void:
 			var b := d[i + 2]
 			if 0.299 * r + 0.587 * g + 0.114 * b > 170.0 and maxi(r, maxi(g, b)) - mini(r, mini(g, b)) < 40:
 				light += 1
-			if g > r + 12 and g > b + 12:
+			# Ореол хромакея — насыщенный зелёный фона эталона (≈ 60,170,60), а не
+			# оливковая футболка экспедиционной формы.
+			if g > 110 and g * 10 > r * 14 and g * 10 > b * 14:
 				green += 1
 	var allow_light := int(edge * 0.03)
 	check("%s: светлой каймы нет (%d из %d пикселей края, допуск %d — белое само по себе)" % [rel, light, edge, allow_light],

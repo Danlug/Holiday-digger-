@@ -1,10 +1,350 @@
 {
 	"_comment": "Геометрия листов мальчика (tools/gen_hero_ref.py): fw/fh — кадр в текселях, ground — линия земли (подошва на строке над ней), scale — текселей на логическую точку, cell — текселей на пиксель рисунка (шейдер чёткости), cols — кадров в ряду (листы шире 4096 — в несколько рядов), frames — сколько кадров. Не править руками.",
 	"sheets": {
+		"boy/age_10": {
+			"fw": 136,
+			"fh": 336,
+			"ground": 336,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/age_11": {
+			"fw": 136,
+			"fh": 336,
+			"ground": 336,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/age_12": {
+			"fw": 136,
+			"fh": 336,
+			"ground": 336,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/age_15": {
+			"fw": 136,
+			"fh": 336,
+			"ground": 336,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/age_8": {
+			"fw": 136,
+			"fh": 336,
+			"ground": 336,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/age_9": {
+			"fw": 136,
+			"fh": 336,
+			"ground": 336,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/dig_drill_down": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy/dig_drill_side": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy/dig_pick": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy/dig_pick_rusty": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy/dig_shovel": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy/fall": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy/fly": {
+			"fw": 416,
+			"fh": 432,
+			"ground": 416,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy/fly_jet": {
+			"fw": 408,
+			"fh": 376,
+			"ground": 344,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy/idle": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy/sleep": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy/walk": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 16
+		},
+		"boy_gear/dig_pick": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy_gear/dig_shovel": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"boy_gear/fall": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy_gear/fly": {
+			"fw": 416,
+			"fh": 432,
+			"ground": 416,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy_gear/fly_jet": {
+			"fw": 408,
+			"fh": 376,
+			"ground": 344,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy_gear/idle": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"boy_gear/sleep": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"boy_gear/walk": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 16
+		},
+		"dig_drill_down": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"dig_drill_side": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"dig_pick": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"dig_pick_rusty": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
+		"dig_shovel": {
+			"fw": 512,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 8
+		},
 		"fall": {
 			"fw": 384,
 			"fh": 384,
 			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"fly": {
+			"fw": 416,
+			"fh": 432,
+			"ground": 416,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"fly_1": {
+			"fw": 416,
+			"fh": 432,
+			"ground": 416,
+			"scale": 8,
+			"cell": 2,
+			"cols": 6,
+			"frames": 6
+		},
+		"fly_2": {
+			"fw": 544,
+			"fh": 448,
+			"ground": 432,
+			"scale": 8,
+			"cell": 2,
+			"cols": 6,
+			"frames": 6
+		},
+		"fly_3": {
+			"fw": 408,
+			"fh": 376,
+			"ground": 344,
+			"scale": 8,
+			"cell": 2,
+			"cols": 6,
+			"frames": 6,
+			"nozzle": [
+				-7.12,
+				-15.25
+			],
+			"jet_dir": [
+				-0.15,
+				1.0
+			]
+		},
+		"fly_4": {
+			"fw": 696,
+			"fh": 368,
+			"ground": 328,
+			"scale": 8,
+			"cell": 2,
+			"cols": 3,
+			"frames": 6,
+			"nozzle": [
+				-4.42,
+				-16.77
+			],
+			"jet_dir": [
+				-0.79,
+				0.62
+			]
+		},
+		"fly_jet": {
+			"fw": 408,
+			"fh": 376,
+			"ground": 344,
 			"scale": 8,
 			"cell": 2,
 			"cols": 4,

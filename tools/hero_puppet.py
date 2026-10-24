@@ -315,13 +315,18 @@ def _rot_about(v, pivot, ang):
     return (pivot[0] + ca * x - sa * y, pivot[1] + sa * x + ca * y)
 
 
-def render(parts, pose, shape=None, extra_back=None, extra_front=None):
-    """Собрать позу на холсте размера эталона. extra_* — функции (canvas,
-    joints) для инструмента/снаряжения позади и поверх мальчика."""
+def render(parts, pose, shape=None, extra_back=None, extra_front=None, extra_mid=None,
+           offset=(0, 0), boy=True):
+    """Собрать позу на холсте (по умолчанию — размера эталона; offset сдвигает
+    мальчика, чтобы инструмент поместился слева/сверху). extra_* — функции
+    (canvas, joints) для инструмента/снаряжения: позади мальчика, между
+    туловищем и ближней рукой, поверх всего. Точки хвата — в координатах
+    эталона (offset прибавляется сам)."""
     ref = parts.ref
     shape = shape or ref.shape[:2]
     canvas = np.zeros(shape + (4,), np.uint8)
-    bx, by = pose.body_dx, pose.body_dy
+    ox, oy = offset
+    bx, by = pose.body_dx + ox, pose.body_dy + oy
     lean = math.radians(pose.lean)
     hip_c = ((J["hip_n"][0] + J["hip_f"][0]) / 2.0, J["hip_n"][1])
     # корпус наклоняется вокруг таза: суставы плеч и шеи едут вместе с ним
@@ -334,6 +339,7 @@ def render(parts, pose, shape=None, extra_back=None, extra_front=None):
         joints[k] = body_pt(J[k])
     joints["hip_n"] = (J["hip_n"][0] + bx, J["hip_n"][1] + by)
     joints["hip_f"] = (J["hip_f"][0] + bx, J["hip_f"][1] + by)
+    joints["offset"] = (ox, oy)
 
     def leg(side, angles):
         hip = J["hip_" + side]
@@ -361,7 +367,7 @@ def render(parts, pose, shape=None, extra_back=None, extra_front=None):
         l1, l2 = seg_len(sh, el), seg_len(el, hand)
         sh_d = joints["sh_" + side]
         if grip is not None:
-            up, lo, eld = ik(sh_d, grip, l1, l2, bend)
+            up, lo, eld = ik(sh_d, (grip[0] + ox, grip[1] + oy), l1, l2, bend)
         elif angles is not None:
             up, lo = math.radians(angles[0]), math.radians(angles[1])
             eld = (sh_d[0] + l1 * math.sin(up), sh_d[1] + l1 * math.cos(up))
@@ -387,20 +393,24 @@ def render(parts, pose, shape=None, extra_back=None, extra_front=None):
 
     if extra_back:
         extra_back(canvas, joints)
-    if not pose.far_arm_front:
-        over(canvas, af[0])
-        over(canvas, af[1])
-    for l in legs_f:
-        over(canvas, l)
-    for l in legs_n:
-        over(canvas, l)
-    over(canvas, torso)
-    over(canvas, head)
-    if pose.far_arm_front:
-        over(canvas, af[0])
-        over(canvas, af[1])
-    over(canvas, an[0])
-    over(canvas, an[1])
+    if boy:
+        if not pose.far_arm_front:
+            over(canvas, af[0])
+            over(canvas, af[1])
+        for l in legs_f:
+            over(canvas, l)
+        for l in legs_n:
+            over(canvas, l)
+        over(canvas, torso)
+        over(canvas, head)
+        if pose.far_arm_front:
+            over(canvas, af[0])
+            over(canvas, af[1])
+    if extra_mid:
+        extra_mid(canvas, joints)
+    if boy:
+        over(canvas, an[0])
+        over(canvas, an[1])
     if extra_front:
         extra_front(canvas, joints)
     return canvas, joints

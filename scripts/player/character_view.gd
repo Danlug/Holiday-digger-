@@ -487,7 +487,7 @@ func _rig_move_frame() -> Dictionary:
 # над ногами, а не «плывёт» (ГДД §15.1).
 # ---------------------------------------------------------------------------
 
-## Листы поз и их кадры (tools/gen_hero_anim.py). Нет листа — кадры fall.png.
+## Листы поз и их кадры (tools/gen_hero_ref.py — кукла из эталона). Нет листа — кадры fall.png.
 const JUMP_FRAMES := {"crouch": 0, "launch": 1, "rise": 2, "apex": 3,
 		"fall": 4, "fall_fast": 5, "recover": 6, "apex_b": 7, "rise_lo": 8}
 const FALL_FALLBACK := {"crouch": 0, "launch": 1, "rise": 1, "apex": 2,
@@ -908,7 +908,8 @@ func _spin_down_frame(dt: float) -> Dictionary:
 
 
 func _tick_jet(dt: float, sheet_name: String, f: int) -> void:
-	var on: bool = _fly_on and String(player.thrust) == "jet" and JET_NOZZLE.has(sheet_name)
+	var inf: Dictionary = HeroSheets.info(sheet_name)
+	var on: bool = _fly_on and String(player.thrust) == "jet" and (JET_NOZZLE.has(sheet_name) or inf.has("nozzle"))
 	if _jet == null:
 		if not on:
 			return
@@ -934,9 +935,10 @@ func _tick_jet(dt: float, sheet_name: String, f: int) -> void:
 		add_child(_jet)
 	_jet.emitting = on
 	if on:
-		var n: Vector2 = JET_NOZZLE[sheet_name]
+		# Сопло нарисованного джетпака — в hero_sheets.json (gen_hero_ref.py), иначе прежние числа.
+		var n: Vector2 = Vector2(inf["nozzle"][0], inf["nozzle"][1]) if inf.has("nozzle") else JET_NOZZLE[sheet_name]
 		_jet.position = Vector2(n.x * float(f), FOOT_Y + n.y)
-		var d: Vector2 = JET_DIR[sheet_name]
+		var d: Vector2 = Vector2(inf["jet_dir"][0], inf["jet_dir"][1]) if inf.has("jet_dir") else JET_DIR[sheet_name]
 		_jet.direction = Vector2(d.x * float(f), d.y).normalized()
 
 

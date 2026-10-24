@@ -78,19 +78,23 @@ func _test_cast_portraits() -> void:
 		check("портрет «%s» загружается" % w, tex != null)
 		if tex == null:
 			continue
-		check("лист «%s» — 3 кадра × 5 выражений по 64 px" % w,
-			tex.get_width() == DialogueCast.FRAMES.size() * DialogueCast.CELL
-			and tex.get_height() == DialogueCast.FACES.size() * DialogueCast.CELL,
+		# Кадр 64 px; у мальчика по эталону (раунд 4) — 128 (пиксель рисунка 2×2).
+		var cell := DialogueCast.cell_of(tex)
+		check("лист «%s» — 3 кадра × 5 выражений по %d px (кратно 64)" % [w, cell],
+			cell % DialogueCast.CELL == 0
+			and tex.get_width() == DialogueCast.FRAMES.size() * cell
+			and tex.get_height() == DialogueCast.FACES.size() * cell,
 			"%dx%d" % [tex.get_width(), tex.get_height()])
 		var img := tex.get_image()
 		var empty: Array = []
+		var step := 2 * cell / DialogueCast.CELL
 		for fi in DialogueCast.FACES.size():
 			for fr in DialogueCast.FRAMES.size():
-				var r := Rect2i(fr * DialogueCast.CELL, fi * DialogueCast.CELL, DialogueCast.CELL, DialogueCast.CELL)
+				var r := Rect2i(fr * cell, fi * cell, cell, cell)
 				var opaque := 0
 				var sub := img.get_region(r)
-				for y in range(0, DialogueCast.CELL, 2):
-					for x in range(0, DialogueCast.CELL, 2):
+				for y in range(0, cell, step):
+					for x in range(0, cell, step):
 						if sub.get_pixel(x, y).a > 0.5:
 							opaque += 1
 				if opaque < 200:

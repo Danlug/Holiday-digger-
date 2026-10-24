@@ -314,7 +314,7 @@ func _step() -> void:
 			GameState.hp, GameState.hunger, GameState.stamina, GameState.get_total_weight(), GameState.get_max_carry_kg())
 	if _trace > 0.0 and _sim >= _next_trace and player != null:
 		_next_trace = _sim + _trace
-		print("[trace] ", _dump().split("\n")[0], " | ", _dump_rows(2))
+		print("[trace] ", _dump().split("\n")[0], " | ", _dump_rows(2), " | путь ", str(_dbg_path.slice(0, 4)), " цель-ряд ", _goal_row, " клавиши ", str(bot._down.keys()))
 	if _shots_on and _sim >= _next_periodic_shot:
 		_next_periodic_shot += 300.0
 		_shot("periodic_%04d" % int(_sim / 60.0))
@@ -1086,6 +1086,9 @@ func _mine() -> void:
 	var last_progress := _sim
 	var last_digs := _digs
 	var visited: Dictionary = {}
+	_goal_row = player.cell_y()
+	_tgt = Vector2i(-1, -1)
+	_tgt_row = -1
 	while not _stop and GameState.is_alive and not GameState.house_is_indoors and not _busy_story():
 		_eat_in_mine()
 		var why := _should_return()
@@ -1109,11 +1112,14 @@ func _mine() -> void:
 			last_progress = _sim
 			if _branch_goal == goal:
 				_branch_goal = Vector2i(-1, -1)
+			_tgt = Vector2i(-1, -1)
+			_tgt_row = -1
 		if path.is_empty() or cell != path_cell or _sim - path_t > 2.0:
 			path = _plan_mine(cell)
 			path_cell = cell
 			path_t = _sim
 			goal = path.back() if not path.is_empty() else Vector2i(-1, -1)
+			_dbg_path = path
 		var keys: Array = [KEY_S]
 		if path.size() >= 2:
 			keys = _keys_for_step(cell, path[1])
@@ -1122,12 +1128,17 @@ func _mine() -> void:
 			if not keys.has(KEY_W) and not _brake_keys().is_empty():
 				keys.append(KEY_W)   # падение (ствол, каверна, обвал) — тормоз тягой до безопасной скорости
 		bot.hold(keys)
+		if _trace > 0.0 and _trace < 0.2 and not player.on_ground:
+			print("[fly] t=%.2f y=%.3f vy=%.2f up=%s thrust='%s' keys=%s step=%s" % [_sim, player.y, player.vy,
+				str(player.hold_up), player.thrust, str(keys), str(path.slice(0, 2))])
 		await _step()
 	bot.release_all()
 
 
 var _bad: Dictionary = {}               # клетка -> до какого sim не пытаться
 var _branch_goal := Vector2i(-1, -1)
+var _goal_row := 0
+var _dbg_path: Array = []
 var _branched: Dictionary = {}          # ряд -> сколько штреков начато
 
 
@@ -1135,7 +1146,37 @@ func _is_bad(c: Vector2i) -> bool:
 	return _bad.has(c) and float(_bad[c]) > _sim
 
 
+## Цель держится, пока не достигнута или не отброшена: если выбирать её заново с каждой
+## клетки, набор «видимой руды рядом» и «ряд глубже меня» меняется вместе с героем, и он
+## зависает на тяге между двумя рядами (с ряда r путь вверх к одной руде, с r−1 — вниз к другой).
+var _tgt := Vector2i(-1, -1)          # клетка-цель (руда, конец штрека) или x=-1
+var _tgt_row := -1                    # цель «глубже ряда N» (спуск)
+
+
 func _plan_mine(cell: Vector2i) -> Array:
+	# 1) держим текущую цель
+	if _tgt.x >= 0:
+		var t := world.get_tile(_tgt.x, _tgt.y)
+		var still := not _is_bad(_tgt) and cell != _tgt and (t != TileTypes.Type.EMPTY or _tgt == _branch_goal)
+		if still:
+			var tg := _tgt
+			var p := nav.plan(cell, func(c: Vector2i) -> bool: return c == tg, mini(cell.y, tg.y) - 4, maxi(cell.y, tg.y) + 4, 160)
+			if not p.is_empty():
+				return p
+			_bad[_tgt] = _sim + 120.0
+		if _tgt == _branch_goal:
+			_branch_goal = Vector2i(-1, -1)
+		_tgt = Vector2i(-1, -1)
+	if _tgt_row >= 0:
+		if cell.y > _tgt_row:
+			_tgt_row = -1   # спустились — выберем заново (может, рядом руда)
+		else:
+			var gr := _tgt_row
+			var p2 := nav.plan(cell, func(c: Vector2i) -> bool: return c.y > gr and not _is_bad(c), cell.y - 6, gr + 6, 160)
+			if not p2.is_empty():
+				return p2
+			_tgt_row = -1
+	# 2) новая цель: видимая руда в радиусе C.side (ближайшая по пути)
 	var r := int(C["side"])
 	var loot: Dictionary = {}
 	for y in range(cell.y - r, cell.y + r + 1):
@@ -1144,26 +1185,28 @@ func _plan_mine(cell: Vector2i) -> Array:
 			if absi(x - cell.x) + absi(y - cell.y) <= r and _is_loot_visible(x, y) and not _is_bad(c):
 				loot[c] = true
 	if not loot.is_empty():
-		var p := nav.plan(cell, func(c: Vector2i) -> bool: return loot.has(c), cell.y - r - 2, cell.y + r + 2, r * 6 + 6)
-		if not p.is_empty():
-			return p
-	# штрек на разведку (жадный): каждые N рядов — в обе стороны на branch_len
+		var p3 := nav.plan(cell, func(c: Vector2i) -> bool: return loot.has(c), cell.y - r - 2, cell.y + r + 2, r * 6 + 6)
+		if not p3.is_empty():
+			_tgt = p3.back()
+			return p3
+	# 3) штрек на разведку (жадный): каждые N рядов — в обе стороны на branch_len
 	var every := int(C["branch_every"])
-	if _branch_goal.x >= 0 and (cell == _branch_goal or cell.y != _branch_goal.y and absi(cell.y - _branch_goal.y) > 2):
-		_branch_goal = Vector2i(-1, -1)
-	if _branch_goal.x < 0 and every > 0 and cell.y >= 8 and cell.y % every == 0 and int(_branched.get(cell.y, 0)) < 2:
+	if every > 0 and cell.y >= 8 and cell.y % every == 0 and int(_branched.get(cell.y, 0)) < 2:
 		var n := int(_branched.get(cell.y, 0))
 		_branched[cell.y] = n + 1
 		var dir := -1 if n == 0 else 1
-		_branch_goal = Vector2i(clampi(cell.x + dir * int(C["branch_len"]), 0, WorldGen.WIDTH - 1), cell.y)
-	if _branch_goal.x >= 0 and not _is_bad(_branch_goal):
-		var bg := _branch_goal
-		var p2 := nav.plan(cell, func(c: Vector2i) -> bool: return c == bg, cell.y - 2, cell.y + 3, 60)
-		if not p2.is_empty():
-			return p2
-		_branch_goal = Vector2i(-1, -1)
-	# вниз: ближайшая клетка глубже нынешней
-	return nav.plan(cell, func(c: Vector2i) -> bool: return c.y > cell.y and not _is_bad(c), cell.y - 4, cell.y + 6, 80)
+		var bg := Vector2i(clampi(cell.x + dir * int(C["branch_len"]), 0, WorldGen.WIDTH - 1), cell.y)
+		if not _is_bad(bg) and bg != cell:
+			var p4 := nav.plan(cell, func(c: Vector2i) -> bool: return c == bg, cell.y - 2, cell.y + 3, 60)
+			if not p4.is_empty():
+				_branch_goal = bg
+				_tgt = bg
+				return p4
+	# 4) вниз: на ряд глубже, чем самый глубокий ряд этой ходки
+	_goal_row = maxi(_goal_row, cell.y)
+	_tgt_row = _goal_row
+	var gr2 := _tgt_row
+	return nav.plan(cell, func(c: Vector2i) -> bool: return c.y > gr2 and not _is_bad(c), cell.y - 6, gr2 + 6, 160)
 
 
 ## Клавиши для шага c → n пути. Вниз в пустоту — к центру клетки и упасть, вниз в породу —
@@ -1243,6 +1286,7 @@ func _ascend() -> void:
 	var mouth_x := float(world.tunnel_mouth().x)
 	var up_cell := Vector2i(-99, -99)
 	var up_path: Array = []
+	var up_top := -1
 	while not _stop and GameState.is_alive and not GameState.house_is_indoors and not _busy_story():
 		if player.y < 1.6 and absf(player.x - (mouth_x + 0.5)) < 1.2:
 			# Устье: долететь выше кромки бетона и боком на огород, не упав обратно.
@@ -1277,14 +1321,16 @@ func _ascend() -> void:
 		var cell := Vector2i(player.cell_x(), player.cell_y())
 		if cell != up_cell:
 			up_cell = cell
-			# цель — на 12 рядов выше (у тоннеля — сам тоннель); по пустоте дешевле, копать — можно
-			var top := maxi(1, cell.y - 12)
+			# цель — на 12 рядов выше (у тоннеля — сам тоннель), держится до достижения; по пустоте
+			# дешевле, копать — можно
+			if up_top < 0 or cell.y <= up_top:
+				up_top = maxi(1, cell.y - 12)
+			var top := up_top
 			up_path = nav.plan(cell, func(c: Vector2i) -> bool: return c.y <= top, top, cell.y + 4, 200)
 		var keys: Array = _ascend_keys()
 		if up_path.size() >= 2:
+			# вбок под потолком тягу не держим: герой упирался бы макушкой в соседнюю породу
 			keys = _keys_for_step(cell, up_path[1])
-			if up_path[1].y == cell.y and not keys.has(KEY_W) and not player.on_ground:
-				keys.append(KEY_W)
 		bot.hold(keys)
 		await _step()
 	bot.release_all()

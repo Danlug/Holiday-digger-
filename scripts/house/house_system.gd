@@ -319,9 +319,9 @@ func _outdoor_camera() -> Vector2:
 	var view_cells: Vector2i = hud.get_view_cells()
 	var vw := float(view_cells.x)
 	var vh := float(view_cells.y)
-	var cam_x: float = clampf(player.x - vw / 2.0, 0.0, maxf(0.0, float(WorldGen.WIDTH) - vw))
-	var cam_y: float = maxf(player.y - vh / 2.0, -float(SKY_HEIGHT))
-	return Vector2(cam_x, cam_y)
+	# камера, с которой main.gd рисует кадр (упреждение/сглаживание — CameraRig);
+	# без кадров (тесты) — классическая формула
+	return CameraRig.for_overlay(player.x, player.y, vw, vh, SKY_HEIGHT)
 
 
 ## Кнопка «Зайти» у окна веранды — над героем, не внизу экрана (решение

@@ -181,6 +181,4 @@ func _camera() -> Vector2:
 	var vw := float(cells.x)
 	var vh := float(cells.y)
 	var sky: int = preload("res://scripts/world/world_view.gd").SKY_HEIGHT
-	return Vector2(
-		clampf(player.x - vw / 2.0, 0.0, maxf(0.0, float(WorldGen.WIDTH) - vw)),
-		maxf(player.y - vh / 2.0, -float(sky)))
+	return CameraRig.for_overlay(player.x, player.y, vw, vh, sky)

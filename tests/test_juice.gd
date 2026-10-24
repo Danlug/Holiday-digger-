@@ -515,6 +515,8 @@ func _test_director() -> void:
 	pl.on_ground = true
 
 	rec.clear()
+	# частота ударов зависит от инструмента (Feel.tool_profile, aaa-feel): здесь — кирка, 0.38 с
+	GameState.current_tool = "iron_pickaxe"
 	pl.digging = {"x": 5, "y": 13, "t": 0.0, "total": 3.0, "type": TileTypes.Type.DIRT}
 	dir._process(0.016)
 	pl.digging["t"] = 0.2
@@ -786,6 +788,11 @@ class _Rec extends Node:
 
 	func float_icon(_p: Vector2, _i, _t: String, _c: Color) -> void:
 		icons += 1
+
+	# «+N» со слиянием (aaa-feel): добыча теперь идёт через float_stack, а не float_icon
+	func float_stack(_k: String, _p: Vector2, _i, add: int, _c: Color, _w: float) -> int:
+		icons += 1
+		return add
 
 	func shake(_s: float, _d: float) -> void:
 		shakes += 1

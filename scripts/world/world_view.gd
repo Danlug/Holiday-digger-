@@ -683,6 +683,7 @@ func _on_overlay_draw() -> void:
 		var d = player.digging
 		var dx: float = d.x * TILE
 		var dy: float = d.y * TILE
-		_overlay.draw_rect(Rect2(dx, dy, TILE, TILE), Color(0, 0, 0, 0.44))
 		var frac: float = clampf(d.t / d.total, 0.0, 1.0)
+		# затемнение клетки и трещины, растущие с прогрессом (aaa-feel; scripts/feel/dig_cracks.gd)
+		DigCracks.draw(_overlay, int(d.x), int(d.y), frac)
 		_overlay.draw_rect(Rect2(dx + 3, dy + TILE - 6, (TILE - 6) * frac, 3), Color8(0xE0, 0xA9, 0x3B))

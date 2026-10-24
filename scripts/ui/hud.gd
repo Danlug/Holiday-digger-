@@ -1795,7 +1795,8 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 		Sfx.play("ui_deny")
 		UiAnim.shake(_load_pill, 3.0, 0.3)
 	elif was_loot and not mineral_id.is_empty():
-		float_item(x, y, mineral_id)
+		# «+N» над героем рисует Fx со слиянием (JuiceDirector._on_picked): второе
+		# «+1» из этой клетки дублировало его и сыпалось стопкой на жиле (aaa-feel)
 		UiAnim.pulse(_inv_button, 0.12, 0.2)
 		# Крупная находка отмечается тостом — но БЕЗ суммы в монетах: монет
 		# за копку не дают вовсе, их дают при продаже, а «+100 монет» читается
@@ -1993,6 +1994,7 @@ func _on_reset_pressed() -> void:
 # ---------------------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
+	_track_last_horizontal_key(event)
 	# Тап мимо меню закрывает меню (решение владельца). Разбирается ДО общей
 	# заглушки ввода: пока меню открыто, мир ввод не получает, и закрыть его
 	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
@@ -2192,11 +2194,8 @@ func update_input_intent() -> void:
 ## читает палец после магнетизма: вниз — строго под собой, без шага; вверх —
 ## можно бежать и прыгать одновременно.
 func _apply_keyboard() -> bool:
-	var dx := 0
-	if _any_key(KEYS_LEFT):
-		dx -= 1
-	if _any_key(KEYS_RIGHT):
-		dx += 1
+	# при зажатых A и D идёт клавиша, нажатая позже (Feel.axis): разворот не останавливает героя
+	var dx := Feel.axis(_any_key(KEYS_LEFT), _any_key(KEYS_RIGHT), _kb_last_h)
 	var up := _any_key(KEYS_UP)
 	var down := _any_key(KEYS_DOWN)
 
@@ -2221,9 +2220,28 @@ func _apply_keyboard() -> bool:
 	return true
 
 
+## Какая из горизонтальных клавиш нажата последней (для Feel.axis).
+var _kb_last_h: int = 0
+
+
+func _track_last_horizontal_key(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var ke := event as InputEventKey
+	if not ke.pressed or ke.echo:
+		return
+	if KEYS_LEFT.has(ke.keycode) or KEYS_LEFT.has(ke.physical_keycode):
+		_kb_last_h = -1
+	elif KEYS_RIGHT.has(ke.keycode) or KEYS_RIGHT.has(ke.physical_keycode):
+		_kb_last_h = 1
+
+
+## Клавиша зажата — по символу раскладки ИЛИ по месту на клавиатуре: WASD должны
+## работать и на нелатинской (русской) раскладке, где символ клавиши другой.
+## Не проверялось на живом ПК с русской раскладкой — только в headless.
 static func _any_key(keys: Array[Key]) -> bool:
 	for k: Key in keys:
-		if Input.is_key_pressed(k):
+		if Input.is_key_pressed(k) or Input.is_physical_key_pressed(k):
 			return true
 	return false
 

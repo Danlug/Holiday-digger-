@@ -206,6 +206,18 @@ var _rig_transition_durations: Array = []  # их длительности в с
 
 var frozen: bool = false       # true во время сцены смерти/катсцен — герой не управляется
 
+# --- Отклик управления и копки (ветка aaa-feel; числа — data/feel.json) ---
+# Койот-время: прыжок можно нажать на пару кадров позже схода с уступа. Буфер:
+# «вверх», нажатое чуть раньше приземления, срабатывает на земле. Микро-пауза
+# после удара по камню: с кредитом, поэтому темп копки (ГДД §5) не меняется.
+var _coyote_left: float = 0.0
+var _jump_buffer_left: float = 0.0
+var _prev_hold_up: bool = false
+var _up_edge: bool = false
+var _hitstop_left: float = 0.0
+var _hitstop_credit: float = 0.0
+var _credit_ttl: float = 0.0
+
 
 func _ready() -> void:
 	_announced_backpack = has_backpack()
@@ -620,6 +632,14 @@ func physics_tick(dt: float) -> void:
 		vx = 0.0
 		return
 
+	# Микро-пауза после разрушения тяжёлой породы: герой на миг замирает, пока
+	# сыплются осколки. Время игры не теряется — см. кредит в _start_dig.
+	if _hitstop_left > 0.0:
+		_hitstop_left -= dt
+		vx = 0.0
+		return
+	_feel_tick(dt)
+
 	var now := Time.get_ticks_msec()
 	if now < stun_until_msec:
 		vx = 0.0
@@ -888,8 +908,8 @@ func _land() -> void:
 # толчка И только когда прыжок перешёл в падение (vy >= 0).
 # ---------------------------------------------------------------------------
 
-func _jump() -> void:
-	if not on_ground or digging != null:
+func _jump(coyote: bool = false) -> void:
+	if (not on_ground and not coyote) or digging != null:
 		return
 	if Time.get_ticks_msec() < stun_until_msec:
 		return
@@ -897,8 +917,35 @@ func _jump() -> void:
 		return
 	vy = -JUMP_V
 	on_ground = false
+	_coyote_left = 0.0
+	_jump_buffer_left = 0.0
 	_fly_arm_at_msec = Time.get_ticks_msec() + JUMP_TO_FLY_MS
 	jumped.emit()
+
+
+## Короткая пауза героя «на ударе» (редкая находка): ни кредита, ни продолжения.
+func hitstop(seconds: float) -> void:
+	_hitstop_left = maxf(_hitstop_left, seconds)
+
+
+## Отсчёт койот-времени и буфера прыжка. Вызывается каждый тик, пока герой
+## управляем: «вверх» только что нажато (фронт) — запоминаем на jump_buffer_s;
+## стоит на земле — койот-окно полное, в воздухе тает.
+func _feel_tick(dt: float) -> void:
+	_up_edge = hold_up and not _prev_hold_up
+	_prev_hold_up = hold_up
+	if on_ground:
+		_coyote_left = Feel.num("controls.coyote_s", 0.09)
+	else:
+		_coyote_left = maxf(0.0, _coyote_left - dt)
+	if _up_edge:
+		_jump_buffer_left = Feel.num("controls.jump_buffer_s", 0.12)
+	else:
+		_jump_buffer_left = maxf(0.0, _jump_buffer_left - dt)
+	if _credit_ttl > 0.0:
+		_credit_ttl -= dt
+		if _credit_ttl <= 0.0:
+			_hitstop_credit = 0.0
 
 
 func _update_flight() -> void:
@@ -937,8 +984,11 @@ func _apply_intent(dt: float) -> void:
 	if hold_dx != 0:
 		facing = hold_dx
 
-	if hold_up and on_ground:
+	if on_ground and (hold_up or _jump_buffer_left > 0.0):
 		_jump()
+	elif _up_edge and _coyote_left > 0.0 and vy >= 0.0 and thrust == "":
+		# койот-прыжок: уступ уже кончился, но нажали «вверх» в пределах окна
+		_jump(true)
 	_update_flight()
 
 	if not on_ground:
@@ -1140,7 +1190,11 @@ func _start_dig(tx: int, ty: int) -> void:
 			# считается из этого времени (Heat.lava_cell_cost_hp).
 			total = Heat.lava_dig_seconds()
 
-	digging = {"x": tx, "y": ty, "t": 0.0, "total": total, "type": type}
+	# Кредит микро-паузы: если копка идёт подряд, пауза уже «съела» часть времени
+	# следующей клетки — возвращаем её, чтобы темп копки не менялся.
+	var credit := minf(_hitstop_credit, total * 0.5)
+	_hitstop_credit = 0.0
+	digging = {"x": tx, "y": ty, "t": credit, "total": total, "type": type}
 	dig_started.emit(tx, ty, type)
 
 
@@ -1154,6 +1208,14 @@ func _finish_dig() -> void:
 	# игнорировался, и опыт капал за удары по несокрушимому.
 	if not world.dig_cell(d.x, d.y):
 		return
+
+	# Микро-пауза на «весомой» породе (камень, твёрдое глубже фундамента).
+	if Feel.WEIGHTY_TILES.has(d.type):
+		var hs := Feel.hitstop_for(float(d.total))
+		if hs > 0.0:
+			_hitstop_left = hs
+			_hitstop_credit = hs
+			_credit_ttl = Feel.num("dig.hitstop_credit_ttl_s", 0.35)
 
 	# Топливо тратится на реально прокопанную клетку, не на попытку удара —
 	# тем же правилом, что и опыт ниже.
@@ -1239,6 +1301,11 @@ func teleport_home() -> void:
 	digging = null
 	thrust = ""
 	coasting = false
+	# отклик управления (aaa-feel): нажатое до телепорта не должно сработать дома
+	_hitstop_left = 0.0
+	_hitstop_credit = 0.0
+	_coyote_left = 0.0
+	_jump_buffer_left = 0.0
 	# Герой оказался дома не своим ходом: следующий спуск обязан снова
 	# считаться входом в тоннель, а не "он и так был внизу".
 	_was_underground = false

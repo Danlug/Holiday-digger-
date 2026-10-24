@@ -61,6 +61,7 @@ func _run() -> void:
 	await _test_tutorial_does_not_loop()
 	await _test_death_trigger_and_bars()
 	_test_tutorial_quests()
+	_test_foundation_hit_does_not_start_workshop()
 
 	_print_total()
 
@@ -242,6 +243,11 @@ func _test_not_shown_twice() -> void:
 
 ## Выход из игры посреди катсцены: узел сюжета умирает вместе со сценой, но
 ## сцена осталась в очереди и её награда ещё не выдана.
+##
+## «workshop» здесь — подопытная сцена с наградой (эффект tool), а не живой путь
+## игры: кирку теперь берут со стены в мастерской (HouseSystem.take_starting_pickaxe),
+## и сюжет эту сцену сам в очередь не ставит. Данные сцены оставлены в
+## data/story.json ради этой проверки.
 func _test_survives_quit_midscene() -> void:
 	StoryState.enqueue("workshop")
 	await _frame()
@@ -439,3 +445,39 @@ func _test_tutorial_quests() -> void:
 	director._update_quests()
 	check("заказанная еда закрывает обучение", StoryState.has_flag("food_ordered"))
 	check("заданий больше нет", director._objective.is_empty())
+
+
+## Лопата о фундамент не запускает мастерскую. Раньше игрок сам выдавал себе
+## кирку (tool_auto_switched("rusty_pickaxe")), а сюжет это перехватывал:
+## откатывал инструмент и ставил сцену «workshop» в очередь. Теперь игрок лишь
+## отказывает с объяснением, а кирку берут руками в доме — сюжету делать нечего.
+func _test_foundation_hit_does_not_start_workshop() -> void:
+	StoryState.clear_all()
+	GameState.story_queue.clear()
+	GameState.set_current_tool("shovel")
+
+	var x := 23   # правее лестницы: гейт «только правее лестницы» не мешает
+	var fy := world.foundation_y()
+	for y in range(1, fy):
+		world.dig_cell(x, y)
+	player.x = float(x) + 0.5
+	player.y = float(fy) - player.HH - 0.01
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+
+	var refusals: Array[String] = []
+	var on_refused := func(reason: String) -> void: refusals.append(reason)
+	player.dig_refused_by_story.connect(on_refused)
+	for i in range(3):
+		player.physics_tick(1.0 / 30.0)
+	player.dig_refused_by_story.disconnect(on_refused)
+	player.hold_down = false
+
+	check("удар дошёл до фундамента и получил отказ", refusals.has("foundation_needs_pickaxe"),
+		"отказы: %s" % [refusals])
+	check("удар о фундамент не ставит мастерскую в очередь", not GameState.story_queue.has("workshop"))
+	check("удар о фундамент не запускает сцену", not director.cutscene.is_playing)
+	check("мастерская по удару не засчитана", not StoryState.is_seen("workshop"))
+	check("инструмент остался лопатой", GameState.current_tool == "shovel")

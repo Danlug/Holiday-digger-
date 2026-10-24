@@ -151,6 +151,9 @@ var world: WorldGen = null
 ## сторону устья — справа от тоннеля (см. _start_rig_exit).
 const HOME_X := float(WorldGen.HOUSE_X_MAX + 1) + 0.5   # 15.5
 
+const LUCK_COLOR := Color8(0xFF, 0xD8, 0x4A)
+var _luck_rng: RandomNumberGenerator = null
+
 var x: float = HOME_X
 var y: float = 0.5
 var vx: float = 0.0
@@ -1228,22 +1231,28 @@ func _finish_dig() -> void:
 
 	var mineral_id := MineralMap.mineral_id_for(d.type)
 	var price := Balance.get_mineral_price(mineral_id) if not mineral_id.is_empty() else 0
-	var luck := GameState.get_skill_stage("luck_multiplier")
-	var luck_mult := Balance.get_luck_multiplier(luck)
-	price = int(round(float(price) * luck_mult)) if price > 0 else price
+	var was_loot := MineralMap.is_loot(d.type)
+	# Удача (ГДД §11): шанс бросается на каждую прокопанную клетку — «ресурс» для
+	# добычи, «земля» для земли и камня; при удаче находка умножается (у руды —
+	# штуки, у земли — опыт). Раньше множитель всегда умножал опыт за руду, а шанс
+	# не бросался вовсе, и ступени «Удачи — шанс» покупались впустую.
+	var lucky := 1
+	if was_loot or d.type == TileTypes.Type.DIRT or d.type == TileTypes.Type.STONE:
+		lucky = _luck_roll(was_loot)
 
 	# Опыт (ГДД раздел 11): земля 1 · камень 2 · руда = цена/5.
 	if d.type == TileTypes.Type.DIRT:
-		GameState.add_xp(1)
+		GameState.add_xp(lucky)
 	elif d.type == TileTypes.Type.STONE:
-		GameState.add_xp(2)
+		GameState.add_xp(2 * lucky)
 	elif price > 0:
 		GameState.add_xp(int(round(float(price) / 5.0)))
+	if lucky > 1 and not was_loot:
+		_lucky_find(d, "", lucky)
 
 	# Монеты за копку НЕ начисляются: сырьё превращается в деньги только при
 	# продаже (ГДД раздел 15). Иначе шахта сама себя оплачивает, и подъём на
 	# поверхность с грузом перестаёт быть решением игрока.
-	var was_loot := MineralMap.is_loot(d.type)
 	if not was_loot:
 		# Земля, камень и фундамент — не добыча: в рюкзак не ложатся, вес не
 		# занимают и не стоят ничего (ГДД раздел 4).
@@ -1256,6 +1265,10 @@ func _finish_dig() -> void:
 		else:
 			GameState.add_item(mineral_id, 1)
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, price)
+			if lucky > 1:
+				var extra := GameState.add_item(mineral_id, lucky - 1)
+				if extra > 0:
+					_lucky_find(d, mineral_id, extra + 1)
 
 	if not was_loot:
 		dig_finished.emit(d.x, d.y, d.type, mineral_id, false, price)
@@ -1268,6 +1281,28 @@ func _finish_dig() -> void:
 		rusty_pickaxe_cracked = true
 
 	GameState.update_max_depth(d.y)
+
+
+## Бросок удачи по клетке: 1 — не повезло. Тесты подставляют свой _luck_rng с сидом.
+func _luck_roll(loot: bool) -> int:
+	if GameState.get_skill_stage("luck_chance") <= 0:
+		return 1
+	if _luck_rng == null:
+		_luck_rng = RandomNumberGenerator.new()
+		_luck_rng.randomize()
+	return Balance.luck_find_multiplier(_luck_rng.randf() * 100.0, loot,
+			GameState.get_skill_stage("luck_chance"), GameState.get_skill_stage("luck_multiplier"))
+
+
+func _lucky_find(d: Dictionary, mineral_id: String, mult: int) -> void:
+	var pos := Vector2(d.x * 32.0 + 16.0, d.y * 32.0 + 16.0)
+	Fx.float_text(pos + Vector2(0, -20), "×%d" % mult, LUCK_COLOR)
+	if not mineral_id.is_empty():
+		# Удача на земле случается часто (до 10% клеток) — ей хватит цифры, без звука.
+		Fx.burst("pickup_glint", pos, 0.9)
+		Sfx.play("pickup_rare")
+		Haptics.tap()
+	GameState.emit_event(&"lucky_find", {"cell": Vector2i(d.x, d.y), "mineral": mineral_id, "mult": mult})
 
 
 # ---------------------------------------------------------------------------

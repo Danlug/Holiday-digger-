@@ -295,7 +295,7 @@ static func effect_text(branch: Dictionary, stage: int) -> String:
 			var per_hunger := int(Balance.unwrap(effect.get("percent_per_stage", 8)))
 			return "-%d%% расхода голода" % (per_hunger * stage)
 		"table":
-			return "множитель x%d" % int(Balance.get_luck_multiplier(stage)) if stage > 0 else "множитель x1"
+			return "находка x%d при удаче" % Balance.get_lucky_find_multiplier(stage)
 		"table_dual":
 			var chance := Balance.get_luck_chance_percent(stage)
 			return "земля %.0f%%, ресурс %.0f%%" % [chance["earth"], chance["resource"]]

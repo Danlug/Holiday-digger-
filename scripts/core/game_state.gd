@@ -693,6 +693,8 @@ var ext: Dictionary = {}
 ##   chest_opened   {cell: Vector2i, tier: String, items: Dictionary, xp: int} — открыт тайник (scripts/mechanics)
 ##   fever_started  {cells: int} / fever_ended {} — лихорадка азарта: следующие клетки с двойной добычей
 ##   mastery_star   {item: String, star: int, xp: int} — звезда мастерства породы
+##   lucky_find     {cell: Vector2i, mineral: String, mult: int} — сработала удача (ГДД §11): руда ×mult
+##                  штук, у земли и камня (mineral "") — ×mult опыта
 ##   spent          {currency: String, amount: int} — списание в spend_coins/spend_dollars (любая
 ##                  покупка, еда, крафт; «бесплатно» отладки не считается)
 ##   ate            {id: String, hunger: float, stamina: float} — герой поел (рюкзак или стол дома,

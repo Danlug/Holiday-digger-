@@ -326,6 +326,22 @@ func get_luck_chance_percent(luck_chance_stage: int) -> Dictionary:
 	return {"earth": float(_v(earth[idx])), "resource": float(_v(resource[idx]))}
 
 
+## Во сколько раз умножается находка при удачном броске: множитель ветки
+## «Удача — множитель», а пока она не куплена — ×2 (решение владельца, раунд 3).
+func get_lucky_find_multiplier(luck_mult_stage: int) -> int:
+	return maxi(2, int(round(get_luck_multiplier(luck_mult_stage))))
+
+
+## Бросок удачи по прокопанной клетке: 1 — не повезло, иначе множитель находки.
+## roll_percent — случайное 0..100; loot — добыча («ресурс»), иначе порода («земля»).
+func luck_find_multiplier(roll_percent: float, loot: bool, chance_stage: int, mult_stage: int) -> int:
+	var chance := get_luck_chance_percent(chance_stage)
+	var p := float(chance["resource"] if loot else chance["earth"])
+	if p <= 0.0 or roll_percent >= p:
+		return 1
+	return get_lucky_find_multiplier(mult_stage)
+
+
 # ---------------------------------------------------------------------------
 # Физика: перегруз, падение, ранец, джетпак (см. GDD раздел 6)
 # ---------------------------------------------------------------------------

@@ -259,7 +259,7 @@ def wall_roots():
     # сырость: тёмные пятна
     wet = np.clip((fbm(rg, 3, 3) - 0.10) * 3.0, 0, 1)
     wet = wet * np.clip((fbm(rg, 6, 2, ax=1.0, ay=1.5) + 0.5), 0, 1)
-    sc.alb = sc.alb * (1 - 0.20 * wet[..., None]) * (1.0 + 0.0 * wet[..., None])
+    sc.alb = sc.alb * (1 - 0.30 * wet[..., None])
     sc.alb[..., 2] += 2.5 * wet
     sc.commit_base()
     stone_pal = [np.array(c, dtype=np.float64) for c in
@@ -271,7 +271,7 @@ def wall_roots():
     fossil_shell(sc, rg, 149, 160, 8.0, bone * 0.92)
     fossil_sherd(sc, rg, 22, 30, 15, 10, 0.4, np.array((78, 54, 40.0)), np.array((44, 28, 21.0)))
     img = sc.render(levels=8, amount=0.22)
-    moss_clumps(img, sc, rg, wet, 0.35, (52, 62, 34), 0.55, 0.30)
+    moss_clumps(img, sc, rg, wet, 0.22, (62, 76, 38), 0.7, 0.55)
     # тонкие светлые корни — только в верхней части плитки, нитями, не мотивом
     for x in rg.uniform(0, N, 7):
         x = float(x)

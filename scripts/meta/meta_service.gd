@@ -25,6 +25,8 @@ static var instance: MetaService = null
 var hub: MetaHub = null
 var popup: DailyPopup = null
 var toast: MetaToast = null
+## Окно ежедневных заданий: его открывает кнопка на экране (DailyTasksButton в HUD).
+var tasks: DailyTasksPanel = null
 
 var _acc: float = 0.0
 var _calm_for: float = 0.0
@@ -55,7 +57,11 @@ func _ready() -> void:
 	toast = MetaToast.new()
 	toast.name = "MetaToast"
 	add_child(toast)
+	tasks = DailyTasksPanel.new()
+	tasks.name = "DailyTasksPanel"
+	add_child(tasks)
 	hub.closed.connect(_on_modal_closed)
+	tasks.closed.connect(_on_modal_closed)
 	popup.closed.connect(_on_popup_closed)
 	popup.claimed.connect(_on_daily_claimed)
 
@@ -139,6 +145,8 @@ func _after_progress() -> void:
 	changed.emit()
 	if hub != null and hub.is_open():
 		hub.refresh()
+	if tasks != null and tasks.is_open():
+		tasks.refresh()
 
 
 func _check_road() -> void:
@@ -182,6 +190,8 @@ func _poll() -> void:
 		changed.emit()
 		if hub != null and hub.is_open():
 			hub.refresh()
+		if tasks != null and tasks.is_open():
+			tasks.refresh()
 
 
 func _unlock() -> void:
@@ -193,7 +203,7 @@ func _unlock() -> void:
 
 
 func _watch_daily_popup(dt: float) -> void:
-	if not MetaState.is_unlocked() or popup.is_open() or hub.is_open():
+	if not MetaState.is_unlocked() or popup.is_open() or hub.is_open() or tasks.is_open():
 		_calm_for = 0.0
 		return
 	if _dismissed_day == MetaState.today() or not DailyReward.can_claim():
@@ -244,8 +254,26 @@ func open_hub(tab: String = "") -> void:
 		return
 	if popup.is_open():
 		popup.close()
+	if tasks.is_open():
+		tasks.close()
 	_lock(true)
 	hub.open(tab)
+
+
+## Окно ежедневных заданий (кнопка на экране игры).
+func open_tasks() -> void:
+	if tasks.is_open() or not MetaState.is_unlocked():
+		return
+	if popup.is_open():
+		popup.close()
+	if hub.is_open():
+		hub.close()
+	_lock(true)
+	tasks.open()
+
+
+func _any_modal_open() -> bool:
+	return hub.is_open() or popup.is_open() or tasks.is_open()
 
 
 func open_daily() -> void:
@@ -253,12 +281,14 @@ func open_daily() -> void:
 		return
 	if hub.is_open():
 		hub.close()
+	if tasks.is_open():
+		tasks.close()
 	_lock(true)
 	popup.open()
 
 
 func _on_modal_closed() -> void:
-	if not popup.is_open():
+	if not _any_modal_open():
 		_lock(false)
 	_after_progress()
 
@@ -266,7 +296,7 @@ func _on_modal_closed() -> void:
 func _on_popup_closed() -> void:
 	if DailyReward.can_claim():
 		_dismissed_day = MetaState.today()
-	if not hub.is_open():
+	if not _any_modal_open():
 		_lock(false)
 	_after_progress()
 

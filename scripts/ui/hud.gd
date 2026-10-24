@@ -277,6 +277,7 @@ func _build_gauges(parent: Control) -> void:
 	_stamina_bar = _make_gauge(bars, Color8(0xE8, 0xC5, 0x47), "stamina", "stamina")
 
 	_build_quest_button(box)
+	DailyTasksButton.mount(box)   # ежедневные задания (ветка daily-tasks, scripts/meta/); до онбординга скрыта
 
 
 func _make_gauge(parent: Control, color: Color, icon_name: String, anchor_id: String) -> HudBar:

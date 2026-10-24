@@ -73,6 +73,12 @@ func _carve(cy: int) -> void:
 		_cell(12, cy + dy)
 
 
+## Префикс «fog…» — настоящие радиусы тумана (виден серый пояс разведанной пустоты), иначе открыто широко.
+func _reveal(p) -> void:
+	if not _prefix.begins_with("fog"):
+		main.fog.reveal_around(p.x, p.y, 10, 10)
+
+
 func _shoot(depth: int) -> void:
 	var cy := maxi(depth, 3)
 	_carve(cy)
@@ -85,7 +91,7 @@ func _shoot(depth: int) -> void:
 	p.on_ground = true
 	p.facing = 1
 	p.frozen = false
-	main.fog.reveal_around(p.x, p.y, 10, 10)
+	_reveal(p)
 	GameState.player_depth = cy
 	GameState.hp = GameState.get_max_hp()
 	director.monsters.clear()
@@ -96,7 +102,7 @@ func _shoot(depth: int) -> void:
 		m.state = "patrol"
 	director.set_process(false)
 	await _frames(6)
-	main.fog.reveal_around(p.x, p.y, 10, 10)
+	_reveal(p)
 	await _frames(20)
 	if main.hud._toast_panel != null:
 		main.hud._toast_panel.visible = false

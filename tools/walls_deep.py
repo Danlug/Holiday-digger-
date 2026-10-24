@@ -99,6 +99,22 @@ def scatter_stones(sc, rg, specs, palette, aniso=1.7, hmul=0.55, rough=0.16, mot
             sc.alb[inside] = col[None, :] * (1.0 + tex[inside])[:, None]
             sc.edge[inside] = np.minimum(sc.edge[inside], (1.0 - r[inside]))
             sc.stone |= inside
+            sc.stone_tone[inside] = stone_bands(inside, np.where(inside, (dome ** (0.75 + flatten)) * hgt, 0.0), min(rx, ry))[inside]
+
+
+def stone_bands(inside, hv, size):
+    """Свет по куполу камня ступенями (4-5 тонов), тёмный контур в 1 px и блик на верхней-левой кромке: чёткий пиксель-арт."""
+    gx = (np.roll(hv, -1, 1) - np.roll(hv, 1, 1)) * 0.5
+    gy = (np.roll(hv, -1, 0) - np.roll(hv, 1, 0)) * 0.5
+    lx, ly, lz = -0.62, -0.78, 0.62
+    nl = (-gx * lx - gy * ly + lz) / np.sqrt(gx * gx + gy * gy + 1.0) / lz
+    tone = np.select([nl < 0.55, nl < 0.85, nl < 1.18, nl < 1.55], [0.60, 0.80, 1.0, 1.2], 1.38)
+    edge = inside & ~(np.roll(inside, 1, 0) & np.roll(inside, -1, 0) & np.roll(inside, 1, 1) & np.roll(inside, -1, 1))
+    if size >= 2.2:
+        up_left = np.roll(edge, (1, 1), (0, 1)) & inside & ~edge
+        tone = np.where(up_left, np.maximum(tone, 1.34), tone)
+        tone = np.where(edge, 0.52, tone)
+    return tone
 
 
 class Scene:
@@ -111,6 +127,7 @@ class Scene:
         self.emit = np.zeros((N, N, 3))
         self.edge = np.full((N, N), 9.0)
         self.stone = np.zeros((N, N), dtype=bool)
+        self.stone_tone = np.full((N, N), np.nan)
 
     def commit_base(self):
         self.base_h = self.h.copy()
@@ -118,6 +135,8 @@ class Scene:
     def render(self, levels=6, amount=0.55, lo=0.34, span=1.12, **lit_kw):
         s = lit(self.h, **lit_kw)
         sq = lo + dq((s - lo) / span, levels, amount) * span
+        m = ~np.isnan(self.stone_tone)
+        sq = np.where(m, self.stone_tone * np.minimum(1.0, 0.55 + 0.45 * sq), sq)
         return self.alb * sq[..., None] + self.emit
 
 
@@ -136,12 +155,14 @@ def fossil_ammonite(sc, rg, cx, cy, r, col):
     th = np.arctan2(dy, dx)
     inside = rho < r
     # спираль: равномерные витки со складками-рёбрами
-    whorl = (rho / r * 3.2 - th / math.tau) % 1.0
-    rib = 0.5 + 0.5 * np.cos(th * 11 + rho * 0.5)
+    whorl = (rho / r * 2.3 - th / math.tau) % 1.0
+    rib = 0.5 + 0.5 * np.cos(th * 9)
     sc.h[inside] = sc.base_h[inside] + (1.1 + 0.9 * np.sqrt(np.clip(1 - (rho[inside] / r) ** 2, 0, 1)) + 0.7 * (1 - whorl[inside]) ** 0.5 * rib[inside])
-    tone = np.where(whorl < 0.12, 0.62, 1.0)[inside] * (0.88 + 0.12 * rib[inside])
+    groove = (whorl < 0.2)
+    tone = np.where(groove, 0.55, 1.0)[inside] * (0.86 + 0.14 * rib[inside])
     sc.alb[inside] = col[None, :] * tone[:, None]
     sc.stone |= inside
+    sc.stone_tone[inside] = stone_bands(inside, np.where(inside, sc.h - sc.base_h, 0.0), r * 0.5)[inside] * np.where(groove, 0.8, 1.0)[inside]
 
 
 def fossil_bone(sc, rg, cx, cy, length, thick, ang, col):
@@ -161,6 +182,7 @@ def fossil_bone(sc, rg, cx, cy, length, thick, ang, col):
     sc.h[m] = sc.base_h[m] + 0.9 + 1.4 * np.sqrt(prof[m])
     sc.alb[m] = col[None, :] * (0.92 + 0.12 * fbm(rg, 10, 2)[m])[:, None]
     sc.stone |= m
+    sc.stone_tone[m] = stone_bands(m, np.where(m, sc.h - sc.base_h, 0.0), thick)[m]
 
 
 def fossil_shell(sc, rg, cx, cy, r, col):
@@ -173,6 +195,7 @@ def fossil_shell(sc, rg, cx, cy, r, col):
     sc.h[m] = sc.base_h[m] + 1.2 + 1.1 * np.sqrt(np.clip(1 - (rho[m] / r) ** 2, 0, 1)) + 0.9 * rib[m]
     sc.alb[m] = col[None, :] * (0.78 + 0.22 * rib[m])[:, None]
     sc.stone |= m
+    sc.stone_tone[m] = stone_bands(m, np.where(m, sc.h - sc.base_h, 0.0), r * 0.5)[m]
 
 
 def fossil_sherd(sc, rg, cx, cy, w, h_, ang, col, dark):
@@ -193,6 +216,7 @@ def fossil_sherd(sc, rg, cx, cy, w, h_, ang, col, dark):
     tone = np.where(bands & m & ~wave, 1.0, tone)
     sc.alb[m] = np.where(tone[m][:, None] < 0.8, dark[None, :], col[None, :] * (0.94 + 0.1 * fbm(rg, 9, 2)[m])[:, None])
     sc.stone |= m
+    sc.stone_tone[m] = stone_bands(m, np.where(m, sc.h - sc.base_h, 0.0), min(w, h_) * 0.5)[m]
 
 
 def moss_clumps(img, sc, rg, wet, thr, color, amt, density):
@@ -242,29 +266,37 @@ def wall_roots():
                  ((58, 52, 47), (54, 50, 49), (63, 54, 42), (56, 41, 31), (62, 47, 35), (48, 44, 41))]
     scatter_stones(sc, rg, [(4, 12.0, 17.0, 46.0), (13, 5.5, 9.5, 24.0), (24, 3.2, 5.2, 13.0), (50, 1.4, 3.0, 6.5)], stone_pal)
     bone = np.array((92, 82, 64), dtype=np.float64)
-    fossil_ammonite(sc, rg, 52, 128, 10.5, bone * 0.96)
+    fossil_ammonite(sc, rg, 52, 128, 13.0, bone * 0.96)
     fossil_bone(sc, rg, 142, 62, 30, 3.2, -0.35, bone)
     fossil_shell(sc, rg, 149, 160, 8.0, bone * 0.92)
     fossil_sherd(sc, rg, 22, 30, 15, 10, 0.4, np.array((78, 54, 40.0)), np.array((44, 28, 21.0)))
-    img = sc.render(levels=7, amount=0.5)
+    img = sc.render(levels=8, amount=0.22)
     moss_clumps(img, sc, rg, wet, 0.35, (52, 62, 34), 0.55, 0.30)
     # тонкие светлые корни — только в верхней части плитки, нитями, не мотивом
-    for x in rg.uniform(0, N, 6):
+    for x in rg.uniform(0, N, 7):
         x = float(x)
-        y = float(rg.uniform(0, 22))
-        ln = float(rg.uniform(22, 54))
+        y = float(rg.uniform(0, 20))
+        ln = float(rg.uniform(20, 58))
+        steps = int(ln // 3)
+        sway = float(rg.uniform(0.5, 1.4))
+        ph = float(rg.uniform(0, math.tau))
         pts = [(x, y)]
-        for _s in range(int(ln // 6)):
-            x += float(rg.normal(0, 1.1))
-            y += 6.0
+        for k in range(steps):
+            x += sway * math.sin(ph + k * 0.55) * 0.9 + float(rg.normal(0, 0.45))
+            y += 3.0
             pts.append((x, y))
-        put_line(img, [(px + 1, py + 1) for px, py in pts], (18, 12, 9), 0.35)
-        put_line(img, pts, (104, 88, 66), 0.5)
-        if rg.random() < 0.6:
-            k = int(rg.integers(1, len(pts)))
+        for k in range(len(pts) - 1):
+            fade = 1.0 - k / max(1, len(pts) - 1)
+            seg = [pts[k], pts[k + 1]]
+            put_line(img, [(px + 1, py + 1) for px, py in seg], (18, 12, 9), 0.26 * (0.4 + fade))
+            put_line(img, seg, (112, 94, 70), 0.14 + 0.46 * fade)
+        for _b in range(int(rg.integers(0, 3))):
+            k = int(rg.integers(1, max(2, len(pts) - 2)))
             bx, by = pts[k]
             sg = float(rg.choice([-1, 1]))
-            put_line(img, [(bx, by), (bx + sg * 3.0, by + 3), (bx + sg * 5.5, by + 7.0)], (98, 82, 62), 0.4)
+            bl = [(bx, by), (bx + sg * 2.5, by + 2.5), (bx + sg * 4.0, by + 6.0), (bx + sg * 4.5, by + 9.5)]
+            for q in range(3):
+                put_line(img, bl[q:q + 2], (104, 88, 66), 0.36 - 0.1 * q)
     return squeeze(img, (37, 27, 21), 0.75)
 
 
@@ -350,11 +382,17 @@ def wall_caves():
     alb *= (1.0 - 0.16 * wet)[..., None]
     lip_y = []
     for ly in ledges:
-        edge_y = ly + fbm(rg, 6, 2, ay=0.3) * 6.0
-        top = edge_y - 20 + 3.5 * fbm(rg, 5, 2, ay=0.2)
+        edge_y = ly + fbm(rg, 5, 3, ay=0.3) * 8.0 + fbm(rg, 18, 2, ay=0.2) * 2.4
+        top = edge_y - 22 + 6.0 * fbm(rg, 3, 2, ay=0.3)
         over = (YY < edge_y) & (YY > top)
-        h = np.where(over, 3.6 + 0.9 * fbm(rg, 8, 2), h)
-        alb = np.where(over[..., None], base[None, None, :] * 0.74 * (1.0 + 0.12 * fbm(rg, 9, 2))[..., None], alb)
+        rough = fbm(rg, 12, 3)
+        h = np.where(over, 3.4 + 1.4 * rough, h)
+        shelf = base[None, None, :] * 0.70 * (1.0 + 0.16 * fbm(rg, 9, 2) + 0.08 * rough)[..., None]
+        alb = np.where(over[..., None], shelf, alb)
+        # трещины-швы в полке
+        seams = over & (np.abs(fbm(rg, 6, 3, ax=2.0, ay=0.7)) < 0.025)
+        h = np.where(seams, h - 1.6, h)
+        alb = np.where(seams[..., None], alb * 0.6, alb)
         lip_y.append(edge_y)
     sc.alb = alb
     sc.h = h
@@ -367,20 +405,12 @@ def wall_caves():
             wd = float(rg.uniform(3.5, 7.0)) * (0.7 + ln / 60.0)
             yb = float(lip_y[j][int(_py) % N, int(px) % N]) + 1
             stalactite(sc, px, yb, ln, wd, stal_tone * rg.uniform(0.92, 1.08))
-    for _ in range(5):
-        px = int(rg.uniform(0, N))
-        py0 = int(rg.uniform(70, 100))
-        for dx in range(-4, 5):
-            hh = max(0.0, 7.0 - abs(dx) * 1.5)
-            for dy in range(int(hh)):
-                sc.h[(py0 - dy) % N, (px + dx) % N] += 2.0 + 2.6 * math.sqrt(max(0.0, 1 - (dx / 5.0) ** 2))
-                sc.alb[(py0 - dy) % N, (px + dx) % N] = stal_tone * 0.95
     grain = rg.random((N, N))
     sc.alb = np.where((grain < 0.04)[..., None], sc.alb * 1.28, sc.alb)
     sc.alb = np.where((grain > 0.96)[..., None], sc.alb * 0.74, sc.alb)
     stone_pal = [np.array(c, dtype=np.float64) for c in ((50, 54, 50), (44, 50, 49), (56, 58, 52))]
     scatter_stones(sc, rg, [(7, 4.0, 8.0, 18.0), (26, 1.5, 3.2, 7.0)], stone_pal, hmul=0.5)
-    img = sc.render(levels=7, amount=0.5)
+    img = sc.render(levels=8, amount=0.22)
     moss_clumps(img, sc, rg, wet, 0.30, (40, 62, 46), 0.45, 0.22)
     glow = np.zeros((N, N, 3))
     m = np.zeros((N, N))
@@ -436,6 +466,13 @@ def wall_crystal():
     veins = np.abs(fbm(rg, 4, 3)) < 0.022
     sc.alb = np.where(veins[..., None], sc.alb * np.array((1.3, 1.36, 1.65)), sc.alb)
     sc.commit_base()
+    pal_d = [np.array(c, dtype=np.float64) for c in ((44, 33, 78), (52, 38, 88), (38, 62, 84), (58, 40, 90))]
+    for (px, py) in place_points(rg, 7, 36.0):
+        rr = float(rg.uniform(11, 17))
+        for _ in range(int(rr * 1.3)):
+            a = float(rg.uniform(0, math.tau))
+            d = rr * math.sqrt(float(rg.random()))
+            crystal_cluster(sc, rg, px + d * math.cos(a), py + d * 0.7 * math.sin(a), 1, float(rg.uniform(5, 9)), 1.3, pal_d)
     geodes = [(54, 62, 21), (150, 150, 17), (160, 36, 11), (28, 152, 10)]
     rim = np.array((40, 31, 58), dtype=np.float64)
     for cx, cy, r in geodes:
@@ -465,14 +502,14 @@ def wall_crystal():
             sc.h[lf | rt] = sc.base_h[lf | rt] + 1.2
             sc.alb[lf] = col * 1.12
             sc.alb[rt] = col * 0.66
-    pal_a = [np.array(c, dtype=np.float64) for c in ((54, 40, 92), (62, 45, 102), (46, 74, 98), (68, 47, 100))]
+    pal_a = [np.array(c, dtype=np.float64) for c in ((54, 40, 92), (62, 45, 102), (42, 66, 90), (68, 47, 100))]
     crystal_cluster(sc, rg, 104, 124, 7, 34, 0.9, pal_a)
     crystal_cluster(sc, rg, 20, 108, 5, 22, 0.8, pal_a)
     crystal_cluster(sc, rg, 168, 96, 5, 26, 0.9, pal_a)
     crystal_cluster(sc, rg, 98, 186, 6, 24, 0.9, pal_a)
     for (px, py) in place_points(rg, 18, 9.0):
         crystal_cluster(sc, rg, px, py, 2, float(rg.uniform(7, 12)), 0.7, pal_a)
-    img = sc.render(levels=7, amount=0.5)
+    img = sc.render(levels=8, amount=0.22)
     glow = np.zeros((N, N, 3))
     m = np.zeros((N, N))
     for _ in range(26):
@@ -497,6 +534,7 @@ def wall_bedrock():
     idx, f, thick = strata(rg, k, wobble=15.0, thick_var=0.9)
     cols = np.array([(38, 25, 22), (31, 21, 20), (44, 28, 23), (35, 24, 24), (28, 20, 20), (48, 30, 24),
                      (34, 23, 21), (40, 27, 25), (30, 21, 21)], dtype=np.float64)
+    hot_layer = rg.random(k) < 0.22
     pick = rg.integers(0, len(cols), k)
     lc = cols[pick] * rg.uniform(0.94, 1.06, (k, 1))
     sc = Scene(lc[0])
@@ -518,12 +556,17 @@ def wall_bedrock():
         sc.alb[ins] = sc.alb[ins] * 0.66
     stone_pal = [np.array(c, dtype=np.float64) for c in ((50, 36, 33), (44, 33, 32), (56, 40, 34))]
     scatter_stones(sc, rg, [(5, 5.0, 9.0, 24.0), (18, 2.0, 3.8, 9.0)], stone_pal, hmul=0.45)
-    img = sc.render(levels=7, amount=0.5)
+    img = sc.render(levels=8, amount=0.22)
     glow = np.zeros((N, N, 3))
-    gate = np.clip((fbm(rg, 3, 3) - 0.18) * 3.0, 0, 1)
+    gate = np.clip((fbm(rg, 3, 3) + 0.05) * 3.0, 0, 1)
     c_mask = np.clip(1.0 - (crack - 0.1) / 1.3, 0, 1) * gate
-    glow += c_mask[..., None] * np.array((140, 52, 18)) * 0.40
-    add_halo(glow, c_mask > 0.5, (110, 40, 14), 2.4, 1.6)
+    glow += c_mask[..., None] * np.array((150, 56, 20)) * 0.55
+    add_halo(glow, c_mask > 0.5, (110, 40, 14), 2.6, 2.2)
+    # тлеющие швы между некоторыми слоями-потоками: тонкая оранжевая нить по границе
+    edge_l = (f < 0.05) & hot_layer[idx]
+    seam = edge_l & (fbm(rg, 5, 2, ax=1.0, ay=0.3) > -0.25)
+    glow += seam[..., None] * np.array((176, 74, 24)) * 0.38
+    add_halo(glow, seam, (120, 44, 14), 2.2, 1.6)
     for _ in range(18):
         x, y = int(rg.integers(0, N)), int(rg.integers(0, N))
         add_dot(glow, x, y, (170, 80, 36), float(rg.uniform(0.2, 0.55)))
@@ -642,6 +685,15 @@ def wall_ruins():
     sc.alb = np.where(niche[..., None], np.array((20, 17, 13.0)) * (1 + 0.15 * fbm(rg, 9, 2))[..., None], sc.alb)
     lip = (np.abs(dxn) < 23) & (cyy > 62) & (cyy < 66)
     sc.h = np.where(lip, 2.0, sc.h)
+    ring_r = np.hypot(dxn, cyy)
+    arch = ((ring_r >= 19) & (ring_r < 26) & (cyy < 0)) | ((np.abs(dxn) >= 19) & (np.abs(dxn) < 26) & (cyy >= 0) & (cyy <= 62))
+    sc.h = np.where(arch, 2.8 + 0.3 * fbm(rg, 12, 2), sc.h)
+    sc.alb = np.where(arch[..., None], sand[None, None, :] * 1.0 * (1 + 0.1 * fbm(rg, 10, 2))[..., None], sc.alb)
+    wedge = np.abs(np.sin(np.arctan2(cyy, dxn) * 6.0)) < 0.07
+    joint_j = (cyy >= 0) & ((cyy % 13) < 1.6)
+    seam_a = arch & np.where(cyy < 0, wedge, joint_j)
+    sc.h = np.where(seam_a, 0.8, sc.h)
+    sc.alb = np.where(seam_a[..., None], sc.alb * 0.55, sc.alb)
     # трещины и выбоины
     for _ in range(5):
         x = float(rg.uniform(0, N))
@@ -663,7 +715,7 @@ def wall_ruins():
     stone_pal = [np.array(c, dtype=np.float64) for c in ((60, 52, 40), (54, 48, 40), (66, 56, 42))]
     scatter_stones(sc, rg, [(6, 1.6, 3.4, 14.0)], stone_pal, hmul=0.5)
     wet = np.clip((fbm(rg, 3, 3) - 0.05) * 3.0, 0, 1)
-    img = sc.render(levels=7, amount=0.5)
+    img = sc.render(levels=8, amount=0.22)
     moss_clumps(img, sc, rg, wet, 0.30, (46, 58, 32), 0.5, 0.24)
     glow = np.zeros((N, N, 3))
     for _ in range(10):
@@ -695,7 +747,7 @@ def wall_hell():
     # сколы-шипы породы: остроугольные осколки
     stone_pal = [np.array(c, dtype=np.float64) for c in ((46, 22, 20), (40, 19, 19), (52, 25, 22))]
     scatter_stones(sc, rg, [(4, 4.0, 7.0, 26.0), (16, 1.6, 3.4, 9.0)], stone_pal, hmul=0.55, rough=0.28)
-    img = sc.render(levels=7, amount=0.5)
+    img = sc.render(levels=8, amount=0.22)
     # копоть над трещинами: тёмные потёки вверх
     glow = np.zeros((N, N, 3))
     gate = np.clip((fbm(rg, 5, 3) - 0.08) * 3.4, 0, 1) ** 1.3
@@ -810,12 +862,12 @@ def wall_heaven():
             cloud = np.maximum(cloud, np.where(ins, dome * rx * 0.45 + 1.0, 0.0))
             puffs += 1
     sc.h = cloud * 1.1
-    gold = np.array((112, 84, 54), dtype=np.float64)
-    pale = np.array((124, 98, 76), dtype=np.float64)
+    gold = np.array((104, 88, 108), dtype=np.float64)
+    pale = np.array((116, 100, 118), dtype=np.float64)
     cm = cloud > 0
     mixc = np.clip(cloud / 6.0, 0, 1)
     cl_col = gold[None, None, :] * (1 - mixc)[..., None] + pale[None, None, :] * mixc[..., None]
-    cl_col = cl_col * (1.0 + 0.07 * fbm(rg, 9, 3))[..., None]
+    cl_col = cl_col * (1.0 + 0.07 * fbm(rg, 9, 3))[..., None] * 0.78
     sc.alb = np.where(cm[..., None], cl_col, sky)
     sc.commit_base()
     s = lit(sc.h, lz=0.7, k_diff=1.0, ao_sigma=3.4, k_ao=0.5, shadow_len=11, slope=0.55, k_shadow=0.55)
@@ -826,6 +878,9 @@ def wall_heaven():
     shade = np.clip(1.0 - sq, 0, 1) * cm
     img[..., 2] += 30.0 * shade
     img[..., 0] += 6.0 * shade
+    # золото ложится на освещённые кромки облаков
+    hl = np.clip(sq - 1.0, 0, 0.5) / 0.5 * cm
+    img += hl[..., None] * np.array((58, 42, -12))
     # лучи под 45 градусов (период ровно N по обеим осям): мягкая золотая дымка
     ray = gblur(np.clip(np.sin(math.tau * 3 * (XX + YY) / N + 1.1), 0, 1) ** 4, 2.2)
     ray = ray * np.clip(fbm(rg, 3, 3) + 0.65, 0, 1)

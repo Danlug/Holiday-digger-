@@ -815,22 +815,34 @@ func take_starting_pickaxe() -> void:
 ## магазину незачем.
 ##
 ## Непереносимую еду (стейк, пельмени — решение владельца) нести некуда,
-## поэтому её не доставляют, а съедают сразу: игрок и так стоит у своей двери.
+## поэтому её не доставляют, а съедают сразу (под землёй — тоже, прямо на месте).
+##
+## Где можно заказать — правило ShopService.can_buy: у входной двери всегда,
+## под землёй за ролик (до 3 раз в сутки на всю еду и снаряжение), иначе нельзя.
 static func order_food(id: String) -> Dictionary:
-	var price_was_free := bool(HouseFood.can_order(id).get("free", false))
+	var gate := ShopService.can_buy({"kind": "food"})
+	if not bool(gate["ok"]):
+		return {"ok": false, "message": String(gate["reason"])}
+	var check := HouseFood.can_order(id)
+	if not bool(check["ok"]):
+		return {"ok": false, "message": String(check.get("reason", "Заказать нельзя."))}
+	# Ролик — после проверки заказа и до оплаты: просмотр не должен пропасть зря.
+	if not ShopService.spend_remote_ad(gate):
+		return {"ok": false, "message": "Роликов на сегодня не осталось."}
+	var price_was_free := bool(check.get("free", false))
 	if not HouseFood.pay_for_order(id):
 		return {"ok": false, "message": String(HouseFood.can_order(id).get("reason", "Заказать нельзя."))}
 	var name := HouseConfig.food_name(id)
 	GameState.emit_event(&"food_ordered", {"id": id, "free": price_was_free})
 	if not HouseConfig.is_portable(id):
 		var eaten := HouseFood.eat_now(id)
-		return {"ok": true, "message": "%s — съедено на месте: голод +%d%%." % [
+		return {"ok": true, "remote": bool(gate["needs_ad"]), "message": "%s — съедено на месте: голод +%d%%." % [
 			name, int(eaten.get("hunger", 0.0))]}
 	if instance != null:
 		instance._start_delivery(id)
 	else:
 		HouseFood.deliver(id)
-	return {"ok": true, "message": "%s: курьер будет у двери через %d с." % [
+	return {"ok": true, "remote": bool(gate["needs_ad"]), "message": "%s: курьер будет у двери через %d с." % [
 		name, int(round(HouseConfig.delivery_seconds()))]}
 
 

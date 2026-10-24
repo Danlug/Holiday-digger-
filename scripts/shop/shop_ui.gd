@@ -125,7 +125,8 @@ static func open_shop() -> void:
 	instance.open(TAB_FOOD)
 
 
-## Витрина за доллары: доступна всегда и везде, в том числе из шахты.
+## Витрина за доллары: открывается откуда угодно (обмен, ролики-награды), но
+## гаджеты в ней покупаются по правилу места — ShopService.can_buy (ГДД §15).
 static func open_premium() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
@@ -141,6 +142,10 @@ func _ready() -> void:
 	GameState.tool_purchase_required.connect(_on_tool_purchase_required)
 	GameState.coins_changed.connect(func(_c): _sync_wallet(true))
 	GameState.dollars_changed.connect(func(_d): _sync_wallet(true))
+	# Новые сутки вернули ролики на покупки под землёй: открытая витрина обновляет бейджи.
+	GameState.daily_reset.connect(func() -> void:
+		if is_open():
+			_render())
 
 
 func _exit_tree() -> void:
@@ -175,6 +180,18 @@ func open(tab: String = TAB_FOOD) -> void:
 		if ShopService.visit_workshop():
 			notice("Среди удочек, лопат и палок нашлась ржавая кирка.", 4.0)
 	_set_tab(tab, false)
+	_announce_place(tab)
+
+
+## Витрину открыли вне двери и не под землёй (меню или «Магазин» на огороде):
+## плитки заперты, и сразу говорим почему. Под землёй не нужно — там плитки с
+## бейджем роликов, а отказ при пустом лимите объясняет сама плитка.
+func _announce_place(tab: String) -> void:
+	if tab == SCREEN_EQUIP or tab == TAB_SELL:
+		return
+	var gate := ShopService.can_buy({"kind": "good"})
+	if not bool(gate["ok"]) and String(gate["place"]) != ShopService.PLACE_UNDERGROUND:
+		notice(String(gate["reason"]), 3.2)
 
 
 func close() -> void:
@@ -820,6 +837,8 @@ func _on_tile_pressed(offer: Dictionary, tile: ShopTile) -> void:
 					Sfx.play("ui_deny")
 					Haptics.tap()
 					tile.deny()
+					if offer.has("lock_reason"):
+						notice(String(offer["lock_reason"]))
 				"poor":
 					if String(offer["kind"]) == "recipe":
 						Sfx.play("ui_tap")
@@ -832,6 +851,17 @@ func _on_tile_pressed(offer: Dictionary, tile: ShopTile) -> void:
 					Sfx.play("ui_tap")
 					Haptics.tap()
 					_open_card(offer, tile)
+					_mark_remote_card(offer)
+
+
+## Покупка за ролик (под землёй): значок ролика в углу зелёной кнопки
+## подтверждения. Накладывается поверх готовой кнопки — вид самого окна не меняется.
+func _mark_remote_card(offer: Dictionary) -> void:
+	if _card_ok == null or not bool(offer.get("needs_ad", false)):
+		return
+	var ic := ShopArt.rect(ShopArt.tex("glyph_video"), Vector2(6, 8), Vector2(16, 16))
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_ok.add_child(ic)
 
 
 func _toggle_sell(offer: Dictionary, tile: ShopTile) -> void:

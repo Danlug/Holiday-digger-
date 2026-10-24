@@ -63,6 +63,7 @@ static func sections(tab: String, selected: Dictionary = {}, remote: bool = fals
 			out.append({"icon": ShopArt.ui("icon_backpack"), "offers": equip_gear_offers()})
 	var filled: Array = []
 	for s in out:
+		apply_purchase_rules(s["offers"])
 		if not (s["offers"] as Array).is_empty():
 			filled.append(s)
 	return filled
@@ -129,6 +130,40 @@ static func _locked(o: Dictionary, text: String, pill: Dictionary = {}) -> void:
 	o["state"] = "locked"
 	o["pill"] = pill
 	o["extra"] = text
+
+
+# ---------------------------------------------------------------------------
+# Где можно покупать (ShopService.can_buy): состояние плитки по месту игрока
+# ---------------------------------------------------------------------------
+
+## Дома у двери плитки как были. Под землёй, пока есть ролики: бейдж «осталось
+## N/3» на значке и значок ролика в левом углу (покупка спишет один просмотр).
+## Вне двери и без роликов: плитка тускнеет, в правом углу замок, причина — в Tip
+## (state «away», а не «locked»: «заперто» — это про глубину, и такие плитки
+## не считаются виденными, а эти должны остаться «как были» для двери).
+## Купленное, запертое по глубине и всё, что вне правила, не трогаем.
+static func apply_purchase_rules(offers: Array) -> void:
+	for o in offers:
+		var gate := ShopService.can_buy(o)
+		var st := String(o["state"])
+		if (st != "available" and st != "poor") or (bool(gate["ok"]) and not bool(gate["needs_ad"])):
+			continue
+		o["place"] = String(gate["place"])
+		if bool(gate["ok"]):
+			o["needs_ad"] = true
+			o["ad_left"] = int(gate["left"])
+			o["ad_limit"] = int(gate["limit"])
+			o["count_text"] = "%d/%d" % [int(gate["left"]), int(gate["limit"])]
+			o["corner_tl"] = "video"
+			o["extra"] = "%s · за ролик, осталось %d из %d" % [String(o["extra"]), int(gate["left"]), int(gate["limit"])]
+			continue
+		o["state"] = "away"
+		o["corner"] = "lock"
+		o["new"] = false
+		o["lock_reason"] = String(gate["reason"])
+		o["extra"] = String(gate["reason"])
+		if String(gate["place"]) == ShopService.PLACE_UNDERGROUND:
+			o["count_text"] = "0/%d" % int(gate["limit"])
 
 
 # ---------------------------------------------------------------------------
@@ -637,7 +672,10 @@ static func seed_seen() -> void:
 		for o in offers_flat(tab):
 			if String(o["state"]) != "locked":
 				keys.append(String(o["key"]))
-	GameState.ext_set(SEEN_KEY, {"seen": keys})
+	# Ключ «shop» делят «новинки» и счётчик удалённых покупок (ShopRemote): чужое не затираем.
+	var cur: Dictionary = (d as Dictionary).duplicate() if typeof(d) == TYPE_DICTIONARY else {}
+	cur["seen"] = keys
+	GameState.ext_set(SEEN_KEY, cur)
 
 
 static func new_count(tab: String) -> int:

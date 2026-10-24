@@ -510,6 +510,18 @@ const WALK_REF := 4.2
 ## Линейный фильтр вместо ближайшего: спрайт теперь наклоняется и сжимается, а на
 ## ближайшем соседе косой край рвётся в лесенку.
 const SMOOTH_FILTER := true
+
+## Чёткость (ветка «hero-art»): линейный фильтр сам по себе мылит рисунок
+## (кадр 144 текселя на экране 448 px уменьшается в 1,5 раза), поэтому поверх
+## него шейдер shaders/pixel_art.gdshader: середина пикселя рисунка чёткая,
+## смешение — только на границе пикселей, наклон и дробный сдвиг остаются
+## гладкими. Листы мальчика перерисованы на сетке 2×2 текселя
+## (tools/gen_hero_art.py, список SHEETS) — для них пиксель рисунка = 2,
+## у авторских листов бурмобиля — 1.
+const PIXEL_ART_SHADER := preload("res://shaders/pixel_art.gdshader")
+const PIXEL_CELL_2 := ["idle", "idle_x", "walk", "fall", "jump", "hurt", "fly", "fly_jet",
+		"fly_1", "fly_2", "fly_3", "fly_4", "dig_pick", "dig_pick_rusty", "dig_shovel",
+		"dig_drill_down", "dig_drill_side", "sleep"]
 const FOOT_Y := -HH * TILE - 16.0 + float(GROUND_Y) / ART_SCALE
 
 signal footstep(world_pos: Vector2)
@@ -611,8 +623,23 @@ func _setup_nodes() -> void:
 	if SMOOTH_FILTER:
 		_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		for spr: Sprite2D in [_sprite, _ghost]:
+			var mat := ShaderMaterial.new()
+			mat.shader = PIXEL_ART_SHADER
+			spr.material = mat
 	_rng.randomize()
 	_next_blink = _rng.randf_range(HeroAnim.num("idle.blink_min_s", 2.4), HeroAnim.num("idle.blink_max_s", 5.2))
+
+
+## Пиксель рисунка текущего листа для шейдера чёткости (см. PIXEL_ART_SHADER).
+func _sync_pixel_cell(spr: Sprite2D) -> void:
+	var mat := spr.material as ShaderMaterial
+	if mat == null or spr.texture == null:
+		return
+	var cell: float = 2.0 if PIXEL_CELL_2.has(spr.texture.resource_path.get_file().get_basename()) else 1.0
+	if float(spr.get_meta("pixel_cell", 0.0)) != cell:
+		spr.set_meta("pixel_cell", cell)
+		mat.set_shader_parameter("cell", cell)
 
 
 ## Сброс накопленного движения: телепорт, смена сцены, начало сценария в тесте.
@@ -1150,6 +1177,7 @@ func _process(delta: float) -> void:
 
 	if tex != null:
 		_sprite.texture = tex
+		_sync_pixel_cell(_sprite)
 		var frames: int = maxi(1, int(round(tex.get_width() / float(fw))))
 		var frame: int = phase_frame
 		if frame < 0:
@@ -1325,6 +1353,7 @@ func _start_ghost() -> void:
 	if fade <= 0.0 or _t <= 0.0:
 		return
 	_ghost.texture = _sprite.texture
+	_sync_pixel_cell(_ghost)
 	_ghost.region_rect = _sprite.region_rect
 	_ghost.flip_h = _sprite.flip_h
 	_ghost.position = _sprite.position - Vector2(_last_shake, 0.0)
@@ -1455,6 +1484,7 @@ func _draw_rig_transition() -> void:
 	var fw: int = int(_rig_exit_sheet.get_width() / RIG_EXIT_FRAMES)
 	var fh: int = int(_rig_exit_sheet.get_height())
 	_sprite.texture = _rig_exit_sheet
+	_sync_pixel_cell(_sprite)
 	_sprite.region_rect = Rect2(clampi(key - 1, 0, RIG_EXIT_FRAMES - 1) * fw, 0, fw, fh)
 	# Сцена выхода всегда смотрит в одну сторону (та, куда исходно смотрел
 	# художник — герой выходит из машины лицом от тоннеля): разворот по

@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_hover_and_long_press_still_work()
 	_test_empty_title_and_gone()
 	_test_double_bind_updates_text()
+	_test_panel_stays_first_child()
 
 	Tip.hide_all()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -217,6 +218,12 @@ func _test_empty_title_and_gone() -> void:
 	c.hide()
 	check("скрытый значок уносит описание", not Tip.is_showing())
 	c.queue_free()
+
+
+func _test_panel_stays_first_child() -> void:
+	var layer := get_tree().root.find_child("TipLayer", true, false)
+	check("панель — первый ребёнок TipLayer (на это опираются чужие проверки)",
+		layer != null and layer.get_child(0) is PanelContainer)
 
 
 func _test_double_bind_updates_text() -> void:

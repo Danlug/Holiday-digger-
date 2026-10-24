@@ -353,9 +353,6 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	_layer.layer = 128
 	_layer.name = "TipLayer"
 	tree.root.add_child(_layer)
-	_watcher = _Watcher.new()
-	_watcher.name = "TipWatcher"
-	_layer.add_child(_watcher)
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.visible = false
@@ -380,6 +377,11 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	box.add_child(_body)
 	box.add_child(_extra)
 	_layer.add_child(_panel)
+	# Следит за нажатиями мимо открытой тапом подсказки. Идёт ПОСЛЕ панели: чужие
+	# проверки берут панель как первого ребёнка слоя (TipLayer.get_child(0)).
+	_watcher = _Watcher.new()
+	_watcher.name = "TipWatcher"
+	_layer.add_child(_watcher)
 
 
 static func _make_label(size: int, col: Color) -> Label:

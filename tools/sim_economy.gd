@@ -29,6 +29,8 @@ extends Node
 ##                     той же логикой, что в игре (ChestLogic, StreakLogic, GreedRules, MasteryLogic).
 ##                     Ветка «Жадность» качается, если её id есть в --skills. По умолчанию 0 — прежние
 ##                     числа §18 не меняются.
+##   --fever_extra=N   сколько штук сверху даёт рудная клетка в жадности (по умолчанию streak.fever_extra
+##                     из data/mechanics.json; 0 — жадность без удвоения, только темп)
 ##
 ## Модель (всё, что она НЕ учитывает, перечислено — числа это ориентир, не истина):
 ##  * герой копает колонку x=17 (ствол тоннеля Роберта) вниз от первого уровня под
@@ -52,7 +54,7 @@ const UPKEEP_COST_S := 30.0
 const SIDE_TURN_S := 0.4            # тап в сторону
 
 var _opt := {"seeds": 6, "policy": "shaft", "hours": 48.0, "skills": "dig_speed,strength,vision",
-	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": "", "mech": "0"}
+	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": "", "mech": "0", "fever_extra": ""}
 
 
 func _ready() -> void:
@@ -285,8 +287,10 @@ func _mech_dug(s: Dictionary, world: WorldGen, x: int, y: int, mid: String, loot
 	if bool(r["started"]):
 		m["fevers"] += 1
 	if bool(r["fever_cell"]) and loot and mid != "":
-		s["items"][mid] = int(s["items"].get(mid, 0)) + 1
-		m["val"]["fever"] += price
+		var extra := int(_opt["fever_extra"]) if String(_opt["fever_extra"]) != "" \
+			else int(MechData.num("streak", "fever_extra", 1))
+		s["items"][mid] = int(s["items"].get(mid, 0)) + extra
+		m["val"]["fever"] += price * extra
 	var ch := _mech_chest(s, world, y)
 	if not ch.is_empty() and ch["cell"] == Vector2i(x, y) and not m["opened"].has(ch["cell"]):
 		_mech_open(s, world, ch)

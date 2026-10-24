@@ -239,6 +239,11 @@ func collect_requirements() -> Array:
 		var cap := 1 if String(r["id"]) == "hand_drill" else (2 if String(r["id"]) == "drill_rig" else _tool_tier_at(gate))
 		for item in r["inputs"].keys():
 			out.append({"owner": owner, "item": String(item), "n": int(r["inputs"][item]), "gate": gate, "cap": cap})
+	# перегонка на станции заправки (торф, уголь -> топливный блок; рецептов на верстаке больше нет)
+	for raw in FuelRefinery.inputs():
+		var rgate := FuelRefinery.unlock_depth(String(raw))
+		out.append({"owner": "station:" + String(raw), "item": String(raw), "n": FuelRefinery.per_block(String(raw)),
+			"gate": rgate, "cap": _tool_tier_at(rgate)})
 	# баки
 	var tanks: Dictionary = TechData.fuel().get("tanks", {})
 	for tool_id in tanks.keys():
@@ -669,13 +674,15 @@ func _check_fuel_selfsufficiency() -> void:
 			add("info", "топливо " + tool_id, "худший запас топлива из породы — %.0f%% расхода на глубине ~%d" % [worst * 100.0, worst_y])
 		if FuelTank.capacities(tool_id).is_empty() or float(FuelTank.capacities(tool_id)[0]) / maxf(rate, 1e-9) < 20.0:
 			add("warn", "топливо " + tool_id, "бак 1-го уровня хватает меньше чем на 20 клеток")
-	# Блок из торфа/угля: рецепт должен быть доступен там, где нужен
-	var bf := ShopCatalog.recipe("fuel_block_coal")
-	if bf.is_empty() or int(bf.get("unlock_depth", 0)) > 1000:
-		add("error", "топливо", "рецепт блока из угля не открыт к глубине угля")
+	# Блок из торфа/угля: перегонка на станции должна быть открыта там, где сырьё появляется
+	var coal_gate := FuelRefinery.unlock_depth("coal")
+	if not FuelRefinery.is_input("coal") or coal_gate > 1000:
+		add("error", "топливо", "перегонка угля на станции не открыта к глубине угля")
 	var coal_first := work_depth("coal", 1)
-	if coal_first < 0 or coal_first > int(bf.get("unlock_depth", 0)) + 50:
-		add("warn", "топливо", "уголь (рабочая плотность) начинается с %d, рецепт блока — с %d" % [coal_first, int(bf.get("unlock_depth", 0))])
+	if coal_first < 0 or coal_first > coal_gate + 50:
+		add("warn", "топливо", "уголь (рабочая плотность) начинается с %d, перегонка угля — с %d" % [coal_first, coal_gate])
+	if not FuelRefinery.is_input("peat") or FuelRefinery.unlock_depth("peat") > ShopCatalog.unlock_depth("hand_drill"):
+		add("error", "топливо", "перегонка торфа открывается позже ручного бура")
 	if work_depth("peat", 1) < 0:
 		add("error", "топливо", "торфа в мире нет")
 

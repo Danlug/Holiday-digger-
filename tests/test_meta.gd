@@ -81,12 +81,13 @@ func _test_generation() -> void:
 	var seen := {}
 	var a := QuestGen.generate("daily", MONDAY, 4242, 120, seen)
 	var b := QuestGen.generate("daily", MONDAY, 4242, 120, seen)
-	check("три ежедневных задания", a.size() == 3)
+	# Было три; заказ владельца (раунд 3) — набор дня из пяти заданий разной сложности.
+	check("пять ежедневных заданий", a.size() == int(MetaData.quests()["daily"]["count"]) and a.size() == 5)
 	check("генерация детерминирована от (дата, сид, ступень)", JSON.stringify(a) == JSON.stringify(b))
 	var groups := {}
 	for q in a:
 		groups[MetaData.template(String(q["tpl"]))["group"]] = true
-	check("задания дня из разных групп", groups.size() == 3)
+	check("задания дня из разных групп", groups.size() == a.size())
 	var differs := false
 	for d in range(1, 12):
 		if JSON.stringify(QuestGen.generate("daily", MONDAY + d, 4242, 120, seen)) != JSON.stringify(a):
@@ -149,7 +150,7 @@ func _test_gate_and_rollover() -> void:
 	check("до онбординга ежедневная награда закрыта", not DailyReward.can_claim())
 
 	MetaState.root()["unlocked"] = true
-	check("после онбординга задания выданы", QuestEngine.refresh() and (MetaState.sub("quests")["daily"] as Array).size() == 3
+	check("после онбординга задания выданы", QuestEngine.refresh() and (MetaState.sub("quests")["daily"] as Array).size() == 5
 		and (MetaState.sub("quests")["weekly"] as Array).size() == 2)
 	var d0 := JSON.stringify(MetaState.sub("quests")["daily"])
 	var w0 := JSON.stringify(MetaState.sub("quests")["weekly"])
@@ -364,7 +365,7 @@ func _test_daily_reward() -> void:
 
 func _test_achievements() -> void:
 	_fresh()
-	check("в данных 30–40 достижений", MetaData.achievements().size() >= 30 and MetaData.achievements().size() <= 40)
+	check("в данных 30–50 достижений", MetaData.achievements().size() >= 30 and MetaData.achievements().size() <= 50)
 	check("у каждого достижения есть название, описание, значок и награда", _ach_data_ok())
 	check("пустой прогресс — ничего не получено", Achievements.evaluate().is_empty())
 	MetaEvents.apply(&"picked", {"item": "gold", "count": 1})

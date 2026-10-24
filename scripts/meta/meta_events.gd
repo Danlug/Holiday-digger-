@@ -55,6 +55,8 @@ static func _count(ev: StringName, data: Dictionary) -> void:
 			MetaState.bump("monsters")
 		"refueled":
 			MetaState.bump("refueled")
+		"lucky_find":
+			MetaState.bump("lucky")
 		"story_beat":
 			MetaState.bump("story_beats")
 		"died":

@@ -39,6 +39,12 @@ static func load_locale(locale: String = DEFAULT_LOCALE) -> void:
 		_table = {}
 	else:
 		_table = raw
+		# Тире не должно начинать строку при переносе в плашке («…с перегонки /
+		# — моё»): приклеиваем его к предыдущему слову неразрывным пробелом.
+		# В файлах остаётся обычный пробел — его видно и правится он как обычно.
+		for k in _table.keys():
+			if typeof(_table[k]) == TYPE_STRING:
+				_table[k] = String(_table[k]).replace(" —", " —")
 	_locale = locale
 
 

@@ -27,6 +27,8 @@ const SHARED := {
 	"coin": "res://art/ui/icon_coin.png",
 	"dollar": "res://art/ui/icon_dollar.png",
 	"stamina": "res://art/ui/icons/stamina.png",   # тот же рисунок, что у полоски бодрости и экрана героя
+	"eat": "res://art/ui/icons/eat.png",           # тот же, что у кнопки «Съесть» в рюкзаке
+	"sleep": "res://art/house_ui/act_bed.png",     # тот же, что у кровати в доме
 }
 ## Предметы-награды без собственной иконки показываются значком энергии.
 ## У энергетического батончика есть нарисованный значок с молнией (art/ui/shop/).

@@ -30,7 +30,11 @@ static func _fx_service_exists(tree: SceneTree) -> bool:
 
 ## Награда забрана: origin — центр плитки в экранных координатах, anchors —
 ## {coins, dollars, xp: Vector2} куда лететь (по умолчанию — кошелёк HUD).
-static func claim(tree: SceneTree, origin: Vector2, reward: Dictionary, big: bool = false, anchors: Dictionary = {}) -> void:
+## over_modal — забирают в окне поверх игры: значки летят на своём слое (98),
+## а не через Fx — слой полёта сервиса (59) лежит под окнами мета-слоя (92–94)
+## и под затемнением шахты, и полёт там не виден.
+static func claim(tree: SceneTree, origin: Vector2, reward: Dictionary, big: bool = false, anchors: Dictionary = {},
+		over_modal: bool = false) -> void:
 	if tree == null:
 		return
 	var r := MetaRewards.normalize(reward)
@@ -40,7 +44,7 @@ static func claim(tree: SceneTree, origin: Vector2, reward: Dictionary, big: boo
 	if big:
 		Fx.flash(Color(1.0, 0.9, 0.5, 0.22), 0.18)
 	var parent := _root(tree)
-	var own_fly := not _fx_service_exists(tree)
+	var own_fly := over_modal or not _fx_service_exists(tree)
 	for key in ["coins", "dollars", "xp", "item"]:
 		if not r.has(key):
 			continue
@@ -56,6 +60,13 @@ static func claim(tree: SceneTree, origin: Vector2, reward: Dictionary, big: boo
 		if not own_fly:
 			Fx.fly_to(t, origin, to, n)
 		_pop(parent, t, origin, to, n, own_fly)
+
+
+## Значки летят из from в to на слое мета-слоя — поверх HUD, окон и темноты шахты.
+static func fly(tree: SceneTree, t: Texture2D, from: Vector2, to: Vector2, n: int = 3) -> void:
+	if tree == null or t == null:
+		return
+	_pop(_root(tree), t, from, to, n, true)
 
 
 static func _pop(parent: Control, t: Texture2D, origin: Vector2, to: Vector2, n: int, fly: bool) -> void:

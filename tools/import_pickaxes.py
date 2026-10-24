@@ -43,6 +43,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import shrink  # noqa: E402
+from defringe import BG_PICKAXES, defringe  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "art", "_source", "pickaxes_sheet.jpg")
@@ -245,9 +246,10 @@ def main():
         # разное положение в кнопке
         img.alpha_composite(small, ((BOX - tw) // 2, (BOX - th) // 2))
         img, boost = lift_blacks(img)
-        img.save(os.path.join(OUT_DIR, "pickaxe_%s.png" % name))
         if name == "rusty":
-            rusty = img
+            rusty = img   # колотая делается из нечищеной — и чистится сама
+        img = defringe(img, bg=BG_PICKAXES)   # светлая кайма подложки
+        img.save(os.path.join(OUT_DIR, "pickaxe_%s.png" % name))
         meta["items"]["pickaxe_%s" % name] = {
             "source_px": list(piece.size), "px": [tw, th],
             "relative": round(tw / (max(s[0] for s in sizes) * k), 3),
@@ -258,7 +260,7 @@ def main():
               % (name, tw, th, BOX, BOX,
                  "" if not boost else ", чёрный поднят на %.0f" % boost))
 
-    cracked = crack(rusty)
+    cracked = defringe(crack(rusty), bg=BG_PICKAXES)
     cracked.save(os.path.join(OUT_DIR, "pickaxe_rusty_cracked.png"))
     meta["items"]["pickaxe_rusty_cracked"] = {"from": "pickaxe_rusty",
                                               "note": "щербина в бойке, цвет глуше"}

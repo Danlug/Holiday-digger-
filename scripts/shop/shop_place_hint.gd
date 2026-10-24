@@ -4,6 +4,9 @@ extends RefCounted
 ## (ShopService.can_buy): подсказка кнопки «Магазин», красная цифра «осталось
 ## роликов» на ней под землёй и строка пункта «Мастерская» в меню «•••».
 ## Только тексты и числа; решает всё ShopService, сюда логика не дублируется.
+## Правило места — про покупки за монеты: за доллары можно где угодно (раунд 4).
+
+const DOLLARS_ANYWHERE := "За доллары — где угодно, без ролика"
 
 
 ## [заголовок, описание, дополнение] подсказки кнопки «Магазин» в шапке HUD.
@@ -12,12 +15,12 @@ static func button_tip() -> Array:
 	match String(gate["place"]):
 		ShopService.PLACE_UNDERGROUND:
 			if bool(gate["ok"]):
-				return ["Магазин", "Еда и снаряжение — за ролик.",
+				return ["Магазин", "Еда и снаряжение за монеты — за ролик. " + DOLLARS_ANYWHERE + ".",
 					"Осталось сегодня: %d из %d" % [int(gate["left"]), int(gate["limit"])]]
-			return ["Магазин", String(gate["reason"]), ""]
+			return ["Магазин", String(gate["reason"]), DOLLARS_ANYWHERE]
 		ShopService.PLACE_DOOR:
 			return ["Магазин", "У входной двери покупки без ограничений.", ""]
-	return ["Магазин", String(gate["reason"]), "Обмен долларов и ролики — здесь"]
+	return ["Магазин", String(gate["reason"]), DOLLARS_ANYWHERE]
 
 
 ## Красная цифра на кнопке: сколько удалённых покупок осталось, только под землёй.
@@ -43,4 +46,4 @@ static func menu_body() -> String:
 			return "Покупки за ролик: %d из %d" % [int(gate["left"]), int(gate["limit"])]
 		ShopService.PLACE_DOOR:
 			return "Продажа, верстак, лавка"
-	return "Продажа. Покупки — у двери"
+	return "Продажа. За монеты — у двери, за доллары — везде"

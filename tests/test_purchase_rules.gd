@@ -2,6 +2,7 @@ extends Node
 ## test_purchase_rules — правило «где можно покупать снаряжение и еду»
 ## (заказ владельца, ГДД §15): дома у входной двери — без ограничений, под землёй
 ## — не более 3 раз в сутки и каждый раз за ролик, в остальных местах нельзя.
+## Раунд 4: всё, что платится долларами, — где угодно, без ролика и мимо счётчика.
 ## Проверяет сервис (ShopService.can_buy и все покупки), счётчик ShopRemote
 ## (сутки, защита от перемотки часов, сейв), состояния плиток ShopItems и то,
 ## что не мешает продаже, обмену долларов, роликам и онбордингу (ГДД §9).
@@ -25,6 +26,8 @@ func _ready() -> void:
 	_test_underground_does_not_waste_ads()
 	_test_underground_food_order()
 	_test_outside_door_denied()
+	_test_dollars_anywhere()
+	_test_dual_price_good()
 	_test_exempt_kinds_and_selling()
 	_test_day_reset_and_clock_guard()
 	_test_save_load()
@@ -98,6 +101,9 @@ func _test_places() -> void:
 		check("«%s» подпадает под правило" % kind, ShopService.is_gated(kind))
 	for kind in ["recipe", "exchange", "ad", "sell", "nosale", "equip_tool", "equip_gear", "info"]:
 		check("«%s» вне правила" % kind, not ShopService.is_gated(kind))
+	check("покупка за доллары узнаётся по валюте", ShopService.is_dollar_purchase({"kind": "good", "currency": "dollars"}))
+	check("покупка за монеты — нет", not ShopService.is_dollar_purchase({"kind": "good", "currency": "coins"}))
+	check("без валюты — нет (кирки, ранцы, еда)", not ShopService.is_dollar_purchase({"kind": "tool"}))
 
 
 func _test_door_is_unlimited() -> void:
@@ -156,22 +162,27 @@ func _test_underground_three_ads() -> void:
 		ShopService.buy_tool("titanium_pickaxe"),
 		ShopService.buy_gear("backpack_plus"),
 		ShopService.buy("energy_drink", "coins"),
-		ShopService.buy("teleport_watch", "dollars"),
 		HouseSystem.order_food("food_buldak"),
 	]
-	check("4-я покупка любого вида отказана", denials.all(func(r): return not bool(r["ok"])))
+	check("4-я покупка за монеты любого вида отказана", denials.all(func(r): return not bool(r["ok"])))
 	check("отказ объясняет причину", denials.all(func(r): return String(r["message"]).to_lower().contains("ролик")))
 	check("монеты не списаны", GameState.coins == coins_before)
 	check("кирка и ранец не выданы", not GameState.owned_tools.has("titanium_pickaxe") and not GameState.has_gear("backpack_plus"))
 	check("счётчик не ушёл в минус", ShopRemote.used_today() == 3)
+	var dollars := GameState.dollars
+	var watch := ShopService.buy("teleport_watch", "dollars")
+	check("а за доллары и при пустом лимите покупка идёт (раунд 4)", bool(watch["ok"]) and not bool(watch.get("remote", false)))
+	check("доллары списаны, счётчик тот же", GameState.dollars < dollars and ShopRemote.used_today() == 3)
 
-	# Долларовый гаджет и ступень бура берут тот же один счётчик.
+	# Ступень бура берёт тот же один счётчик, гаджет за доллары — нет (раунд 4;
+	# раньше тут ждали, что и гаджет спишет ролик).
 	_fresh()
 	_place("underground")
 	GameState.owned_tools.append("drill_rig")
-	check("гаджет за доллары под землёй — за ролик", bool(ShopService.buy("teleport_watch", "dollars")["ok"]))
+	var gadget := ShopService.buy("teleport_watch", "dollars")
+	check("гаджет за доллары под землёй — без ролика", bool(gadget["ok"]) and not bool(gadget.get("remote", false)))
 	check("ступень бура под землёй — за ролик", bool(ShopService.buy_drill_upgrade()["ok"]))
-	check("оба списали из общего счётчика", ShopRemote.left_today() == 1)
+	check("из общего счётчика списала только ступень", ShopRemote.left_today() == 2)
 
 
 ## Ролик не пропадает зря: пока покупка не состоится, единица лимита цела.
@@ -240,15 +251,86 @@ func _test_outside_door_denied() -> void:
 			ShopService.buy_gear("backpack"),
 			ShopService.buy_drill_upgrade(),
 			ShopService.buy("energy_drink", "coins"),
-			ShopService.buy("teleport_watch", "dollars"),
 			HouseSystem.order_food("food_bar"),
 		]
-		check("%s: ни одна покупка не прошла" % place, tries.all(func(r): return not bool(r["ok"])))
+		check("%s: ни одна покупка за монеты не прошла" % place, tries.all(func(r): return not bool(r["ok"])))
 		check("%s: у каждого отказа есть причина" % place, tries.all(func(r): return String(r["message"]) != ""))
 		check("%s: деньги целы" % place, GameState.coins == coins and GameState.dollars == dollars)
 		check("%s: ролики не тронуты" % place, ShopRemote.left_today() == 3)
 		check("%s: ничего не выдано" % place, not GameState.owned_tools.has("iron_pickaxe") and not GameState.has_gear("backpack"))
 	check("огород и дом объясняют по-разному", reasons["garden"] != reasons["house"])
+
+
+## Раунд 4, слова владельца: «Покупки за доллары можно делать в любом месте, не
+## нужен просмотр рекламы». Все товары за доллары в каждом месте, в том числе под
+## землёй при пустом лимите: без ролика, счётчик «N/3» не тронут.
+func _test_dollars_anywhere() -> void:
+	var ids: Array = ShopCatalog.goods_dollars().map(func(g): return String(g["id"]))
+	check("товары за доллары: батончик, часы, таблетка",
+		ids.has("energy_bar") and ids.has("teleport_watch") and ids.has("full_restore_pill"))
+	var bought: Array = []
+	var on_event := func(id: StringName, data: Dictionary) -> void:
+		if id == &"bought":
+			bought.append(data)
+	GameState.game_event.connect(on_event)
+	for place in ["door", "house", "garden", "underground", "underground_empty"]:
+		_fresh()
+		_place("underground" if place == "underground_empty" else place)
+		if place == "underground_empty":
+			for i in ShopRemote.limit():
+				ShopRemote.watch_ad()
+		var used := ShopRemote.used_today()
+		var g := ShopService.can_buy({"kind": "good", "currency": "dollars"})
+		check("%s: за доллары можно, без ролика" % place,
+			bool(g["ok"]) and not bool(g["needs_ad"]) and String(g["reason"]) == "")
+		if place != "door":
+			var coin_gate := ShopService.can_buy({"kind": "good", "currency": "coins"})
+			check("%s: за монеты правило места прежнее" % place, not bool(coin_gate["ok"]) or bool(coin_gate["needs_ad"]))
+		var coins := GameState.coins
+		var dollars := GameState.dollars
+		var price := 0
+		var results: Array = []
+		bought.clear()
+		for id in ids:
+			results.append(ShopService.buy(id, "dollars"))
+			price += ShopCatalog.good_price(ShopCatalog.good(id, "dollars"), "dollars")
+		check("%s: все %d товара за доллары куплены" % [place, ids.size()], results.all(func(r): return bool(r["ok"])))
+		check("%s: ни один не «за ролик» (и в событии bought)" % place,
+			results.all(func(r): return not bool(r.get("remote", false))) \
+			and bought.size() == ids.size() and bought.all(func(d): return not d.has("remote")))
+		check("%s: списаны ровно доллары, монеты целы" % place, GameState.dollars == dollars - price and GameState.coins == coins)
+		check("%s: счётчик роликов не тронут" % place, ShopRemote.used_today() == used)
+	GameState.game_event.disconnect(on_event)
+	_fresh()
+	_place("garden")
+	GameState.dollars = 0
+	var poor := ShopService.buy("full_restore_pill", "dollars")
+	check("без долларов — отказ про доллары, а не про место", not bool(poor["ok"]) and String(poor["message"]).contains("доллар"))
+
+
+## Цена в двух валютах — это две плитки, каждая платится одной валютой и идёт по
+## правилу своей валюты: монетная — по месту, долларовая — где угодно. Смешанной
+## цены «монеты + доллары разом» в витрине нет (ГДД §15).
+func _test_dual_price_good() -> void:
+	_fresh()
+	var dual := {"id": "test_dual", "name_ru": "Двойная цена", "desc_ru": "", "shelf": "food",
+		"effect": "restore", "stamina_percent": 10, "price_coins": 100, "price_dollars": 1}
+	ShopCatalog.data()["goods_coins"]["extra"].append(dual)
+	ShopCatalog.data()["goods_dollars"]["extra"].append(dual)
+	_place("garden")
+	var coin_tile := _find(_offers("food"), "good:coins:test_dual")
+	var dollar_tile := _find(_offers("food"), "good:dollars:test_dual")
+	check("цена в двух валютах — две плитки", not coin_tile.is_empty() and not dollar_tile.is_empty())
+	check("огород: монетная плитка заперта", String(coin_tile.get("state", "")) == "away")
+	check("огород: долларовая свободна", String(dollar_tile.get("state", "")) == "available" and not dollar_tile.has("lock_reason"))
+	check("огород: за монеты — отказ", not bool(ShopService.buy("test_dual", "coins")["ok"]))
+	check("огород: за доллары — куплено", bool(ShopService.buy("test_dual", "dollars")["ok"]))
+	_place("underground")
+	coin_tile = _find(_offers("food"), "good:coins:test_dual")
+	dollar_tile = _find(_offers("food"), "good:dollars:test_dual")
+	check("шахта: монетная — за ролик, долларовая — без",
+		bool(coin_tile.get("needs_ad", false)) and not dollar_tile.has("needs_ad") and not dollar_tile.has("count_text"))
+	ShopCatalog.reload()
 
 
 func _test_exempt_kinds_and_selling() -> void:
@@ -375,12 +457,18 @@ func _test_tiles_by_place() -> void:
 	for tab in ["food", "picks", "tech", "premium"]:
 		var offers := _offers(tab)
 		var gated := offers.filter(func(o): return ShopService.is_gated(String(o["kind"])) \
+				and not ShopService.is_dollar_purchase(o) \
 				and (String(o["state"]) == "available" or String(o["state"]) == "poor"))
 		var all_badged := true
 		for o in gated:
 			all_badged = all_badged and bool(o.get("needs_ad", false)) and String(o.get("count_text", "")) == "3/3" \
 					and String(o.get("corner_tl", "")) == "video"
-		check("под землёй «%s»: у %d плиток бейдж 3/3 и ролик" % [tab, gated.size()], all_badged and (tab == "tech" or not gated.is_empty()))
+		# Во вкладке за доллары монетных товаров нет — бейджей там не ждём (раунд 4).
+		check("под землёй «%s»: у %d плиток за монеты бейдж 3/3 и ролик" % [tab, gated.size()],
+			all_badged and (tab in ["tech", "premium"] or not gated.is_empty()))
+	var dollar_tiles: Array = _offers("premium").filter(func(o): return String(o["currency"]) == "dollars" and String(o["kind"]) == "good")
+	check("под землёй плитки за доллары без бейджа N/3, ролика и замка", dollar_tiles.size() >= 3 \
+		and dollar_tiles.all(func(o): return _plain(o)))
 	var owned: Dictionary = _find(_offers("picks"), "tool:iron_pickaxe")
 	check("купленное бейджа не получает", String(owned["state"]) == "owned" and not owned.has("needs_ad"))
 	var tool_tile: Dictionary = _find(_offers("picks"), "tool:titanium_pickaxe")
@@ -401,6 +489,9 @@ func _test_tiles_by_place() -> void:
 			and String(o["corner"]) == "lock" and String(o["count_text"]) == "0/3" and String(o["extra"]) == String(o["lock_reason"])))
 	check("заперта и экипировка", not _locked(_offers("picks")).is_empty())
 	check("запертое не считается «новинкой»", _locked(_offers("food")).all(func(o): return not bool(o["new"])))
+	var premium_empty: Array = _offers("premium")
+	check("без роликов плитки за доллары по-прежнему открыты", premium_empty.filter(func(o): \
+		return String(o["currency"]) == "dollars" and String(o["kind"]) == "good").all(func(o): return _plain(o)))
 
 	# На огороде и в доме вне двери: замок, причина, без счётчика.
 	for place in ["garden", "house"]:
@@ -413,6 +504,16 @@ func _test_tiles_by_place() -> void:
 		check("%s: причина — про входную дверь" % place, reason.contains("двер"))
 		check("%s: в подсказке та же причина" % place, String(food[0]["extra"]) == reason)
 		check("%s: ад-бейджей нет" % place, _badged(_offers("picks")).is_empty())
+		# «3/3» у ролика-награды «+1 $» — его собственный лимит, не покупка: его не проверяем.
+		var paid: Array = _offers("premium").filter(func(o): return String(o["currency"]) == "dollars")
+		check("%s: плитки за доллары (%d) без замка и «N/3»" % [place, paid.size()],
+			paid.size() >= 4 and paid.all(func(o): return _plain(o)))
+
+
+## Плитка «как у двери»: правило места её не тронуло.
+func _plain(o: Dictionary) -> bool:
+	return not o.has("needs_ad") and not o.has("lock_reason") and String(o.get("count_text", "")) == "" \
+		and String(o.get("corner_tl", "")) == "" and String(o["state"]) != "away"
 
 
 func _find(offers: Array, key: String) -> Dictionary:
@@ -481,6 +582,26 @@ func _test_ui_flow() -> void:
 	check("причина в подсказке плитки", String(tip["extra"]) == String(food_tile.offer["lock_reason"]))
 	ui.close()
 
+	# Без роликов витрина за доллары работает как дома у двери (раунд 4).
+	ui._notice_panel.visible = false
+	ui.open(ShopUI.SCREEN_PREMIUM)
+	var pill: ShopTile = ui._tiles["good:dollars:full_restore_pill"]
+	check("шахта без роликов: таблетка без замка и «N/3»", String(pill.offer["state"]) == "available" \
+		and not pill._corner_tr.visible and not pill._corner_tl.visible and String(pill.offer.get("count_text", "")) == "")
+	ui._on_tile_pressed(pill.offer, pill)
+	check("тап по таблетке открыл карточку", ui._card != null)
+	var pill_ad_glyph := false
+	if ui._card_ok != null:
+		for c in ui._card_ok.get_children():
+			if c is TextureRect and (c as TextureRect).texture == ShopArt.tex("glyph_video"):
+				pill_ad_glyph = true
+	check("на кнопке покупки за доллары значка ролика нет", not pill_ad_glyph)
+	var dollars_before := GameState.dollars
+	ui._confirm_card()
+	check("таблетка куплена за доллары, счётчик роликов тот же",
+		GameState.dollars == dollars_before - int(pill.offer["price"]) and ShopRemote.used_today() == ShopRemote.limit())
+	ui.close()
+
 	# Огород: витрина открывается, плитки заперты, плашка объясняет.
 	_place("garden")
 	ui._notice_panel.visible = false
@@ -493,6 +614,9 @@ func _test_ui_flow() -> void:
 	check("премиум-витрина (кнопка «Магазин») на огороде открыта", ui.is_open())
 	var exch: ShopTile = ui._tiles["exchange:1"]
 	check("обмен долларов на огороде доступен", String(exch.offer["state"]) == "available")
+	check("на огороде во вкладке за доллары плашки «к двери» нет (раунд 4)", not ui._notice_panel.visible)
+	var watch: ShopTile = ui._tiles["good:dollars:teleport_watch"]
+	check("часы на огороде без замка", String(watch.offer["state"]) == "available" and not watch._corner_tr.visible)
 	ui.close()
 
 	# У двери — всё как раньше, плашки нет.
@@ -525,10 +649,13 @@ func _test_hud_hints() -> void:
 	check("пункт меню называет ролики", ShopPlaceHint.menu_body().contains("ролик"))
 	ShopRemote.watch_ad()
 	check("цифра на кнопке уменьшилась", ShopPlaceHint.button_badge() == 2)
+	check("под землёй подсказка говорит, что за доллары ролик не нужен", String(ShopPlaceHint.button_tip()[1]).contains("доллар"))
 	_place("garden")
 	check("на огороде цифры нет", ShopPlaceHint.button_badge() == 0)
 	check("на огороде подсказка про дверь", String(ShopPlaceHint.button_tip()[1]).contains("двер"))
+	check("на огороде подсказка: за доллары — где угодно", String(ShopPlaceHint.button_tip()[2]).contains("доллар"))
 	check("на огороде в меню про дверь", ShopPlaceHint.menu_body().contains("двер"))
+	check("и про доллары", ShopPlaceHint.menu_body().contains("доллар"))
 	_place("door")
 	check("у двери меню как раньше", ShopPlaceHint.menu_body() == "Продажа, верстак, лавка")
 	var btn := Button.new()

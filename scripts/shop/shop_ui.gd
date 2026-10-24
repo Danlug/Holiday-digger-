@@ -39,6 +39,7 @@ const NAV_TIPS := {TAB_FOOD: ["Еда", "Заказ с доставкой к д�
 	TAB_SELL: ["Продать", "Сдать руду из рюкзака"],
 	SCREEN_PREMIUM: ["Магазин за доллары", "Гаджеты, обмен и ролики"]}
 
+const CARD_INFO_KEY := "shop_confirm"   # GameState.ext: {tapped: bool} — игрок уже знает про тап по значку
 const NAV_H := 38.0
 const HEAD_H := 32.0
 const ACTION_H := 46.0
@@ -90,6 +91,8 @@ var _ad_label: Label
 var _card: Control = null
 var _card_offer: Dictionary = {}
 var _card_ok: Button = null
+var _card_panel: Control = null   # плашка карточки: над ней встаёт описание по тапу
+var _info_pulse: Tween = null     # пульсация «i», пока игрок не научился тапать
 
 var _notice_panel: Panel
 var _notice_label: Label
@@ -895,7 +898,9 @@ func _close_card(animate: bool) -> void:
 	var c := _card
 	_card = null
 	_card_ok = null
+	_card_panel = null
 	_drag.set_process_input(true)
+	Tip.hide_all()
 	if animate and c.is_inside_tree():
 		Sfx.play("ui_close")
 		var tw := create_tween()
@@ -922,7 +927,8 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	dim.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and ev.pressed or ev is InputEventScreenTouch and ev.pressed:
-			if not Tip.swallowed():
+			# Тап мимо открытого описания гасит только описание, окно остаётся.
+			if not Tip.swallowed() and not Tip.dismissed_by_tap():
 				_close_card(true))
 	_card.add_child(dim)
 
@@ -943,6 +949,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 		sb.set("content_margin_" + m, 9)
 	panel.add_theme_stylebox_override("panel", sb)
 	_card.add_child(panel)
+	_card_panel = panel
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 7)
@@ -973,6 +980,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	else:
 		for e in offer.get("effects", []):
 			side.add_child(_make_chip_row(e["icon"], String(e["text"]), Color.WHITE))
+	_bind_card_info(preview, side, offer)
 
 	if is_recipe:
 		col.add_child(_make_inputs_grid(offer))
@@ -1019,6 +1027,48 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	tw.tween_property(panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(panel, "modulate:a", 1.0, 0.12)
 	tw.tween_property(dim, "modulate:a", 1.0, 0.15)
+
+
+## Тап по значку товара (и по чипам эффекта) раскрывает описание тут же над
+## карточкой; значок «i» на углу — намёк, что значок нажимается. Пока игрок ни
+## разу не тапнул, «i» пару раз пульсирует; выучил — пульсация больше не нужна.
+func _bind_card_info(preview: ShopTile, side: Control, offer: Dictionary) -> void:
+	var title := String(offer["title"])
+	var body := String(offer["body"])
+	var extra := String(offer["extra"])
+	Tip.bind_tap(preview, title, body, extra, _card_panel)
+	side.mouse_filter = Control.MOUSE_FILTER_STOP
+	Tip.bind_tap(side, title, body, extra, _card_panel)
+	var badge := ShopArt.rect(ShopArt.tex("glyph_info"),
+		Vector2(ShopTile.W - 17.0, ShopTile.H - 17.0), Vector2(14, 14))
+	preview.add_child(badge)
+	preview.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			_learn_card_info(badge))
+	if _card_info_learned() or ShopFx.reduced():
+		return
+	badge.pivot_offset = badge.size * 0.5
+	_info_pulse = badge.create_tween()
+	_info_pulse.tween_interval(0.4)
+	for i in 3:
+		_info_pulse.tween_property(badge, "scale", Vector2(1.3, 1.3), 0.22).set_trans(Tween.TRANS_SINE)
+		_info_pulse.tween_property(badge, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE)
+		_info_pulse.tween_interval(0.25)
+
+
+func _card_info_learned() -> bool:
+	return bool((GameState.ext_get(CARD_INFO_KEY, {}) as Dictionary).get("tapped", false))
+
+
+func _learn_card_info(badge: Control) -> void:
+	if _info_pulse != null and _info_pulse.is_valid():
+		_info_pulse.kill()
+	if is_instance_valid(badge):
+		badge.scale = Vector2.ONE
+	if not _card_info_learned():
+		var st: Dictionary = GameState.ext_get(CARD_INFO_KEY, {})
+		st["tapped"] = true
+		GameState.ext_set(CARD_INFO_KEY, st)
 
 
 func _card_can_confirm(offer: Dictionary) -> bool:
@@ -1085,6 +1135,19 @@ func _make_price_row(offer: Dictionary) -> Control:
 	return row
 
 
+## Значок материала нажимается: тап — название и сколько есть. Строка не ниже
+## 22 точек, чтобы попадал палец.
+func _make_chip_tappable(row: Control, title: String, have: int, need: int) -> void:
+	row.custom_minimum_size.y = 22.0
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	for c in row.get_children():
+		if c is Label:
+			(c as Label).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var short := need - have
+	Tip.bind_tap(row, title, "Есть: %s из %s" % [ShopArt.full(have), ShopArt.full(need)],
+		"Не хватает: %s" % ShopArt.full(short) if short > 0 else "Хватает", _card_panel)
+
+
 ## Материалы рецепта значками: «есть/нужно», зелёное — хватает, красное — нет.
 func _make_inputs_grid(offer: Dictionary) -> Control:
 	var grid := GridContainer.new()
@@ -1095,14 +1158,18 @@ func _make_inputs_grid(offer: Dictionary) -> Control:
 	for inp in offer.get("inputs", []):
 		var have := int(inp["have"])
 		var need := int(inp["need"])
-		grid.add_child(_make_chip_row(inp["icon"], "%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)],
-			ShopArt.COL_GOOD if have >= need else ShopArt.COL_BAD))
+		var chip := _make_chip_row(inp["icon"], "%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)],
+			ShopArt.COL_GOOD if have >= need else ShopArt.COL_BAD)
+		_make_chip_tappable(chip, ShopCatalog.item_name(String(inp["id"])), have, need)
+		grid.add_child(chip)
 	var coins_need := int(offer.get("coins_need", 0))
 	if coins_need > 0:
 		var have := int(offer.get("coins_have", 0))
-		grid.add_child(_make_chip_row(ShopArt.ui("icon_coin"),
+		var coin_chip := _make_chip_row(ShopArt.ui("icon_coin"),
 			"%s/%s" % [ShopArt.compact(have), ShopArt.compact(coins_need)],
-			ShopArt.COL_GOOD if have >= coins_need or GameState.debug_free_shop else ShopArt.COL_BAD))
+			ShopArt.COL_GOOD if have >= coins_need or GameState.debug_free_shop else ShopArt.COL_BAD)
+		_make_chip_tappable(coin_chip, "Монеты", have, coins_need)
+		grid.add_child(coin_chip)
 	wrap.add_child(grid)
 	return wrap
 

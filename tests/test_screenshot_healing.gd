@@ -58,6 +58,7 @@ func _ready() -> void:
 	await _scene("shop_card", _s_shop_card)
 	await _scene("death_card", _s_death_card)
 	await _scene("death_card_poor", _s_death_card_poor)
+	await _scene("death_real", _s_death_real)
 	print("test_screenshot_healing: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -208,6 +209,24 @@ func _s_death_card_poor() -> void:
 	card.open(_death_report(70))
 	await _frames(6)
 	Tip.show_now(card.find_child("Fee", true, false))
+
+
+## Настоящая смерть в игре: урон → падение героя → респавн дома → карточка
+## режиссёра «ощущений» со «скорой» (весь путь, без ручного build_report).
+func _s_death_real() -> void:
+	StoryState.set_flag("gold_sold", true)
+	GameState.coins = 900
+	GameState.inventory = {"iron_ore": 9, "silver": 3, "food_bar": 1}
+	GameState.inventory_changed.emit()
+	GameState.player_depth = 30
+	GameState.take_damage(9999.0, "fall")
+	var card: DeathCard = _main.get_node("FeelDirector").card
+	for _i in range(40):
+		if card.is_open():
+			break
+		await _wait(0.25)
+	await _frames(10)
+	print("death_real: монет %d, карточка %s" % [GameState.coins, card.is_open()])
 
 
 # ---------------------------------------------------------------------------

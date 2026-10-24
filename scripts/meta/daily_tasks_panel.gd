@@ -59,7 +59,10 @@ func close() -> void:
 		return
 	_closing = true
 	Sfx.play("ui_close")
+	var closing_root := _root
 	var finish := func() -> void:
+		if _root != closing_root:
+			return   # пока гасло, окно открыли заново — новое не трогаем
 		visible = false
 		_closing = false
 		if _root != null:
@@ -89,6 +92,7 @@ func _process(delta: float) -> void:
 		return
 	_tick = 0.0
 	if QuestEngine.refresh():
+		QuestEngine.mark_opened()
 		_fill()   # полночь наступила при открытом окне — новый набор
 	_update_timer()
 

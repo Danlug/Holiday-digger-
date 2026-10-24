@@ -303,7 +303,7 @@ static func screen_open(name: String) -> bool:
 			return es != null and bool(es.call("is_open"))
 		"meta":
 			var m := MetaService.instance
-			return m != null and (m.hub.is_open() or m.popup.is_open())
+			return m != null and (m.hub.is_open() or m.popup.is_open() or (m.tasks != null and m.tasks.is_open()))
 	return false
 
 

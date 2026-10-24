@@ -122,7 +122,8 @@ static func open_shop() -> void:
 	instance.open(TAB_FOOD)
 
 
-## Витрина за доллары: доступна всегда и везде, в том числе из шахты.
+## Витрина за доллары: открывается откуда угодно (обмен, ролики-награды), но
+## гаджеты в ней покупаются по правилу места — ShopService.can_buy (ГДД §15).
 static func open_premium() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")

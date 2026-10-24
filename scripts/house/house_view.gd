@@ -776,8 +776,13 @@ func _update_hero_frame() -> void:
 	if sheet == null:
 		_hero.texture = null
 		return
-	var frame_w := int(HERO_W * ART_SCALE)
-	var frame_count: int = maxi(1, int(sheet.get_width()) / frame_w)
+	# Листы мальчика по эталону (раунд 4) — 8 текселей на точку и несколько
+	# рядов (HeroSheets); кадр тот же 48×48 точек с линией земли 46.
+	var inf: Dictionary = HeroSheets.info_for(sheet)
+	var sc: float = HeroSheets.scale_of(inf)
+	var frame_w := int(HERO_W * sc)
+	var frame_count: int = HeroSheets.frames_of(inf) if not inf.is_empty() \
+			else maxi(1, int(sheet.get_width()) / frame_w)
 	var idx := 0
 	if moving:
 		idx = int(_walk_frame_t * WALK_FPS) % frame_count
@@ -787,8 +792,12 @@ func _update_hero_frame() -> void:
 	_cur_frame_idx = idx
 	var atlas := AtlasTexture.new()
 	atlas.atlas = sheet
-	atlas.region = Rect2(idx * frame_w, 0, frame_w, int(HERO_H * ART_SCALE))
+	atlas.region = HeroSheets.region(inf, idx) if not inf.is_empty() \
+			else Rect2(idx * frame_w, 0, frame_w, int(HERO_H * sc))
 	_hero.texture = atlas
+	_hero.size = Vector2(HERO_W * sc, HERO_H * sc)
+	_hero.scale = Vector2(HERO_SCALE / sc, HERO_SCALE / sc)
+	HeroSheets.crisp(_hero, inf)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,77 @@
+{
+	"_comment": "Геометрия листов мальчика (tools/gen_hero_ref.py): fw/fh — кадр в текселях, ground — линия земли (подошва на строке над ней), scale — текселей на логическую точку, cell — текселей на пиксель рисунка (шейдер чёткости), cols — кадров в ряду (листы шире 4096 — в несколько рядов), frames — сколько кадров. Не править руками.",
+	"sheets": {
+		"fall": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"hurt": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 2,
+			"frames": 2
+		},
+		"idle": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 4,
+			"frames": 4
+		},
+		"idle_x": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 5,
+			"frames": 5
+		},
+		"jump": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 9,
+			"frames": 9
+		},
+		"sleep": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 1,
+			"frames": 1
+		},
+		"walk": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 8,
+			"frames": 16
+		},
+		"walk_turn": {
+			"fw": 384,
+			"fh": 384,
+			"ground": 368,
+			"scale": 8,
+			"cell": 2,
+			"cols": 2,
+			"frames": 2
+		}
+	}
+}

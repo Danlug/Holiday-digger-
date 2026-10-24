@@ -890,12 +890,24 @@ func _load_pose(id: String, pose: String, flip: bool) -> bool:
 	var atlas := AtlasTexture.new()
 	atlas.atlas = tex
 	var frame_w: float = tex.get_width() / float(frames)
-	atlas.region = Rect2(0, 0, frame_w, tex.get_height())
+	var frame_h: float = tex.get_height()
+	# Листы мальчика по эталону (раунд 4): 8 текселей на точку, кадры рядами.
+	var inf: Dictionary = HeroSheets.info_for(tex)
+	if not inf.is_empty():
+		frames = HeroSheets.frames_of(inf)
+		frame_w = float(inf["fw"])
+		frame_h = float(inf["fh"])
+		atlas.region = HeroSheets.region(inf, 0)
+	else:
+		atlas.region = Rect2(0, 0, frame_w, frame_h)
+	HeroSheets.crisp(node, inf)
 	node.texture = atlas
 	node.flip_h = flip
 	_actors[id].frames = frames
 	_actors[id].frame_w = frame_w
-	_actors[id].tex_h = tex.get_height()
+	_actors[id].tex_h = frame_h
+	_actors[id].inf = inf
+	_actors[id].art_scale = HeroSheets.scale_of(inf)
 	_actors[id].pose = pose
 	_actors[id].flip = flip
 	return true
@@ -926,7 +938,7 @@ func _show_actor(beat: Dictionary) -> void:
 	var prev_dy: float = float(_actors[id].get("dy", 0.0)) if _actors.has(id) else 0.0
 	_actors[id] = {
 		"node": node,
-		"frames": 1, "frame_w": 1.0, "tex_h": 1.0,
+		"frames": 1, "frame_w": 1.0, "tex_h": 1.0, "inf": {}, "art_scale": ART_SCALE,
 		"at": String(beat.get("at", "center")),
 		"scale": float(beat.get("scale", 2.0)),
 		"dy": prev_dy,
@@ -941,7 +953,7 @@ func _show_actor(beat: Dictionary) -> void:
 	var enter_from := String(beat.get("enter", ""))
 	if is_new and not enter_from.is_empty():
 		var a: Dictionary = _actors[id]
-		var w: float = a.frame_w * a.scale / ART_SCALE
+		var w: float = a.frame_w * a.scale / a.art_scale
 		var start_off: float = _fit_x(_stage_x(enter_from), w) - _fit_x(_stage_x(String(a.at)), w)
 		_actors[id].dx = start_off
 		_place_actor(id)
@@ -997,7 +1009,7 @@ func _hide_actor(beat: Dictionary) -> void:
 		_actors.erase(id)
 		return
 	var a: Dictionary = _actors[id]
-	var w: float = a.frame_w * a.scale / ART_SCALE
+	var w: float = a.frame_w * a.scale / a.art_scale
 	var to_off: float = _fit_x(_stage_x(exit_to), w) - _fit_x(_stage_x(String(a.at)), w)
 	var sec: float = maxf(0.05, float(beat.get("exit_sec", 0.6)))
 	# Пока уходит, тоже проигрываем позу ходьбы, если она есть (см. _show_actor:
@@ -1102,8 +1114,8 @@ func _place_actor(id: String) -> void:
 	# Лист на диске в ART_SCALE раз крупнее логики (см. CHAR_FRAME выше) —
 	# делим перед тем, как накладывать "scale" сцены, иначе актёр выходит
 	# втрое крупнее замысла постановщика и не помещается на сцене портрета.
-	var w: float = a.frame_w * s / ART_SCALE
-	var h: float = a.tex_h * s / ART_SCALE
+	var w: float = a.frame_w * s / a.art_scale
+	var h: float = a.tex_h * s / a.art_scale
 	node.size = Vector2(w, h)
 	# Актёр стоит НА земле: низ кадра совпадает с линией земли сцены, иначе
 	# фигура висит в воздухе, и сцена перестаёт читаться как место. dx —
@@ -1171,7 +1183,10 @@ func _tick_actor_frames() -> void:
 		var atlas: AtlasTexture = a.node.texture
 		if atlas == null:
 			continue
-		atlas.region = Rect2((frame_idx % a.frames) * a.frame_w, 0, a.frame_w, a.tex_h)
+		if not (a.inf as Dictionary).is_empty():
+			atlas.region = HeroSheets.region(a.inf, frame_idx % a.frames)
+		else:
+			atlas.region = Rect2((frame_idx % a.frames) * a.frame_w, 0, a.frame_w, a.tex_h)
 
 
 func _tick_moves(dt: float) -> void:

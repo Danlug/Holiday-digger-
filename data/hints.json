@@ -36,7 +36,7 @@
 	},
 
 	"menu_new": {
-		"entries": ["tech", "meta_rewards", "equipment", "journal"],
+		"entries": ["tech", "meta_rewards", "equipment"],
 		"note": "пункты меню «•••» с красным ярлыком «new», пока игрок не открыл их ни разу; новые подсистемы дописывают свой id сюда."
 	},
 
@@ -76,14 +76,6 @@
 			"target": ["menu:meta_rewards"],
 			"toast": {"icon": "meta:trophy", "text": "награды"},
 			"tip": ["Награды", "Задания, достижения и дорога трофеев."]
-		},
-		{
-			"id": "menu_journal",
-			"prio": 36,
-			"when": {"all": [{"fn": "menu_new", "entry": "journal"}, {"any": [{"fn": "event", "id": "mastery_star"}, {"fn": "event", "id": "chest_opened"}]}]},
-			"target": ["menu:journal"],
-			"toast": {"icon": "star", "text": "журнал"},
-			"tip": ["Журнал добытчика", "Звёзды мастерства за каждую руду и найденные тайники."]
 		},
 		{
 			"id": "daily_reward",

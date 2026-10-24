@@ -303,6 +303,20 @@ def _load_resource_modules():
 
 
 SPRITES.update(_load_resource_modules())
+
+
+def _load_override(mod_name, attr):
+    """Необязательные модули-переопределения: tools/ground_tiles.py (GROUND: земля и камень пояса 0)
+    и tools/walls_deep.py (WALLS: стены-фоны). Каждая запись — функция без аргументов, возвращающая
+    float RGB (96, 96, 3), бесшовную по обоим краям."""
+    import importlib
+    try:
+        m = importlib.import_module(mod_name)
+    except ModuleNotFoundError as e:
+        if e.name != mod_name:
+            raise
+        return {}
+    return dict(getattr(m, attr, {}))
 # все руды, у которых есть спрайт, собираются поверх грунта пояса (а не режутся из авторского листа)
 NEW_ORES = [n for n in ATLAS_NAMES if n in SPRITES]
 
@@ -657,6 +671,9 @@ def compose_sprite_on(bg, sprite_img, w_feather=None):
 
 def main():
     biomes = json.load(open(os.path.join(ROOT, "data", "world_layers.json"), encoding="utf-8"))["biomes"]["list"]
+    # перерисованная земля и камень пояса 0 пишутся в art/tiles ДО чтения (дальше всё как обычно: тон поясов, руды сверху)
+    for gname, gfn in _load_override("ground_tiles", "GROUND").items():
+        save_rgb(np.asarray(gfn(), dtype=np.float64), os.path.join(TILES, gname + ".png"))
     dirt = [load(os.path.join(TILES, f"dirt_{i}.png")) for i in range(1, 9)]
     ref_lab = np.mean([rgb2lab(d).reshape(-1, 3).mean(0) for d in dirt], axis=0)
     print("эталон грунта пояса 0 (Lab):", ref_lab.round(1))
@@ -754,7 +771,8 @@ def main():
     os.makedirs(ENV, exist_ok=True)
     for b in biomes:
         name = b["wall"]
-        wall = paint_wall(name)
+        wall_over = _load_override("walls_deep", "WALLS")
+        wall = np.asarray(wall_over[name](), dtype=np.float64) if name in wall_over else paint_wall(name)
         save_rgb(wall, os.path.join(ENV, f"wall_{name}.png"))
     print("стены-фоны:", ", ".join(b["wall"] for b in biomes))
 

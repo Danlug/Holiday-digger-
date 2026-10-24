@@ -423,9 +423,9 @@ def _owned_by_sprites():
     нарезка авторского листа их не трогает."""
     import importlib
     names = set()
-    for mod_name in ("ores_metals", "ores_gems"):
+    for mod_name, attr in (("ores_metals", "TILES"), ("ores_gems", "TILES"), ("ground_tiles", "GROUND")):
         try:
-            names |= set(getattr(importlib.import_module(mod_name), "TILES", {}))
+            names |= set(getattr(importlib.import_module(mod_name), attr, {}))
         except ModuleNotFoundError as e:
             if e.name != mod_name:
                 raise
@@ -464,7 +464,8 @@ def main(sheet_path):
         img, _, _ = prepare(flat[cell].copy(), "dirt", ref)
         for turn in DIRT_TURNS:
             out = img if turn == 0 else img.rotate(180)
-            out.save(os.path.join(ROOT, "art", "tiles", f"dirt_{n}.png"))
+            if f"dirt_{n}" not in _owned_by_sprites():
+                out.save(os.path.join(ROOT, "art", "tiles", f"dirt_{n}.png"))
             lab = mean_lab(out)
             spread.append(lab[0])
             print(f"  dirt_{n:<12} <- ячейка {cell[0]},{cell[1]}"

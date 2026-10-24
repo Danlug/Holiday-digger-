@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8x2t5jn0dbq4a"]
+
+[ext_resource type="Script" path="res://tests/test_debug_panel.gd" id="1_dbgpanel"]
+
+[node name="TestDebugPanel" type="Node"]
+script = ExtResource("1_dbgpanel")

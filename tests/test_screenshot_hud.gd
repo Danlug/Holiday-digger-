@@ -1,0 +1,182 @@
+extends Node
+## test_screenshot_hud — не автотест, а инструмент глаз: поднимает main.tscn и
+## снимает HUD в разных состояниях (база, меню «•••», настройки, рюкзак с
+## кучей предметов, низкое HP, длинные числа). Нужен настоящий рендер; окно
+## лучше брать вдвое крупнее, чтобы текст и иконки читались:
+##
+##   xvfb-run -a -s "-screen 0 1280x1024x24" godot --path . \
+##       res://tests/test_screenshot_hud.tscn --rendering-driver opengl3 \
+##       --resolution 448x960 -- /каталог [сцена ...]
+##
+## Первый аргумент после "--" — каталог, остальные — имена сцен (по умолчанию
+## все): base menu settings inventory drop lowhp bigmoney toasts.
+
+var _out_dir := "/tmp/hud_shots"
+var _only: Array[String] = []
+var _hud: Control
+var _main: Node2D
+
+
+func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	if args.size() > 0:
+		_out_dir = args[0]
+	for i in range(1, args.size()):
+		_only.append(args[i])
+	if not DirAccess.dir_exists_absolute(_out_dir):
+		DirAccess.make_dir_recursive_absolute(_out_dir)
+
+	StoryState.mark_seen("intro_grandpa")
+	StoryState.mark_seen("intro_boy")
+	var main: Node2D = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	await _frames(3)
+	_main = main
+	_hud = main.hud
+	# Полоски жизни режиссура прячет до сцены смерти. Запуск — с отдельным
+	# каталогом пользователя (XDG_DATA_HOME), поэтому флаг на диск безопасен.
+	StoryState.set_flag("bars_introduced")
+	Settings.reduce_motion = true   # снимки без «полёта» посреди твина
+	_hud.set_gauges_visible(true)
+	GameState.coins = 1250
+	GameState.dollars = 3
+	GameState.coins_changed.emit(GameState.coins)
+	GameState.dollars_changed.emit(GameState.dollars)
+	await _frames(3)
+
+	if _want("base"):
+		await _shot("base")
+
+	if _want("menu"):
+		_hud._toggle_more_menu()
+		await _frames(3)
+		await _shot("menu")
+		_hud.close_more_menu()
+		await _frames(2)
+
+	if _want("settings"):
+		_hud.open_settings()
+		await _frames(3)
+		await _shot("settings")
+		_hud.close_settings()
+		await _frames(2)
+
+	if _want("inventory") or _want("drop"):
+		GameState.inventory = {"gold": 5, "obsidian": 3, "iron_ore": 12, "diamond": 2,
+			"copper": 40, "coal": 7, "silver": 1, "uranium": 1, "energy_bar": 2}
+		GameState.inventory_changed.emit()
+		_hud.open_inventory()
+		await _frames(3)
+		if _want("inventory"):
+			await _shot("inventory")
+		if _want("inventory"):
+			_hud._inv_sheet._slot_buttons["energy_bar"].pressed.emit()
+			await _frames(2)
+			await _shot("inventory_sel")
+			_hud._inv_sheet._slot_buttons["energy_bar"].pressed.emit()
+		if _want("drop"):
+			_hud._open_drop("gold", 5)
+			await _frames(3)
+			await _shot("drop")
+			_hud._close_drop()
+		_hud.close_inventory()
+		await _frames(2)
+
+	if _want("lowhp"):
+		GameState.hp = 18.0
+		GameState.hp_changed.emit(GameState.hp, GameState.get_max_hp())
+		GameState.hunger = 20.0
+		GameState.hunger_changed.emit(GameState.hunger)
+		GameState.stamina = 60.0
+		GameState.stamina_changed.emit(GameState.stamina)
+		await _frames(30)
+		await _shot("lowhp")
+
+	if _want("bigmoney"):
+		GameState.coins = 123456789
+		GameState.dollars = 99999
+		GameState.coins_changed.emit(GameState.coins)
+		GameState.dollars_changed.emit(GameState.dollars)
+		await _frames(40)
+		await _shot("bigmoney")
+
+	if _want("toasts"):
+		_hud.toast("Готово.")
+		await _frames(3)
+		await _shot("toast_short")
+		_hud.toast("Это очень длинный тестовый текст тоста, специально составленный так, чтобы проверить перенос по словам и то, как панель тоста растягивается вверх, когда строка занимает много строк подряд и грозит вылезти за пределы видимой области экрана на портретном вьюпорте.")
+		await _frames(3)
+		await _shot("toast_long")
+		_hud.show_rare_find("diamond")
+		await _frames(3)
+		await _shot("toast_rare")
+		_hud._on_dig_blocked(TileTypes.Type.DIAMOND)
+		await _frames(3)
+		await _shot("toast_blocked")
+		_hud._on_fell(12.0, 9.0)
+		await _frames(3)
+		await _shot("toast_fall")
+		_hud._eat_from_inventory("energy_bar")
+		await _frames(3)
+		await _shot("toast_eat")
+
+	if _want("objective"):
+		_hud.set_objective("Накопай золота и продай его в мастерской — на кирку.")
+		await _frames(4)
+		await _shot("objective")
+		_hud.set_objective("")
+
+	if _want("well"):
+		_hud.show_well_report({"seconds": 5400.0, "items": {"iron_ore": 24, "copper": 11, "coal": 7, "silver": 3, "gold": 1}})
+		await _frames(3)
+		await _shot("well")
+		_hud.close_well_report()
+
+	if _want("strip"):
+		# Бурмобиль с топливом и надетый ранец: все значки в нижней полосе сразу.
+		if not GameState.owned_tools.has("drill_rig"):
+			GameState.owned_tools.append("drill_rig")
+		GameState.grant_gear("backpack")
+		GameState.inventory["fuel_block"] = 3
+		GameState.current_tool = "drill_rig"
+		GameState.tool_changed.emit("drill_rig")
+		GameState.gear_changed.emit(GameState.current_gear)
+		await _frames(4)
+		await _shot("strip")
+		_hud._show_tool_name()
+		await _frames(30)
+		await _shot("strip_tip")
+		GameState.current_tool = "shovel"
+		GameState.tool_changed.emit("shovel")
+		GameState.inventory.erase("fuel_block")
+
+	if _want("depth"):
+		_main.player.y = 24.5
+		await _frames(6)
+		await _shot("depth")
+
+	if _want("hold"):
+		_hud._set_mode("hold")
+		await _frames(3)
+		await _shot("mode_hold")
+		_hud._set_mode("arrows")
+		await _frames(3)
+		await _shot("mode_arrows")
+		_hud._set_mode("stick")
+
+	print("test_screenshot_hud: снимки -> " + _out_dir)
+	get_tree().quit(0)
+
+
+func _want(n: String) -> bool:
+	return _only.is_empty() or _only.has(n)
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await get_tree().process_frame
+
+
+func _shot(n: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(_out_dir.path_join(n + ".png"))

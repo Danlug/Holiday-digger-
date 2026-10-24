@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c3p1v0x1jgqy8"]
+
+[ext_resource type="Script" path="res://tests/test_dig_phases.gd" id="1_phases"]
+
+[node name="TestDigPhases" type="Node"]
+script = ExtResource("1_phases")

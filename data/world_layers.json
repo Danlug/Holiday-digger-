@@ -1,0 +1,674 @@
+{
+	"_comment": "Раскладка слоёв генерации мира. Формат читается world_gen.gd. Глубина (y) отсчитывается от 1 у поверхности вниз. Диапазоны инклюзивны с обеих сторон. Значения без явного роста в ГДД (нет стрелки X%→Y%) взяты как плоская вероятность = середина указанного в ГДД диапазона — это авторское допущение, не число из ГДД.",
+	"_comment_density": "Руды проверяются по порядку массива ores, клетка достаётся первой совпавшей, плюс часть клеток отсекается как пустоты. Массив отсортирован от редких к частым, чтобы редкие не вытеснялись. curve=parabola: до y_min руды нет; от y_min к peak_y плотность растёт по параболе до peak; глубже peak_y спадает с полушириной fall_width, но не ниже tail — руды не заканчиваются.",
+	"world_width": 32,
+	"house_x_max": 14,
+	"garden_x_min": 15,
+	"max_depth": 10000,
+	"foundation_y": 5,
+	"staircase": {
+		"_comment": "Нерушимая лестница слева у дома: 1 клетка на ур.1, 2 на ур.2, 3 на ур.3, 4 на ур.4 — ступенчатый треугольник от края огорода (x=15) вправо. Точная геометрия не описана в ГДД дословно, взята как наиболее естественное прочтение раздела 3. ВНИМАНИЕ: лестница живёт только ДО сцены с Робертом. После неё (WorldGen.build_robert_tunnel) лестницы в мире нет вообще — её место занимает тоннель, см. robert_tunnel ниже.",
+		"x_start": 15,
+		"y_max": 4
+	},
+	"robert_tunnel": {
+		"_comment": "СПРАВОЧНО, генератор эти числа НЕ читает. Геометрия тоннеля Роберта задана константами WorldGen.TUNNEL_X / TUNNEL_WALL_LEFT / TUNNEL_WALL_RIGHT / TUNNEL_DEPTH, потому что на них завязана система дома (она зовёт build_robert_tunnel и ставит героя в устье): разъехавшись с данными, код пустил бы игрока в шахту мимо тоннеля. Дословный заказ владельца: после огорода Роберт вместо лестницы делает тоннель вниз глубиной 4 клетки — x=17 пусто, x=16 и x=18 некопаемый железобетон (TileTypes.REINFORCED, не берётся ни лопатой, ни киркой, никогда). Весь остальной огород на уровнях 1..4 после этого не копается вообще, верхний грунт (y=0) неприкасаем всегда. Клетка (17, foundation_y) пробивается при постройке, под ней расчищается приямок на 2 уровня — иначе тоннель упирается в целый фундамент и становится тупиком-колодцем.",
+		"x": 17,
+		"wall_left": 16,
+		"wall_right": 18,
+		"depth": 4,
+		"landing_height": 2
+	},
+	"peat_seam": {
+		"_comment": "Сплошной торфяной пласт, раздел 4. После сброса не восстанавливается (см. collapse.gd) — недокопанный торф остаётся, докопанный не возвращается.",
+		"y_min": 450,
+		"y_max": 455
+	},
+	"scripted_diamond": {
+		"_comment": "Сценарная клетка алмаза на глубине 80 (раздел 4 ГДД). Окружена камнем со всех четырёх сторон: сверху, снизу, слева и справа. x подобран произвольно в пределах огорода.",
+		"x": 20,
+		"y": 80,
+		"guard_offsets": [
+			[
+				-1,
+				0
+			],
+			[
+				1,
+				0
+			],
+			[
+				0,
+				1
+			],
+			[
+				0,
+				-1
+			]
+		]
+	},
+	"scripted_loot": {
+		"_comment": "Пять клеток золота на ЧЕТВЁРТОМ уровне огорода — «5 тайлов золота, лопатой не берутся» из ГДД п.9. Автокопка проходит все четыре уровня и обходит их стороной (берёт только то, что берётся лопатой), а выбрать их игрока заставляет сюжет уже киркой деда, до пробития фундамента. Никакой другой сценарной добычи в огороде нет: до фундамента в игре нет ни жизни, ни голода, ни энергии, ни мастерской, и продавать пока некому. x правее лестницы (на 4 уровне она занимает 15-18). Клетки зафиксированы, как лестница и сценарный алмаз: обвал их не трогает, пока не выкопаны, и не возвращает после.",
+		"cells": [
+			{
+				"x": 20,
+				"y": 4,
+				"tile": "GOLD_ORE"
+			},
+			{
+				"x": 23,
+				"y": 4,
+				"tile": "GOLD_ORE"
+			},
+			{
+				"x": 26,
+				"y": 4,
+				"tile": "GOLD_ORE"
+			},
+			{
+				"x": 29,
+				"y": 4,
+				"tile": "GOLD_ORE"
+			},
+			{
+				"x": 31,
+				"y": 4,
+				"tile": "GOLD_ORE"
+			}
+		]
+	},
+	"shallow_layers": [
+		{
+			"_comment": "Первые четыре уровня огорода — БЕЗ КАМНЯ. Это обучающая песочница: жизни, голода, энергии и мастерской в игре ещё нет, а лопата о камень даёт минуту стана (ГДД п.5). Камень здесь — наказание за незнание на первой минуте игры, причём наказание, которое ничему не учит: кирки ещё нет и взяться ей неоткуда. Плюс автокопка камень не берёт и оставляла бы его торчать посреди расчищенной земли — ровно на пути игрока к фундаменту. Камень начинается ниже фундамента, где уже есть кирка деда.",
+			"y_min": 1,
+			"y_max": 4,
+			"stone_chance": 0.0
+		}
+	],
+	"deep": {
+		"_comment": "Слои 5+ (ниже фундамента). Пустоты 10%. Камень проверяется ПОСЛЕ руд, поэтому его вероятность броска (0.14) выше целевой доли: руды занимают до 54% породы и вытесняют его примерно вдвое, на выходе получается заявленные ГДД 5-10%.",
+		"y_min": 6,
+		"void_chance": 0.1,
+		"stone_chance": 0.14
+	},
+	"_ores_comment": "Глубины и профили руд синхронизированы с data/minerals.json — один источник правды, чтобы экономика и генерация не расходились. Значения, не заданные владельцем, помечены proposed там же. curve=ramp — линейный рост density_start->density_end к ramp_end_y (торф). curve=parabola — рост к пику и вечный хвост. rise=zero — подъём к пику начинается с нуля на y_min (без ступеньки); без него до пика плотность не ниже tail (старое поведение для железа/свинца/серебра/золота/алюминия/алмаза — не трогаем, их кривые утверждены ранее). Расчёт слоёв глубинных руд — docs/GDD.md §4.1, замер — tools/world_economy.gd.",
+	"ores": [
+		{
+			"id": "divine_heart",
+			"tile": "DIVINE_HEART",
+			"curve": "parabola",
+			"y_min": 5800,
+			"peak_y": 6400,
+			"peak": 0.0095,
+			"fall_width": 2000,
+			"tail": 0.00712
+		},
+		{
+			"id": "angelstone",
+			"tile": "ANGEL_STONE",
+			"curve": "parabola",
+			"y_min": 5200,
+			"peak_y": 6000,
+			"peak": 0.0152,
+			"fall_width": 2000,
+			"tail": 0.0114
+		},
+		{
+			"id": "universum",
+			"tile": "UNIVERSALIUM",
+			"curve": "parabola",
+			"y_min": 4700,
+			"peak_y": 5600,
+			"peak": 0.019,
+			"fall_width": 2000,
+			"tail": 0.01425
+		},
+		{
+			"id": "diamond",
+			"tile": "DIAMOND",
+			"curve": "parabola",
+			"y_min": 200,
+			"peak_y": 900,
+			"peak": 0.015,
+			"fall_width": 1800,
+			"tail": 0.00375
+		},
+		{
+			"id": "dark_matter",
+			"tile": "DARK_MATTER",
+			"curve": "parabola",
+			"y_min": 4300,
+			"peak_y": 5200,
+			"peak": 0.0285,
+			"fall_width": 2000,
+			"tail": 0.02138
+		},
+		{
+			"id": "ruby",
+			"tile": "RUBY",
+			"curve": "parabola",
+			"y_min": 2000,
+			"peak_y": 3000,
+			"peak": 0.0342,
+			"fall_width": 1800,
+			"tail": 0.02565,
+			"rise": "zero"
+		},
+		{
+			"id": "emerald",
+			"tile": "EMERALD",
+			"curve": "parabola",
+			"y_min": 2000,
+			"peak_y": 3000,
+			"peak": 0.0342,
+			"fall_width": 1800,
+			"tail": 0.02565,
+			"rise": "zero"
+		},
+		{
+			"id": "platinum",
+			"tile": "PLATINUM_ORE",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 1800,
+			"peak": 0.038,
+			"fall_width": 1600,
+			"tail": 0.0285,
+			"rise": "zero"
+		},
+		{
+			"id": "geocrystal",
+			"tile": "GEOCRYSTAL",
+			"curve": "parabola",
+			"y_min": 3000,
+			"peak_y": 3800,
+			"peak": 0.038,
+			"fall_width": 2000,
+			"tail": 0.0285,
+			"rise": "zero"
+		},
+		{
+			"id": "ancient_metal",
+			"tile": "ANCIENT_METAL",
+			"curve": "parabola",
+			"y_min": 3000,
+			"peak_y": 4000,
+			"peak": 0.032,
+			"fall_width": 2000,
+			"tail": 0.024,
+			"rise": "zero"
+		},
+		{
+			"id": "mercury",
+			"tile": "MERCURY_ORE",
+			"curve": "parabola",
+			"y_min": 800,
+			"peak_y": 1600,
+			"peak": 0.0475,
+			"fall_width": 1500,
+			"tail": 0.03563,
+			"rise": "zero"
+		},
+		{
+			"id": "uranium",
+			"tile": "URANIUM_ORE",
+			"curve": "parabola",
+			"y_min": 1500,
+			"peak_y": 2600,
+			"peak": 0.021,
+			"fall_width": 1800,
+			"tail": 0.0158,
+			"rise": "zero"
+		},
+		{
+			"id": "silver",
+			"tile": "SILVER_ORE",
+			"curve": "parabola",
+			"y_min": 50,
+			"peak_y": 160,
+			"peak": 0.027999999999999997,
+			"fall_width": 700,
+			"tail": 0.007
+		},
+		{
+			"id": "obsidian",
+			"tile": "OBSIDIAN",
+			"curve": "parabola",
+			"y_min": 3000,
+			"peak_y": 4200,
+			"peak": 0.026,
+			"fall_width": 2000,
+			"tail": 0.0195,
+			"rise": "zero"
+		},
+		{
+			"id": "hellstone",
+			"tile": "HELLSTONE",
+			"curve": "parabola",
+			"y_min": 4000,
+			"peak_y": 4800,
+			"peak": 0.057,
+			"fall_width": 2000,
+			"tail": 0.04275
+		},
+		{
+			"id": "lead",
+			"tile": "LEAD_ORE",
+			"curve": "parabola",
+			"y_min": 20,
+			"peak_y": 120,
+			"peak": 0.035,
+			"fall_width": 600,
+			"tail": 0.00875
+		},
+		{
+			"id": "titanium",
+			"tile": "TITANIUM_ORE",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 1900,
+			"peak": 0.0665,
+			"fall_width": 1600,
+			"tail": 0.04988,
+			"rise": "zero"
+		},
+		{
+			"id": "lithium",
+			"tile": "LITHIUM_ORE",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 2000,
+			"peak": 0.0665,
+			"fall_width": 1600,
+			"tail": 0.04988,
+			"rise": "zero"
+		},
+		{
+			"id": "nickel",
+			"tile": "NICKEL_ORE",
+			"curve": "parabola",
+			"y_min": 500,
+			"peak_y": 1200,
+			"peak": 0.076,
+			"fall_width": 1500,
+			"tail": 0.057,
+			"rise": "zero"
+		},
+		{
+			"id": "copper",
+			"tile": "COPPER_ORE",
+			"curve": "parabola",
+			"y_min": 100,
+			"peak_y": 320,
+			"peak": 0.05,
+			"fall_width": 900,
+			"tail": 0.0125,
+			"rise": "zero"
+		},
+		{
+			"id": "aluminium",
+			"tile": "ALUMINIUM_ORE",
+			"curve": "parabola",
+			"y_min": 150,
+			"peak_y": 500,
+			"peak": 0.06,
+			"fall_width": 1000,
+			"tail": 0.015
+		},
+		{
+			"id": "iron_ore",
+			"tile": "IRON_ORE",
+			"curve": "parabola",
+			"y_min": 5,
+			"peak_y": 100,
+			"peak": 0.08,
+			"fall_width": 600,
+			"tail": 0.02
+		},
+		{
+			"id": "gold",
+			"tile": "GOLD_ORE",
+			"curve": "parabola",
+			"y_min": 100,
+			"peak_y": 500,
+			"peak": 0.1,
+			"fall_width": 1200,
+			"tail": 0.025
+		},
+		{
+			"id": "peat",
+			"tile": "PEAT",
+			"curve": "ramp",
+			"y_min": 60,
+			"y_max": 1000,
+			"density_start": 0.05,
+			"density_end": 0.2,
+			"ramp_end_y": 450
+		},
+		{
+			"id": "coal",
+			"tile": "COAL",
+			"curve": "parabola",
+			"y_min": 1000,
+			"peak_y": 1300,
+			"peak": 0.38,
+			"fall_width": 1500,
+			"tail": 0.285
+		},
+		{
+			"id": "scrap",
+			"tile": "SCRAP_METAL",
+			"y_min": 1,
+			"y_max": 500,
+			"density": 0.02
+		}
+	],
+	"biomes": {
+		"_comment": "Пояса глубины (docs/GDD.md §4.2). Каждый ~1000-1500 клеток; границы совпадают с рубежами ГДД (1000 уголь/ртуть, 2000 самоцветы, 3000 лава и геокристалл, 4000 жанровый поворот). Внутри пояса земля ОДНОЙ светлоты (ГДД §15.1), от пояса к поясу меняется оттенок. transition — ширина зоны вокруг границы, где тайлы двух поясов перемешиваются по хешу клетки (ровной линии нет). soil — цель в Lab (L,a,b) для tools/gen_tiles_deep.py; ambient/wall читают scripts/world/ambient_fx.gd и deep_backdrop.gd.",
+		"transition": 70,
+		"list": [
+			{
+				"id": "roots",
+				"name_ru": "Корни",
+				"y_from": 1,
+				"y_to": 999,
+				"soil": [
+					28.6,
+					6.8,
+					13.6
+				],
+				"aura_relief": "EAC598",
+				"aura_res": "E0A93B",
+				"gray_solid": "2C241B",
+				"gray_empty": "100D0A",
+				"ambient": "dust_drip",
+				"wall": "roots"
+			},
+			{
+				"id": "caves",
+				"name_ru": "Пещеры",
+				"y_from": 1000,
+				"y_to": 1999,
+				"soil": [
+					27.0,
+					0.5,
+					6.5
+				],
+				"aura_relief": "A9D6C0",
+				"aura_res": "C6E04A",
+				"gray_solid": "20261F",
+				"gray_empty": "0C100E",
+				"ambient": "drip_firefly",
+				"wall": "caves"
+			},
+			{
+				"id": "crystal",
+				"name_ru": "Кристаллы",
+				"y_from": 2000,
+				"y_to": 2999,
+				"soil": [
+					26.0,
+					8.0,
+					-9.0
+				],
+				"aura_relief": "C9A8F0",
+				"aura_res": "6FE0D8",
+				"gray_solid": "261D33",
+				"gray_empty": "0E0A14",
+				"ambient": "glint",
+				"wall": "crystal"
+			},
+			{
+				"id": "magma_upper",
+				"name_ru": "Недра",
+				"y_from": 3000,
+				"y_to": 3999,
+				"soil": [
+					23.0,
+					13.0,
+					8.0
+				],
+				"aura_relief": "F0B488",
+				"aura_res": "FF8A3C",
+				"gray_solid": "2E1D18",
+				"gray_empty": "120A08",
+				"ambient": "ember_dust",
+				"wall": "bedrock"
+			},
+			{
+				"id": "ruins",
+				"name_ru": "Руины",
+				"y_from": 4000,
+				"y_to": 5499,
+				"soil": [
+					31.0,
+					3.0,
+					17.0
+				],
+				"aura_relief": "F0DCA0",
+				"aura_res": "E8B32E",
+				"gray_solid": "2E281C",
+				"gray_empty": "100D09",
+				"ambient": "dust_fall",
+				"wall": "ruins"
+			},
+			{
+				"id": "hell",
+				"name_ru": "Преисподняя",
+				"y_from": 5500,
+				"y_to": 6999,
+				"soil": [
+					18.0,
+					16.0,
+					6.0
+				],
+				"aura_relief": "FF7A5A",
+				"aura_res": "FFB347",
+				"gray_solid": "2A1414",
+				"gray_empty": "0F0606",
+				"ambient": "ember",
+				"wall": "hell"
+			},
+			{
+				"id": "void",
+				"name_ru": "Пустота",
+				"y_from": 7000,
+				"y_to": 8499,
+				"soil": [
+					15.0,
+					2.0,
+					-14.0
+				],
+				"aura_relief": "8FA8FF",
+				"aura_res": "D2C2EE",
+				"gray_solid": "161A2E",
+				"gray_empty": "07080F",
+				"ambient": "wisp",
+				"wall": "void"
+			},
+			{
+				"id": "heaven",
+				"name_ru": "Небесное ядро",
+				"y_from": 8500,
+				"y_to": 10000,
+				"soil": [
+					31.0,
+					5.0,
+					-4.0
+				],
+				"aura_relief": "FFF4C2",
+				"aura_res": "FFE066",
+				"gray_solid": "2B2838",
+				"gray_empty": "0F0E16",
+				"ambient": "gold_mote",
+				"wall": "heaven"
+			}
+		]
+	},
+	"formations": {
+		"_comment": "Особые образования (ГДД §4.3): каверны, провалы, кристаллические гроты, руины глубже 4000, жилы. Мир режется на слоты по slot_h рядов; в слоте — не больше одного образования, целиком внутри слота (проверка клетки — один поиск в кэше слотов). Есть оно с шансом slot_chance, вид — по весам weight среди подходящих по глубине. Геометрия зависит только от сида (каверны и стены руин переживают обвалы и землетрясения), добыча внутри — ещё и от соли события: после сброса клад выпадает заново, как руда. В сохранение идут только диффы раскопок. Все числа — предложение (proposed).",
+		"proposed": true,
+		"slot_h": 36,
+		"slot_chance": 0.8,
+		"kinds": {
+			"cavern": {
+				"y_min": 700,
+				"weight": 0.34,
+				"rx": [
+					3,
+					7
+				],
+				"ry": [
+					2,
+					4
+				],
+				"treasure_chance": 0.28,
+				"rim_ore_chance": 0.22
+			},
+			"pit": {
+				"y_min": 800,
+				"weight": 0.12,
+				"w": [
+					2,
+					3
+				],
+				"h": [
+					6,
+					12
+				]
+			},
+			"grotto": {
+				"y_min": 2000,
+				"y_max": 3400,
+				"weight": 0.45,
+				"rx": [
+					4,
+					8
+				],
+				"ry": [
+					3,
+					5
+				],
+				"rim_gem_chance": 0.3
+			},
+			"ruin": {
+				"y_min": 4000,
+				"ramp": 400,
+				"weight": 0.9,
+				"w": [
+					9,
+					15
+				],
+				"h": [
+					6,
+					9
+				],
+				"decay": 0.12
+			},
+			"vein": {
+				"y_min": 150,
+				"weight": 0.55,
+				"len": [
+					8,
+					18
+				],
+				"thick": [
+					2,
+					3
+				],
+				"fill": 0.88
+			}
+		},
+		"vein_exclude": [
+			"coal",
+			"peat",
+			"scrap"
+		],
+		"treasure": [
+			{
+				"tile": "GOLD_ORE",
+				"y_min": 700,
+				"w": 3.0
+			},
+			{
+				"tile": "DIAMOND",
+				"y_min": 700,
+				"w": 2.0
+			},
+			{
+				"tile": "PLATINUM_ORE",
+				"y_min": 1000,
+				"w": 2.0
+			},
+			{
+				"tile": "URANIUM_ORE",
+				"y_min": 1500,
+				"w": 0.6
+			},
+			{
+				"tile": "RUBY",
+				"y_min": 2000,
+				"w": 2.0
+			},
+			{
+				"tile": "EMERALD",
+				"y_min": 2000,
+				"w": 2.0
+			},
+			{
+				"tile": "GEOCRYSTAL",
+				"y_min": 3000,
+				"w": 1.5
+			}
+		],
+		"gems": [
+			{
+				"tile": "DIAMOND",
+				"y_min": 2000,
+				"w": 1.0
+			},
+			{
+				"tile": "RUBY",
+				"y_min": 2000,
+				"w": 2.0
+			},
+			{
+				"tile": "EMERALD",
+				"y_min": 2000,
+				"w": 2.0
+			}
+		],
+		"ruin_loot": [
+			{
+				"tile": "ANCIENT_METAL",
+				"y_min": 4000,
+				"w": 3.0
+			},
+			{
+				"tile": "GEOCRYSTAL",
+				"y_min": 4000,
+				"w": 1.0
+			},
+			{
+				"tile": "OBSIDIAN",
+				"y_min": 4000,
+				"w": 1.5
+			},
+			{
+				"tile": "HELLSTONE",
+				"y_min": 4000,
+				"w": 2.0
+			},
+			{
+				"tile": "DARK_MATTER",
+				"y_min": 4300,
+				"w": 1.0
+			},
+			{
+				"tile": "UNIVERSALIUM",
+				"y_min": 4700,
+				"w": 0.6
+			}
+		]
+	}
+}

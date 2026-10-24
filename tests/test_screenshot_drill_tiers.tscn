@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dqx8mfhg6b3ks"]
+
+[ext_resource type="Script" path="res://tests/test_screenshot_drill_tiers.gd" id="1_shot"]
+
+[node name="TestScreenshotDrillTiers" type="Node"]
+script = ExtResource("1_shot")

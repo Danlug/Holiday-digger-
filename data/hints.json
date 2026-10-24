@@ -1,0 +1,254 @@
+{
+	"version": 1,
+	"_legend": "Правила контекстных подсказок («знакомство с системами», ГДД: «Знакомство с системами»). Одно правило = условие (when) -> цель на экране (target) -> сигнал (кольцо, палец или стрелка, значок-тост). Описание — только в подсказке Tip (tip: [заголовок, текст]); на экране — 1–3 слова в toast. Показ один раз на игрока (GameState.ext[\"hints\"]). Все числа в этом файле придуманы агентом и ждут утверждения владельца: поле {value, proposed:true, note} разворачивает Balance.unwrap. Подсказки включаются только после онбординга (флаг сюжета food_ordered, ГДД п.9) и молчат во время катсцены, шторки, диалога и боя.\n\nФормат условия: {\"fn\": имя, ...параметры} или {\"all\": [...]} / {\"any\": [...]} / {\"not\": условие}. Имена и параметры — scripts/hints/hint_conditions.gd. Цель: строка или список строк (берётся первая, что нашлась и видна): hud:<hero|backpack|menu|tool|gear|load|hp|hunger|stamina|coins|dollars>, menu:<id пункта меню •••>, tech_hud:<fuel|heat>, world:<station|well|grave>, group:<имя группы>, attached:<id из HintPulse.attach(control, id)>. done — дополнительное условие «игрок уже сделал» (нажатие по цели и пропажа условия when снимают подсказку сами).",
+
+	"timing": {
+		"poll": {
+			"value": 0.25,
+			"proposed": true,
+			"note": "как часто движок проверяет условия, секунд; быстрее незачем, подсказка — не реакция на кадр."
+		},
+		"first_delay": {
+			"value": 4.0,
+			"proposed": true,
+			"note": "пауза после окончания онбординга (и после закрытия шторки/катсцены) до первой подсказки: игроку надо перевести дух."
+		},
+		"gap": {
+			"value": 8.0,
+			"proposed": true,
+			"note": "пауза между двумя подсказками: не больше одной за раз и не подряд, иначе экран превращается в туториал."
+		},
+		"hold": {
+			"value": 1.2,
+			"proposed": true,
+			"note": "условие должно продержаться столько секунд, прежде чем подсказка покажется (не показывать на мелькнувшем состоянии)."
+		},
+		"ttl": {
+			"value": 16.0,
+			"proposed": true,
+			"note": "сколько секунд висит подсказка, если игрок её не заметил; время не идёт, пока открыта шторка или играет сцена."
+		},
+		"lost_after": {
+			"value": 2.0,
+			"proposed": true,
+			"note": "цель пропала с экрана (мир уехал, меню закрыли) — через столько секунд подсказка снимается."
+		}
+	},
+
+	"menu_new": {
+		"entries": ["tech", "meta_rewards", "equipment"],
+		"note": "пункты меню «•••» с красным ярлыком «new», пока игрок не открыл их ни разу; новые подсистемы дописывают свой id сюда."
+	},
+
+	"rules": [
+		{
+			"id": "skill_points",
+			"prio": 80,
+			"when": {"fn": "skill_points", "min": 1},
+			"target": ["hud:hero"],
+			"done": {"fn": "screen_open", "name": "progress"},
+			"toast": {"icon": "ui:plus", "text": "очки"},
+			"tip": ["Очки навыков", "Герой — дерево навыков: потрать очки, и копка пойдёт быстрее."],
+			"sfx": "reward"
+		},
+		{
+			"id": "first_artifact",
+			"prio": 70,
+			"when": {"fn": "artifacts", "min": 1},
+			"target": ["hud:hero"],
+			"done": {"fn": "screen_open", "name": "progress"},
+			"toast": {"icon": "meta:vase", "text": "находка"},
+			"tip": ["Первая находка", "Артефакты лежат в музее: Герой, вкладка «Музей». Собери ветку — получишь награду."],
+			"sfx": "reward"
+		},
+		{
+			"id": "menu_tech",
+			"prio": 40,
+			"when": {"fn": "menu_new", "entry": "tech"},
+			"target": ["menu:tech"],
+			"toast": {"icon": "tech:icon_tech", "text": "техника"},
+			"tip": ["Техника", "Топливный бак, костюм от жары и буровая скважина."]
+		},
+		{
+			"id": "menu_rewards",
+			"prio": 38,
+			"when": {"fn": "menu_new", "entry": "meta_rewards"},
+			"target": ["menu:meta_rewards"],
+			"toast": {"icon": "meta:trophy", "text": "награды"},
+			"tip": ["Награды", "Задания, достижения и дорога трофеев."]
+		},
+		{
+			"id": "daily_reward",
+			"prio": 60,
+			"hold": {"value": 3.0, "proposed": true, "note": "ежедневное окно открывается само после «спокойного момента»; если игрок его закрыл, подсказка показывает, где забрать."},
+			"when": {"fn": "daily_ready"},
+			"target": ["menu:meta_daily"],
+			"toast": {"icon": "meta:gift", "text": "подарок"},
+			"tip": ["Ежедневный подарок", "Заходи каждый день: серия растёт, награда тоже."],
+			"sfx": "reward"
+		},
+		{
+			"id": "quest_ready",
+			"prio": 55,
+			"when": {"fn": "quest_claimable", "min": 1},
+			"target": ["menu:meta_rewards"],
+			"toast": {"icon": "meta:check", "text": "готово"},
+			"tip": ["Задание выполнено", "Забери награду: Награды, вкладка «Задания»."],
+			"sfx": "reward"
+		},
+		{
+			"id": "achievement_new",
+			"prio": 50,
+			"when": {"fn": "achievement_unseen"},
+			"target": ["menu:meta_rewards"],
+			"toast": {"icon": "meta:medal", "text": "достижение"},
+			"tip": ["Новое достижение", "Награды, вкладка «Достижения»: что получено и что осталось."],
+			"sfx": "reward"
+		},
+		{
+			"id": "station_new",
+			"prio": 65,
+			"when": {"all": [{"fn": "station_ready"}, {"fn": "on_surface"}]},
+			"target": ["world:station"],
+			"done": {"fn": "near_world", "target": "station"},
+			"toast": {"icon": "tech:icon_tank", "text": "заправка"},
+			"tip": ["Станция заправки", "Подойди: здесь торф и уголь перегоняются в топливные блоки и заливаются в бак бура."],
+			"sfx": "reward"
+		},
+		{
+			"id": "tank_empty",
+			"prio": 90,
+			"when": {"fn": "tank_empty"},
+			"target": ["tech_hud:fuel", "world:station"],
+			"toast": {"icon": "tech:icon_flame", "text": "бак пуст"},
+			"tip": ["Бак пуст", "Нажми на значок топлива, чтобы залить блоки из рюкзака. Блоков нет — копай киркой, а торф перегони в блоки на станции в огороде."],
+			"sfx": "warn_low"
+		},
+		{
+			"id": "refine_ready",
+			"prio": 70,
+			"when": {"all": [{"fn": "refine_ready"}, {"fn": "on_surface"}]},
+			"target": ["world:station"],
+			"done": {"fn": "screen_open", "name": "tech"},
+			"toast": {"icon": "tech:icon_refine", "text": "перегонка"},
+			"tip": ["Перегонка", "Топливных блоков нет, а торфа хватает: перегони его на станции в огороде."],
+			"sfx": "reward"
+		},
+		{
+			"id": "heat_over",
+			"prio": 75,
+			"when": {"fn": "heat_over"},
+			"target": ["tech_hud:heat", "hud:stamina"],
+			"done": {"fn": "screen_open", "name": "tech"},
+			"toast": {"icon": "tech:icon_thermo_2", "text": "жарко"},
+			"tip": ["Жара", "Глубже стойкости костюма бодрость тает быстрее. Костюм собирается в «Технике»."],
+			"sfx": "warn_low"
+		},
+		{
+			"id": "well_ready",
+			"prio": 70,
+			"when": {"fn": "well_ready", "frac": {"value": 1.0, "proposed": true, "note": "то же, что красная метка на пункте «Техника»: скважина накопила полный отчёт."}},
+			"target": ["menu:tech"],
+			"done": {"fn": "screen_open", "name": "tech"},
+			"toast": {"icon": "tech:icon_well", "text": "добыча"},
+			"tip": ["Скважина накопила добычу", "Открой «Технику», вкладка «Скважина»: забрать монеты."],
+			"sfx": "reward"
+		},
+		{
+			"id": "grave_news",
+			"prio": 75,
+			"when": {"fn": "grave_news"},
+			"target": ["world:grave"],
+			"done": {"fn": "near_world", "target": "grave"},
+			"toast": {"icon": "story:icon_flower", "text": "дед"},
+			"tip": ["Могила деда", "Загляни к деду во дворе: рядом с могилой он оставил тетрадь."]
+		},
+		{
+			"id": "diary_unread",
+			"prio": 45,
+			"when": {"fn": "diary_unread"},
+			"target": ["world:grave"],
+			"done": {"fn": "screen_open", "name": "diary"},
+			"toast": {"icon": "story:icon_diary", "text": "дневник"},
+			"tip": ["Новая страница", "В дневнике деда появилась запись. Подойди к могиле и открой тетрадь."]
+		},
+		{
+			"id": "load_high",
+			"prio": 35,
+			"when": {"fn": "load_high", "frac": {"value": 0.9, "proposed": true, "note": "доля грузоподъёмности: выше жёлтая полоска краснеет, герой замедляется."}},
+			"target": ["hud:load"],
+			"toast": {"icon": "ui:weight", "text": "тяжело"},
+			"tip": ["Тяжёлый рюкзак", "Чем больше вес, тем медленнее подъём. Поднимись и продай добычу в мастерской."]
+		},
+		{
+			"id": "sell_ready",
+			"prio": 30,
+			"when": {"all": [{"fn": "sellable", "coins": {"value": 150, "proposed": true, "note": "порог суммы добычи в рюкзаке, при которой стоит напомнить про мастерскую."}}, {"fn": "on_surface", "max": {"value": 3, "proposed": true, "note": "не ниже третьей клетки: подсказка про мастерскую уместна рядом с домом."}}]},
+			"target": ["menu:workshop"],
+			"toast": {"icon": "ui:workshop", "text": "продай"},
+			"tip": ["Мастерская", "Продай добычу: деньги нужны на кирки, ранцы и технику."]
+		},
+		{
+			"id": "craft_ready",
+			"prio": 32,
+			"when": {"fn": "craft_ready"},
+			"target": ["menu:workshop"],
+			"toast": {"icon": "ui:workshop", "text": "верстак"},
+			"tip": ["Можно собрать", "Материалов хватает на новую технику: верстак в подвале мастерской."],
+			"sfx": "reward"
+		},
+		{
+			"id": "shop_afford",
+			"prio": 28,
+			"when": {"fn": "tool_affordable"},
+			"target": ["menu:workshop"],
+			"toast": {"icon": "ui:shop", "text": "апгрейд"},
+			"tip": ["Новая кирка по карману", "Магазин у входной двери: кирка получше копает быстрее."]
+		},
+		{
+			"id": "hungry_food",
+			"prio": 60,
+			"when": {"fn": "hungry_food", "pct": {"value": 35, "proposed": true, "note": "сытость в процентах, ниже которой напоминаем про еду в рюкзаке."}},
+			"target": ["hud:backpack"],
+			"done": {"fn": "screen_open", "name": "backpack"},
+			"toast": {"icon": "ui:eat", "text": "голод"},
+			"tip": ["Проголодался", "Открой рюкзак и тапни по еде: сытость вернётся."]
+		},
+		{
+			"id": "menu_equipment",
+			"prio": 44,
+			"when": {"fn": "menu_new", "entry": "equipment"},
+			"target": ["menu:equipment"],
+			"toast": {"icon": "gear:ui_equip", "text": "броня"},
+			"tip": ["Снаряжение", "Броня, оружие и ковка из глубинных материалов: глубже четырёх тысяч метров водятся монстры."],
+			"sfx": "reward"
+		},
+		{
+			"id": "combat_forge",
+			"prio": 46,
+			"when": {"fn": "combat_craftable"},
+			"target": ["menu:equipment"],
+			"toast": {"icon": "gear:ui_equip", "text": "ковка"},
+			"tip": ["Можно сковать", "Материалов хватает на новое снаряжение: верстак в мастерской, вкладки экрана «Снаряжение»."],
+			"sfx": "reward"
+		},
+		{
+			"id": "combat_wear",
+			"prio": 48,
+			"when": {"fn": "combat_unworn"},
+			"target": ["menu:equipment"],
+			"done": {"fn": "screen_open", "name": "equipment"},
+			"toast": {"icon": "gear:ui_equip", "text": "надень"},
+			"tip": ["Есть лучше надетого", "В экране «Снаряжение» тапни по предмету, чтобы надеть: броня снижает урон монстров."]
+		},
+		{
+			"id": "gear_new",
+			"prio": 42,
+			"when": {"fn": "has_gear"},
+			"target": ["hud:gear", "hud:tool"],
+			"toast": {"icon": "ui:arrow_up", "text": "ранец"},
+			"tip": ["Ранец", "Держи «вверх» — полетишь. Надетое снаряжение меняется на верстаке в мастерской."],
+			"sfx": "reward"
+		}
+	]
+}

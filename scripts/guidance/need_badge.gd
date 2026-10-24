@@ -5,7 +5,7 @@ extends Control
 ## ободок янтарный и значок мерно «дышит» (мягкое предупреждение, без запрета).
 ## Сам ввод не ловит — подсказку Tip держит плитка.
 
-const SIZE := 16.0
+const SIZE := 18.0
 const COL_BG := Color(0.07, 0.055, 0.045, 0.94)
 const COL_RIM := Color8(0xE0, 0xA9, 0x3B)
 const COL_WARN := Color8(0xFF, 0x9A, 0x2E)
@@ -46,5 +46,5 @@ func _draw() -> void:
 	draw_circle(c, r, COL_WARN if warn else COL_RIM)
 	draw_circle(c, r - 1.5, COL_BG)
 	if texture != null:
-		var isz := Vector2(11, 11) * k
+		var isz := Vector2(13, 13) * k
 		draw_texture_rect(texture, Rect2((c - isz * 0.5).round(), isz.round()), false)

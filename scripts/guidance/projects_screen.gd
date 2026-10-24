@@ -15,7 +15,7 @@ extends CanvasLayer
 signal closed
 signal track_changed(id: String)
 
-const BAR_W := 104.0
+const BAR_W := 92.0
 const ROW_H := 34.0
 const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
 const COL_FILL_VIA := Color8(0xE0, 0xA9, 0x3B, 0x70)
@@ -308,7 +308,7 @@ func _project_card(id: String) -> Control:
 	var bar_row := HBoxContainer.new()
 	bar_row.add_theme_constant_override("separation", 4)
 	bar_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar_row.add_child(_bar_ctrl(BAR_W - 8.0, 10.0, frac, 0.0, built or ProjectChain.ready(id)))
+	bar_row.add_child(_bar_ctrl(68.0, 10.0, frac, 0.0, built or ProjectChain.ready(id)))
 	var pct := ProgressUiKit.make_label("%d%%" % int(floor(frac * 100.0)), 11, ProgressUiKit.TEXT_HI)
 	pct.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_row.add_child(pct)
@@ -428,8 +428,8 @@ func _via_row(m: Dictionary, v: Dictionary) -> Control:
 	var name_src := ShopCatalog.item_name(src)
 	var name_out := ShopCatalog.item_name(String(m["id"]))
 	Tip.bind_tap(p, "%s → %s" % [name_src, name_out],
-		"%s плавится в %s на верстаке в мастерской: %d к %d. Не продавай %s — он нужен для «%s»." % [
-			name_src, name_out.to_lower(), int(v["per"]), int(v["out"]), name_src.to_lower(), ProjectChain.title(_current)],
+		"Плавка на верстаке в мастерской: %d шт. → %d шт. Не продавай: это сырьё для проекта «%s»." % [
+			int(v["per"]), int(v["out"]), ProjectChain.title(_current)],
 		ProjectChain.where_text(src))
 	return outer
 

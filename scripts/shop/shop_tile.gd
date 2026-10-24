@@ -200,7 +200,9 @@ func _set_need(o: Dictionary) -> void:
 	_need.texture = tex
 	_need.position = Vector2(0, 17) if _corner_tl.visible else Vector2(0, 0)
 	_need.visible = true
-	_need.warn = bool(o.get("selected", false))
+	# Продажа «за ролик» из-под земли сдаёт всё разом — там отметок нет, и плитка
+	# предупреждает сразу.
+	_need.warn = bool(o.get("selected", String(o.get("kind", "")) == "sell"))
 	if _need.warn:
 		_rim.modulate = COL_NEED
 

@@ -305,7 +305,11 @@ func _s_delivery_far() -> void:
 	var door := HouseConfig.door_cell()
 	_main.player.x = door.x - 4.0
 	_main.player.y = 0.5
+	# Заказ — только у двери (ГДД §15): с огорода его делает «призрак» в прихожей.
+	GameState.house_is_indoors = true
+	GameState.house_room = "hall"
 	HouseSystem.order_food("food_buldak")
+	GameState.house_is_indoors = false
 	await _wait(2.2)
 
 

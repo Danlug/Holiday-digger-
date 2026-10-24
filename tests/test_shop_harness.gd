@@ -90,6 +90,15 @@ func _fresh() -> void:
 	GameState.house_room = "workshop"
 
 
+## То же, но герой стоит у входной двери (прихожая). Снаряжение, еду и товары
+## лавки покупают только там либо под землёй за ролик (ГДД §15, ShopService.can_buy,
+## tests/test_purchase_rules): раньше можно было откуда угодно, и покупки в этом
+## файле просто встают в прихожую. Склад и верстак остаются в мастерской (_fresh).
+func _fresh_at_door() -> void:
+	_fresh()
+	GameState.house_room = "hall"
+
+
 # ---------------------------------------------------------------------------
 # Продажа
 # ---------------------------------------------------------------------------
@@ -315,7 +324,7 @@ func _test_tool_requires_ownership() -> void:
 # ---------------------------------------------------------------------------
 
 func _test_buy_spends_coins() -> void:
-	_fresh()
+	_fresh_at_door()
 	var goods := ShopCatalog.goods_coins()
 	check("в лавке есть хотя бы один товар за монеты", not goods.is_empty())
 	if goods.is_empty():
@@ -485,7 +494,7 @@ func _test_gear_prices_and_multipliers() -> void:
 
 ## Покупка снимает РОВНО цену — ни монетой больше.
 func _test_buy_pickaxe_spends_exact_coins() -> void:
-	_fresh()
+	_fresh_at_door()
 	var price := Balance.get_tool_cost_coins("titanium_pickaxe")
 	GameState.coins = price - 1
 	check("без монет титановая кирка не покупается",
@@ -504,37 +513,44 @@ func _test_buy_pickaxe_spends_exact_coins() -> void:
 	check("повторная покупка монет не тронула", GameState.coins == 77)
 
 	# Ржавая кирка не продаётся вовсе: она находится в мастерской.
-	_fresh()
+	_fresh_at_door()
 	GameState.coins = 10000
 	check("ржавая кирка в магазине не продаётся",
 		not bool(ShopService.buy_tool("rusty_pickaxe")["ok"]))
 
 
 ## Бурмобиль — транспорт (решение владельца): его нельзя бросить под землёй,
-## купив по дороге другую кирку. Магазин у входной двери работает откуда
-## угодно (can_shop_here() == true всегда), и это единственный путь, которым
-## смена инструмента могла бы проскочить мимо GameState.set_current_tool.
+## купив по дороге другую кирку. Под землёй кирку теперь можно купить за ролик
+## (ГДД §15, ShopService.can_buy), и это единственный путь, которым смена
+## инструмента могла бы проскочить мимо GameState.set_current_tool.
+## Ожидание «на поверхности купить можно» устарело: поверхность вне двери —
+## огород, там покупки закрыты (правило места); покупка идёт у двери, дома.
 func _test_buy_tool_cannot_dismount_rig_underground() -> void:
-	_fresh()
+	_fresh_at_door()
 	GameState.owned_tools = ["shovel", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.house_is_indoors = false
 	GameState.player_depth = 50  # под землёй
 	GameState.coins = 100000
+	var left := ShopRemote.left_today()
 
 	var result := ShopService.buy_tool("titanium_pickaxe")
 	check("под землёй в бурмобиле новую кирку не купить", not bool(result["ok"]))
 	check("монеты не списаны", GameState.coins == 100000)
 	check("бурмобиль остался в руках", GameState.current_tool == "drill_rig")
 	check("кирка не куплена", not GameState.owned_tools.has("titanium_pickaxe"))
+	check("отказ не стоил ролика", ShopRemote.left_today() == left)
 
-	# На поверхности — можно.
+	# Дома у двери — можно, и ролик не нужен.
+	GameState.house_is_indoors = true
+	GameState.house_room = "hall"
 	GameState.player_depth = 0
-	check("на поверхности новую кирку купить можно", bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+	check("у двери новую кирку купить можно", bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
 	check("бурмобиль снят, кирка в руках", GameState.current_tool == "titanium_pickaxe")
+	check("у двери ролик не списан", ShopRemote.left_today() == left)
 
 	# Дома под тем же кодом глубины — тоже можно (house_is_indoors снимает запрет).
-	_fresh()
+	_fresh_at_door()
 	GameState.owned_tools = ["shovel", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.house_is_indoors = true
@@ -545,7 +561,7 @@ func _test_buy_tool_cannot_dismount_rig_underground() -> void:
 
 
 func _test_buy_gear_spends_exact_coins() -> void:
-	_fresh()
+	_fresh_at_door()
 	var price := Balance.get_gear_cost_coins("backpack")
 	GameState.coins = price - 1
 	check("без монет ранец не покупается", not bool(ShopService.buy_gear("backpack")["ok"]))
@@ -579,7 +595,7 @@ func _test_pickaxes_and_gear_are_not_crafted() -> void:
 	check("рецепта джетпака больше нет", ShopCatalog.recipe("jetpack").is_empty())
 
 	# И наоборот: технику за одни монеты не купить.
-	_fresh()
+	_fresh_at_door()
 	GameState.coins = 999999
 	check("ручной бур за монеты не продаётся — он собирается",
 		not bool(ShopService.buy_tool("hand_drill")["ok"]))
@@ -752,7 +768,7 @@ func _test_drill_upgrade_hidden_without_rig() -> void:
 ## Строго последовательно: платину нельзя купить, не купив титан, — тем же
 ## гейтом, каким в игре устроены другие последовательные апгрейды.
 func _test_drill_upgrade_sequential_gate() -> void:
-	_fresh()
+	_fresh_at_door()
 	GameState.owned_tools.append("drill_rig")
 	GameState.coins = 100000000
 
@@ -786,7 +802,7 @@ func _test_drill_upgrade_sequential_gate() -> void:
 	check("тир не пополз выше 4", GameState.drill_rig_tier == 4)
 
 	# Без самого бурмобиля апгрейд не продаётся, даже если тир почему-то не 0.
-	_fresh()
+	_fresh_at_door()
 	GameState.coins = 100000000
 	check("без бурмобиля апгрейд не продаётся", not bool(ShopService.buy_drill_upgrade()["ok"]))
 
@@ -796,7 +812,7 @@ func _test_drill_upgrade_sequential_gate() -> void:
 ## проверяет без GameState), а живьём, через GameState.drill_rig_tier,
 ## который меняет именно покупка в магазине.
 func _test_drill_upgrade_speed_multiplies_live() -> void:
-	_fresh()
+	_fresh_at_door()
 	GameState.owned_tools.append("drill_rig")
 	GameState.coins = 100000000
 
@@ -810,7 +826,7 @@ func _test_drill_upgrade_speed_multiplies_live() -> void:
 
 
 func _test_drill_upgrade_spends_exact_coins() -> void:
-	_fresh()
+	_fresh_at_door()
 	GameState.owned_tools.append("drill_rig")
 	var price := Balance.get_drill_rig_tier_cost_coins(1)
 	GameState.coins = price - 1
@@ -828,7 +844,7 @@ func _test_drill_upgrade_spends_exact_coins() -> void:
 ## монет во всей игре (GameState.spend_coins), апгрейд бура ничего не
 ## изобретает заново (см. ShopService.buy_drill_upgrade).
 func _test_drill_upgrade_debug_free_shop() -> void:
-	_fresh()
+	_fresh_at_door()
 	GameState.owned_tools.append("drill_rig")
 	GameState.coins = 0
 	GameState.debug_free_shop = true

@@ -880,9 +880,6 @@ def before_after_sheet(out_path):
             cell = dark.copy()
             cell.alpha_composite(im, (0, row_h - im.height))
             sheet.alpha_composite(cell, (x, ys[k]))
-        # Линия земли в кадре ~ на 6 текселей выше низа кадра.
-        game = _game_bg(cw, row_h + 96)
-        game = game.crop((0, 96 - (row_h - 6) + row_h - 6, cw, 96 + row_h))
         game = _game_bg(cw, row_h)
         cell = game.copy()
         cell.alpha_composite(after, (0, row_h - after.height))

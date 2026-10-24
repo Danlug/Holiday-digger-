@@ -28,6 +28,9 @@ const SHEETS := [
 	["boy_gear/dig_pick", 144, false], ["boy_gear/dig_shovel", 144, false],
 	["boy_gear/sleep", 144, false],
 ]
+## Кадры перерисованных листов, оставленные авторскими (без каймы): замах с
+## руками над головой. Тот же список — PIXEL_CELL_1_FRAMES в character_view.gd.
+const KEPT_FRAMES := {"dig_pick": [0, 1, 2], "dig_pick_rusty": [0, 1, 2]}
 ## Листы сюжетного «мальчика» — копии листов героя.
 const COPIES := {
 	"boy/idle": "idle", "boy/fall": "fall", "boy/sleep": "sleep",
@@ -88,9 +91,12 @@ func _test_sheet(rel: String, fw: int, redrawn: bool) -> void:
 
 	# Сетка 2×2: каждый квадрат 2×2 от верхнего левого угла — один цвет.
 	if redrawn:
+		var kept: Array = KEPT_FRAMES.get(rel, [])
 		var broken := 0
 		for y in range(0, h - 1, 2):
 			for x in range(0, w - 1, 2):
+				if kept.has(x / fw):
+					continue
 				var i := (y * w + x) * 4
 				for o in [4, w * 4, w * 4 + 4]:
 					for k in 4:
@@ -199,3 +205,5 @@ func _test_view_contract() -> void:
 			var fw: int = int(frames[name][0]) if frames.has(name) else 144
 			check("%s: ширина кадра у героя и генератора одна (%d)" % [name, fw], fw == int(redrawn[name]))
 	check("шейдер чёткости существует", ResourceLoader.exists("res://shaders/pixel_art.gdshader"))
+	check("шейдер знает авторские кадры среди перерисованных",
+			consts.get("PIXEL_CELL_1_FRAMES", {}) == KEPT_FRAMES)

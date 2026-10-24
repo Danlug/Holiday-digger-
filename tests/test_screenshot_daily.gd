@@ -52,7 +52,7 @@ func _ready() -> void:
 	MetaState.sub("daily")["last"] = MetaState.today()   # подарок дня уже взят — окно не всплывёт
 	_main.hud.set_gauges_visible(true)
 	_seed_progress()
-	await _wait(0.6)
+	await _wait(3.2)   # тост дороги трофеев от подставного прогресса уходит
 
 	# 1. Кнопка на поверхности: бейдж «1 готово», полоска дня, покачивание.
 	await _shot("01_surface_button")
@@ -61,6 +61,16 @@ func _ready() -> void:
 	_main.player.y = 24.5
 	await _wait(0.5)
 	await _shot("02_mine_button")
+
+	# 2б. Задание закрылось прямо в шахте: тост и значок летит от героя в кнопку.
+	var hunt: Dictionary = QuestEngine.daily()[4]
+	hunt["progress"] = int(hunt["target"]) - 1
+	_svc._apply(StringName(String(hunt["event"])), _event_for(hunt))
+	await _wait(0.3)
+	await _shot("02b_mine_quest_done_fly")
+	await _wait(0.4)
+	await _shot("02c_mine_quest_done_badge")
+	await _wait(2.4)
 	_main.player.y = 4.5
 
 	# 3. Окно заданий.
@@ -126,6 +136,18 @@ func _seed_progress() -> void:
 		q["progress"] = int(round(float(q["target"]) * float(fr[mini(i, fr.size() - 1)])))
 	QuestEngine.mark_opened()
 	_svc.after_change()
+
+
+## Подставное событие, которое двигает это задание на единицу.
+func _event_for(q: Dictionary) -> Dictionary:
+	var d := {"cell": Vector2i(5, 200), "tile": TileTypes.Type.STONE, "loot": true, "count": 1, "depth": 9999,
+		"amount": 1, "coins": 1}
+	var f: Dictionary = q["filter"]
+	if f.has("item"):
+		d["item"] = f["item"]
+	if f.has("currency"):
+		d["currency"] = f["currency"]
+	return d
 
 
 func _find_button(n: Node, icon_name: String) -> Button:

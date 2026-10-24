@@ -450,7 +450,7 @@ func _claim(qid: String, mult: float, from: Control) -> void:
 	var res := QuestEngine.claim(qid, mult)
 	if not bool(res["ok"]):
 		return
-	MetaFx.claim(get_tree(), origin, res["reward"], false, _anchors())
+	MetaFx.claim(get_tree(), origin, res["reward"], false, _anchors(), true)
 	_after_change(before)
 
 
@@ -471,7 +471,7 @@ func _claim_chest(chest: Control) -> void:
 	if not bool(res["ok"]):
 		return
 	UiAnim.shake(chest, 4.0, 0.3)
-	MetaFx.claim(get_tree(), origin, res["reward"], true, _anchors())
+	MetaFx.claim(get_tree(), origin, res["reward"], true, _anchors(), true)
 	_after_change(before)
 
 

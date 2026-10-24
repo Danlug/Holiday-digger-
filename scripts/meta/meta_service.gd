@@ -132,12 +132,28 @@ func _announce(res: Dictionary) -> void:
 	var any := false
 	for q in res.get("quests", []):
 		toast.show_quest(q)
+		_fly_to_button(q)
 		any = true
 	for a in res.get("ach", []):
 		toast.show_achievement(a)
 		any = true
 	if any:
 		_after_progress()
+
+
+## Задание дня выполнено прямо в игре — его значок летит от героя в кнопку
+## заданий на экране: видно, куда идти за наградой.
+func _fly_to_button(q: Dictionary) -> void:
+	if String(q.get("kind", "")) != "daily" or _any_modal_open():
+		return
+	var player := get_tree().root.find_child("Player", true, false) as Node2D
+	if player == null or not (player.get_parent() is CanvasItem):
+		return
+	# Узел героя стоит в начале координат, а сам герой — в (x, y) клетках: так же
+	# считает экранную точку FxService.world_to_screen (камера — сдвиг ViewRoot).
+	var cell := Vector2(float(player.get("x")), float(player.get("y")))
+	var from := (player.get_parent() as CanvasItem).get_global_transform_with_canvas() * (cell * 32.0)
+	MetaFx.fly(get_tree(), MetaUiKit.tex(String(q["glyph"])), from, HudAnchors.get_anchor("tasks"), 3)
 
 
 func _after_progress() -> void:

@@ -374,7 +374,7 @@ func _claim_quest(qid: String, mult: float, from: Control) -> void:
 	var res := QuestEngine.claim(qid, mult)
 	if not bool(res["ok"]):
 		return
-	MetaFx.claim(get_tree(), origin, res["reward"], false, _anchors())
+	MetaFx.claim(get_tree(), origin, res["reward"], false, _anchors(), true)
 	_after_claim()
 
 
@@ -429,7 +429,7 @@ func _bonus_card() -> Control:
 			var origin := _center(claim)
 			var res := QuestEngine.claim_bonus()
 			if bool(res["ok"]):
-				MetaFx.claim(get_tree(), origin, res["reward"], true, _anchors())
+				MetaFx.claim(get_tree(), origin, res["reward"], true, _anchors(), true)
 				_after_claim())
 		Tip.bind(claim, "Забрать бонус дня")
 		h.add_child(claim)
@@ -679,7 +679,7 @@ func _step_tile(i: int) -> Control:
 			var origin := _center(t)
 			var res := TrophyRoad.claim(i)
 			if bool(res["ok"]):
-				MetaFx.claim(get_tree(), origin, res["reward"], big, _anchors())
+				MetaFx.claim(get_tree(), origin, res["reward"], big, _anchors(), true)
 				_after_claim())
 	return t
 

@@ -106,7 +106,9 @@ func close() -> void:
 	closed.emit()
 
 
-func _unhandled_input(event: InputEvent) -> void:
+## _input, а не _unhandled_input: открытый поверх мастерской экран должен закрыться
+## сам, а не отдать «назад» карточке рецепта под собой.
+func _input(event: InputEvent) -> void:
 	if is_open() and event.is_action_pressed("ui_cancel"):
 		close()
 		get_viewport().set_input_as_handled()

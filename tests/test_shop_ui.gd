@@ -26,6 +26,8 @@ func _ready() -> void:
 	await _test_buy_through_card()
 	await _test_cancel_and_poor()
 	await _test_recipe_card()
+	await _test_card_description_by_tap()
+	await _test_recipe_chips_by_tap()
 	await _test_food_order()
 	await _test_sell_flow()
 	await _test_remote_sell()
@@ -282,6 +284,158 @@ func _test_recipe_card() -> void:
 	ui.close()
 
 
+## Узлы карточки с описанием по тапу (Tip.bind_tap), в порядке обхода.
+func _tap_targets() -> Array[Control]:
+	var out: Array[Control] = []
+	var stack: Array[Node] = [ui._card]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is Control and n.has_meta(Tip.TAP_META):
+			out.append(n)
+		for c in n.get_children():
+			stack.push_back(c)
+	out.reverse()
+	return out
+
+
+## Тап, как его видит контрол: нажатие и отпускание в gui_input, а у кнопки
+## ещё и pressed (сам BaseButton из gui_input.emit не срабатывает).
+func _click(c: Control) -> void:
+	var at := Vector2(4, 4)
+	for pressed in [true, false]:
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = pressed
+		e.position = at
+		c.gui_input.emit(e)
+	if c is BaseButton:
+		(c as BaseButton).pressed.emit()
+
+
+## Тап по значку товара в карточке подтверждения раскрывает описание и ничего
+## не покупает; кнопки «купить/отмена» остаются главными.
+func _test_card_description_by_tap() -> void:
+	_fresh()
+	Tip.hide_all()
+	GameState.coins = 600
+	ui.open(ShopUI.TAB_PICKS)
+	await _frames(1)
+	_tap("tool:iron_pickaxe")
+	await _frames(2)
+	var offer := _offer("picks", "tool:iron_pickaxe")
+	var targets := _tap_targets()
+	check("в карточке покупки есть значки, раскрывающиеся тапом", targets.size() >= 1)
+	var icon: Control = targets[0]
+	check("главный значок — плитка товара крупнее 22 точек", icon is ShopTile and icon.size.x >= 22.0 and icon.size.y >= 22.0)
+	check("на значке есть подсказка-намёк «i»", icon.get_child_count() > 0 and icon.get_child(icon.get_child_count() - 1) is TextureRect \
+		and (icon.get_child(icon.get_child_count() - 1) as TextureRect).texture != null)
+	check("кнопка «купить» не привязана к тапу-описанию (она покупает)", not ui._card_ok.has_meta(Tip.TAP_META))
+	check("пока никто не тапнул, описания нет", not Tip.is_showing())
+
+	_click(icon)
+	check("тап по значку раскрывает описание", Tip.is_pinned())
+	check("в нём название, эффект и цена из предложения",
+		Tip._title.text == String(offer["title"]) and Tip._body.text == String(offer["body"])
+		and Tip._extra.text == String(offer["extra"]) and Tip._title.text != "")
+	check("тап не покупает и не закрывает карточку",
+		ui._card != null and not GameState.owns_tool("iron_pickaxe") and GameState.coins == 600)
+	check("тап не включает swallowed(): кнопки работают", not Tip.swallowed())
+	var rect := Tip._panel.get_global_rect()
+	var card_rect := ui._card_panel.get_global_rect()
+	check("описание над карточкой: не закрывает ни значок, ни кнопки", rect.end.y <= card_rect.position.y + 0.5)
+	var vp := ui.get_viewport().get_visible_rect().grow(0.5)
+	check("описание целиком в окне", vp.encloses(rect))
+	check("запомнили, что игрок знает про тап", bool((GameState.ext_get(ShopUI.CARD_INFO_KEY, {}) as Dictionary).get("tapped", false)))
+
+	_click(icon)
+	check("повторный тап скрывает описание", not Tip.is_showing())
+	check("карточка при этом на месте", ui._card != null)
+
+	# Тап вне: сперва гаснет только описание, окно остаётся.
+	_click(icon)
+	var dim: ColorRect = ui._card.get_child(0)
+	var outside := InputEventMouseButton.new()
+	outside.button_index = MOUSE_BUTTON_LEFT
+	outside.pressed = true
+	outside.position = Vector2(200, 12)
+	Tip._on_global_input(outside)
+	dim.gui_input.emit(outside)
+	check("тап вне прячет описание", not Tip.is_showing())
+	check("и тот же тап не закрывает карточку", ui._card != null)
+	Tip._dismissed_until_ms = 0
+	dim.gui_input.emit(outside)
+	await _frames(1)
+	check("следующий тап по фону закрывает карточку как раньше", ui._card == null)
+
+	# Отмена и покупка при открытом описании работают как раньше.
+	_tap("tool:iron_pickaxe")
+	await _frames(2)
+	_click(_tap_targets()[0])
+	check("описание открыто", Tip.is_pinned())
+	ui._close_card(false)
+	check("закрытие карточки уносит описание", not Tip.is_showing())
+	_tap("tool:iron_pickaxe")
+	await _frames(2)
+	_click(_tap_targets()[0])
+	Tip._swallow_until_ms = Time.get_ticks_msec() + 250
+	ui._card_ok.pressed.emit()
+	check("защита от случайной покупки жива: swallowed() не даёт купить", not GameState.owns_tool("iron_pickaxe"))
+	Tip._swallow_until_ms = 0
+	ui._card_ok.pressed.emit()
+	await _frames(1)
+	check("«купить» при открытом описании покупает", GameState.owns_tool("iron_pickaxe") and GameState.coins == 100)
+	check("после покупки описания нет", not Tip.is_showing() and ui._card == null)
+	ui.close()
+
+
+## Значки материалов рецепта: тап — название и сколько есть.
+func _test_recipe_chips_by_tap() -> void:
+	_fresh()
+	Tip.hide_all()
+	GameState.max_depth_reached = 200
+	GameState.coins = 900
+	GameState.inventory["iron_ore"] = 300
+	GameState.inventory["bronze"] = 40
+	GameState.inventory["silver"] = 60
+	ui.open(ShopUI.TAB_TECH)
+	await _frames(1)
+	_tap("recipe:hand_drill")
+	await _frames(2)
+	var o := _offer("tech", "recipe:hand_drill")
+	var targets := _tap_targets()
+	var inputs: Array = o["inputs"]
+	check("у рецепта тапабельны значок товара, чипы эффекта и каждый материал (+ монеты)",
+		targets.size() >= inputs.size() + 1 + 1)
+	var chips: Array[Control] = []
+	for t in targets:
+		if not (t is ShopTile) and String((t.get_meta(Tip.META) as Dictionary).get("body", "")).begins_with("Есть:"):
+			chips.append(t)
+	check("значков материалов: по числу материалов и монеты", chips.size() == inputs.size() + 1)
+	var all_big := true
+	for c in chips:
+		all_big = all_big and c.size.y >= 22.0 and c.custom_minimum_size.y >= 22.0
+	check("цель нажатия каждого значка материала не ниже 22 точек", all_big)
+	var first: Control = chips[0]
+	var first_input: Dictionary = inputs[0]
+	_click(first)
+	check("тап по материалу раскрывает описание", Tip.is_pinned())
+	check("название — название предмета", Tip._title.text == ShopCatalog.item_name(String(first_input["id"])))
+	check("в описании «есть из нужно» полными числами",
+		Tip._body.text == "Есть: %s из %s" % [ShopArt.full(int(first_input["have"])), ShopArt.full(int(first_input["need"]))])
+	check("тап по материалу ничего не собирает", not GameState.owns_tool("hand_drill") and GameState.coins == 900 and ui._card != null)
+	check("и не включает swallowed()", not Tip.swallowed())
+	_click(chips[1])
+	check("тап по соседнему материалу переносит описание на него", Tip.is_pinned() and Tip._owner_ctrl == chips[1])
+	_click(chips[1])
+	check("повторный тап по нему скрывает", not Tip.is_showing())
+	var coins_chip: Control = chips[chips.size() - 1]
+	_click(coins_chip)
+	check("монеты: «Монеты» и сколько есть", Tip._title.text == "Монеты" and Tip._body.text == "Есть: 900 из 2 000")
+	Tip.hide_all()
+	ui._close_card(false)
+	ui.close()
+
+
 func _test_food_order() -> void:
 	_fresh()
 	GameState.coins = 0
@@ -489,7 +643,9 @@ func _test_navigation() -> void:
 func _test_pointer_input() -> void:
 	# В headless окно 64×64, и события указателя до интерфейса не доходят —
 	# проверка работает только под настоящим рендером (xvfb-run, см. шапку
-	# test_screenshot_shop), в run_tests.sh она честно пропускается.
+	# test_screenshot_shop), в run_tests.sh она честно пропускается. Запуск руками:
+	# окно 1:1 (--resolution 224x480): push_input берёт оконные координаты, а плитки
+	# считаются в логических, при окне 448×960 они разъедутся вдвое.
 	if DisplayServer.get_name() == "headless":
 		print("[--] события указателя: headless, проверка пропущена")
 		return
@@ -527,6 +683,43 @@ func _test_pointer_input() -> void:
 	await _frames(2)
 	check("долгое нажатие показывает подсказку", tip_shown)
 	check("долгое нажатие не открывает карточку и не покупает", ui._card == null and not GameState.owns_tool("iron_pickaxe"))
+	Tip.hide_all()
+
+	# Описание в карточке — по обычному тапу (настоящий указатель, не только gui_input).
+	await get_tree().create_timer(0.35).timeout   # swallowed() после долгого нажатия гаснет за 0.25 с
+	_mouse(pos, true)
+	await _frames(1)
+	_mouse(pos, false)
+	await _frames(2)
+	var icon: Control = _tap_targets()[0]
+	var ipos := icon.get_global_rect().get_center()
+	_mouse(ipos, true)
+	await _frames(1)
+	_mouse(ipos, false)
+	await _frames(2)
+	check("тап пальцем по значку в карточке раскрывает описание", Tip.is_pinned() and ui._card != null)
+	check("и ничего не покупает", not GameState.owns_tool("iron_pickaxe") and GameState.coins == 600)
+	_mouse(ipos, true)
+	await _frames(1)
+	_mouse(ipos, false)
+	await _frames(2)
+	check("повторный тап пальцем скрывает его", not Tip.is_showing() and ui._card != null)
+	_mouse(ipos, true)
+	await _frames(1)
+	_mouse(ipos, false)
+	await _frames(2)
+	var away := Vector2(200.0, 12.0)
+	_mouse(away, true)
+	await _frames(1)
+	_mouse(away, false)
+	await _frames(2)
+	check("тап мимо гасит описание, но не закрывает карточку", not Tip.is_showing() and ui._card != null)
+	await get_tree().create_timer(0.4).timeout
+	_mouse(away, true)
+	await _frames(1)
+	_mouse(away, false)
+	await _frames(3)
+	check("следующий тап по фону закрывает карточку", ui._card == null)
 	Tip.hide_all()
 	ui.close()
 

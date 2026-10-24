@@ -31,7 +31,11 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CHAR = os.path.join(ROOT, "art", "character")
+# Куклу собирает из АВТОРСКОЙ нарезки и кладёт результат туда же: в
+# art/character/ кадры попадают только через tools/gen_hero_art.py, который
+# перерисовывает их чётким пиксель-артом (ветка «hero-art»). После этого
+# скрипта: python3 tools/gen_hero_art.py jump hurt idle_x
+CHAR = os.path.join(ROOT, "art", "_source", "hero_cut")
 FW = FH = 144
 
 # --- геометрия стойки idle.png[0] (координаты кадра 144×144) ---------------

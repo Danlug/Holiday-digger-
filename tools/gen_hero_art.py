@@ -26,14 +26,17 @@
   * альфа только 0 или 255, без сглаживания.
 
 Вход — снимок нарезки авторских листов `art/_source/hero_cut/` (там лежат
-кадры ровно такими, какими их выдали tools/import_*.py и gen_hero_anim.py;
-папка скрыта от Godot файлом .gdignore). Выход — те же файлы в
-art/character/ с теми же именами и размерами. Если авторский лист пришлёт
-новую версию: прогнать нужный import_*.py, скопировать его результат в
-hero_cut/ и запустить этот скрипт.
+кадры ровно такими, какими их выдали tools/import_*.py; gen_hero_anim.py
+читает и пишет прямо туда; папка скрыта от Godot файлом .gdignore). Выход —
+те же файлы в art/character/ с теми же именами и размерами. Если авторский
+лист пришлёт новую версию: прогнать нужный import_*.py (он пишет в
+art/character/), затем `python3 tools/gen_hero_art.py --take <листы>` —
+свежая нарезка уйдёт в hero_cut/ и сразу будет перерисована.
 
 Запуск:  python3 tools/gen_hero_art.py            — перерисовать всё
          python3 tools/gen_hero_art.py idle walk  — только эти листы
+         python3 tools/gen_hero_art.py --take walk — забрать свежую нарезку
+                                                   import_*.py и перерисовать
          python3 tools/gen_hero_art.py --sheet OUT.png — лист «было/стало»
 """
 
@@ -898,6 +901,11 @@ def main(argv):
         print("лист было/стало:", out, before_after_sheet(out))
         return
     only = [a for a in argv if not a.startswith("-")]
+    if "--take" in argv:
+        assert only, "--take без списка листов забрал бы в снимок уже перерисованное"
+        for rel in only:
+            Image.open(_png(OUT_DIR, rel)).save(_png(SRC_DIR, rel))
+            print("%-22s нарезка -> hero_cut/" % rel)
     done = []
     for rel, fw, gy, modes in SHEETS:
         if only and rel not in only:

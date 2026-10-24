@@ -1,0 +1,57 @@
+{
+ "version": 1,
+ "_source": "docs/GDD.md §20.1 «Механики из больших игр (раунд 3)». Владелец этих чисел не задавал — всё помечено proposed. Код — scripts/mechanics/, состояние — GameState.ext[\"mechanics\"].",
+ "_gate": "Все три механики включаются после онбординга (HintBusy.onboarding_done: флаг сюжета food_ordered или второй урок выживания). До этого тайники не видны, азарт не копится, журнал не показывается (счётчик мастерства копится молча).",
+
+ "chests": {
+  "_what": "Тайники (Terraria, Spelunky, Stardew Valley): сундук вмурован в породу. Место — чистая функция от сида мира (полоса рядов → одна попытка), виден только в полном обзоре (как руда, локатора нет). Открывается, когда его клетку выкопали; добыча кладётся в рюкзак с проверкой веса, что не влезло — остаётся в открытом сундуке.",
+  "y_min": {"value": 20, "proposed": true, "note": "ниже фундамента (5) и ряда никчёмного клада (15): онбординг не тронут"},
+  "band_rows": {"value": 12, "proposed": true, "note": "одна попытка поставить сундук на полосу в 12 рядов"},
+  "chance": {"value": 0.6, "proposed": true, "note": "≈ сундук на 20 рядов: «серпантин» видит 2–3 в час на первой сотне, «дайв» — 4–5 (сундук виден только в радиусе ресурсов)"},
+  "tries": {"value": 4, "proposed": true, "note": "если выпала пустота, лава или несокрушимое — ещё до трёх клеток в той же полосе"},
+  "exclude": ["mercury", "uranium", "peat", "coal"],
+  "_exclude_note": "ртуть — только в банку (§13), уран — только в свинцовом контейнере (§Уран): сундук не должен обходить эти правила; торф и уголь — топливо, его делает станция заправки, а сундук должен радовать",
+  "unpriced_weight_price": {"value": 100, "proposed": true, "note": "материалы без цены (экзотика, всё глубже 4000) в выборе добычи весят как руда за 100"},
+  "unpriced_xp": {"value": 10, "proposed": true, "note": "опыт за штуку материала без цены"},
+  "xp_share": {"value": 0.5, "proposed": true, "note": "опыт за добычу из сундука — половина того, что дала бы копка тех же руд (копать их не пришлось), плюс бонус ступени"},
+  "tiers": [
+   {"id": "wood", "y_min": 20, "weight": {"value": 70, "proposed": true}, "value_cells": {"value": 20, "proposed": true}, "items": [2, 12], "xp_bonus": {"value": 15, "proposed": true}, "food": "food_bar", "food_chance": {"value": 0.35, "proposed": true}},
+   {"id": "iron", "y_min": 120, "weight": {"value": 24, "proposed": true}, "value_cells": {"value": 45, "proposed": true}, "items": [4, 20], "xp_bonus": {"value": 40, "proposed": true}, "food": "food_bar", "food_chance": {"value": 0.5, "proposed": true}},
+   {"id": "gold", "y_min": 300, "weight": {"value": 6, "proposed": true}, "value_cells": {"value": 120, "proposed": true}, "items": [6, 30], "xp_bonus": {"value": 120, "proposed": true}, "food": "food_buldak", "food_chance": {"value": 1.0, "proposed": true}, "gem": true}
+  ],
+  "_tiers_note": "Ценность сундука задана в «клетках»: value_cells × средняя выручка клетки породы на этой глубине (Σ доля руды × цена, по настоящему составу), ±25%. Так сундук одинаково весом на 100 и на 2000 — не кошелёк, а «полторы минуты копки сверху». items — сколько штук не меньше/не больше. Самоцвет золотого сундука — сверх ценности.",
+  "value_spread": {"value": 0.25, "proposed": true},
+  "deep_shift_per_1000": {"value": [-6, 3, 1.5], "proposed": true, "note": "на каждую 1000 клеток глубины веса ступеней сдвигаются к железу и золоту (дерево не ниже 30)"},
+  "gems_by_depth": [
+   {"y_min": 300, "id": "diamond", "count": 1},
+   {"y_min": 2000, "id": "ruby", "count": 1},
+   {"y_min": 4000, "id": "divine_heart", "count": 1}
+  ],
+  "gem_fallback": {"id": "gold", "count": 3, "note": "золотой сундук мельче алмазов (его ступень и так с 300) — запасной вариант на случай правки y_min"}
+ },
+
+ "streak": {
+  "_what": "Азарт и лихорадка («fever» мобильных игр: Bejeweled Blitz, Fruit Ninja; серия Downwell, Mr. Driller): копаешь без пауз — шкала азарта растёт; полная — несколько следующих клеток дают двойную добычу. Пауза дольше idle_break_s, подъём на поверхность или дом — сброс.",
+  "min_depth": {"value": 6, "proposed": true, "note": "ниже фундамента; огород и обучение не считаются"},
+  "idle_break_s": {"value": 2.5, "proposed": true, "note": "сколько секунд без копки серия ждёт: шаг-два по тоннелю к следующей руде не рвёт, подъём на ранце — рвёт"},
+  "fever_at": {"value": 50, "proposed": true, "note": "клеток подряд до лихорадки"},
+  "fever_cells": {"value": 6, "proposed": true, "note": "сколько следующих клеток копаются в лихорадке; счёт клетками, а не секундами — темп не зависит от инструмента (лопата и бурмобиль получают ту же долю)"},
+  "fever_extra": {"value": 1, "proposed": true, "note": "сколько штук добычи сверху на рудной клетке в лихорадке (если влезает)"}
+ },
+
+ "mastery": {
+  "_what": "Мастерство руд и журнал (Stardew Valley: коллекции; Melvor Idle и Deep Rock Galactic: мастерство): у каждой добываемой породы пять звёзд за число выкопанных клеток; звезда даёт опыт и +шанс двойной добычи этой руды. Журнал — сетка всех пород по глубине, ненайденные — силуэтом.",
+  "thresholds": {
+   "cheap": {"value": [10, 40, 150, 500, 1500], "proposed": true, "note": "цена < 30 (железо, медь, алюминий, никель, серебро, торф, уголь, металлолом)"},
+   "mid": {"value": [5, 20, 75, 250, 750], "proposed": true, "note": "цена 30–299 и материалы без цены (свинец, золото, титан, литий, ртуть, экзотика, всё глубже 4000)"},
+   "precious": {"value": [3, 10, 30, 100, 300], "proposed": true, "note": "цена ≥ 300 (алмаз, платина, рубин, изумруд, уран)"}
+  },
+  "price_mid": {"value": 30, "proposed": true},
+  "price_precious": {"value": 300, "proposed": true},
+  "chance_per_star": {"value": 0.02, "proposed": true, "note": "+2% двойной добычи этой руды за звезду, до +10% на пяти"},
+  "xp_per_star": {"value": 0.25, "proposed": true, "note": "опыт звезды = четверть опыта за все клетки до порога (порог × опыт клетки × 0.25), не меньше min_star_xp"},
+  "min_star_xp": {"value": 10, "proposed": true},
+  "kinds": ["iron_ore", "scrap", "lead", "silver", "peat", "copper", "gold", "aluminium", "diamond", "nickel", "mercury", "coal", "platinum", "titanium", "lithium", "uranium", "ruby", "emerald", "geocrystal", "ancient_metal", "obsidian", "hellstone", "dark_matter", "universum", "angelstone", "divine_heart"],
+  "_kinds_note": "порядок — по глубине появления: журнал читается как спуск"
+ }
+}

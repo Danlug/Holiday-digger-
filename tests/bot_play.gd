@@ -106,6 +106,10 @@ var _trace := 0.0
 var _death_card: Node = null
 var _from_house := false
 var _frame_events: Array = []
+var _session_min := 0.0           # каждые N игровых минут — «закрыл игру, вернулся завтра»
+var _next_session := 0.0
+var _sessions := 0
+var _input_lost_t := 0.0
 var _next_trace := 0.0
 
 
@@ -129,6 +133,8 @@ func _ready() -> void:
 			_short = true
 		elif a.begins_with("--wall="):
 			_wall_cap = float(a.substr(7))
+		elif a.begins_with("--session="):
+			_session_min = float(a.substr(10))
 		elif a.begins_with("--trace="):
 			_trace = float(a.substr(8))
 		elif a.begins_with("--max-depth="):
@@ -170,6 +176,7 @@ func _run() -> void:
 	nav.world = world
 	nav.dig_cost = _nav_dig_cost
 	_end = _minutes * 60.0
+	_next_session = _session_min * 60.0 if _session_min > 0.0 else INF
 	T.meta = {"seed": _seed, "character": char_name, "minutes_target": _minutes, "short": _short,
 		"build": _build_label(), "fixed_fps_hint": "--fixed-fps 31", "started_utc": Time.get_datetime_string_from_system(true)}
 	_connect_signals()
@@ -200,13 +207,17 @@ func _clean_slate() -> void:
 	GameState.world_seed = _seed
 
 
-func _connect_signals() -> void:
+func _connect_player() -> void:
 	player.dig_finished.connect(_on_dig_finished)
 	player.dig_refused_by_story.connect(func(r: String) -> void: _refusals.append(r))
 	player.dig_blocked.connect(func(_t: int) -> void: _dig_blocked += 1)
 	if player.has_signal("dig_refused_by_lava"):
 		player.dig_refused_by_lava.connect(func(_c: float) -> void: _lava_refused += 1)
 	player.fell.connect(_on_fell)
+
+
+func _connect_signals() -> void:
+	_connect_player()
 	GameState.max_depth_changed.connect(_on_max_depth)
 	GameState.died.connect(_on_died)
 	GameState.respawned.connect(_on_respawned)
@@ -454,6 +465,20 @@ func _detectors() -> void:
 			{"dump": d}, _activity)
 		if _shots_on:
 			_shot("stuck_%s_%d" % [_activity, int(_sim)])
+	# Ввод не доходит до героя: бот держит клавишу, окон и сцен нет, а намерение героя пустое.
+	var want_dir := 1 if bot.is_down(KEY_D) else (-1 if bot.is_down(KEY_A) else 0)
+	var want_down := bot.is_down(KEY_S)
+	var lost_input: bool = not GameState.house_is_indoors and not player.frozen and not _busy_story() \
+		and hud.visible and _modal_since.is_empty() and ((want_dir != 0 and not want_down and player.hold_dx != want_dir) \
+		or (want_down and not player.hold_down and want_dir == 0))
+	if lost_input:
+		_input_lost_t += 8.0 / 31.0
+		if _input_lost_t > 3.0:
+			T.finding("P1", "input_lost", "клавиши зажаты, а намерение героя пустое > 3 с (занятие «%s»)" % _activity,
+				_sim, {"dump": _dump()}, _activity)
+			_input_lost_t = 0.0
+	else:
+		_input_lost_t = 0.0
 	# Герой внутри твёрдой клетки — зажат.
 	if not GameState.house_is_indoors and GameState.is_alive and not player.frozen and not _busy_story() \
 			and player._solid_at(player.x, player.y):
@@ -899,7 +924,7 @@ func _visit_grave() -> void:
 			await _step()
 		await _until(func(): return not _busy_story(), 300.0, "сцена у могилы")
 		if director.diary_ui != null and director.diary_ui.is_open:
-			_shot("diary")
+			await _shot("diary")
 			director.diary_ui.close_diary()
 	else:
 		T.finding("P1", "grave_button", "у могилы нет кнопки, хотя задание «%s»" % director._objective, _sim, {"dump": _dump()})
@@ -1309,6 +1334,9 @@ func _home_visit() -> void:
 	if _stop or not GameState.house_is_indoors:
 		return
 	await _go_room("hall")
+	if _sim >= _next_session and not _stop:
+		await _session_restart()
+		return   # новая сессия начинается у дома снаружи — дальше решает основной цикл
 	_from_house = true
 	if not await _house_press("exit_door"):
 		await _wait(1.0)
@@ -1446,7 +1474,7 @@ func _shop() -> void:
 	if _shots_on and _home_visits % 6 == 1:
 		ui._set_tab(ShopUI.TAB_PICKS, false)
 		await _frames_n(4)
-		_shot("shop_picks")
+		await _shot("shop_picks")
 	for tgt in targets:
 		var before := GameState.coins
 		var ok := await _ui_buy(ui, String(tgt["tab"]), String(tgt["ref"]), String(tgt["kind"]))
@@ -1485,7 +1513,7 @@ func _ui_buy(ui: ShopUI, tab: String, ref: String, kind: String) -> bool:
 		return false
 	if _shots_on and not T.milestones.has("shot_card"):
 		T.mark("shot_card", _sim)
-		_shot("shop_card_" + ref)
+		await _shot("shop_card_" + ref)
 	ui._card_ok.pressed.emit()
 	await _frames_n(3)
 	var owned := GameState.owns_tool(ref) if kind == "tool" else GameState.has_gear(ref)
@@ -1612,7 +1640,7 @@ func _sleep() -> void:
 	var t0 := _sim
 	await _frames_n(3)
 	if _shots_on and T.sleeps.is_empty():
-		_shot("sleep")
+		await _shot("sleep")
 	while _view().is_sleeping() and _sim - t0 < 60.0 and not _stop:
 		await _step()
 	await _frames_n(3)
@@ -1626,6 +1654,57 @@ func _sleep() -> void:
 		T.finding("P1", "sleep", "сон не прибавил бодрости (%.0f → %.0f)" % [before, GameState.stamina], _sim)
 	_activity = "home"
 	await _go_room("hall")
+
+
+## «Закрыл игру и вернулся завтра»: сейв, освобождение main.tscn, мета-часы на сутки
+## вперёд (ежедневная награда и задания), новая main.tscn с загрузкой. Прогресс обязан
+## пережить это без потерь — иначе P0.
+func _session_restart() -> void:
+	_activity = "session"
+	_sessions += 1
+	_next_session = _sim + _session_min * 60.0
+	var snap := {"coins": GameState.coins, "max_depth": GameState.max_depth_reached, "tool": GameState.current_tool,
+		"gear": GameState.current_gear, "level": GameState.level, "artifacts": GameState.collected_artifacts.size(),
+		"seen": GameState.story_seen.size(), "items": GameState.inventory.duplicate(), "dollars": GameState.dollars}
+	bot.release_all()
+	SaveSystem.save_game()
+	main.free()
+	await get_tree().process_frame
+	# Новый процесс начал бы с чистого GameState; то, что в сейв не пишется (герой в доме),
+	# обнуляем сами — как при настоящем запуске.
+	GameState.house_is_indoors = false
+	var now_unix := int(Time.get_unix_time_from_system())
+	MetaClock.override_unix = maxi(MetaClock.override_unix, now_unix) + MetaClock.DAY
+	main = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	await _frames_n(4)
+	player = main.player
+	world = main.world
+	hud = main.hud
+	director = main.find_child("StoryDirector", true, false)
+	house = HouseSystem.instance
+	nav.world = world
+	_death_card = null
+	_connect_player()
+	var after := {"coins": GameState.coins, "max_depth": GameState.max_depth_reached, "tool": GameState.current_tool,
+		"gear": GameState.current_gear, "level": GameState.level, "artifacts": GameState.collected_artifacts.size(),
+		"seen": GameState.story_seen.size(), "items": GameState.inventory.duplicate(), "dollars": GameState.dollars}
+	var lost: Array = []
+	for d in [snap, after]:
+		var norm: Dictionary = {}
+		for id in (d["items"] as Dictionary).keys():
+			norm[id] = int(d["items"][id])   # JSON отдаёт числа float — сравниваем как целые
+		d["items"] = norm
+	for k in snap.keys():
+		if k == "coins" or k == "dollars":
+			if int(after[k]) < int(snap[k]):
+				lost.append("%s %s → %s" % [k, str(snap[k]), str(after[k])])
+		elif str(after[k]) != str(snap[k]):
+			lost.append("%s %s → %s" % [k, str(snap[k]), str(after[k])])
+	T.event(_sim, "session", "перезапуск игры №%d (сейв → загрузка, мета-день +1)" % _sessions)
+	if not lost.is_empty():
+		T.finding("P0", "save_load", "после перезапуска игры потеряно: " + "; ".join(lost), _sim, {"before": snap, "after": after})
+	_activity = "home"
 
 
 func _heal_at_home() -> void:
@@ -1710,6 +1789,18 @@ func _final_checks() -> void:
 		if lack > 0 and lack / maxf(rate, 1.0) > 3.0:
 			T.finding("P2", "far_goal", "до %s (%d) при доходе %d/ч ещё %.1f ч игры" % [nxt["ref"], nxt["price"], int(rate),
 				lack / maxf(rate, 1.0)], _sim)
+	var projects: Array = []
+	for r in ShopCatalog.recipes():
+		if not ["tool", "machine"].has(String(r.get("kind", ""))):
+			continue
+		var rid := String(r["id"])
+		var chk := ShopService.check_craft(rid) if GameState.house_is_indoors else {}
+		var have: Dictionary = {}
+		for id in r["inputs"].keys():
+			have[id] = "%d/%d" % [HouseStorage.count(String(id)) + GameState.get_item_count(String(id)), int(r["inputs"][id])]
+		projects.append({"id": rid, "unlocked": ShopService.is_recipe_unlocked(rid), "unlock_depth": ShopCatalog.unlock_depth(rid),
+			"coins": int(r.get("coins", 0)), "materials": have, "done": T.milestones.has("craft:" + rid)})
+	T.meta["projects"] = projects
 	var spent_food := 0
 	for m in T.meals:
 		spent_food += int(m.get("price", 0))

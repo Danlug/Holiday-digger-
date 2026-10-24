@@ -7,6 +7,9 @@
 #   tools/bot_play.sh all 120                               # 3 характера × 2 сида параллельно
 #   SHOTS=1 tools/bot_play.sh 7 30 hasty                    # с настоящим рендером и снимками (xvfb)
 #   OUT=/каталог JOBS=3 WALL=1800 tools/bot_play.sh ...
+#   SESSION=60 tools/bot_play.sh 7 240     # каждые 60 игровых минут «закрыл игру, вернулся завтра»
+#                                          # (сейв → новая main.tscn → загрузка, мета-сутки +1)
+#   TRACE=5 tools/bot_play.sh ...           # строка состояния в лог каждые 5 игровых секунд
 #
 # Характеры: cautious (осторожный), greedy (жадный), hasty (торопливый).
 # Результат: build/bot/<метка>/ — telemetry.json, log.txt, summary.txt (и shots/ при SHOTS=1);
@@ -25,6 +28,9 @@ JOBS="${JOBS:-3}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BASE="${OUT:-build/bot/$STAMP}"
 mkdir -p "$BASE"
+# Снимки и сейвы прогонов лежат внутри проекта: без .gdignore Godot импортировал бы их PNG.
+[ -f build/bot/.gdignore ] || { mkdir -p build/bot && : >build/bot/.gdignore; }
+[ -f "$BASE/.gdignore" ] || : >"$BASE/.gdignore"
 
 # Новые class_name видны после переимпорта (как в run_tests.sh).
 CACHE=.godot/global_script_class_cache.cfg
@@ -50,6 +56,7 @@ run_one() {
 	fi
 	local args=(--seed="$seed" --minutes="$min" --char="$char" --out="$out" --wall="$WALL")
 	[ -n "${TRACE:-}" ] && args+=(--trace="$TRACE")
+	[ -n "${SESSION:-}" ] && args+=(--session="$SESSION")
 	[ "${SHOTS}" = 1 ] && args+=(--shots)
 	timeout $(( WALL + 120 )) "${runner[@]}" "$GODOT" "${extra[@]}" --fixed-fps 31 --path . \
 		res://tests/bot_play.tscn -- "${args[@]}" >"$out/log.txt" 2>&1
@@ -57,7 +64,7 @@ run_one() {
 	python3 tools/bot_report.py "$out" >/dev/null 2>&1 || echo "bot_report.py упал на $out" >"$out/summary.txt"
 }
 export -f run_one
-export GODOT SHOTS WALL
+export GODOT SHOTS WALL TRACE SESSION
 
 if [ "$SEED" = all ]; then
 	jobs=()

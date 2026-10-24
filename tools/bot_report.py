@@ -25,6 +25,8 @@ ALLOW = [
     re.compile(r"story_en\.json"),
     re.compile(r"ObjectDB instances leaked"),
     re.compile(r"resources still in use at exit"),
+    # звук под xvfb без звуковой карты — окружение, не игра
+    re.compile(r"audio_driver_alsa|All audio drivers failed|init_output_device|pulseaudio", re.I),
 ]
 
 MILESTONES = [

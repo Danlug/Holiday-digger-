@@ -2,8 +2,10 @@ class_name TechScreen
 extends Control
 ## Экран техники: три вкладки-иконки — бак (топливо), костюм (жара и лава),
 ## скважина. Станция заправки в огороде открывает его на вкладке бака с доступом
-## к складу; из меню «•••» — на любой вкладке «посмотреть», а улучшать можно на
-## поверхности и дома (TechCost.can_act_here).
+## к складу и к перегонке (торф/уголь -> топливные блоки, FuelRefinery): станция —
+## это перегонка и заправка в одном месте. Из меню «•••» — на любой вкладке
+## «посмотреть» (перегонка под замком), а улучшать можно на поверхности и дома
+## (TechCost.can_act_here).
 ##
 ## Текста на плитках нет: иконка и число; названия и описания — в подсказках Tip.
 ## Экран пересобирается целиком при каждом действии — он маленький, а состояние
@@ -36,6 +38,11 @@ var _tab_buttons: Dictionary = {}
 var _content: VBoxContainer = null
 var _fx_layer: Control = null
 var _gauge_from: float = -1.0
+# Перегонка: выбранное сырьё и сколько блоков (-1 — максимум); живые узлы карточки.
+var _raw_sel: String = "peat"
+var _refine_n: int = -1
+var _ref: Dictionary = {}
+var _src_icons: Dictionary = {}
 
 
 # ---------------------------------------------------------------------------
@@ -358,9 +365,12 @@ func _build_tank() -> void:
 	# Источники блоков: рюкзак (откуда угодно) и склад (на станции).
 	var src := _card()
 	var sv := _vbox(src, 6)
+	_src_icons.clear()
 	_source_row(sv, "pack", UiIcons.tex("backpack"), FuelTank.in_pack(), true, "Рюкзак", "Блоки в рюкзаке — заливать можно и в шахте")
 	_source_row(sv, "storage", TechUi.tex("icon_storage"), FuelTank.in_storage(), _station or HouseStorage.can_access(),
 		"Склад", "Блоки со склада — только у станции заправки или в мастерской")
+
+	_build_refinery()
 
 
 func _source_row(parent: Node, source: String, icon: Texture2D, have: int, allowed: bool, title: String, body: String) -> void:
@@ -370,6 +380,7 @@ func _source_row(parent: Node, source: String, icon: Texture2D, have: int, allow
 	Tip.bind(ic, title, body)
 	ic.name = "Src_" + source
 	row.add_child(ic)
+	_src_icons[source] = ic
 	var cnt := TechUi.chip(TechUi.tex("fuel_block"), "×%d" % have, TechUi.GOLD if have > 0 else TechUi.DIM, 20)
 	cnt.custom_minimum_size = Vector2(60, 0)
 	row.add_child(cnt)
@@ -408,6 +419,271 @@ func _pour(source: String, amount: int, from_ctrl: Control, btn: Control) -> voi
 		TechUi.fly(_fx_layer, TechUi.tex("fuel_block"), from, to, 0.05 * i, Callable(), 18.0)
 	SaveSystem.save_game()
 	refresh()
+
+
+# ---------------------------------------------------------------------------
+# Перегонка (только у станции): торф и уголь -> топливные блоки
+# ---------------------------------------------------------------------------
+
+const RAW_TIPS := {
+	"peat": ["Торф", "Перегоняется в топливные блоки"],
+	"coal": ["Уголь", "Плотнее торфа: на блок нужно меньше"],
+}
+
+
+func _build_refinery() -> void:
+	_ref.clear()
+	var raws := FuelRefinery.inputs()
+	if not raws.has(_raw_sel) or not FuelRefinery.is_unlocked(_raw_sel):
+		_raw_sel = String(raws[0])
+	var per := FuelRefinery.per_block(_raw_sel)
+	var can_here := _station and FuelRefinery.station_built()
+	var card := _card()
+	card.name = "Refinery"
+	var v := _vbox(card, 6)
+
+	# Сырьё: плитки «иконка + сколько есть (рюкзак + склад)» и курс справа.
+	var top := _hbox(v, 4, false)
+	for raw in raws:
+		top.add_child(_raw_tile(String(raw)))
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(gap)
+	var rate := _hbox(top, 1)
+	rate.mouse_filter = Control.MOUSE_FILTER_STOP
+	rate.add_child(TechUi.icon_rect(TechUi.item_icon_small(_raw_sel, 14), 14))
+	rate.add_child(TechUi.label(str(per), 10, TechUi.MUTED))
+	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
+	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 14))
+	rate.add_child(TechUi.label("1", 10, TechUi.MUTED))
+	Tip.bind(rate, "Курс перегонки", "%s: %d шт. = 1 топливный блок" % [TechUi.item_name(_raw_sel), per])
+
+	# Превращение: сырьё -> куб -> блоки. Куб — кнопка «перегнать».
+	var conv := _hbox(v, 3)
+	var raw_ic := TechUi.icon_rect(TechUi.item_icon(_raw_sel), 24)
+	conv.add_child(raw_ic)
+	var used_lbl := TechUi.label("", 11, TechUi.MUTED)
+	used_lbl.custom_minimum_size = Vector2(26, 0)
+	conv.add_child(used_lbl)
+	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
+	var still := UiBtn.icon_button(TechUi.tex("icon_refine") if can_here else TechUi.tex("icon_lock"),
+		Vector2(46, 40), UiBtn.Kind.ACCENT if can_here else UiBtn.Kind.NORMAL, 30)
+	still.name = "Still"
+	still.pressed.connect(_on_refine_pressed)
+	conv.add_child(still)
+	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
+	var out_ic := TechUi.icon_rect(TechUi.tex("fuel_block"), 24)
+	conv.add_child(out_ic)
+	var made_lbl := TechUi.label("", 11, TechUi.GOLD)
+	made_lbl.custom_minimum_size = Vector2(26, 0)
+	conv.add_child(made_lbl)
+
+	# Сколько: «−», ползунок, «+», «до максимума» — как окно «сколько» склада.
+	var qty := _hbox(v, 4)
+	var minus := UiBtn.icon_button(UiIcons.tex("minus"), Vector2(26, 24), UiBtn.Kind.NORMAL, 14)
+	var slider := HSlider.new()
+	slider.name = "RefineSlider"
+	slider.min_value = 1
+	slider.step = 1
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.custom_minimum_size = Vector2(70, 22)
+	slider.focus_mode = Control.FOCUS_NONE
+	UiBtn.style_slider(slider)
+	var plus := UiBtn.icon_button(UiIcons.tex("plus"), Vector2(26, 24), UiBtn.Kind.NORMAL, 14)
+	var maxb := UiBtn.icon_button(UiIcons.tex("max"), Vector2(34, 24), UiBtn.Kind.ACCENT, 16)
+	qty.add_child(minus)
+	qty.add_child(slider)
+	qty.add_child(plus)
+	qty.add_child(maxb)
+	Tip.bind(minus, "Меньше")
+	Tip.bind(plus, "Больше")
+	Tip.bind(maxb, "Максимум", "Перегнать всё, что есть")
+	minus.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			slider.value -= 1)
+	plus.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			slider.value += 1)
+	maxb.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			slider.value = slider.max_value)
+
+	_ref = {"slider": slider, "used": used_lbl, "made": made_lbl, "still": still,
+		"raw_icon": raw_ic, "out_icon": out_ic}
+	var most := FuelRefinery.max_blocks(_raw_sel)
+	# Сырья нет — ручка слева на нуле, а не «полная» на единице, которой нет.
+	slider.min_value = 1 if most > 0 else 0
+	slider.max_value = maxi(most, 1) if most > 0 else 1
+	slider.editable = most > 1
+	for b in [minus, plus, maxb]:
+		(b as Button).disabled = most <= 1
+	slider.value = (most if _refine_n < 0 else clampi(_refine_n, 1, most)) if most > 0 else 0
+	slider.value_changed.connect(func(val: float) -> void:
+		_refine_n = int(val) if int(val) < int(slider.max_value) else -1
+		Sfx.play("ui_slider")
+		_update_refine_numbers())
+	_update_refine_numbers()
+
+
+## Плитка сырья: иконка, число «есть» (рюкзак + склад) в углу; уголь до своей
+## глубины — под замком.
+func _raw_tile(raw: String) -> Control:
+	var unlocked := FuelRefinery.is_unlocked(raw)
+	var kind := UiBtn.Kind.ACCENT if raw == _raw_sel else UiBtn.Kind.NORMAL
+	var b := UiBtn.icon_button(TechUi.item_icon(raw), Vector2(44, 40), kind, 26)
+	b.name = "Raw_" + raw
+	b.modulate = Color(1, 1, 1, 1.0 if unlocked else 0.5)
+	var held := FuelRefinery.held(raw)
+	if unlocked:
+		var n := TechUi.label("×%d" % held if held < 1000 else TechUi.short(held), 9,
+			Color.WHITE if held >= FuelRefinery.per_block(raw) else TechUi.DIM)
+		n.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		n.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		n.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		n.offset_right = -3
+		n.offset_bottom = 0
+		b.add_child(n)
+	else:
+		var lk := TechUi.icon_rect(TechUi.tex("icon_lock"), 14)
+		lk.position = Vector2(28, 24)
+		b.add_child(lk)
+	var tip: Array = RAW_TIPS.get(raw, [TechUi.item_name(raw), ""])
+	var extra := "рюкзак %d · склад %d" % [FuelRefinery.in_pack(raw), FuelRefinery.in_storage(raw)] if unlocked \
+		else "глубже %d м" % FuelRefinery.unlock_depth(raw)
+	Tip.bind(b, String(tip[0]), String(tip[1]), extra)
+	b.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		if not FuelRefinery.is_unlocked(raw):
+			_deny(b)
+			return
+		_raw_sel = raw
+		_refine_n = -1
+		refresh())
+	return b
+
+
+func _refine_amount() -> int:
+	var most := FuelRefinery.max_blocks(_raw_sel)
+	if most <= 0 or _ref.is_empty():
+		return 0
+	return clampi(int((_ref["slider"] as HSlider).value), 1, most)
+
+
+func _update_refine_numbers() -> void:
+	if _ref.is_empty():
+		return
+	var n := _refine_amount()
+	var per := FuelRefinery.per_block(_raw_sel)
+	(_ref["used"] as Label).text = "−%d" % (n * per) if n > 0 else "0"
+	(_ref["made"] as Label).text = "+%d" % n if n > 0 else "0"
+	(_ref["made"] as Label).add_theme_color_override("font_color", TechUi.GOLD if n > 0 else TechUi.DIM)
+	var still := _ref["still"] as Button
+	var reason := ""
+	if not _station:
+		reason = "Перегонка — у станции заправки в огороде"
+	elif n <= 0:
+		reason = "Мало: нужно %d на блок, есть %d" % [per, FuelRefinery.held(_raw_sel)]
+	Tip.bind(still, "Перегнать", "%s: уйдёт %d, блоков выйдет %d" % [TechUi.item_name(_raw_sel), n * per, n], reason)
+	still.modulate = Color(1, 1, 1, 1.0 if reason == "" else 0.6)
+
+
+func _on_refine_pressed() -> void:
+	if Tip.swallowed():
+		return
+	var still := _ref.get("still", null) as Button
+	var n := _refine_amount()
+	if not _station or n <= 0:
+		_deny(still)
+		return
+	# Точки полёта снимаем ДО пересборки экрана: после refresh() узлы новые, а раскладка та же.
+	var from_raw := (_ref["raw_icon"] as Control).get_global_rect().get_center()
+	var at_still := still.get_global_rect().get_center()
+	var targets := {}
+	for src in _src_icons.keys():
+		var t := _src_icons[src] as Control
+		if t != null and is_instance_valid(t):
+			targets[src] = t.get_global_rect().get_center()
+	var raw := _raw_sel
+	var res := FuelRefinery.refine(raw, n)
+	if not bool(res["ok"]):
+		_deny(still)
+		return
+	SaveSystem.save_game()
+	_refine_n = -1
+	refresh()
+	_play_refine(raw, res, from_raw, at_still, targets)
+
+
+## Сочный отклик: сырьё летит в куб, куб вспыхивает, блоки летят в рюкзак/на склад.
+func _play_refine(raw: String, res: Dictionary, from_raw: Vector2, at_still: Vector2, targets: Dictionary) -> void:
+	Sfx.play("lava_hiss")
+	Haptics.thud()
+	var raw_tex := TechUi.item_icon(raw)
+	var shown_in := mini(int(res["used"]), 6)
+	for i in range(shown_in):
+		TechUi.fly(_fx_layer, raw_tex, from_raw, at_still, 0.05 * i, Callable(), 18.0)
+	var flare_at := 0.5 + 0.05 * float(shown_in)
+	_flare(at_still, flare_at)
+	var k := 0
+	for src in ["pack", "storage"]:
+		var cnt := int(res["to_" + src])
+		if cnt <= 0:
+			continue
+		var to: Vector2 = targets.get(src, at_still)
+		var flights := mini(cnt, 5)
+		for i in range(flights):
+			var last := i == flights - 1
+			TechUi.fly(_fx_layer, TechUi.tex("fuel_block"), at_still, to, flare_at + 0.12 + 0.07 * k,
+				func() -> void: _block_landed(String(src), to, cnt, last), 20.0)
+			k += 1
+
+
+func _block_landed(src: String, at: Vector2, cnt: int, last: bool) -> void:
+	var t := _src_icons.get(src, null) as Control
+	if t != null and is_instance_valid(t):
+		UiAnim.pulse(t, 0.3, 0.24)
+	Sfx.play("pickup")
+	Haptics.tap()
+	if last:
+		_float_text(at + Vector2(14, -10), "+%d" % cnt)
+
+
+## Вспышка над кубом: пламя растёт и гаснет, тёплый отсвет на экране.
+func _flare(at: Vector2, delay: float) -> void:
+	if UiAnim.reduced() or _fx_layer == null or not _fx_layer.is_inside_tree():
+		Sfx.play("ui_buy")
+		return
+	var f := TechUi.icon_rect(TechUi.tex("icon_flame"), 28)
+	f.size = Vector2(28, 28)
+	f.pivot_offset = f.size * 0.5
+	f.position = at - f.size * 0.5 + Vector2(0, -6)
+	f.modulate.a = 0.0
+	f.scale = Vector2.ONE * 0.5
+	_fx_layer.add_child(f)
+	var tw := f.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_callback(func() -> void:
+		Sfx.play("ui_buy")
+		Fx.flash(Color(1.0, 0.6, 0.2, 0.16), 0.2))
+	tw.tween_property(f, "modulate:a", 1.0, 0.08)
+	tw.parallel().tween_property(f, "scale", Vector2.ONE * 1.5, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(f, "position:y", f.position.y - 10.0, 0.4)
+	tw.tween_property(f, "modulate:a", 0.0, 0.2)
+	tw.tween_callback(f.queue_free)
+
+
+func _float_text(at: Vector2, text: String) -> void:
+	if UiAnim.reduced() or _fx_layer == null or not _fx_layer.is_inside_tree():
+		return
+	var l := TechUi.label(text, 12, TechUi.GOLD)
+	l.position = at - Vector2(10, 8)
+	_fx_layer.add_child(l)
+	var tw := l.create_tween()
+	tw.tween_property(l, "position:y", l.position.y - 16.0, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.35).set_delay(0.25)
+	tw.tween_callback(l.queue_free)
 
 
 # ---------------------------------------------------------------------------

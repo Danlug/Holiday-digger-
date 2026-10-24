@@ -20,8 +20,7 @@ func _ready() -> void:
 	_test_sell_only_selected()
 	_test_not_bought()
 	_test_craft_bronze()
-	_test_craft_fuel_block()
-	_test_craft_fuel_block_coal()
+	_test_no_fuel_recipes_in_workshop()
 	_test_idle_well_payout()
 	_test_craft_without_materials()
 	_test_hand_drill_from_storage()
@@ -162,40 +161,30 @@ func _test_craft_bronze() -> void:
 	check("бронза появилась в рюкзаке", GameState.get_item_count("bronze") == 1)
 
 
-func _test_craft_fuel_block() -> void:
+## Топливные блоки больше не делаются на верстаке (решение владельца, раунд 3:
+## «переработка торфа в топливо — на заправочной станции, а не в магазине»).
+## Перегонку проверяет tests/test_fuel_station.gd; здесь — что из мастерской она ушла
+## целиком: ни рецепта на торфе, ни на угле, ни плитки в разделе «Техника».
+func _test_no_fuel_recipes_in_workshop() -> void:
 	_fresh()
-	var recipe := ShopCatalog.recipe("fuel_block")
-	check("топливный блок делается из 4 торфа (ГДД раздел 5)", int(recipe["inputs"]["peat"]) == 4)
-
-	GameState.inventory["peat"] = 3
-	check("с тремя торфами блок не делается", not bool(ShopService.craft("fuel_block")["ok"]))
-	check("неудачный крафт не тронул торф", GameState.get_item_count("peat") == 3)
-
-	GameState.inventory["peat"] = 4
-	check("с четырьмя торфами блок делается", bool(ShopService.craft("fuel_block")["ok"]))
-	check("торф списан весь", GameState.get_item_count("peat") == 0)
-	check("блок лежит в рюкзаке", GameState.get_item_count("fuel_block") == 1)
-
-
-## Бурмобиль требует брикеты угля (задача «Бурмобиль — транспорт», решение
-## владельца: «если он экипирован бурмобилем, он должен иметь на себе
-## топливо (брикеты каменного угля)»). Уголь — второй путь к тому же
-## предмету fuel_block, рядом с торфом, а не замена ему.
-func _test_craft_fuel_block_coal() -> void:
-	_fresh()
-	var recipe := ShopCatalog.recipe("fuel_block_coal")
-	check("рецепт угольного блока существует", not recipe.is_empty())
-	var need := int(recipe["inputs"]["coal"])
-	check("выход тот же предмет, что и у торфяного рецепта", String(recipe["output"]["id"]) == "fuel_block")
-
-	GameState.max_depth_reached = 1000  # рецепт открывается той же глубиной, что и уголь
-	GameState.inventory["coal"] = need - 1
-	check("без достаточного угля блок не делается", not bool(ShopService.craft("fuel_block_coal")["ok"]))
-
-	GameState.inventory["coal"] = need
-	check("с углём по рецепту блок делается", bool(ShopService.craft("fuel_block_coal")["ok"]))
-	check("уголь списан весь", GameState.get_item_count("coal") == 0)
-	check("блок лежит в рюкзаке", GameState.get_item_count("fuel_block") == 1)
+	check("рецепта блока из торфа на верстаке нет", ShopCatalog.recipe("fuel_block").is_empty())
+	check("рецепта блока из угля на верстаке нет", ShopCatalog.recipe("fuel_block_coal").is_empty())
+	var outputs: Array = []
+	for r in ShopCatalog.recipes():
+		outputs.append(String(r["output"]["id"]))
+	check("ни один рецепт мастерской не делает топливный блок", not outputs.has("fuel_block"))
+	GameState.max_depth_reached = 1000
+	GameState.inventory["peat"] = 8
+	GameState.inventory["coal"] = 4
+	check("craft(fuel_block) отказывает", not bool(ShopService.craft("fuel_block")["ok"]))
+	check("craft(fuel_block_coal) отказывает", not bool(ShopService.craft("fuel_block_coal")["ok"]))
+	check("торф и уголь не тронуты", GameState.get_item_count("peat") == 8 and GameState.get_item_count("coal") == 4)
+	check("блок не появился", GameState.get_item_count("fuel_block") == 0)
+	var tiles: Array = []
+	for o in ShopItems.recipe_offers():
+		tiles.append(String(o["key"]))
+	check("в разделе «Техника» нет плиток топлива",
+		not tiles.has("recipe:fuel_block") and not tiles.has("recipe:fuel_block_coal"))
 
 
 ## Скважина платит рудой и золотом и никогда — донатной валютой

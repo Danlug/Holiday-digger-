@@ -679,6 +679,8 @@ var ext: Dictionary = {}
 ##   sold           {coins: int, count: int}   — сделка в мастерской
 ##   bought         {id: String, currency: String} — покупка в магазине
 ##   fuel_used / refueled {amount: float}      — топливо бура
+##   fuel_refined   {raw: String, used: int, blocks: int, to_pack: int, to_storage: int}
+##                  — перегонка на станции заправки (торф/уголь -> топливные блоки)
 ##   monster_killed {id: String, depth: int, pos: Vector2}
 ##   boss_defeated  {id: String}
 ##   quest_done     {id: String}
@@ -686,6 +688,9 @@ var ext: Dictionary = {}
 ##   slept          {hours: float, stamina: int, skipped: bool} — сон дома (ветка house)
 ##   food_ordered   {id: String, free: bool} / food_delivered {id: String} — заказ еды и приезд курьера
 ##   stored         {item: String, count: int, dir: String} — dir "put" на склад / "take" в рюкзак
+##   chest_opened   {cell: Vector2i, tier: String, items: Dictionary, xp: int} — открыт тайник (scripts/mechanics)
+##   fever_started  {cells: int} / fever_ended {} — лихорадка азарта: следующие клетки с двойной добычей
+##   mastery_star   {item: String, star: int, xp: int} — звезда мастерства породы
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)

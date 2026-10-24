@@ -88,7 +88,7 @@ func _close_meta() -> void:
 
 
 func _scene_world() -> void:
-	Settings.reduce_motion = true
+	Settings.reduce_motion = false   # пар над кубом рисуется только с движением
 	_close_meta()
 	GameState.player_depth = 0
 	var p = _main.player
@@ -96,8 +96,9 @@ func _scene_world() -> void:
 	p.y = 0.5
 	p.vx = 0.0
 	p.vy = 0.0
-	await _frames(8)
+	await get_tree().create_timer(1.2).timeout
 	await _shot("st_0_world")
+	Settings.reduce_motion = true
 
 
 func _scene_refine() -> void:

@@ -59,10 +59,58 @@ def icon_arrow():
     return T.outline(im)
 
 
+def still_world(frame):
+    """Перегонный куб у станции в огороде (32×40, правее колонки): медный котёл на
+    кирпичной топке, змеевик в ведро с блоками. frame 0/1 — огонь в топке мигает."""
+    im = T.new(32, 40)
+    # кирпичная топка
+    T.rect(im, 3, 29, 24, 39, "rebar_dark")
+    for row, y in enumerate(range(30, 39, 3)):
+        off = 0 if row % 2 == 0 else 3
+        for x in range(3 + off, 24, 6):
+            T.rect(im, x, y, min(x + 4, 24), y + 1, "copper_base" if (x + y) % 4 else "rebar_rust")
+    T.rect(im, 9, 32, 18, 38, "lava_crust_0")              # устье топки
+    if frame == 0:
+        T.poly(im, [(10, 38), (10, 35), (12, 33), (13, 35), (15, 32), (17, 35), (17, 38)], "fire_orange")
+        T.poly(im, [(12, 38), (12, 36), (14, 34), (16, 37), (16, 38)], "fire_yellow")
+    else:
+        T.poly(im, [(10, 38), (11, 34), (13, 36), (14, 33), (16, 35), (17, 34), (17, 38)], "fire_red")
+        T.poly(im, [(11, 38), (12, 35), (14, 36), (15, 35), (16, 38)], "fire_orange")
+        T.dot(im, 14, 37, "fire_yellow")
+    # медный котёл
+    T.ell(im, 3, 12, 24, 31, "rebar_rust")
+    T.ell(im, 4, 13, 22, 29, "copper_base")
+    T.ell(im, 5, 14, 13, 21, "copper_light")
+    T.rect(im, 7, 16, 8, 18, "gold_light")
+    T.rect(im, 3, 25, 24, 26, "rebar_dark")                # обруч
+    T.rect(im, 5, 25, 9, 25, "copper_light")
+    # горло и колпак
+    T.rect(im, 11, 6, 16, 13, "copper_base")
+    T.rect(im, 11, 6, 12, 13, "copper_light")
+    T.rect(im, 15, 6, 16, 13, "rebar_rust")
+    T.ell(im, 10, 3, 17, 8, "copper_base")
+    T.rect(im, 11, 4, 12, 5, "gold_light")
+    # змеевик: вправо и вниз, в ведро
+    T.line(im, [(17, 5), (25, 5), (28, 8), (28, 14)], "copper_base", 2)
+    T.line(im, [(17, 5), (25, 5)], "copper_light", 1)
+    for y in (15, 19, 23):
+        T.line(im, [(28, y), (25, y + 2), (28, y + 4)], "copper_base", 2)
+    T.dot(im, 28, 28, "fire_orange")                        # капля топлива
+    # ведро с брикетами
+    T.rect(im, 24, 31, 31, 39, "steel_blue")
+    T.rect(im, 24, 31, 31, 32, "lead_light")
+    T.rect(im, 25, 30, 27, 31, "soil_light")
+    T.rect(im, 28, 29, 30, 31, "soil_shadow")
+    T.dot(im, 29, 30, "fire_orange")
+    return T.outline(im)
+
+
 def main():
     items = {
         "icon_refine.png": icon_refine(),
         "icon_arrow.png": icon_arrow(),
+        "still_0.png": still_world(0),
+        "still_1.png": still_world(1),
     }
     for name, im in items.items():
         T.save(im, name)

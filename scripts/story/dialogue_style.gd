@@ -17,7 +17,7 @@ static func panel_box(radius: int = 10, border: int = 2, shadow: int = 6) -> Sty
 	sb.bg_color = PANEL_BG
 	sb.border_color = GOLD
 	sb.set_border_width_all(border)
-	sb.set_corner_radius_all(radius)
+	sb.set_corner_radius_all(ProgressUiKit.snap_radius(radius))   # общие ступени радиусов
 	sb.shadow_color = Color(0, 0, 0, 0.55)
 	sb.shadow_size = shadow
 	sb.shadow_offset = Vector2(0, 2)
@@ -31,7 +31,7 @@ static func ribbon_box(accent: Color) -> StyleBoxFlat:
 	sb.bg_color = accent.darkened(0.45)
 	sb.border_color = GOLD
 	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(5)
+	sb.set_corner_radius_all(ProgressUiKit.R_TILE)
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 1

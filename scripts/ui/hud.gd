@@ -8,6 +8,7 @@ extends Control
 
 const TILE := 32
 const STRIP_H := 40.0
+const STRIP_BTN_W := 38.0   # кнопки нижней полосы одного размера, значки 32 (раньше: 34 с 16 и инструмент 38 с 32)
 # Джойстик задаётся долей ширины экрана, а не пикселями из web-демо: там
 # интерфейс живёт в пикселях устройства (118px на экране в 390), а здесь — в
 # проектных единицах вьюпорта (224 в ширину), и те же 118 занимали половину
@@ -53,6 +54,7 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
+const PILL_W := 78.0    # ширина таблеток кошелька (монеты, доллары, вес)
 const GAUGE_W := 62.0   # ширина полоски: правее остаётся место кошельку
 var _xp_bar: HudBar
 var _level_label: Label
@@ -411,14 +413,18 @@ func _build_purse(parent: Control) -> void:
 	_dollars_pill = _make_pill(box, "dollar", Color8(0x7F, 0xB8, 0x6B), "dollars")
 	Tip.bind(_coins_pill, "Монеты")
 	Tip.bind(_dollars_pill, "Доллары", "Премиум-валюта")
+	# Три таблетки одной ширины: ровный правый и левый край столбика (раньше 72/64/58).
+	_coins_pill.custom_minimum_size.x = PILL_W
+	_dollars_pill.custom_minimum_size.x = PILL_W
 
 	_load_pill = PanelContainer.new()
 	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(Color8(0x8F, 0xA3, 0x5C)))
 	_load_pill.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_load_pill.custom_minimum_size.x = PILL_W
 	_load_pill.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(_load_pill)
 	_load_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
-	_load_bar.bar_width = 44.0
+	_load_bar.bar_width = 48.0
 	_load_bar.pulse_above = 1.0
 	_load_pill.add_child(_load_bar)
 	_load_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -836,7 +842,7 @@ func _build_strip() -> void:
 	# Только иконки: слова («Инвентарь», «Склад», название инструмента) — в
 	# подсказке Tip. Кнопка рюкзака — переключатель: при открытой шторке она
 	# «вдавлена» и подсвечена золотом.
-	_inv_button = UiBtn.icon_button(UiIcons.tex("backpack"), Vector2(34, 34), UiBtn.Kind.NORMAL, 16)
+	_inv_button = UiBtn.icon_button(UiIcons.tex("backpack"), Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	Tip.bind(_inv_button, "Рюкзак", "Что несёшь и сколько это стоит")
 	_inv_button.toggle_mode = true
 	_inv_button.pressed.connect(_on_inv_button_pressed)
@@ -845,7 +851,7 @@ func _build_strip() -> void:
 	# Инструмент — одна иконка без подписи, чуть крупнее остальных: это то, чем
 	# копают. Название всплывает НАД полосой по нажатию (и при наведении на
 	# компьютере), и само — когда инструмент сменился (ГДД п.16).
-	_tool_button = UiBtn.icon_button(null, Vector2(38, 36), UiBtn.Kind.NORMAL, 32)
+	_tool_button = UiBtn.icon_button(null, Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	_tool_button.pressed.connect(func():
 		if Tip.swallowed():
 			return
@@ -897,7 +903,7 @@ func _build_strip() -> void:
 	# на просмотр: игрок должен планировать вылазку, зная, чего не хватает до
 	# кирки. Поэтому кнопка постоянная, а не контекстная. Нажатие подключает
 	# сама система дома по группе "house_storage_button".
-	var storage_btn := UiBtn.icon_button(UiIcons.tex("inventory"), Vector2(34, 34))
+	var storage_btn := UiBtn.icon_button(UiIcons.tex("inventory"), Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	Tip.bind(storage_btn, "Склад", "В мастерской: можно смотреть откуда угодно")
 	storage_btn.add_to_group("house_storage_button")
 	strip.add_child(storage_btn)
@@ -906,7 +912,7 @@ func _build_strip() -> void:
 	# «•••» встаёт последним, чтобы контекстная кнопка дома, появляясь и
 	# исчезая, не сдвигала его под пальцем. Красный бейдж — сумма бейджей
 	# пунктов меню (новые задания и т.п.).
-	_more_button = UiBtn.icon_button(UiIcons.tex("more"), Vector2(34, 34))
+	_more_button = UiBtn.icon_button(UiIcons.tex("more"), Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	Tip.bind(_more_button, "Меню")
 	_more_button.pressed.connect(func():
 		if Tip.swallowed():

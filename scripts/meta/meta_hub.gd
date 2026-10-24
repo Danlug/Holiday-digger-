@@ -73,6 +73,7 @@ func open(tab: String = "") -> void:
 	UiAnim.open(_root, UiAnim.Kind.FADE)
 	Sfx.play("ui_open")
 	refresh()
+	UiAnim.stagger(_vbox.get_children(), 0.045, 0.92)
 
 
 func close() -> void:

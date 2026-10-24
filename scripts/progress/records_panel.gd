@@ -58,6 +58,10 @@ func _line() -> Control:
 	return c
 
 
+func tiles() -> Array:
+	return _grid.get_children() if _grid != null else []
+
+
 func refresh() -> void:
 	if _grid == null:
 		return

@@ -129,6 +129,28 @@ static func appear(c: Control, from_scale: float = 0.9, duration: float = 0.14) 
 	tw.tween_property(c, "modulate:a", 1.0, duration * 0.8)
 
 
+## Плитки сетки или карточки списка всплывают по очереди (шаг step секунд, не дольше
+## max_total всего). Размер для точки вращения берётся в момент показа: сразу после
+## добавления в контейнер он ещё нулевой.
+static func stagger(nodes: Array, step: float = 0.03, from_scale: float = 0.85, max_total: float = 0.4) -> void:
+	if nodes.is_empty() or instant(nodes[0] as Control):
+		return
+	var n := nodes.size()
+	var dt := minf(step, max_total / float(n))
+	for i in n:
+		var c := nodes[i] as Control
+		if c == null or not c.is_inside_tree():
+			continue
+		c.modulate.a = 0.0
+		var tw := c.create_tween()
+		tw.tween_interval(dt * float(i))
+		tw.tween_callback(func() -> void:
+			c.pivot_offset = c.size * 0.5
+			c.scale = Vector2.ONE * from_scale)
+		tw.tween_property(c, "scale", Vector2.ONE, D_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(c, "modulate:a", 1.0, D_IN * 0.7)
+
+
 ## Шторка выезжает снизу: сдвиг вверх на dy и появление.
 static func slide_up(c: Control, dy: float = 24.0, duration: float = 0.2) -> void:
 	if c == null:

@@ -289,7 +289,8 @@ func open_tab(tab: String) -> void:
 	if to_records:
 		tab = TAB_HERO
 	_current_tab = tab if _panels.has(tab) else TAB_PROGRESS
-	var switching := visible and not _closing
+	var entering := not visible or _closing
+	var switching := not entering
 	for key in _panels.keys():
 		var panel: Control = _panels[key]
 		var was_shown := panel.visible
@@ -297,8 +298,11 @@ func open_tab(tab: String) -> void:
 		if panel.visible and panel.has_method("refresh"):
 			panel.refresh()
 		# Смена вкладки проявляется мягко, а не щёлкает; первое открытие проявляет весь экран.
-		if panel.visible and switching and not was_shown:
-			UiAnim.open(panel, UiAnim.Kind.FADE)
+		if panel.visible and (not was_shown or entering):
+			if switching:
+				UiAnim.open(panel, UiAnim.Kind.FADE)
+			if panel.has_method("play_intro"):
+				panel.play_intro()
 	for key in _tab_buttons.keys():
 		(_tab_buttons[key] as HeroTabButton).set_selected(key == _current_tab)
 	_sync_tabs()

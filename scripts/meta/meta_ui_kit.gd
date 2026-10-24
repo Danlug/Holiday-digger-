@@ -26,7 +26,7 @@ const ICON_DIR := "res://art/meta/"
 const SHARED := {
 	"coin": "res://art/ui/icon_coin.png",
 	"dollar": "res://art/ui/icon_dollar.png",
-	"stamina": "res://art/ui/icon_stamina.png",
+	"stamina": "res://art/ui/icons/stamina.png",   # тот же рисунок, что у полоски бодрости и экрана героя
 }
 ## Предметы-награды без собственной иконки показываются значком энергии.
 const ITEM_ICON := {"energy_drink": "stamina", "energy_bar": "stamina"}

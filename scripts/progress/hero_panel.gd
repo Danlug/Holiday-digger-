@@ -183,6 +183,14 @@ func refresh() -> void:
 		records_panel.refresh()
 
 
+## Плитки характеристик и рекордов всплывают по очереди при открытии вкладки.
+func play_intro() -> void:
+	var tiles: Array = _stats.values()
+	if records_panel != null:
+		tiles.append_array(records_panel.tiles())
+	UiAnim.stagger(tiles, 0.035)
+
+
 ## Подкрутить список к рекордам (ProgressScreen.open("records")).
 func scroll_to_records() -> void:
 	await get_tree().process_frame

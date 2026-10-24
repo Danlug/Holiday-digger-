@@ -26,7 +26,7 @@ const LONG_PRESS := 0.38
 const AUTO_HIDE := 3.2
 const AFTER_RELEASE := 1.8
 const MOVE_CANCEL_PX := 12.0
-const MAX_WIDTH := 152.0
+const MAX_WIDTH := 160.0
 const META := &"_tip_data"
 
 const COL_BG := Color8(0x17, 0x13, 0x0F, 0xF2)
@@ -214,9 +214,9 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override("separation", 1)
 	_panel.add_child(box)
-	_title = _make_label(10, COL_TITLE)
-	_body = _make_label(9, COL_BODY)
-	_extra = _make_label(9, COL_EXTRA)
+	_title = _make_label(11, COL_TITLE)
+	_body = _make_label(10, COL_BODY)
+	_extra = _make_label(10, COL_EXTRA)
 	box.add_child(_title)
 	box.add_child(_body)
 	box.add_child(_extra)

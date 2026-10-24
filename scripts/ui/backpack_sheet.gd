@@ -81,6 +81,7 @@ func open() -> void:
 	visible = true
 	Sfx.play("ui_open")
 	UiAnim.open(_card, UiAnim.Kind.SHEET, self)
+	UiAnim.stagger(_grid.get_children().filter(func(c: Node) -> bool: return c is Button))
 
 
 func close() -> void:

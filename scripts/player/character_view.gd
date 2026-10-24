@@ -572,6 +572,14 @@ var _death_bounced: bool = false
 var _getup_t: float = -1.0
 var _flash: Color = Color(1, 1, 1, 1)
 
+# Тень под ногами: в прыжке и полёте по ней читается высота, на земле она приземляет героя.
+var _shadow_a: float = 0.0
+var _shadow_w: float = 11.0
+var _shadow_h: float = 3.6
+var _shadow_y: float = 15.0
+const SHADOW_REACH := 9          # столько клеток вниз ищем землю
+const SHADOW_FADE_CELLS := 7.0   # на такой высоте тень исчезает
+
 
 func _connect_signals() -> void:
 	if player != null and player.has_signal("jumped") and not player.jumped.is_connected(_on_jumped):
@@ -1180,6 +1188,7 @@ func _process(delta: float) -> void:
 
 	_apply_pose(dt, mode, f, turn_x, sheet_name, fw, geom)
 	_tick_jet(dt, sheet_name, f)
+	_update_shadow(in_rig)
 
 
 ## Ставит спрайт относительно оси в подошве и накладывает все движения корпуса.
@@ -1219,6 +1228,9 @@ func _apply_pose(dt: float, mode: String, f: int, turn_x: float, sheet_name: Str
 			sway = deg_to_rad(1.1) * sin(_t * TAU * 0.9)
 			if is_jet:
 				shake = Vector2(sin(_t * 91.0), cos(_t * 77.0)) * 0.35
+		"dig":
+			if _dig_cached_base == "dig_drill" and player.digging != null:
+				shake = Vector2(sin(_t * TAU * 43.0), cos(_t * TAU * 37.0) * 0.7) * HeroAnim.num("rig.dig_shake_px", 0.55) * amp
 		"rigdig":
 			if player.digging != null:
 				var s: float = HeroAnim.num("rig.dig_shake_px", 0.55)
@@ -1357,6 +1369,48 @@ func _ground_pose(dt: float) -> Dictionary:
 		return {"sheet_name": jf["sheet_name"], "frame": jf["frame"], "mode": "idle"}
 	var ip: Dictionary = _idle_pose(dt)
 	return {"sheet_name": ip["sheet_name"], "frame": ip["frame"], "mode": "idle"}
+
+
+## Находит землю под героем и ставит под неё тень: чем выше герой, тем она
+## меньше и бледнее. Ищет только на SHADOW_REACH клеток вниз — выше тени нет.
+func _update_shadow(in_rig: bool) -> void:
+	var world = player.get("world")
+	var a := 0.0
+	var k := 1.0
+	var ground_y := 0.0
+	if world != null and _death_t < 0.0:
+		var feet: float = player.y + HH
+		var cx: int = int(floor(player.x))
+		var r0: int = int(floor(feet + 0.05))
+		for r in range(r0, r0 + SHADOW_REACH):
+			if world.get_tile(cx, r) != TileTypes.Type.EMPTY:
+				var d: float = maxf(0.0, float(r) - feet)
+				var t: float = clampf(d / SHADOW_FADE_CELLS, 0.0, 1.0)
+				a = 0.30 * (1.0 - t)
+				k = 1.0 - 0.5 * t
+				ground_y = (float(r) - player.y) * float(TILE) + 0.6
+				break
+	var w: float = (26.0 if in_rig else 11.0) * k * (1.0 + 0.5 * maxf(_sq.x, 0.0))
+	var h: float = (6.5 if in_rig else 3.6) * k
+	if absf(a - _shadow_a) > 0.004 or absf(w - _shadow_w) > 0.15 or absf(ground_y - _shadow_y) > 0.15:
+		_shadow_a = a
+		_shadow_w = w
+		_shadow_h = h
+		_shadow_y = ground_y
+		queue_redraw()
+
+
+func _draw() -> void:
+	if _shadow_a <= 0.01:
+		return
+	var outer := PackedVector2Array()
+	var inner := PackedVector2Array()
+	for i in 16:
+		var ang: float = TAU * float(i) / 16.0
+		outer.append(Vector2(cos(ang) * _shadow_w * 0.5, _shadow_y + sin(ang) * _shadow_h * 0.5))
+		inner.append(Vector2(cos(ang) * _shadow_w * 0.32, _shadow_y + sin(ang) * _shadow_h * 0.3))
+	draw_colored_polygon(outer, Color(0.0, 0.0, 0.0, _shadow_a))
+	draw_colored_polygon(inner, Color(0.0, 0.0, 0.0, _shadow_a * 0.7))
 
 
 ## Стан показывается тряской, а не простоем: секунда без движения выглядит как

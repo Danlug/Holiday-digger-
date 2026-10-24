@@ -171,8 +171,8 @@ func _set_tab(t: String) -> void:
 	_tab = t
 	_road_centered = false
 	_scroll.scroll_vertical = 0
-	Sfx.play("ui_tab")
-	refresh()
+	refresh()   # звук и вибро вкладки — в HeroTabButton.make_bar
+	UiAnim.stagger(_vbox.get_children(), 0.035, 0.94)
 
 
 func refresh() -> void:

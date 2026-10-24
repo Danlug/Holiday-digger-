@@ -9,7 +9,7 @@ extends RefCounted
 
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
 const MUTED := Color8(0x9D, 0x8B, 0x73)
-const DIM := Color8(0x6A, 0x5C, 0x4C)
+const DIM := Color8(0x86, 0x76, 0x60)   # было 6A5C4C: на тёмной плашке контраст ~2.7, теперь ~4
 const BORDER := Color8(0x3E, 0x31, 0x25)
 const BG := Color(0.071, 0.055, 0.043, 0.97)
 ## Фон полноэкранных экранов (герой, техника, хаб, снаряжение): непрозрачный, иначе сквозь

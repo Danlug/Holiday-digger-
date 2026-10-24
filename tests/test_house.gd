@@ -196,7 +196,14 @@ func _test_non_portable_food_is_eaten_at_home() -> void:
 	check("пельмени с собой унести нельзя", not HouseConfig.is_portable("food_dumplings"))
 
 	var before := GameState.hunger
+	# Заказ — у входной двери (ГДД §15, ShopService.can_buy): ставим героя в прихожую.
+	var was_indoors := GameState.house_is_indoors
+	var was_room := GameState.house_room
+	GameState.house_is_indoors = true
+	GameState.house_room = "hall"
 	var r := HouseSystem.order_food("food_steak")
+	GameState.house_is_indoors = was_indoors
+	GameState.house_room = was_room
 	check("стейк заказан", bool(r.get("ok", false)))
 	check("стейк восстановил голод сразу", GameState.hunger > before)
 	check("стейка нет в рюкзаке", GameState.get_item_count("food_steak") == 0)

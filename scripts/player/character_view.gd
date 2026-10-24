@@ -500,7 +500,9 @@ const FLY_START := {"fly_1": [0, 1, 2], "fly_2": [0, 1, 2]}
 const FLY_LOOP := {"fly_1": [3, 4, 5], "fly_2": [3, 4, 5],
 		"fly_3": [0, 1, 2, 3, 4, 5], "fly_4": [0, 1, 2, 3, 4, 5]}
 ## Сопло джетпака относительно подошвы (логические точки, герой смотрит вправо).
-const JET_NOZZLE := {"fly_3": Vector2(-14.0, -3.0), "fly_4": Vector2(-24.0, -9.0)}
+const JET_NOZZLE := {"fly_3": Vector2(-14.0, -3.0), "fly_4": Vector2(-33.0, -8.0)}
+## Куда летят искры от сопла (по оси факела в рисунке).
+const JET_DIR := {"fly_3": Vector2(-0.35, 1.0), "fly_4": Vector2(-0.87, 0.5)}
 
 ## Скорость ходьбы из player.gd — нужна как масштаб наклона.
 const WALK_REF := 4.2
@@ -670,7 +672,7 @@ func _update_air(dt: float) -> bool:
 		_air_t = 0.0
 	else:
 		_air_t += dt
-	var coyote: float = HeroAnim.num("air.coyote_s", 0.07)
+	var coyote: float = HeroAnim.num("air.coyote_s", 0.1)
 	var air: bool = (not grounded) and (_air_t > coyote or float(player.vy) < -0.5 or thrusting)
 	if _was_air and not air and grounded:
 		_on_landed(absf(_prev_vy))
@@ -690,8 +692,7 @@ func _on_landed(impact: float) -> void:
 	_sq.target = 0.0
 	_land_hard = impact > 11.0
 	_land_t = HeroAnim.num("air.land_pose_s", 0.16) * (1.0 if _land_hard else 0.75)
-	if impact > 5.0:
-		Fx.burst("poof", _feet_world(), 0.25 + 0.5 * k)
+	# Пыль приземления поднимает JuiceDirector — здесь только тело.
 
 
 func _on_jumped() -> void:
@@ -803,7 +804,7 @@ func _air_pose() -> Dictionary:
 		pose = "rise_lo"
 	elif vy < -1.4:
 		pose = "rise"
-	elif vy <= 1.6:
+	elif vy <= 1.4:
 		# Зависание: два такта поз чередуются, герой не стоит истуканом.
 		pose = "apex" if int(_t * 5.5) % 2 == 0 else "apex_b"
 	elif vy <= 5.0:
@@ -863,9 +864,9 @@ func _tick_jet(dt: float, sheet_name: String, f: int) -> void:
 		_jet.scale_amount_min = 1.2
 		_jet.scale_amount_max = 2.4
 		var ramp := Gradient.new()
-		ramp.set_color(0, Color(1.0, 0.92, 0.55, 0.95))
-		ramp.add_point(0.45, Color(1.0, 0.55, 0.18, 0.8))
-		ramp.set_color(1, Color(0.6, 0.15, 0.05, 0.0))
+		ramp.set_color(0, Color(1.0, 0.96, 0.62, 1.0))
+		ramp.add_point(0.5, Color(1.0, 0.66, 0.2, 0.9))
+		ramp.set_color(1, Color(0.85, 0.25, 0.1, 0.0))
 		_jet.color_ramp = ramp
 		_jet.z_index = -1
 		add_child(_jet)
@@ -873,7 +874,8 @@ func _tick_jet(dt: float, sheet_name: String, f: int) -> void:
 	if on:
 		var n: Vector2 = JET_NOZZLE[sheet_name]
 		_jet.position = Vector2(n.x * float(f), FOOT_Y + n.y)
-		_jet.direction = Vector2(-0.35 * float(f), 1.0).normalized()
+		var d: Vector2 = JET_DIR[sheet_name]
+		_jet.direction = Vector2(d.x * float(f), d.y).normalized()
 
 
 # ---------------------------------------------------------------------------
@@ -929,6 +931,9 @@ func death_playing() -> bool:
 
 
 func _tick_reactions(dt: float) -> void:
+	if _death_t >= 0.0 and GameState.is_alive:
+		# Воскрес мимо сигнала respawned (сброс, отладка) — не оставляем героя лежать.
+		on_respawned()
 	_hurt_t = maxf(0.0, _hurt_t - dt)
 	_hurt_pose_t = maxf(0.0, _hurt_pose_t - dt)
 	if _death_t >= 0.0:

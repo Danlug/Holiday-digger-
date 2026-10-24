@@ -34,6 +34,10 @@ func _ready() -> void:
 	_test_walk_by_distance()
 	_test_air_pose()
 	_test_art_anchor()
+	_test_idle_extras()
+	_test_reduce_motion()
+	_test_death_cycle()
+	_test_cost()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -302,3 +306,122 @@ func _head_x(path: String, frame: int) -> float:
 				sum += float(x)
 				cnt += 1
 	return sum / float(cnt) if cnt > 0 else -1.0
+
+
+## Слой движения не должен отнимать кадр: средняя цена _process по состояниям.
+## Порог — на порядок выше ожидаемого (≈50 мкс), чтобы загруженная машина не краснила тест.
+func _test_cost() -> void:
+	var dt := 1.0 / 60.0
+	for state in ["walk", "dig", "fly"]:
+		view._reset_motion()
+		player.digging = null
+		player.thrust = ""
+		player.on_ground = true
+		player.facing = 1
+		player.x = 20.0
+		player.y = 5.0
+		if state == "fly":
+			GameState.current_gear = "jetpack"
+			player.on_ground = false
+		var t0 := Time.get_ticks_usec()
+		var n := 600
+		for i in n:
+			if state == "walk":
+				player.x += 4.2 * dt
+				if player.x > 40.0:
+					player.x = 20.0
+			elif state == "dig":
+				player.digging = {"x": player.cell_x() + 1, "y": player.cell_y(), "t": float(i) * dt, "total": 99.0, "type": TileTypes.Type.DIRT}
+			elif state == "fly":
+				player.thrust = "jet"
+				player.vy = -2.0
+			view._process(dt)
+		var us := float(Time.get_ticks_usec() - t0) / float(n)
+		print("  _process (%s): %.0f мкс/кадр" % [state, us])
+		check("цена кадра героя (%s) %.0f мкс < 2000" % [state, us], us < 2000.0)
+	player.digging = null
+	player.thrust = ""
+	GameState.current_gear = ""
+
+
+## Простой: дыхание всегда, моргание изредка, оглядывание и постукивание после долгого простоя.
+func _test_idle_extras() -> void:
+	view._reset_motion()
+	player.digging = null
+	player.x = 20.0
+	player.y = 5.0
+	player.on_ground = true
+	player.vx = 0.0
+	view._rng.seed = 7
+	var dt := 1.0 / 60.0
+	view._process(dt)
+	var blink := 0
+	var look := 0
+	var tap := 0
+	var total_frames := 0
+	var frames_seen := {}
+	for i in 60 * 24:
+		view._process(dt)
+		total_frames += 1
+		if _sheet() == "idle_x":
+			var f := _frame()
+			frames_seen[f] = true
+			if f == 0:
+				blink += 1
+			elif f <= 2:
+				look += 1
+			else:
+				tap += 1
+	check("за 24 с простоя герой моргал (%d кадров)" % blink, blink > 6)
+	check("моргание короткое (%.1f%% времени)" % [100.0 * blink / total_frames], blink < total_frames / 10)
+	check("после долгого простоя оглядывался (%d кадров)" % look, look > 20)
+	check("после долгого простоя постукивал ногой (%d кадров)" % tap, tap > 20)
+	check("кадр стойки — исходный idle.png в большинстве кадров", _sheet() == "idle" or _sheet() == "idle_x")
+
+
+func _test_reduce_motion() -> void:
+	var dt := 1.0 / 60.0
+	view._reset_motion()
+	player.x = 20.0
+	player.y = 0.5
+	player.on_ground = true
+	player.digging = null
+	var worst := 1.0
+	var worst_soft := 1.0
+	for soft in [false, true]:
+		Settings.reduce_motion = soft
+		view._reset_motion()
+		view._process(dt)
+		view._on_landed(18.0)
+		var low := 1.0
+		for i in 20:
+			view._process(dt)
+			low = minf(low, view._body.scale.y)
+		if soft:
+			worst_soft = low
+		else:
+			worst = low
+	Settings.reduce_motion = false
+	check("«Уменьшить движение» смягчает сжатие при приземлении (%.3f против %.3f)" % [worst_soft, worst], (1.0 - worst_soft) < (1.0 - worst) * 0.6)
+
+
+func _test_death_cycle() -> void:
+	var dt := 1.0 / 60.0
+	view._reset_motion()
+	player.x = 20.0
+	player.y = 0.5
+	player.on_ground = true
+	GameState.is_alive = true
+	view._process(dt)
+	view.on_died()
+	GameState.is_alive = false
+	check("в headless смерть не задерживает возрождение", not view.death_playing())
+	for i in 40:
+		view._process(dt)
+	check("после падения корпус лежит (поворот > 60°)", absf(view._body.rotation) > deg_to_rad(60.0))
+	GameState.is_alive = true
+	view._process(dt)
+	check("воскрес мимо сигнала — герой снова на ногах", view._death_t < 0.0)
+	for i in 40:
+		view._process(dt)
+	check("после воскрешения поза обычная", absf(view._body.rotation) < deg_to_rad(8.0) and view._body.scale.x > 0.95)

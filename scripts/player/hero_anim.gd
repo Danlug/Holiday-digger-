@@ -9,6 +9,7 @@ const CONFIG_PATH := "res://data/hero_anim.json"
 
 static var _cfg: Dictionary = {}
 static var _cfg_loaded: bool = false
+static var _memo: Dictionary = {}
 
 
 static func config() -> Dictionary:
@@ -34,12 +35,15 @@ static func _node(path: String) -> Variant:
 
 ## Число по пути "раздел.ключ" (понимает {value, proposed, note}).
 static func num(path: String, default: float) -> float:
+	# Зовётся десятки раз за кадр — разбор пути и обход словаря кладём в кэш.
+	if _memo.has(path):
+		return _memo[path]
 	var node: Variant = _node(path)
 	if typeof(node) == TYPE_DICTIONARY:
 		node = node.get("value", default)
-	if typeof(node) == TYPE_INT or typeof(node) == TYPE_FLOAT:
-		return float(node)
-	return default
+	var out: float = float(node) if (typeof(node) == TYPE_INT or typeof(node) == TYPE_FLOAT) else default
+	_memo[path] = out
+	return out
 
 
 ## Список чисел по пути (например, веса кадров копки).

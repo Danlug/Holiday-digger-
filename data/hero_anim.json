@@ -18,7 +18,7 @@
 		"impatient_after_s": { "value": 13.0, "proposed": true, "note": "после этого — нетерпеливо постукивает ногой" }
 	},
 	"air": {
-		"coyote_s": { "value": 0.07, "proposed": true, "note": "короче этого «сошёл с края» не считается воздухом (кадр без земли не мигает)" },
+		"coyote_s": { "value": 0.1, "proposed": true, "note": "короче этого «сошёл с края» не считается воздухом (кадр без земли не мигает)" },
 		"takeoff_stretch": { "value": 0.16, "proposed": true },
 		"fall_stretch": { "value": 0.10, "proposed": true, "note": "вытягивание на скорости падения" },
 		"land_squash_min": { "value": 0.07, "proposed": true },

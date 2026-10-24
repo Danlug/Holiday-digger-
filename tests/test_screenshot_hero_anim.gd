@@ -10,7 +10,7 @@ extends Node
 ##       --resolution 448x960 -- /каталог [сценарий ...]
 ##
 ## Сценарии: idle walk jump leap fall dig_down dig_side shovel fly_prop fly_jet
-## hurt die sleep turn. Без имён — все. Состояние только в памяти (user:// не пишем).
+## hurt die sleep turn fly_jet3 fly_prop2. Без имён — все. Состояние только в памяти (user:// не пишем).
 
 const DT := 1.0 / 60.0
 const CROP := 72.0         # сторона вырезки в логических точках
@@ -56,9 +56,11 @@ func _ready() -> void:
 	if _want("fall"): await _sc_fall()
 	if _want("dig_down"): await _sc_dig("dig_down", "pickaxe", false)
 	if _want("dig_side"): await _sc_dig("dig_side", "pickaxe", true)
-	if _want("shovel"): await _sc_dig("shovel", "shovel", true)
+	if _want("shovel"): await _sc_dig("shovel", "shovel", true, 3)
 	if _want("fly_prop"): await _sc_fly("fly_prop", "backpack")
 	if _want("fly_jet"): await _sc_fly("fly_jet", "jetpack_top")
+	if _want("fly_jet3"): await _sc_fly("fly_jet3", "jetpack")
+	if _want("fly_prop2"): await _sc_fly("fly_prop2", "backpack_plus")
 	if _want("hurt"): await _sc_hurt()
 	if _want("die"): await _sc_die()
 	if _want("sleep"): await _sc_sleep()
@@ -158,6 +160,12 @@ func _run(seconds: float, label_each: int = -1) -> void:
 var _n_steps := 0
 
 
+## Прогрев без съёмки: герой оседает на землю, пружины успокаиваются.
+func _skip(seconds: float) -> void:
+	for i in range(int(round(seconds / DT))):
+		await _step(false)
+
+
 func _grab() -> void:
 	var img := get_viewport().get_texture().get_image()
 	var sc: float = float(img.get_width()) / 224.0
@@ -183,14 +191,15 @@ func _sc(prefix: String, every: int = 3) -> void:
 
 func _sc_idle() -> void:
 	_sc("idle", 12)
-	_stand_at(20.5, 0.5)
-	await _run(0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(8.0)
 
 
 func _sc_walk() -> void:
 	_sc("walk", 3)
-	_stand_at(20.5, 0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(0.3)
 	player.set_intent(1, false, false)
 	await _run(1.4)
@@ -200,7 +209,8 @@ func _sc_walk() -> void:
 
 func _sc_turn() -> void:
 	_sc("turn", 2)
-	_stand_at(20.5, 0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(0.2)
 	player.set_intent(1, false, false)
 	await _run(0.6)
@@ -212,7 +222,8 @@ func _sc_turn() -> void:
 
 func _sc_jump(horizontal: int) -> void:
 	_sc("jump" if horizontal == 0 else "leap", 2)
-	_stand_at(20.5, 0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(0.3)
 	player.set_intent(horizontal, true, false)
 	await _run(0.05)
@@ -230,17 +241,17 @@ func _sc_fall() -> void:
 	await _run(0.5)
 
 
-func _sc_dig(prefix: String, tool_id: String, side: bool) -> void:
+func _sc_dig(prefix: String, tool_id: String, side: bool, depth: int = 9) -> void:
 	_sc(prefix, 3)
 	var cx := 22
-	var cy := 9
+	var cy := depth
 	_pit(cx, cy)
 	GameState.current_tool = tool_id
 	_stand_at(float(cx) + 0.5, float(cy) + 0.5)
 	if side:
 		player.x = float(cx + 1) - 0.38 - 0.01
 	player.on_ground = true
-	await _run(0.3)
+	await _skip(0.7)
 	if side:
 		player.set_intent(1, false, false)
 	else:
@@ -253,7 +264,8 @@ func _sc_dig(prefix: String, tool_id: String, side: bool) -> void:
 func _sc_fly(prefix: String, gear: String) -> void:
 	_sc(prefix, 3)
 	GameState.current_gear = gear
-	_stand_at(20.5, 0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(0.3)
 	player.set_intent(0, true, false)
 	await _run(1.4)
@@ -265,7 +277,8 @@ func _sc_fly(prefix: String, gear: String) -> void:
 
 func _sc_hurt() -> void:
 	_sc("hurt", 2)
-	_stand_at(20.5, 0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(0.3)
 	if view.has_method("on_hurt"):
 		view.on_hurt(10.0, -1)
@@ -275,7 +288,8 @@ func _sc_hurt() -> void:
 
 func _sc_die() -> void:
 	_sc("die", 3)
-	_stand_at(20.5, 0.5)
+	_stand_at(20.5, 0.54)
+	await _skip(0.6)
 	await _run(0.3)
 	GameState.is_alive = false
 	player.frozen = true

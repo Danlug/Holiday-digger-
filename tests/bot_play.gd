@@ -21,6 +21,7 @@ extends Node
 ## Код возврата: 0 — без находок P0 (тупик, застревание, падение), 1 — есть.
 
 const Telemetry := preload("res://tests/bot/bot_telemetry.gd")
+const Nav := preload("res://tests/bot/bot_nav.gd")
 
 const CHARS := {
 	# ret_* — когда возвращаться домой; side — на сколько клеток в сторону идти за видимой
@@ -46,6 +47,7 @@ const MODAL_STUCK_SEC := 20.0   # окно не закрылось за стол
 const SAMPLE_SEC := 30.0
 
 var T = Telemetry.new()
+var nav = Nav.new()
 var bot := BotPlayer.new()
 var C: Dictionary = {}
 var char_name := "cautious"
@@ -83,12 +85,7 @@ var _refusals: Array = []
 var _lava_refused := 0
 var _dig_blocked := 0
 var _shaft_x := SHAFT_X
-var _branched: Dictionary = {}
-var _ms := "shaft"               # автомат копки: shaft | side | return
-var _m_row := 0
-var _m_dir := 1
-var _m_until := 0
-var _climb_tries := 0
+
 var _last_hp := 100.0
 var _last_fall_sim := -100.0
 var _last_fall_dmg := 0.0
@@ -140,6 +137,8 @@ func _ready() -> void:
 		push_warning("bot: неизвестный характер %s — беру cautious" % char_name)
 		char_name = "cautious"
 	C = (CHARS[char_name] as Dictionary).duplicate(true)
+	if _short:
+		C["trip_max"] = 150.0   # короткий прогон обязан успеть круг «шахта → дом → шахта»
 	if _out.is_empty():
 		_out = OS.get_user_data_dir().path_join("bot_run")
 	DirAccess.make_dir_recursive_absolute(_out)
@@ -168,6 +167,8 @@ func _run() -> void:
 		T.finding("P0", "boot", "игра не поднялась: нет героя/мира/сюжета/дома", _sim)
 		_finish()
 		return
+	nav.world = world
+	nav.dig_cost = _nav_dig_cost
 	_end = _minutes * 60.0
 	T.meta = {"seed": _seed, "character": char_name, "minutes_target": _minutes, "short": _short,
 		"build": _build_label(), "fixed_fps_hint": "--fixed-fps 31", "started_utc": Time.get_datetime_string_from_system(true)}
@@ -570,7 +571,7 @@ func _on_died() -> void:
 			cause, _depth(), _activity, value], _sim, d, cause + "@" + _activity)
 	_died_pending = true
 	bot.release_all()
-	_ms = "shaft"
+	_branch_goal = Vector2i(-1, -1)
 
 
 func _on_respawned() -> void:
@@ -1011,22 +1012,24 @@ func _eat_in_mine() -> void:
 	T.event(_sim, "eat", "съел %s в шахте" % id, false)
 
 
-## Копка: вниз по стволу, в сторону — за видимой рудой и в штреки (жадный).
+## Копка. Каждую новую клетку — новый план навигатора (tests/bot/bot_nav.gd): к видимой
+## руде в радиусе C.side, к концу штрека (жадный), иначе на клетку глубже. Цель, к которой
+## 10 с нет продвижения, уходит в чёрный список на две минуты.
 func _mine() -> void:
 	_activity = "mine"
 	if not T.in_trip():
 		T.trip_start(_sim, _depth())
+	var path: Array = []
+	var path_cell := Vector2i(-99, -99)
+	var path_t := -100.0
+	var goal := Vector2i(-1, -1)
 	var last_progress := _sim
 	var last_digs := _digs
-	var last_cell := Vector2i(player.cell_x(), player.cell_y())
-	var air_dir: Array = []
-	var lava0 := _lava_refused
-	var blocked0 := _dig_blocked
+	var visited: Dictionary = {}
 	while not _stop and GameState.is_alive and not GameState.house_is_indoors and not _busy_story():
 		_eat_in_mine()
 		var why := _should_return()
 		if why != "":
-			_ms = "shaft"
 			bot.release_all()
 			if T.in_trip():
 				T._trip["return_reason"] = why
@@ -1035,38 +1038,111 @@ func _mine() -> void:
 			bot.release_all()
 			return
 		var cell := Vector2i(player.cell_x(), player.cell_y())
-		# прогресс — новая клетка выкопана или герой ушёл хотя бы на две клетки
-		if _digs != last_digs or absi(cell.x - last_cell.x) + absi(cell.y - last_cell.y) >= 2:
+		if _digs != last_digs or not visited.has(cell):
+			visited[cell] = true
 			last_progress = _sim
 			last_digs = _digs
-			last_cell = cell
-		elif _sim - last_progress > 12.0:
-			# Не копается и не движется: обойти — сместить ствол на клетку в сторону.
-			await _unstick_mine("нет копки 12 с")
+		elif _sim - last_progress > 10.0:
+			_bad[goal] = _sim + 120.0
+			T.event(_sim, "unstick", "10 с без продвижения к %s" % str(goal), false)
+			path = []
 			last_progress = _sim
-		if _lava_refused > lava0 or _dig_blocked > blocked0:
-			lava0 = _lava_refused
-			blocked0 = _dig_blocked
-			await _unstick_mine("порода не копается (лава/стан)")
-			last_progress = _sim
+			if _branch_goal == goal:
+				_branch_goal = Vector2i(-1, -1)
+		if path.is_empty() or cell != path_cell or _sim - path_t > 2.0:
+			path = _plan_mine(cell)
+			path_cell = cell
+			path_t = _sim
+			goal = path.back() if not path.is_empty() else Vector2i(-1, -1)
+		var keys: Array = [KEY_S]
+		if path.size() >= 2:
+			keys = _keys_for_step(cell, path[1])
 		if not player.on_ground:
-			# В воздухе: прыжок из ямы держит направление; в свободном падении — тормоз тягой.
-			var k: Array = _brake_keys()
-			k.append_array(air_dir)
-			bot.hold(k)
-			await _step()
-			continue
-		var keys := _mine_keys()
-		air_dir = []
-		if keys.has(KEY_W) and _ms != "shaft":
-			_climb_tries += 1
-		if keys.has(KEY_W):
-			for kk in keys:
-				if kk == KEY_A or kk == KEY_D:
-					air_dir.append(kk)
+			keys.erase(KEY_S)
+			if player.vy > 10.0 and _floor_gap() >= 3 and player.has_backpack() and not keys.has(KEY_W):
+				keys.append(KEY_W)   # долгое падение (каверна, обвал) — тормоз тягой
 		bot.hold(keys)
 		await _step()
 	bot.release_all()
+
+
+var _bad: Dictionary = {}               # клетка -> до какого sim не пытаться
+var _branch_goal := Vector2i(-1, -1)
+var _branched: Dictionary = {}          # ряд -> сколько штреков начато
+
+
+func _is_bad(c: Vector2i) -> bool:
+	return _bad.has(c) and float(_bad[c]) > _sim
+
+
+func _plan_mine(cell: Vector2i) -> Array:
+	var r := int(C["side"])
+	var loot: Dictionary = {}
+	for y in range(cell.y - r, cell.y + r + 1):
+		for x in range(maxi(0, cell.x - r), mini(WorldGen.WIDTH, cell.x + r + 1)):
+			var c := Vector2i(x, y)
+			if absi(x - cell.x) + absi(y - cell.y) <= r and _is_loot_visible(x, y) and not _is_bad(c):
+				loot[c] = true
+	if not loot.is_empty():
+		var p := nav.plan(cell, func(c: Vector2i) -> bool: return loot.has(c), cell.y - r - 2, cell.y + r + 2, r * 6 + 6)
+		if not p.is_empty():
+			return p
+	# штрек на разведку (жадный): каждые N рядов — в обе стороны на branch_len
+	var every := int(C["branch_every"])
+	if _branch_goal.x >= 0 and (cell == _branch_goal or cell.y != _branch_goal.y and absi(cell.y - _branch_goal.y) > 2):
+		_branch_goal = Vector2i(-1, -1)
+	if _branch_goal.x < 0 and every > 0 and cell.y >= 8 and cell.y % every == 0 and int(_branched.get(cell.y, 0)) < 2:
+		var n := int(_branched.get(cell.y, 0))
+		_branched[cell.y] = n + 1
+		var dir := -1 if n == 0 else 1
+		_branch_goal = Vector2i(clampi(cell.x + dir * int(C["branch_len"]), 0, WorldGen.WIDTH - 1), cell.y)
+	if _branch_goal.x >= 0 and not _is_bad(_branch_goal):
+		var bg := _branch_goal
+		var p2 := nav.plan(cell, func(c: Vector2i) -> bool: return c == bg, cell.y - 2, cell.y + 3, 60)
+		if not p2.is_empty():
+			return p2
+		_branch_goal = Vector2i(-1, -1)
+	# вниз: ближайшая клетка глубже нынешней
+	return nav.plan(cell, func(c: Vector2i) -> bool: return c.y > cell.y and not _is_bad(c), cell.y - 4, cell.y + 6, 80)
+
+
+## Клавиши для шага c → n пути. Вниз в пустоту — к центру клетки и упасть, вниз в породу —
+## «вниз»; вверх — тяга с подруливанием к центру; вбок — направление (копка вбок сама
+## начнётся у стены), а в воздухе ещё и тяга, чтобы не просесть ниже ряда.
+func _keys_for_step(c: Vector2i, n: Vector2i) -> Array:
+	var off: float = player.x - (float(c.x) + 0.5)
+	var t := world.get_tile(n.x, n.y)
+	if n.y > c.y:
+		if t == TileTypes.Type.EMPTY:
+			return [] if absf(off) < 0.12 else [KEY_A if off > 0.0 else KEY_D]
+		return [KEY_S]
+	if n.y < c.y:
+		var k: Array = [KEY_W]
+		if absf(off) > 0.12:
+			k.append(KEY_A if off > 0.0 else KEY_D)
+		return k
+	var k2: Array = [_dirkey(n.x - c.x)]
+	if not player.on_ground and world.get_tile(c.x, c.y + 1) == TileTypes.Type.EMPTY \
+			and player.y > float(c.y) + 0.55:
+		k2.append(KEY_W)
+	return k2
+
+
+func _dirkey(d: int) -> Key:
+	return KEY_D if d > 0 else KEY_A
+
+
+func _nav_dig_cost(x: int, y: int) -> int:
+	if x < 0 or x >= WorldGen.WIDTH or world.is_house_locked_cell(x, y):
+		return -1
+	var t := world.get_tile(x, y)
+	if t == TileTypes.Type.LAVA:
+		return 14 if _lava_ok() else -1
+	if not (TileTypes.is_diggable(t) and player._can_dig(t)):
+		return -1
+	if _is_bad(Vector2i(x, y)):
+		return 30
+	return 4 if t == TileTypes.Type.STONE else 2
 
 
 func _is_loot_visible(x: int, y: int) -> bool:
@@ -1093,128 +1169,6 @@ func _lava_ok() -> bool:
 	return Heat.can_dig_lava() and GameState.hp > Heat.lava_cell_cost_hp() * 2.5
 
 
-## Решение копки — маленький автомат: «ствол» (копать вниз, решать про боковые ходы),
-## «вбок» (ход по ряду к видимой руде или штрек), «назад» (к стволу по тому же ряду).
-## Упал ниже рабочего ряда (взял руду под ногами, провалился в каверну) — выпрыгнуть
-## обратно, а не вышло — новый ствол прямо здесь.
-func _mine_keys() -> Array:
-	var cx: int = player.cell_x()
-	var cy: int = player.cell_y()
-	if _ms != "shaft" and cy > _m_row:
-		return _climb_or_reshaft(cx, cy)
-	if _ms != "shaft" and cy < _m_row:
-		_m_row = cy
-	_climb_tries = 0
-	match _ms:
-		"side":
-			# руда прямо под ногами в боковом ходе — вниз, потом выпрыгнем назад
-			if cx != _shaft_x and _is_loot_visible(cx, cy + 1) and _diggable(cx, cy + 1) \
-					and world.get_tile(cx - _m_dir, cy) == TileTypes.Type.EMPTY:
-				return [KEY_S]
-			var reached := (_m_dir > 0 and cx >= _m_until) or (_m_dir < 0 and cx <= _m_until)
-			if reached or not _diggable(cx + _m_dir, cy):
-				_ms = "return"
-			else:
-				return [_dirkey(_m_dir)]
-		"return":
-			pass
-	if _ms == "return":
-		if cx == _shaft_x:
-			_ms = "shaft"
-		else:
-			var back := signi(_shaft_x - cx)
-			if not _diggable(cx + back, cy):
-				_shaft_x = cx   # дорогу назад не прокопать — новый ствол здесь
-				_ms = "shaft"
-			else:
-				return [_dirkey(back)]
-	# --- ствол ---
-	if cx != _shaft_x:
-		_shaft_x = cx       # сдвинуло (каверна, обвал) — ствол там, где стоим
-	_m_row = cy
-	# видимая руда на этом ряду в пределах C.side
-	var side := int(C["side"])
-	for d in range(1, side + 1):
-		for dir in [-1, 1]:
-			var x: int = cx + dir * d
-			if _is_loot_visible(x, cy) and _row_path_ok(cx, x, cy):
-				_ms = "side"
-				_m_dir = dir
-				_m_until = x
-				return [_dirkey(dir)]
-	# штрек на разведку (жадный): каждые N рядов в обе стороны
-	var every := int(C["branch_every"])
-	if every > 0 and cy >= 8 and cy % every == 0 and int(_branched.get(cy, 0)) < 2:
-		var n := int(_branched.get(cy, 0))
-		_branched[cy] = n + 1
-		var dir2 := -1 if n == 0 else 1
-		if _diggable(cx + dir2, cy):
-			_ms = "side"
-			_m_dir = dir2
-			_m_until = clampi(cx + dir2 * int(C["branch_len"]), 0, WorldGen.WIDTH - 1)
-			return [_dirkey(dir2)]
-	# под центром уже пусто, а герой стоит краем на соседней клетке — к центру:
-	# «вниз» на клавиатуре без шага ничего не делает
-	if world.get_tile(cx, cy + 1) == TileTypes.Type.EMPTY:
-		var off: float = player.x - (float(cx) + 0.5)
-		return [KEY_A if off > 0.0 else KEY_D]
-	if not _diggable(cx, cy + 1):
-		# под ногами не копается (лава без запаса HP, неприступная порода) — ствол в сторону
-		for dir3 in [1, -1]:
-			if _diggable(cx + dir3, cy) and _diggable(cx + dir3, cy + 1):
-				_shaft_x = cx + dir3
-				_ms = "return"
-				return [_dirkey(dir3)]
-	return [KEY_S]
-
-
-func _dirkey(d: int) -> Key:
-	return KEY_D if d > 0 else KEY_A
-
-
-## Ниже рабочего ряда на одну клетку — прыжок назад в ход; иначе новый ствол здесь.
-func _climb_or_reshaft(cx: int, cy: int) -> Array:
-	var back := -_m_dir if _ms == "side" else signi(_shaft_x - cx)
-	if back == 0:
-		back = 1
-	# Яма поперёк хода (своя рудная или природная): дальше по ряду её не перейти шагом —
-	# выпрыгиваем к стволу и возвращаемся.
-	_ms = "return"
-	if cy == _m_row + 1 and _climb_tries < 4 and world.get_tile(cx, cy - 1) == TileTypes.Type.EMPTY \
-			and world.get_tile(cx + back, cy - 1) == TileTypes.Type.EMPTY:
-		return [KEY_W, _dirkey(back)]
-	_shaft_x = cx
-	_ms = "shaft"
-	_m_row = cy
-	return [KEY_S]
-
-
-func _row_path_ok(x0: int, x1: int, y: int) -> bool:
-	var step := 1 if x1 > x0 else -1
-	var x := x0 + step
-	while x != x1 + step:
-		if not _diggable(x, y):
-			return false
-		x += step
-	return true
-
-
-func _unstick_mine(why: String) -> void:
-	T.event(_sim, "unstick", why, false)
-	_ms = "shaft"
-	var cx: int = player.cell_x()
-	for dir in [1, -1]:
-		var x: int = cx + dir
-		if _diggable(x, player.cell_y()) and _diggable(x, player.cell_y() + 1):
-			_shaft_x = x
-			_ms = "return"
-			_m_row = player.cell_y()
-			return
-	bot.hold([KEY_W])
-	await _wait(0.6)
-	bot.release_all()
-
-
 ## Подъём: тяга ранца вверх по стволу; потолок — в сторону к ближайшей открытой колонке.
 func _ascend() -> void:
 	_activity = "ascend"
@@ -1227,6 +1181,8 @@ func _ascend() -> void:
 	var best_y: float = player.y
 	var best_t := _sim
 	var mouth_x := float(world.tunnel_mouth().x)
+	var up_cell := Vector2i(-99, -99)
+	var up_path: Array = []
 	while not _stop and GameState.is_alive and not GameState.house_is_indoors and not _busy_story():
 		if player.y < 1.6 and absf(player.x - (mouth_x + 0.5)) < 1.2:
 			# Устье: долететь выше кромки бетона и боком на огород, не упав обратно.
@@ -1252,13 +1208,24 @@ func _ascend() -> void:
 		if player.y < best_y - 0.5:
 			best_y = player.y
 			best_t = _sim
-		elif _sim - best_t > 30.0:
-			T.finding("P0", "ascent_stuck", "подъём: 30 с без высоты на глубине %d" % player.cell_y(), _sim,
+		elif _sim - best_t > 40.0:
+			T.finding("P0", "ascent_stuck", "подъём: 40 с без высоты на глубине %d" % player.cell_y(), _sim,
 				{"dump": _dump()}, str(player.cell_y() / 50))
 			best_t = _sim
 			best_y = player.y
 			await _unstick_ascent()
-		bot.hold(_ascend_keys())
+		var cell := Vector2i(player.cell_x(), player.cell_y())
+		if cell != up_cell:
+			up_cell = cell
+			# цель — на 12 рядов выше (у тоннеля — сам тоннель); по пустоте дешевле, копать — можно
+			var top := maxi(1, cell.y - 12)
+			up_path = nav.plan(cell, func(c: Vector2i) -> bool: return c.y <= top, top, cell.y + 4, 200)
+		var keys: Array = _ascend_keys()
+		if up_path.size() >= 2:
+			keys = _keys_for_step(cell, up_path[1])
+			if up_path[1].y == cell.y and not keys.has(KEY_W) and not player.on_ground:
+				keys.append(KEY_W)
+		bot.hold(keys)
 		await _step()
 	bot.release_all()
 	if _sim - t0 > 0.0:

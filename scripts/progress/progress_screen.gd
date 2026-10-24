@@ -29,7 +29,7 @@ const TAB_MUSEUM := "museum"
 # Рекорды переехали внутрь вкладки героя; старое имя оставлено для вызовов извне.
 const TAB_RECORDS := "records"
 
-const TAB_BAR_H := 26
+const TAB_BAR_H := ProgressUiKit.TAB_BAR_H
 
 static var _instance: ProgressScreen = null
 
@@ -42,6 +42,7 @@ var _tab_buttons: Dictionary = {}   # вкладка -> HeroTabButton
 var _panels: Dictionary = {}
 var _current_tab: String = TAB_PROGRESS
 var _hud_button: Button = null
+var _closing: bool = false   # экран гаснет (анимация): по смыслу уже закрыт
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +100,7 @@ static func close_screen() -> void:
 
 static func is_open() -> bool:
 	var screen := instance()
-	return screen != null and screen.visible
+	return screen != null and screen.visible and not screen._closing
 
 
 ## Витрина музея отдельным узлом — для комнаты музея в доме.
@@ -205,7 +206,7 @@ func setup(player, hud) -> void:
 func _build() -> void:
 	var bg := ColorRect.new()
 	# Непрозрачный: сквозь прежние 0.97 просвечивали тосты и мир под экраном.
-	bg.color = Color(ProgressUiKit.BG.r, ProgressUiKit.BG.g, ProgressUiKit.BG.b, 1.0)
+	bg.color = ProgressUiKit.BG_SOLID
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -288,25 +289,35 @@ func open_tab(tab: String) -> void:
 	if to_records:
 		tab = TAB_HERO
 	_current_tab = tab if _panels.has(tab) else TAB_PROGRESS
+	var entering := not visible or _closing
+	var switching := not entering
 	for key in _panels.keys():
 		var panel: Control = _panels[key]
+		var was_shown := panel.visible
 		panel.visible = key == _current_tab
 		if panel.visible and panel.has_method("refresh"):
 			panel.refresh()
+		# Смена вкладки проявляется мягко, а не щёлкает; первое открытие проявляет весь экран.
+		if panel.visible and (not was_shown or entering):
+			if switching:
+				UiAnim.open(panel, UiAnim.Kind.FADE)
+			if panel.has_method("play_intro"):
+				panel.play_intro()
 	for key in _tab_buttons.keys():
 		(_tab_buttons[key] as HeroTabButton).set_selected(key == _current_tab)
 	_sync_tabs()
 	Tip.hide_all()
-	if not visible:
+	if not visible or _closing:
 		_enter()
 	if to_records:
 		(_panels[TAB_HERO] as HeroPanel).scroll_to_records()
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _closing:
 		return
-	visible = false
+	_closing = true
+	UiAnim.close(self, UiAnim.Kind.FADE, null, func() -> void: _closing = false)
 	Tip.hide_all()
 	Sfx.play("ui_close")
 	Haptics.tap()
@@ -316,7 +327,9 @@ func close() -> void:
 
 
 func _enter() -> void:
+	_closing = false
 	visible = true
+	UiAnim.open(self, UiAnim.Kind.FADE)
 	Sfx.play("ui_open")
 	Haptics.tap()
 	# Экран во весь вьюпорт, а герой в это время не должен ни копать, ни идти.

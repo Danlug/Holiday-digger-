@@ -1,8 +1,11 @@
 class_name MetaToast
 extends CanvasLayer
-## Плашка-тост сверху: значок + короткое слово (достижение получено, задание
-## готово). Очередь по одному: пачка достижений при включении мета-слоя не
-## закрывает экран, а показывается по очереди — и не больше MAX_QUEUE.
+## Плашка-тост сверху: значок + название (достижение получено, задание готово).
+## Рубрика («Достижение», «Задание готово») — не словом, а цветом рамки и малым
+## значком: слова на экране только по наведению. Пока открыт хаб заданий, тост
+## идёт снизу: сверху он закрывал бы вкладки.
+## Очередь по одному: пачка достижений при включении мета-слоя не закрывает
+## экран, а показывается по очереди — и не больше MAX_QUEUE.
 
 const MAX_QUEUE := 4
 const HOLD := 2.2
@@ -10,6 +13,7 @@ const HOLD := 2.2
 var _queue: Array = []
 var _busy: bool = false
 var _panel: PanelContainer = null
+var _from_bottom: bool = false
 
 
 func _ready() -> void:
@@ -19,21 +23,21 @@ func _ready() -> void:
 func show_achievement(a: Dictionary) -> void:
 	var tier := clampi(int(a["tier"]), 1, 3)
 	_enqueue({
-		"glyph": String(a["glyph"]), "head": "Достижение", "name": String(a["name_ru"]),
+		"glyph": String(a["glyph"]), "head": "medal", "name": String(a["name_ru"]),
 		"reward": a.get("reward", {}), "frame": MetaUiKit.TIER_COL[tier - 1], "sfx": "reward",
 	})
 
 
 func show_quest(q: Dictionary) -> void:
 	_enqueue({
-		"glyph": String(q["glyph"]), "head": "Задание готово", "name": QuestGen.title(q),
+		"glyph": String(q["glyph"]), "head": "check", "name": QuestGen.title(q),
 		"reward": q.get("reward", {}), "frame": MetaUiKit.GREEN, "sfx": "quest_done",
 	})
 
 
 func show_road(count: int) -> void:
 	_enqueue({
-		"glyph": "trophy", "head": "Дорога трофеев", "name": "Новая награда: %d" % count,
+		"glyph": "trophy", "head": "trophy", "name": "×%d" % count,
 		"reward": {}, "frame": MetaUiKit.GOLD, "sfx": "reward",
 	})
 
@@ -59,13 +63,15 @@ func _next() -> void:
 	_build(item)
 	Sfx.play(String(item["sfx"]))
 	Haptics.tap()
-	_panel.position = Vector2(_panel_x(), -50.0)
+	_from_bottom = _hub_open()
+	_panel.reset_size()
+	_panel.position = Vector2(_panel_x(), _off_y())
 	if UiAnim.reduced() or not is_inside_tree():
-		_panel.position.y = 6.0
+		_panel.position.y = _rest_y()
 		get_tree().create_timer(HOLD).timeout.connect(_leave)
 		return
 	var tw := create_tween()
-	tw.tween_property(_panel, "position:y", 6.0, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_panel, "position:y", _rest_y(), UiAnim.D_IN + 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(HOLD)
 	tw.tween_callback(_leave)
 
@@ -79,12 +85,31 @@ func _leave() -> void:
 		_next()
 		return
 	var tw := create_tween()
-	tw.tween_property(_panel, "position:y", -50.0, 0.2).set_ease(Tween.EASE_IN)
+	tw.tween_property(_panel, "position:y", _off_y(), UiAnim.D_OUT + 0.04).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func() -> void:
 		if _panel != null:
 			_panel.queue_free()
 			_panel = null
 		_next())
+
+
+func _hub_open() -> bool:
+	for n in get_tree().get_nodes_in_group("meta_hub"):
+		if n.has_method("is_open") and n.is_open():
+			return true
+	return false
+
+
+func _view_h() -> float:
+	return get_viewport().get_visible_rect().size.y
+
+
+func _rest_y() -> float:
+	return _view_h() - _panel.size.y - 12.0 if _from_bottom else 6.0
+
+
+func _off_y() -> float:
+	return _view_h() + 10.0 if _from_bottom else -_panel.size.y - 10.0
 
 
 func _panel_x() -> float:
@@ -118,12 +143,16 @@ func _build(item: Dictionary) -> void:
 	v.add_theme_constant_override("separation", 0)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(v)
-	v.add_child(MetaUiKit.label(String(item["head"]), 8, frame))
+	var title := HBoxContainer.new()
+	title.add_theme_constant_override("separation", 3)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(title)
+	title.add_child(MetaUiKit.icon_rect(MetaUiKit.tex(String(item["head"])), 12))
 	var name_l := MetaUiKit.label(String(item["name"]), 10, Color.WHITE)
 	name_l.clip_text = true
 	name_l.custom_minimum_size.x = 100
 	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(name_l)
+	title.add_child(name_l)
 	var rr := MetaUiKit.reward_row(item["reward"], 11, 9)
 	if rr.get_child_count() > 0:
 		v.add_child(rr)
@@ -132,8 +161,5 @@ func _build(item: Dictionary) -> void:
 
 
 func _style(frame: Color) -> StyleBoxFlat:
-	var sb := MetaUiKit.box(Color8(0x1A, 0x14, 0x0F, 0xF5), frame, 1, 6)
-	sb.set_content_margin_all(4)
-	sb.shadow_color = Color(0, 0, 0, 0.55)
-	sb.shadow_size = 3
+	var sb := ProgressUiKit.popup_box(frame, Color8(0x1A, 0x14, 0x0F, 0xF5), 4)
 	return sb

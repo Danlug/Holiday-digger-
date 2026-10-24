@@ -8,6 +8,7 @@ extends Control
 
 const TILE := 32
 const STRIP_H := 40.0
+const STRIP_BTN_W := 38.0   # кнопки нижней полосы одного размера, значки 32 (раньше: 34 с 16 и инструмент 38 с 32)
 # Джойстик задаётся долей ширины экрана, а не пикселями из web-демо: там
 # интерфейс живёт в пикселях устройства (118px на экране в 390), а здесь — в
 # проектных единицах вьюпорта (224 в ширину), и те же 118 занимали половину
@@ -53,6 +54,7 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
+const PILL_W := 78.0    # ширина таблеток кошелька (монеты, доллары, вес)
 const GAUGE_W := 62.0   # ширина полоски: правее остаётся место кошельку
 var _xp_bar: HudBar
 var _level_label: Label
@@ -412,14 +414,18 @@ func _build_purse(parent: Control) -> void:
 	_dollars_pill = _make_pill(box, "dollar", Color8(0x7F, 0xB8, 0x6B), "dollars")
 	Tip.bind(_coins_pill, "Монеты")
 	Tip.bind(_dollars_pill, "Доллары", "Премиум-валюта")
+	# Три таблетки одной ширины: ровный правый и левый край столбика (раньше 72/64/58).
+	_coins_pill.custom_minimum_size.x = PILL_W
+	_dollars_pill.custom_minimum_size.x = PILL_W
 
 	_load_pill = PanelContainer.new()
 	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(Color8(0x8F, 0xA3, 0x5C)))
 	_load_pill.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_load_pill.custom_minimum_size.x = PILL_W
 	_load_pill.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(_load_pill)
 	_load_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
-	_load_bar.bar_width = 44.0
+	_load_bar.bar_width = 48.0
 	_load_bar.pulse_above = 1.0
 	_load_pill.add_child(_load_bar)
 	_load_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -459,8 +465,8 @@ func _build_depth(parent: Control) -> void:
 	sb.border_color = Color8(0x52, 0x40, 0x2D)
 	sb.set_border_width_all(1)
 	sb.border_width_right = 0
-	sb.corner_radius_top_left = 9
-	sb.corner_radius_bottom_left = 9
+	sb.corner_radius_top_left = ProgressUiKit.R_CARD
+	sb.corner_radius_bottom_left = ProgressUiKit.R_CARD
 	sb.content_margin_left = 5
 	sb.content_margin_right = 4
 	sb.content_margin_top = 1
@@ -784,13 +790,14 @@ func _on_drop_confirmed(id: String, n: int) -> void:
 	_inv_sheet.refresh()
 	_sync_purse()
 	toast_parts([
-		{"icon_tex": UiIcons.item(id), "text": "−%d" % n, "color": Color8(0xE8, 0x8C, 0x80)},
+		{"icon_tex": UiIcons.item_small(id), "text": "−%d" % n, "color": Color8(0xE8, 0x8C, 0x80)},
 	], 1.6)
 
 
 var _more_panel: PanelContainer
 var _more_grid: GridContainer
 var _more_button: Button
+var _more_closing: bool = false   # меню гаснет (анимация): по смыслу уже закрыто
 var _menu_badge_timer: float = 0.0
 var _menu_armed_id: String = ""
 var _menu_armed_until_msec: int = 0
@@ -809,7 +816,7 @@ func _build_strip() -> void:
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color8(0x16, 0x12, 0x0E)
-	sb.border_color = Color8(0x4A, 0x3B, 0x2C)
+	sb.border_color = ProgressUiKit.EDGE
 	sb.border_width_top = 2
 	var bg_panel := Panel.new()
 	bg_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -838,7 +845,7 @@ func _build_strip() -> void:
 	# Только иконки: слова («Инвентарь», «Склад», название инструмента) — в
 	# подсказке Tip. Кнопка рюкзака — переключатель: при открытой шторке она
 	# «вдавлена» и подсвечена золотом.
-	_inv_button = UiBtn.icon_button(UiIcons.tex("backpack"), Vector2(34, 34), UiBtn.Kind.NORMAL, 16)
+	_inv_button = UiBtn.icon_button(UiIcons.tex("backpack"), Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	Tip.bind(_inv_button, "Рюкзак", "Что несёшь и сколько это стоит")
 	_inv_button.toggle_mode = true
 	_inv_button.pressed.connect(_on_inv_button_pressed)
@@ -847,7 +854,7 @@ func _build_strip() -> void:
 	# Инструмент — одна иконка без подписи, чуть крупнее остальных: это то, чем
 	# копают. Название всплывает НАД полосой по нажатию (и при наведении на
 	# компьютере), и само — когда инструмент сменился (ГДД п.16).
-	_tool_button = UiBtn.icon_button(null, Vector2(38, 36), UiBtn.Kind.NORMAL, 32)
+	_tool_button = UiBtn.icon_button(null, Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	_tool_button.pressed.connect(func():
 		if Tip.swallowed():
 			return
@@ -899,7 +906,7 @@ func _build_strip() -> void:
 	# на просмотр: игрок должен планировать вылазку, зная, чего не хватает до
 	# кирки. Поэтому кнопка постоянная, а не контекстная. Нажатие подключает
 	# сама система дома по группе "house_storage_button".
-	var storage_btn := UiBtn.icon_button(UiIcons.tex("inventory"), Vector2(34, 34))
+	var storage_btn := UiBtn.icon_button(UiIcons.tex("inventory"), Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	Tip.bind(storage_btn, "Склад", "В мастерской: можно смотреть откуда угодно")
 	storage_btn.add_to_group("house_storage_button")
 	strip.add_child(storage_btn)
@@ -908,7 +915,7 @@ func _build_strip() -> void:
 	# «•••» встаёт последним, чтобы контекстная кнопка дома, появляясь и
 	# исчезая, не сдвигала его под пальцем. Красный бейдж — сумма бейджей
 	# пунктов меню (новые задания и т.п.).
-	_more_button = UiBtn.icon_button(UiIcons.tex("more"), Vector2(34, 34))
+	_more_button = UiBtn.icon_button(UiIcons.tex("more"), Vector2(STRIP_BTN_W, 36), UiBtn.Kind.NORMAL, 32)
 	Tip.bind(_more_button, "Меню")
 	_more_button.pressed.connect(func():
 		if Tip.swallowed():
@@ -958,15 +965,8 @@ func _build_more_menu() -> void:
 	_more_panel = PanelContainer.new()
 	_more_panel.name = "MoreMenu"
 	_more_panel.visible = false
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F, 0xF5)
-	sb.border_color = Color8(0x52, 0x40, 0x2D)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(7)
-	sb.set_content_margin_all(5)
-	sb.shadow_color = Color(0, 0, 0, 0.5)
-	sb.shadow_size = 3
-	_more_panel.add_theme_stylebox_override("panel", sb)
+	_more_panel.add_theme_stylebox_override("panel",
+		ProgressUiKit.popup_box(ProgressUiKit.EDGE, Color8(0x1A, 0x14, 0x0F, 0xF5), 5))
 	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	add_child(_more_panel)
 
@@ -985,8 +985,8 @@ func _build_more_menu() -> void:
 	# вопрос. Пишется tools/make_build_info.py перед экспортом.
 	var build_label := Label.new()
 	build_label.text = _build_stamp()
-	build_label.add_theme_font_size_override("font_size", 7)
-	build_label.add_theme_color_override("font_color", Color8(0x6B, 0x5D, 0x4C))
+	build_label.add_theme_font_size_override("font_size", 8)
+	build_label.add_theme_color_override("font_color", Color8(0x86, 0x76, 0x60))
 	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(build_label)
@@ -1142,13 +1142,7 @@ func _build_objective_line() -> void:
 	_objective_panel.name = "Objective"
 	_objective_panel.visible = false
 	_objective_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
-	sb.border_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(9)
-	sb.shadow_color = Color(0, 0, 0, 0.4)
-	sb.shadow_size = 3
+	var sb := ProgressUiKit.popup_box(ProgressUiKit.GOLD, Color(0.071, 0.055, 0.043, 0.94))
 	sb.content_margin_left = 7
 	sb.content_margin_right = 8
 	sb.content_margin_top = 5
@@ -1222,7 +1216,7 @@ func _show_objective_banner() -> void:
 	_objective_panel.visible = true
 	_objective_hide_at_msec = Time.get_ticks_msec() + OBJECTIVE_SHOW_SECONDS * 1000.0
 	_place_objective()
-	UiAnim.appear(_objective_panel, 0.96, 0.18)
+	UiAnim.appear(_objective_panel, UiAnim.POP_FROM, UiAnim.D_IN)
 
 
 func _on_quest_button_pressed() -> void:
@@ -1249,12 +1243,13 @@ func _show_tool_name() -> void:
 
 
 func _toggle_more_menu() -> void:
-	if _more_panel.visible:
+	if is_more_menu_open():
 		close_more_menu()
 		return
 	_rebuild_more_menu()
+	_more_closing = false
 	_more_panel.visible = true
-	UiAnim.appear(_more_panel, 0.85, 0.14)
+	UiAnim.open(_more_panel, UiAnim.Kind.POP)
 	_more_panel.pivot_offset = _more_panel.get_combined_minimum_size()
 	Sfx.play("ui_open")
 	# Иначе палец, уже «зажавший» мир, остаётся зажатым под открытым меню:
@@ -1268,14 +1263,14 @@ func _toggle_more_menu() -> void:
 
 
 func close_more_menu() -> void:
-	if _more_panel != null:
-		if _more_panel.visible:
-			Sfx.play("ui_close")
-		_more_panel.visible = false
+	if _more_panel != null and _more_panel.visible and not _more_closing:
+		Sfx.play("ui_close")
+		_more_closing = true
+		UiAnim.close(_more_panel, UiAnim.Kind.POP, null, func() -> void: _more_closing = false)
 
 
 func is_more_menu_open() -> bool:
-	return _more_panel != null and _more_panel.visible
+	return _more_panel != null and _more_panel.visible and not _more_closing
 
 
 # Кнопка нижней полосы: у темы Godot по умолчанию минимальная высота около
@@ -1665,17 +1660,12 @@ func _show_toast(parts: Array, seconds: float, kind: String) -> void:
 		_toast_row.remove_child(c)
 		c.queue_free()
 	var border: Color = TOAST_COLORS.get(kind, TOAST_COLORS["info"])
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
-	sb.border_color = border
+	var sb := ProgressUiKit.popup_box(border, Color(0.071, 0.055, 0.043, 0.94))
 	sb.set_border_width_all(2 if kind == "rare" else 1)
-	sb.set_corner_radius_all(9)
 	sb.content_margin_left = TOAST_PAD.x
 	sb.content_margin_right = TOAST_PAD.x
 	sb.content_margin_top = TOAST_PAD.y
 	sb.content_margin_bottom = TOAST_PAD.y
-	sb.shadow_color = Color(0, 0, 0, 0.45)
-	sb.shadow_size = 3
 	_toast_panel.add_theme_stylebox_override("panel", sb)
 
 	var font: Font = ThemeDB.fallback_font
@@ -1725,7 +1715,7 @@ func _show_toast(parts: Array, seconds: float, kind: String) -> void:
 	_toast_timer.start(seconds)
 	if _toast_tween != null and _toast_tween.is_valid():
 		_toast_tween.kill()
-	UiAnim.appear(_toast_panel, 0.88, 0.16)
+	UiAnim.appear(_toast_panel, UiAnim.POP_FROM, UiAnim.D_IN)
 	if kind == "rare" and not Settings.reduce_motion:
 		UiAnim.pulse(_toast_panel, 0.1, 0.5)
 
@@ -1788,7 +1778,7 @@ func _on_dig_blocked(tile_type: int) -> void:
 	if not tool_path.is_empty() and ResourceLoader.exists(tool_path):
 		parts.append({"icon_tex": load(tool_path)})
 	if not mineral_id.is_empty():
-		parts.append({"icon_tex": UiIcons.item(mineral_id)})
+		parts.append({"icon_tex": UiIcons.item_small(mineral_id)})
 	parts.append({"text": "Звон!", "color": Color8(0xE8, 0x8C, 0x80)})
 	toast_parts(parts, 2.0, "bad")
 	Sfx.play("ui_deny")
@@ -1798,7 +1788,7 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 	if was_loot and coins == 0 and not mineral_id.is_empty():
 		# Рюкзак полон, находку пришлось оставить: предмет, рюкзак, «Полно».
 		toast_parts([
-			{"icon_tex": UiIcons.item(mineral_id)},
+			{"icon_tex": UiIcons.item_small(mineral_id)},
 			{"icon": "weight"},
 			{"text": "Полно", "color": Color8(0xE8, 0x8C, 0x80)},
 		], 2.2, "bad")
@@ -1817,7 +1807,7 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 	if y == 80 and tile_type == TileTypes.Type.DIAMOND:
 		# Алмаз замурован в камне, дедова кирка трескается (−25% скорости).
 		toast_parts([
-			{"icon_tex": UiIcons.item("diamond")},
+			{"icon_tex": UiIcons.item_small("diamond")},
 			{"icon_tex": load("res://art/items/pickaxe_rusty_cracked.png")},
 			{"text": "−25%", "color": Color8(0xE8, 0x8C, 0x80)},
 		], 4.0, "bad")
@@ -1829,7 +1819,7 @@ func show_rare_find(mineral_id: String) -> void:
 	var name_ru := String(Balance.get_mineral(mineral_id).get("name_ru", ""))
 	toast_parts([
 		{"icon": "star"},
-		{"icon_tex": UiIcons.item(mineral_id), "icon_px": 24},
+		{"icon_tex": UiIcons.item_small(mineral_id, 24), "icon_px": 24},
 		{"text": name_ru, "color": TOAST_COLORS["rare"]},
 	], 2.8, "rare")
 	Sfx.play("pickup_rare")

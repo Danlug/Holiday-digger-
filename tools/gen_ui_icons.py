@@ -235,6 +235,26 @@ icon("arrow_up", """
 ................
 """)
 
+# два шеврона вверх: «до максимума» (залить бак доверху, выбросить всё)
+icon("max", """
+................
+................
+.......GG.......
+......GggG......
+.....GgGGgG.....
+....GgG..GgG....
+...GgG....GgG...
+..GGG..GG..GGG..
+......GggG......
+.....GgGGgG.....
+....GgG..GgG....
+...GgG....GgG...
+..GGG......GGG..
+................
+................
+................
+""")
+
 icon("chunk", """
 ................
 ................
@@ -729,6 +749,25 @@ ICONS["motion_off"] = list(ICONS["motion"])
 slash("motion_off")
 
 
+# Полоски HUD (здоровье, голод, бодрость) рисовались прежними заглушками art/ui/icon_*.png:
+# бледная молния, расплывчатый «желудок», плоское сердце. На экране героя те же три величины —
+# плотные значки с ободком (art/ui/hero/sk_*.png, tools/gen_hero_icons.py). Берём их же,
+# чтобы HUD, тосты и экран героя говорили одним рисунком. Нет файла героя — остаются прежние.
+HERO_ALIAS = {"hp": "sk_hp", "hunger": "sk_hunger", "stamina": "sk_stamina"}
+
+
+def alias_hero_icons():
+	hero = os.path.join(HERE, "..", "art", "ui", "hero")
+	for name, src in HERO_ALIAS.items():
+		path = os.path.join(hero, src + ".png")
+		if not os.path.exists(path):
+			continue
+		im = Image.open(path).convert("RGBA")
+		if im.size != (32, 32):
+			im = im.resize((32, 32), Image.NEAREST)
+		im.save(os.path.join(OUT, name + ".png"))
+
+
 def build(sheet_path=None):
 	os.makedirs(OUT, exist_ok=True)
 	names = sorted(ICONS)
@@ -767,6 +806,7 @@ def build(sheet_path=None):
 		imgs[name] = big
 	if errors:
 		sys.exit(1)
+	alias_hero_icons()
 	print("иконок:", len(names))
 	if sheet_path:
 		cols = 8

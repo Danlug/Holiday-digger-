@@ -132,8 +132,7 @@ func _draw_bar() -> void:
 	if b == null:
 		return
 	var w := _bar.size.x
-	_bar.draw_rect(Rect2(0, 0, w, 22), BG)
-	_bar.draw_rect(Rect2(0, 0, w, 22), BORDER, false, 1.0)
+	_bar.draw_style_box(ProgressUiKit.box(BG, BORDER, ProgressUiKit.R_TILE), Rect2(0, 0, w, 22))   # плашка на общих ступенях радиуса
 	if _boss_icon != null:
 		_bar.draw_texture_rect(_boss_icon, Rect2(2, 3, 16, 16), false)
 	var x0 := 22.0

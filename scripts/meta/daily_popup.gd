@@ -20,6 +20,7 @@ var _ad_btn: Button = null
 var _plan: Dictionary = {}
 var _done: bool = false
 var _hero: TextureRect = null
+var _closing: bool = false
 
 
 func _ready() -> void:
@@ -28,27 +29,31 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return visible
+	return visible and not _closing
 
 
 func open() -> void:
 	_plan = DailyReward.plan()
 	_done = false
 	_build()
+	_closing = false
 	visible = true
 	Sfx.play("ui_open")
-	if _card != null:
-		UiAnim.appear(_card, 0.85, 0.22)
+	UiAnim.open(_card, UiAnim.Kind.POP, _root)
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _closing:
 		return
-	visible = false
-	if _root != null:
-		_root.queue_free()
-		_root = null
-	closed.emit()
+	_closing = true
+	var finish := func() -> void:
+		visible = false
+		_closing = false
+		if _root != null:
+			_root.queue_free()
+			_root = null
+		closed.emit()
+	UiAnim.close(_card, UiAnim.Kind.POP, _root, finish)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -78,10 +83,8 @@ func _build() -> void:
 	_root.add_child(center)
 
 	_card = PanelContainer.new()
-	var sb := MetaUiKit.box(MetaUiKit.CARD, MetaUiKit.GOLD, 2, 6)
-	sb.set_content_margin_all(8)
-	sb.shadow_color = Color(0, 0, 0, 0.6)
-	sb.shadow_size = 4
+	var sb := ProgressUiKit.popup_box(MetaUiKit.GOLD, MetaUiKit.CARD, 8)
+	sb.set_border_width_all(2)
 	_card.add_theme_stylebox_override("panel", sb)
 	_card.custom_minimum_size = Vector2(208, 0)
 	center.add_child(_card)
@@ -110,12 +113,12 @@ func _build_header() -> Control:
 		var chip := MetaUiKit.chip(MetaUiKit.tex("up"), "+%d%%" % pct, MetaUiKit.GREEN, 14, 9)
 		Tip.bind(chip, "Бонус серии", "Каждая пройденная неделя подряд добавляет к монетам и опыту.", "+%d%%" % pct)
 		h.add_child(chip)
-	var x := Button.new()
-	x.text = "×"
-	x.add_theme_font_size_override("font_size", 16)
-	x.custom_minimum_size = Vector2(28, 28)
-	UiBtn.style(x, UiBtn.Kind.GHOST)
-	x.pressed.connect(close)
+	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 28), UiBtn.Kind.GHOST)   # тот же крестик, что у шторок
+	Tip.bind(x, "Закрыть")
+	x.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		close())
 	h.add_child(x)
 	Tip.bind(h.get_child(0) as Control, "Серия", "Дней подряд. Пропуск в один день серию не рвёт, два — рвёт.", str(int(_plan["streak"])))
 	return h
@@ -240,14 +243,17 @@ func _build_buttons() -> Control:
 	h.add_theme_constant_override("separation", 6)
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	_claim_btn = Button.new()
-	_claim_btn.text = "Забрать"
-	_claim_btn.icon = MetaUiKit.tex("check")
-	_claim_btn.add_theme_constant_override("icon_max_width", 16)
-	_claim_btn.add_theme_font_size_override("font_size", 11)
+	_claim_btn.icon = MetaUiKit.tex("check")      # «Забрать» — крупная галочка, слово в Tip
+	_claim_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_claim_btn.add_theme_constant_override("icon_max_width", 32)
+	Tip.bind(_claim_btn, "Забрать")
 	_claim_btn.custom_minimum_size = Vector2(112, 34)
 	_claim_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_style_cta(_claim_btn, MetaUiKit.GREEN_BTN)
-	_claim_btn.pressed.connect(func() -> void: _claim(1.0))
+	_claim_btn.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		_claim(1.0))
 	h.add_child(_claim_btn)
 
 	_ad_btn = Button.new()

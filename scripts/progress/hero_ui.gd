@@ -9,6 +9,8 @@ const TILE_BG_HI := Color(0.17, 0.13, 0.08, 1.0)
 const ACCENT := Color8(0xE0, 0xA9, 0x3B)
 const OK := Color8(0x7D, 0xE0, 0x8A)
 const POOR := Color8(0xB8, 0x5A, 0x52)
+const TILE_H := 34.0     # высота плитки «иконка + число»: на узком экране цифры читаются крупнее
+const TILE_FONT := 11
 
 # Цвет каждой ветки прокачки: по нему читается дерево с первого взгляда.
 const BRANCH_COLORS := {
@@ -27,13 +29,8 @@ static func branch_color(branch_id: String) -> Color:
 	return BRANCH_COLORS.get(branch_id, ACCENT)
 
 
-static func box(bg: Color, border: Color, radius: int = 3, border_w: int = 1) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(border_w)
-	sb.set_corner_radius_all(radius)
-	return sb
+static func box(bg: Color, border: Color, radius: int = ProgressUiKit.R_TILE, border_w: int = 1) -> StyleBoxFlat:
+	return ProgressUiKit.box(bg, border, ProgressUiKit.snap_radius(radius), border_w)
 
 
 ## «Меньше движения» (Settings.reduce_motion): пульс, покачивание, искры и вспышки
@@ -50,12 +47,7 @@ static func tap(sound: String = "ui_tap") -> void:
 
 ## Короткий «пружинистый» отклик: сжатие и возврат с перелётом.
 static func bounce(c: Control, amount: float = 1.12) -> void:
-	if c == null or not c.is_inside_tree() or calm():
-		return
-	c.pivot_offset = c.size * 0.5
-	var tw := c.create_tween()
-	tw.tween_property(c, "scale", Vector2(amount, amount), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(c, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	UiAnim.pulse(c, amount - 1.0, 0.23)
 
 
 ## Отказ: быстрое покачивание по горизонтали.
@@ -85,7 +77,7 @@ static func _trim(s: String) -> String:
 ## Плитка «иконка + число». Подпись плитки — только в подсказке Tip.
 ## Возвращает панель; число доступно через метаданные "value_label".
 static func make_tile(icon_name: String, value: String, color: Color = ProgressUiKit.GOLD,
-		min_size: Vector2 = Vector2(0, 28), fraction: float = -1.0) -> PanelContainer:
+		min_size: Vector2 = Vector2(0, TILE_H), fraction: float = -1.0) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.custom_minimum_size = min_size
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -101,7 +93,7 @@ static func make_tile(icon_name: String, value: String, color: Color = ProgressU
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(row)
 	row.add_child(HeroIcons.make(icon_name, 16.0))
-	var l := ProgressUiKit.make_label(value, 10, color)
+	var l := ProgressUiKit.make_label(value, TILE_FONT, color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(l)
 	if fraction >= 0.0:

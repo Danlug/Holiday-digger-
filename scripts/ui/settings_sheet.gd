@@ -13,11 +13,11 @@ signal closed
 signal mode_chosen(mode: String)
 signal restore_pressed
 
-const CARD_BG := Color8(0x1A, 0x14, 0x0F)
 const ROW_BG := Color8(0x23, 0x1B, 0x14)
-const EDGE := Color8(0x52, 0x40, 0x2D)
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
+const GOLD := ProgressUiKit.GOLD
+const MUTED := ProgressUiKit.MUTED
+## Высота кнопок во всех рядах одна: раньше было 26/30/32/34/36 и ряды выглядели рваными.
+const BTN_H := 34.0
 
 const MODES: Array[String] = ["stick", "hold", "arrows"]
 const MODE_ICONS := {"stick": "joystick", "hold": "ctl_hold", "arrows": "ctl_arrows"}
@@ -39,6 +39,7 @@ var _mode_btns: Dictionary = {}
 var _lang_btns: Dictionary = {}
 var _last_tick_ms: int = 0
 var _hints_row: HintSettingsRow = null
+var _closing: bool = false   # шторка уходит (анимация): по смыслу уже закрыта
 
 
 func _init() -> void:
@@ -49,22 +50,23 @@ func _init() -> void:
 
 
 func is_open() -> bool:
-	return visible
+	return visible and not _closing
 
 
 func open() -> void:
 	refresh()
+	_closing = false
 	visible = true
 	Sfx.play("ui_open")
-	if _card != null and is_inside_tree():
-		UiAnim.slide_up(_card, 28.0, 0.2)
+	UiAnim.open(_card, UiAnim.Kind.SHEET, self)
 
 
 func close() -> void:
-	var was := visible
-	visible = false
+	var was := visible and not _closing
 	if was:
 		Sfx.play("ui_close")
+		_closing = true
+		UiAnim.close(_card, UiAnim.Kind.SHEET, self, func() -> void: _closing = false)
 	closed.emit()
 
 
@@ -111,14 +113,7 @@ func _build() -> void:
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_card.offset_top = 22.0
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = CARD_BG
-	sb.border_color = EDGE
-	sb.border_width_top = 2
-	sb.border_width_left = 1
-	sb.border_width_right = 1
-	sb.corner_radius_top_left = 12
-	sb.corner_radius_top_right = 12
+	var sb := ProgressUiKit.sheet_box()
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 8
@@ -175,15 +170,16 @@ func _build() -> void:
 	_build_restore_row(body)
 
 
-func _row(parent: Control) -> HBoxContainer:
+func _row_panel() -> PanelContainer:
 	var p := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = ROW_BG
-	sb.border_color = Color8(0x3A, 0x2E, 0x22)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(8)
+	var sb := ProgressUiKit.box(ROW_BG, ProgressUiKit.BORDER, ProgressUiKit.R_CARD)
 	sb.set_content_margin_all(6)
 	p.add_theme_stylebox_override("panel", sb)
+	return p
+
+
+func _row(parent: Control) -> HBoxContainer:
+	var p := _row_panel()
 	parent.add_child(p)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
@@ -193,7 +189,7 @@ func _row(parent: Control) -> HBoxContainer:
 
 func _build_volume_rows(body: Control) -> void:
 	var row := _row(body)
-	_sound_btn = UiBtn.icon_button(UiIcons.tex("sound_on"), Vector2(34, 30))
+	_sound_btn = UiBtn.icon_button(UiIcons.tex("sound_on"), Vector2(BTN_H, BTN_H))
 	_sound_btn.pressed.connect(func():
 		if Tip.swallowed():
 			return
@@ -206,7 +202,7 @@ func _build_volume_rows(body: Control) -> void:
 		_tick())
 
 	var row2 := _row(body)
-	_music_btn = UiBtn.icon_button(UiIcons.tex("music_on"), Vector2(34, 30))
+	_music_btn = UiBtn.icon_button(UiIcons.tex("music_on"), Vector2(BTN_H, BTN_H))
 	_music_btn.pressed.connect(func():
 		if Tip.swallowed():
 			return
@@ -250,7 +246,7 @@ func _build_toggle_row(body: Control) -> void:
 
 
 func _toggle(row: Control, icon_name: String, action: Callable) -> Button:
-	var b := UiBtn.icon_button(UiIcons.tex(icon_name), Vector2(0, 32))
+	var b := UiBtn.icon_button(UiIcons.tex(icon_name), Vector2(0, BTN_H))
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.toggle_mode = false
 	b.pressed.connect(func():
@@ -277,7 +273,7 @@ func _mark(b: Button, on: bool) -> void:
 func _build_mode_row(body: Control) -> void:
 	var row := _row(body)
 	for m in MODES:
-		var b := UiBtn.icon_button(UiIcons.tex(MODE_ICONS[m]), Vector2(0, 36))
+		var b := UiBtn.icon_button(UiIcons.tex(MODE_ICONS[m]), Vector2(0, BTN_H))
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		Tip.bind(b, MODE_TIPS[m][0], MODE_TIPS[m][1])
 		var mode_id: String = m
@@ -289,27 +285,21 @@ func _build_mode_row(body: Control) -> void:
 		_mode_btns[m] = b
 
 
-## Язык: чипы с названиями на самом языке. HFlowContainer, не HBoxContainer:
-## шесть чипов в один ряд не помещаются на портретных 224px — этот контейнер сам
-## переносит лишние на следующую строку, а не сжимает всех до нечитаемой ширины.
+## Язык: чипы с названиями на самом языке. Сетка 3×2 с равными ячейками: шесть
+## чипов в один ряд на 224px не помещаются, а «поток» давал рваные края.
 func _build_language_row(body: Control) -> void:
-	var p := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = ROW_BG
-	sb.border_color = Color8(0x3A, 0x2E, 0x22)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(8)
-	sb.set_content_margin_all(6)
-	p.add_theme_stylebox_override("panel", sb)
+	var p := _row_panel()
 	body.add_child(p)
-	var flow := HFlowContainer.new()
+	var flow := GridContainer.new()
+	flow.columns = 3
 	flow.add_theme_constant_override("h_separation", 5)
 	flow.add_theme_constant_override("v_separation", 5)
 	p.add_child(flow)
 	for entry in Settings.LANGUAGES:
 		var code := String(entry.get("code", ""))
 		var available := bool(entry.get("available", false))
-		var b := UiBtn.icon_button(null, Vector2(0, 26))
+		var b := UiBtn.icon_button(null, Vector2(0, 28))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.text = String(entry.get("name", code))
 		b.add_theme_font_size_override("font_size", 10)
 		b.disabled = not available
@@ -333,7 +323,7 @@ func _build_language_row(body: Control) -> void:
 ## покупками без неё). Пока платежей нет, об этом скажет тост HUD.
 func _build_restore_row(body: Control) -> void:
 	var row := _row(body)
-	var b := UiBtn.icon_button(UiIcons.tex("restore"), Vector2(0, 30))
+	var b := UiBtn.icon_button(UiIcons.tex("restore"), Vector2(0, BTN_H))
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	Tip.bind(b, "Восстановить покупки", "Платежи не подключены в этой сборке")
 	b.pressed.connect(func():

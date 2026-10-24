@@ -43,8 +43,8 @@ func _build() -> void:
 
 	_grid = GridContainer.new()
 	_grid.columns = 3
-	_grid.add_theme_constant_override("h_separation", 4)
-	_grid.add_theme_constant_override("v_separation", 4)
+	_grid.add_theme_constant_override("h_separation", 5)
+	_grid.add_theme_constant_override("v_separation", 5)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(_grid)
 
@@ -56,6 +56,10 @@ func _line() -> Control:
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return c
+
+
+func tiles() -> Array:
+	return _grid.get_children() if _grid != null else []
 
 
 func refresh() -> void:
@@ -107,6 +111,6 @@ func refresh() -> void:
 
 func _add(icon: String, value: String, color: Color, fraction: float,
 		title: String, body: String, extra: String) -> void:
-	var tile := HeroUi.make_tile(icon, value, color, Vector2(0, 28), fraction)
+	var tile := HeroUi.make_tile(icon, value, color, Vector2(0, HeroUi.TILE_H), fraction)
 	_grid.add_child(tile)
 	Tip.bind(tile, title, body, extra)

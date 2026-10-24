@@ -139,7 +139,7 @@ func _make_branch_case(branch: Dictionary) -> Control:
 func _case_box(branch_num: int, complete: bool) -> StyleBoxFlat:
 	var tint: Color = ArtifactSlot.TINTS.get(branch_num, ProgressUiKit.GOLD)
 	var sb := HeroUi.box(Color(0.085, 0.07, 0.06).lerp(tint.darkened(0.78), 0.35),
-		ProgressUiKit.GOLD if complete else ProgressUiKit.BORDER, 5, 2 if complete else 1)
+		ProgressUiKit.GOLD if complete else ProgressUiKit.BORDER, ProgressUiKit.R_CARD, 2 if complete else 1)
 	sb.content_margin_left = 4
 	sb.content_margin_right = 4
 	sb.content_margin_top = 3

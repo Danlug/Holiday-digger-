@@ -38,7 +38,7 @@ const LONG_PRESS := 0.38
 const AUTO_HIDE := 3.2
 const AFTER_RELEASE := 1.8
 const MOVE_CANCEL_PX := 12.0
-const MAX_WIDTH := 152.0
+const MAX_WIDTH := 160.0
 const META := &"_tip_data"
 const TAP_META := &"_tip_tap"
 const ANCHOR_META := &"_tip_anchor"
@@ -360,7 +360,10 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	sb.bg_color = COL_BG
 	sb.border_color = COL_BORDER
 	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(3)
+	sb.set_corner_radius_all(ProgressUiKit.R_TILE)
+	sb.shadow_color = ProgressUiKit.SHADOW
+	sb.shadow_size = 3
+	sb.shadow_offset = Vector2(0, 1)
 	sb.content_margin_left = 6
 	sb.content_margin_right = 6
 	sb.content_margin_top = 4
@@ -370,9 +373,9 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override("separation", 1)
 	_panel.add_child(box)
-	_title = _make_label(10, COL_TITLE)
-	_body = _make_label(9, COL_BODY)
-	_extra = _make_label(9, COL_EXTRA)
+	_title = _make_label(11, COL_TITLE)
+	_body = _make_label(10, COL_BODY)
+	_extra = _make_label(10, COL_EXTRA)
 	box.add_child(_title)
 	box.add_child(_body)
 	box.add_child(_extra)
@@ -432,6 +435,7 @@ static func _show(ctrl: Control) -> void:
 	_panel.scale = Vector2.ONE
 	_panel.modulate.a = 1.0
 	_fill(ctrl)
+	var was_visible := _panel.visible
 	_panel.visible = true
 	_panel.reset_size()
 	var vp := ctrl.get_viewport().get_visible_rect()
@@ -448,3 +452,9 @@ static func _show(ctrl: Control) -> void:
 	pos.x = clampf(pos.x, vp.position.x + 2.0, maxf(vp.position.x + 2.0, vp.end.x - sz.x - 2.0))
 	pos.y = clampf(pos.y, vp.position.y + 2.0, maxf(vp.position.y + 2.0, vp.end.y - sz.y - 2.0))
 	_panel.position = pos
+	# Лёгкое проявление: подсказка не «выскакивает», но и не мешает (0.1 с).
+	if not was_visible and not UiAnim.instant(_panel):
+		_panel.modulate.a = 0.0
+		_panel.create_tween().tween_property(_panel, "modulate:a", 1.0, 0.1)
+	else:
+		_panel.modulate.a = 1.0

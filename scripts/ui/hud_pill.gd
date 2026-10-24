@@ -15,7 +15,7 @@ static func pill_style(color: Color) -> StyleBoxFlat:
 	sb.bg_color = Color(0.07, 0.055, 0.043, 0.74)
 	sb.border_color = Color(color.r, color.g, color.b, 0.45)
 	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(9)
+	sb.set_corner_radius_all(ProgressUiKit.R_CARD)
 	sb.content_margin_left = 4
 	sb.content_margin_right = 7
 	sb.content_margin_top = 1

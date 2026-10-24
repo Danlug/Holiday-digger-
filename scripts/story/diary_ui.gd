@@ -345,8 +345,10 @@ func close_diary() -> void:
 	if not is_open:
 		return
 	is_open = false
-	_root.visible = false
 	Sfx.play("ui_close")
+	if _tween != null:
+		_tween.kill()
+	UiAnim.close(_panel, UiAnim.Kind.POP, _root)
 	closed.emit()
 
 

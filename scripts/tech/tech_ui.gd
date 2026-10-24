@@ -6,14 +6,14 @@ extends RefCounted
 
 const ART := "res://art/tech/%s.png"
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
-const DIM := Color8(0x6A, 0x5C, 0x4C)
-const GREEN := Color8(0x7F, 0xB8, 0x6B)
+const GOLD := ProgressUiKit.GOLD
+const MUTED := ProgressUiKit.MUTED
+const DIM := ProgressUiKit.DIM
+const GREEN := ProgressUiKit.GREEN
 const RED := Color8(0xD0, 0x5A, 0x4E)
-const PANEL := Color8(0x1D, 0x16, 0x10)
+const PANEL := ProgressUiKit.CARD_BG
 const PANEL_DARK := Color8(0x12, 0x0D, 0x0A)
-const BORDER := Color8(0x52, 0x40, 0x2D)
+const BORDER := ProgressUiKit.EDGE
 const FIRE := Color8(0xF0, 0x70, 0x1E)
 
 static var _cache: Dictionary = {}
@@ -56,6 +56,22 @@ static func item_icon(id: String) -> Texture2D:
 	return t
 
 
+## То же для мелких мест (ряд цены 14 px): с ободком, без «нарезки» ближайшим.
+static func item_icon_small(id: String, px: int = 16) -> Texture2D:
+	var key := "item_small:%s@%d" % [id, px]
+	if _cache.has(key):
+		return _cache[key]
+	var t: Texture2D = null
+	if id == FuelTank.block_item():
+		t = tex("fuel_block")
+	else:
+		t = UiIcons.item_small(id, px)
+	if t == null:
+		t = item_icon(id)
+	_cache[key] = t
+	return t
+
+
 static func item_name(id: String) -> String:
 	if id == FuelTank.block_item():
 		return "Топливный блок"
@@ -87,24 +103,19 @@ static func label(text: String, size: int = 9, color: Color = MUTED, outline: bo
 
 ## Рамка-плитка. selected — золотая; ok — зелёная; bad — красная.
 static func box(bg: Color = PANEL, border: Color = BORDER, radius: int = 5, margin: int = 3) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(radius)
+	var sb := ProgressUiKit.box(bg, border, ProgressUiKit.snap_radius(radius), 1)
 	sb.set_content_margin_all(margin)
-	sb.anti_aliasing = true
 	return sb
 
 
 ## Ряд «иконка + число» (цена, количество). Число красное, если не хватает.
-static func chip(texture: Texture2D, number: String, color: Color = MUTED, icon_px: float = 14) -> HBoxContainer:
+static func chip(texture: Texture2D, number: String, color: Color = MUTED, icon_px: float = 16) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 2)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(icon_rect(texture, icon_px))
-	row.add_child(label(number, 9, color))
+	row.add_child(label(number, 10, color))
 	return row
 
 

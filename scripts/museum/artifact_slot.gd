@@ -42,7 +42,7 @@ func _init() -> void:
 	flat = true
 	for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 		add_theme_stylebox_override(st, StyleBoxEmpty.new())
-	_sb.set_corner_radius_all(4)
+	_sb.set_corner_radius_all(ProgressUiKit.R_TILE)
 	_sb.set_border_width_all(1)
 	button_down.connect(func() -> void: create_tween().tween_property(self, "scale", Vector2(0.92, 0.92), 0.05))
 	button_up.connect(func() -> void:

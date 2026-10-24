@@ -216,6 +216,7 @@ func _tick_active(dt: float, busy: bool) -> void:
 	_active["lost"] = 0.0
 	_active["rect"] = res["rect"]
 	_active["final"] = bool(res["final"])
+	overlay.set_blockers(HintTargets.neighbors(res.get("node", null) as Control))
 	overlay.track(res["rect"])
 	if not bool(r.get("sticky", false)) and not HintConditions.test(r.get("when", {})):
 		_end("cond")
@@ -230,6 +231,7 @@ func _start(r: Dictionary, res: Dictionary) -> void:
 		"rect": res["rect"], "final": bool(res["final"])}
 	HintState.mark_seen(id)
 	var toast: Dictionary = r.get("toast", {})
+	overlay.set_blockers(HintTargets.neighbors(res.get("node", null) as Control))
 	overlay.show_hint(res["rect"], bool(res["world"]), HintArt.icon(String(toast.get("icon", ""))),
 		String(toast.get("text", "")), r.get("tip", []), String(r.get("style", "")))
 	Sfx.play(String(r.get("sfx", "ui_open")))

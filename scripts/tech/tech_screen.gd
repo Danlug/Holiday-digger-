@@ -30,6 +30,7 @@ var _player: Node = null
 var _tab: String = TAB_TANK
 var _tool: String = "hand_drill"
 var _station: bool = false
+var _closing: bool = false   # экран гаснет (анимация): по смыслу уже закрыт
 var _tier_sel: int = 0
 var _tab_buttons: Dictionary = {}
 var _content: VBoxContainer = null
@@ -68,7 +69,7 @@ static func open(tab: String = TAB_TANK, station: bool = false) -> void:
 
 static func is_open() -> bool:
 	var s := instance()
-	return s != null and s.visible
+	return s != null and s.visible and not s._closing
 
 
 static func close_screen() -> void:
@@ -87,7 +88,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.98)
+	bg.color = ProgressUiKit.BG_SOLID
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var column := VBoxContainer.new()
@@ -98,11 +99,11 @@ func _ready() -> void:
 	column.offset_bottom = -6
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
-	column.add_child(_build_tabs())
 	_content = VBoxContainer.new()
 	_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", 6)
 	column.add_child(_content)
+	column.add_child(_build_tabs())   # вкладки внизу, в зоне большого пальца — как на экране героя
 	_fx_layer = Control.new()
 	_fx_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -117,45 +118,28 @@ func _fit() -> void:
 
 
 func _build_tabs() -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	var defs := [
-		[TAB_TANK, "icon_tank", "Топливо", "Бак бура и бурмобиля, заправка"],
-		[TAB_SUIT, "suit_1", "Костюм", "Защита от жары и лавы"],
-		[TAB_WELL, "icon_well", "Скважина", "Копает сама, пока тебя нет"],
+	var specs := [
+		[TAB_TANK, TechUi.tex("icon_tank"), "Топливо", "Бак бура и бурмобиля, заправка"],
+		[TAB_SUIT, TechUi.tex("suit_1"), "Костюм", "Защита от жары и лавы"],
+		[TAB_WELL, TechUi.tex("icon_well"), "Скважина", "Копает сама, пока тебя нет"],
 	]
-	for d in defs:
-		var b := UiBtn.icon_button(TechUi.tex(String(d[1])), Vector2(44, 32), UiBtn.Kind.NORMAL, 24)
-		Tip.bind(b, String(d[2]), String(d[3]))
-		b.pressed.connect(func() -> void:
-			if Tip.swallowed():
-				return
-			open_tab(String(d[0]), _station))
-		row.add_child(b)
-		_tab_buttons[String(d[0])] = b
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(spacer)
-	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(32, 32), UiBtn.Kind.NORMAL, 16)
-	Tip.bind(x, "Закрыть")
-	x.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		close())
-	row.add_child(x)
-	return row
+	var bar := HeroTabButton.make_bar(specs, _tab,
+		func(key: String) -> void: open_tab(key, _station), close)
+	_tab_buttons = bar.get_meta("buttons")
+	return bar
 
 
 func open_tab(tab: String, station: bool = false) -> void:
 	_tab = tab
 	_station = station or (visible and _station and tab == TAB_TANK)
-	if not visible:
+	if not visible or _closing:
 		_station = station
 		_enter()
 	refresh()
 
 
 func _enter() -> void:
+	_closing = false
 	visible = true
 	Sfx.play("ui_open")
 	if _player != null:
@@ -164,7 +148,7 @@ func _enter() -> void:
 	var hud := get_tree().get_first_node_in_group("hud")
 	if hud != null and hud.has_method("close_inventory"):
 		hud.close_inventory()
-	UiAnim.appear(self, 0.97, 0.12)
+	UiAnim.open(self, UiAnim.Kind.FADE)
 	if not FuelTank.uses_fuel(_tool) or not GameState.owns_tool(_tool):
 		_tool = GameState.current_tool if FuelTank.uses_fuel(GameState.current_tool) else "hand_drill"
 
@@ -176,9 +160,10 @@ func select_tool(tool_id: String) -> void:
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _closing:
 		return
-	visible = false
+	_closing = true
+	UiAnim.close(self, UiAnim.Kind.FADE, null, func() -> void: _closing = false)
 	Sfx.play("ui_close")
 	SaveSystem.save_game()
 
@@ -203,8 +188,7 @@ func refresh() -> void:
 		_content.remove_child(c)
 		c.queue_free()
 	for key in _tab_buttons.keys():
-		var b: Button = _tab_buttons[key]
-		UiBtn.set_kind(b, UiBtn.Kind.ACCENT if key == _tab else UiBtn.Kind.NORMAL)
+		(_tab_buttons[key] as HeroTabButton).set_selected(key == _tab)
 	match _tab:
 		TAB_SUIT: _build_suit()
 		TAB_WELL: _build_well()
@@ -274,7 +258,7 @@ func _cost_row(parent: Node, cost) -> void:
 	for id in items.keys():
 		var need := int(items[id])
 		var have := TechCost.held(String(id))
-		var chip := TechUi.chip(TechUi.item_icon(String(id)), "%d/%d" % [have, need],
+		var chip := TechUi.chip(TechUi.item_icon_small(String(id)), "%d/%d" % [have, need],
 			TechUi.GREEN if have >= need else TechUi.RED, 16)
 		chip.mouse_filter = Control.MOUSE_FILTER_STOP
 		Tip.bind(chip, TechUi.item_name(String(id)), "Склад и рюкзак", "есть %d из %d" % [have, need])
@@ -393,7 +377,10 @@ func _source_row(parent: Node, source: String, icon: Texture2D, have: int, allow
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 	var one := _text_button("+1", UiBtn.Kind.NORMAL, 34)
-	var all := _text_button("МАКС", UiBtn.Kind.ACCENT, 48)
+	var all := _text_button("", UiBtn.Kind.ACCENT, 48)
+	all.icon = UiIcons.tex("max")      # «до максимума» — значок, слова нет
+	all.add_theme_constant_override("icon_max_width", 16)
+	all.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for b in [one, all]:
 		(b as Button).disabled = not allowed
 		Tip.bind(b, "Залить %s" % ("один блок" if b == one else "сколько влезет"), title,

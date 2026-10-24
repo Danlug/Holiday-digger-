@@ -6,11 +6,13 @@ extends RefCounted
 ## Владелец переписал прогресс: КИРКИ И РАНЦЫ БОЛЬШЕ НЕ КРАФТЯТСЯ — шесть
 ## кирок и четыре ранца покупаются за монеты. Рецепты из материалов остались
 ## только у ТЕХНИКИ: ручной бур, бурмобиль, буровая скважина (плюс
-## плавка бронзы и топливный блок, без которых техника не собирается).
+## плавка бронзы, без которой техника не собирается). Топливные блоки здесь
+## больше не делаются: перегонка торфа и угля переехала на станцию заправки
+## в огороде (решение владельца, раунд 3; scripts/tech/fuel_refinery.gd).
 ##
 ## Числа НЕ дублируются: линейки и рецепты собираются из data/balance.json
-## (цены и множители кирок и ранцев заданы владельцем напрямую, бронза 1:1 и
-## топливный блок 4:1 — ГДД разделом 5, цены бура и машины лежат там же с
+## (цены и множители кирок и ранцев заданы владельцем напрямую, бронза 1:1 —
+## ГДД разделом 5, цены бура и машины лежат там же с
 ## пометкой proposed), а цены руды — из data/minerals.json через автолоад
 ## Balance. Свой файл data/shop.json держит только то, чего в них нет:
 ## ассортимент лавки, величину рекламных наград, глубины открытия рецептов и
@@ -92,8 +94,6 @@ static func ad_double_sale_id() -> String:
 static func recipes() -> Array:
 	var out: Array = []
 	out.append(_recipe_bronze())
-	out.append(_recipe_fuel_block())
-	out.append(_recipe_fuel_block_coal())
 	for tool_id in ["hand_drill", "drill_rig"]:
 		var r := _recipe_tool(tool_id)
 		if not r.is_empty():
@@ -125,41 +125,6 @@ static func _recipe_bronze() -> Dictionary:
 		"inputs": {"scrap": maxi(per, 1)},
 		"coins": 0,
 		"unlock_depth": 0,
-	}
-
-
-## Топливный блок: ГДД раздел 5 — 4 торфа = 1 блок (торфоперегонка).
-static func _recipe_fuel_block() -> Dictionary:
-	var per: int = int(Balance.unwrap(Balance.balance.get("fuel_consumption", {}).get("peat_per_fuel_block", 4)))
-	return {
-		"id": "fuel_block",
-		"name_ru": "Топливный блок",
-		"desc_ru": "Торфоперегонка",
-		"kind": "item",
-		"output": {"id": "fuel_block", "count": 1},
-		"inputs": {"peat": maxi(per, 1)},
-		"coins": 0,
-		"unlock_depth": 0,
-	}
-
-
-## Топливный блок из угля (решение владельца, задача «Бурмобиль — транспорт»:
-## «если он экипирован бурмобилем, он должен иметь на себе топливо (брикеты
-## каменного угля)» — уголь назван прямо, поэтому это основной рецепт блока
-## начиная с глубины угля). Рецепт на торфе (см. _recipe_fuel_block) не
-## отменён: он и раньше был в ГДД (торфоперегонка), просто теперь не
-## единственный.
-static func _recipe_fuel_block_coal() -> Dictionary:
-	var per: int = int(Balance.unwrap(Balance.balance.get("fuel_consumption", {}).get("coal_per_fuel_block", 2)))
-	return {
-		"id": "fuel_block_coal",
-		"name_ru": "Топливный блок (уголь)",
-		"desc_ru": "Брикетирование угля",
-		"kind": "item",
-		"output": {"id": "fuel_block", "count": 1},
-		"inputs": {"coal": maxi(per, 1)},
-		"coins": 0,
-		"unlock_depth": unlock_depth("fuel_block_coal"),
 	}
 
 

@@ -42,6 +42,28 @@ const CHARS := {
 		"buy": "best", "reserve": 0, "skills": ["dig_speed", "strength", "stamina", "hunger", "hp", "vision", "luck_chance", "luck_multiplier"]},
 }
 
+## Стратегии-цели (раунд 4, «ночной прогон»): поверх характера задают, ЧТО бот хочет от игры —
+## порядок прокачки, покупок и проектов, радиус охоты за рудой, особое поведение и метрику успеха.
+## «Застрял» для цели — метрика не растёт stall_min игровых минут. Ветки навыков, которых нет в
+## data/upgrades.json, просто пропускаются; незнакомые (новые) — добавляются в конец списка.
+const GOALS := {
+	"deep": {"char": "hasty", "skills": ["dig_speed", "greed", "fever", "vision", "strength", "stamina", "hunger", "hp"],
+		"buy": "best", "side": 1, "branch_every": 0, "projects": ["hand_drill", "drill_rig"], "suits": true,
+		"metric": "max_depth", "stall_min": 45.0},
+	"achiever": {"char": "cautious", "skills": ["luck_chance", "luck_multiplier", "vision", "dig_speed", "strength", "hp", "stamina", "hunger", "greed", "fever"],
+		"buy": "next", "side": 4, "branch_every": 0, "projects": ["well", "hand_drill"], "quests": true, "die_once": true,
+		"metric": "achievements", "stall_min": 60.0},
+	"tycoon": {"char": "greedy", "skills": ["luck_chance", "luck_multiplier", "strength", "vision", "dig_speed", "greed", "fever", "stamina", "hunger", "hp"],
+		"buy": "next", "side": 6, "branch_every": 6, "projects": ["well", "hand_drill"], "quests": true, "well_upgrade": true,
+		"metric": "earned", "stall_min": 30.0},
+	"collector": {"char": "greedy", "skills": ["vision", "luck_chance", "luck_multiplier", "strength", "dig_speed", "stamina", "hunger", "hp", "greed", "fever"],
+		"buy": "next", "side": 8, "branch_every": 5, "projects": [], "screens": true,
+		"metric": "collection", "stall_min": 45.0},
+	"fighter": {"char": "cautious", "skills": ["hp", "dig_speed", "stamina", "strength", "greed", "fever", "vision", "hunger"],
+		"buy": "best", "side": 2, "branch_every": 0, "projects": ["hand_drill", "drill_rig"], "suits": true, "combat_gear": true,
+		"metric": "fight", "stall_min": 60.0, "ret_hp": 45.0},
+}
+
 const SHAFT_X := 17
 const STUCK_SEC := 120.0        # без прогресса столько игровых секунд — «застрял»
 const MODAL_STUCK_SEC := 20.0   # окно не закрылось за столько — находка
@@ -53,6 +75,24 @@ var bot: BotPlayer = BotPlayer.new()
 var _input_mode := "keys"         # keys — WASD; stick — экранный джойстик пальцем (tests/bot/bot_stick.gd)
 var C: Dictionary = {}
 var char_name := "cautious"
+var goal_name := ""               # пусто — без стратегии (как раунд 3); deep|achiever|tycoon|collector|fighter
+var G: Dictionary = {}
+var _char_given := false
+var _skip_onb := false
+var _flush_sec := 600.0           # телеметрия на диск каждые N игровых секунд (ночной прогон не теряет итог)
+var _next_flush := 600.0
+var _metric_best := -1.0
+var _metric_t := 0.0
+var _earned := 0
+var _coins_seen := 0
+var _coins_frame := 0
+var _no_brake := false             # намеренная смерть (достижение «умри»): не тормозить тягой
+var _die_tries := 0
+var _death_entry: Dictionary = {}
+var _heal_seen := false            # HP хоть раз выросло от сна/еды/аптечки — лечение в игре есть
+var _greed_t := 0.0
+var _craft_args := -1
+var _prev_cell := Vector2i(-99, -99)
 var main: Node2D
 var player
 var world: WorldGen
@@ -130,6 +170,13 @@ func _ready() -> void:
 			_minutes = float(a.substr(10))
 		elif a.begins_with("--char="):
 			char_name = a.substr(7)
+			_char_given = true
+		elif a.begins_with("--goal="):
+			goal_name = a.substr(7)
+		elif a == "--skip-onboarding":
+			_skip_onb = true
+		elif a.begins_with("--flush="):
+			_flush_sec = float(a.substr(8)) * 60.0
 		elif a.begins_with("--out="):
 			_out = a.substr(6)
 		elif a == "--shots":
@@ -148,10 +195,22 @@ func _ready() -> void:
 			_trace = float(a.substr(8))
 		elif a.begins_with("--max-depth="):
 			_max_depth_stop = int(a.substr(12))
+	if goal_name != "" and not GOALS.has(goal_name):
+		push_warning("bot: неизвестная стратегия %s — без стратегии" % goal_name)
+		goal_name = ""
+	if goal_name != "":
+		G = (GOALS[goal_name] as Dictionary).duplicate(true)
+		if not _char_given:
+			char_name = String(G["char"])
 	if not CHARS.has(char_name):
 		push_warning("bot: неизвестный характер %s — беру cautious" % char_name)
 		char_name = "cautious"
 	C = (CHARS[char_name] as Dictionary).duplicate(true)
+	for k in ["skills", "buy", "side", "branch_every", "ret_hp"]:
+		if G.has(k):
+			C[k] = G[k]
+	if G.has("skills"):
+		C["skills"] = _skill_order(G["skills"])
 	if _short:
 		C["trip_max"] = 150.0   # короткий прогон обязан успеть круг «шахта → дом → шахта»
 	if _out.is_empty():
@@ -169,6 +228,13 @@ func _run() -> void:
 	_rng.seed = _seed
 	if not _resume:
 		_clean_slate()
+	if _skip_onb and not _resume:
+		# состояние «сразу после онбординга» — до main.tscn: режиссёр читает сюжет при старте
+		for id in ["intro_grandpa", "intro_boy", "autodig_start", "dud_treasure", "autodig_done", "workshop", "death", "backpack", "robert"]:
+			StoryState.mark_seen(id)
+		for f in ["intro_seen", "dud_treasure_found", "autodig_done", "workshop_seen", "gold_taken", "foundation_broken",
+				"bars_introduced", "death_seen", "backpack_owned", "robert_seen", "hatch_built", "gold_sold", "food_ordered"]:
+			StoryState.set_flag(f)
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames_n(4)
@@ -190,16 +256,22 @@ func _run() -> void:
 		bot = Stick.new(hud)
 	_end = _minutes * 60.0
 	_next_session = _session_min * 60.0 if _session_min > 0.0 else INF
-	T.meta = {"seed": _seed, "character": char_name, "input": _input_mode, "minutes_target": _minutes, "short": _short,
+	T.meta = {"seed": _seed, "character": char_name, "goal": goal_name, "input": _input_mode, "minutes_target": _minutes, "short": _short,
 		"build": _build_label(), "fixed_fps_hint": "--fixed-fps 31", "started_utc": Time.get_datetime_string_from_system(true)}
 	_connect_signals()
 	_last_us = Time.get_ticks_usec()
 	_resume_us = _last_us
 	_progress_t = 0.0
 
+	_coins_seen = GameState.coins
+	_next_flush = _flush_sec
 	if _resume and StoryState.is_seen("robert"):
 		T.mark("resumed", _sim)
 		T.meta["resumed_from"] = {"max_depth": GameState.max_depth_reached, "coins": GameState.coins, "tool": GameState.current_tool}
+	elif _skip_onb:
+		_fast_start()
+		await _frames_n(3)
+		T.mark("onboarding_done", _sim)
 	else:
 		await _onboarding()
 	if not _stop:
@@ -264,6 +336,12 @@ func _finish() -> void:
 	T.meta["game_days"] = snappedf(_sim / 3600.0 * Balance.get_game_hours_per_real_hour() / 24.0, 0.01)
 	T.meta["end_state"] = _state_dict()
 	T.meta["home_visits"] = _home_visits
+	T.meta["partial"] = false
+	if goal_name != "":
+		T.meta["goal_metric"] = snappedf(_goal_metric(), 0.1)
+		T.meta["achievements_done"] = int(_ach_done())
+		T.meta["coins_earned_total"] = _earned
+		T.meta["monsters"] = MetaState.counter("monsters")
 	var path := _out.path_join("telemetry.json")
 	T.write_json(path, _sim)
 	var p0 := 0
@@ -294,6 +372,7 @@ func _step() -> void:
 	var now_us := Time.get_ticks_usec()
 	var cpu_ms := float(now_us - _last_us - bot_us) / 1000.0
 	T.bot_ms += float(bot_us) / 1000.0
+	_coins_frame = GameState.coins
 	_last_us = now_us
 	_burn_us_frame = 0
 	_frames += 1
@@ -306,10 +385,21 @@ func _step() -> void:
 			print("[bot] кадр %.0f мс на t=%.1f: %s, события кадра %s" % [cpu_ms, _sim, _activity, str(_frame_events)])
 	_frame_events.clear()
 	_real_time_waits()
+	_check_tunneling()
 	_auto_story()
 	_dismiss_modals()
 	_detectors()
+	if GameState.coins > _coins_seen:
+		_earned += GameState.coins - _coins_seen
+	_coins_seen = GameState.coins
+	if _sim >= _next_flush and _flush_sec > 0.0:
+		_next_flush = _sim + _flush_sec
+		T.meta["sim_seconds"] = snappedf(_sim, 0.1)
+		T.meta["end_state"] = _state_dict()
+		T.meta["partial"] = true
+		T.write_json(_out.path_join("telemetry.json"), _sim)
 	if _sim - _last_sample >= SAMPLE_SEC:
+		_goal_tick()
 		_last_sample = _sim
 		T.sample(_sim, GameState.coins, GameState.xp, GameState.level, _depth(), GameState.max_depth_reached,
 			GameState.hp, GameState.hunger, GameState.stamina, GameState.get_total_weight(), GameState.get_max_carry_kg())
@@ -351,6 +441,22 @@ func _burn(ms: int) -> void:
 	OS.delay_msec(ms)
 	_burn_us_frame += ms * 1000
 	T.burned_ms += ms
+
+
+## Прошёл сквозь породу: за кадр герой сдвинулся вниз больше чем на клетку, а между старой и новой
+## клеткой по его колонке есть твёрдая порода (быстрое падение, режим жадности ×7).
+func _check_tunneling() -> void:
+	if player == null or GameState.house_is_indoors or not GameState.is_alive:
+		_prev_cell = Vector2i(-99, -99)
+		return
+	var c := Vector2i(player.cell_x(), player.cell_y())
+	if _prev_cell.x == c.x and c.y > _prev_cell.y + 1 and c.y - _prev_cell.y < 40 and not player.frozen:
+		for y in range(_prev_cell.y + 1, c.y):
+			if world.get_tile(c.x, y) != TileTypes.Type.EMPTY and not _died_pending:
+				T.finding("P1", "tunneling", "герой прошёл сквозь породу (%d,%d)→(%d,%d)%s" % [_prev_cell.x, _prev_cell.y,
+					c.x, c.y, " в режиме жадности" if _greed_active() else ""], _sim, {"dump": _dump()}, "greed" if _greed_active() else "fall")
+				break
+	_prev_cell = c
 
 
 ## Места, где игра считает настоящие миллисекунды: проживаем их честно.
@@ -422,7 +528,7 @@ func _dismiss_modals() -> void:
 	if _frames % 4 != 0:
 		return
 	var open: Array = []
-	if ProgressScreen.is_open():
+	if ProgressScreen.is_open() and _activity != "screens":
 		open.append("progress")
 		ProgressScreen.close_screen()
 	var meta = MetaService.instance
@@ -509,6 +615,11 @@ func _detectors() -> void:
 			_input_lost_t = 0.0
 	else:
 		_input_lost_t = 0.0
+	if _greed_active():
+		if _greed_t == 0.0:
+			T.mark("first_greed", _sim)
+		_greed_t += 8.0 / 31.0
+		T.meta["greed_seconds"] = snappedf(_greed_t, 0.1)
 	# Герой внутри твёрдой клетки — зажат.
 	if not GameState.house_is_indoors and GameState.is_alive and not player.frozen and not _busy_story() \
 			and player._solid_at(player.x, player.y):
@@ -588,6 +699,8 @@ func _on_dig_finished(x: int, y: int, _t: int, mineral: String, loot: bool, _c: 
 func _on_fell(dmg: float, v: float) -> void:
 	if dmg <= 0.0:
 		return
+	if _greed_active():
+		T.finding("P1", "greed_fall", "урон от падения в режиме жадности: −%.0f HP на скорости %.1f" % [dmg, v], _sim, {}, "greed_fall")
 	_last_fall_sim = _sim
 	_last_fall_dmg = dmg
 	T.event(_sim, "fall", "падение: −%.0f HP (скорость %.1f)" % [dmg, v], false)
@@ -618,7 +731,10 @@ func _on_died() -> void:
 	for id in _pack_before_death.keys():
 		value += Balance.get_mineral_price(String(id)) * int(_pack_before_death[id])
 	var d := {"t": snappedf(_sim, 0.1), "cause": cause, "depth": _depth(), "activity": _activity,
-		"lost_items": _pack_before_death.duplicate(), "lost_value": value, "scripted": not StoryState.is_seen("death")}
+		"lost_items": _pack_before_death.duplicate(), "lost_value": value, "scripted": not StoryState.is_seen("death"),
+		"coins_before": _coins_frame, "deliberate": _no_brake}
+	_no_brake = false
+	_death_entry = d
 	T.deaths.append(d)
 	T.event(_sim, "death", "смерть: %s на глубине %d, потеряно на %d" % [cause, _depth(), value])
 	if StoryState.is_seen("death"):
@@ -633,6 +749,19 @@ func _on_respawned() -> void:
 	_died_pending = false
 	if T.in_trip():
 		T.trip_end(_sim, "death", 0, 0.0)
+	# Цена смерти (решение владельца, раунд 4): весь лут и 200 монет («скорая забрала»).
+	# Списание может прийти и в die(), и в respawn(): сверяем через секунду игры.
+	var d := _death_entry
+	if d.is_empty() or bool(d.get("scripted", false)):
+		return
+	var t := get_tree().create_timer(1.0, true, false, false)
+	t.timeout.connect(func() -> void:
+		var lost := int(d.get("coins_before", 0)) - GameState.coins
+		d["coins_lost"] = lost
+		var expect := mini(200, int(d.get("coins_before", 0)))
+		if lost != expect:
+			T.finding("P1", "death_cost", "смерть отняла %d монет, а по правилу — %d («скорая забрала» 200)" % [lost, expect],
+				_sim, d, str(lost == 0)))
 
 
 func _on_inventory() -> void:
@@ -862,6 +991,22 @@ func _onboarding() -> void:
 	_activity = "free"
 
 
+## Короткий тест стратегий: без 2 минут онбординга — сразу «после Роберта» (кирка, ранец, тоннель, 750 монет).
+func _fast_start() -> void:
+	GameState.grant_tool("rusty_pickaxe")
+	GameState.set_current_tool("rusty_pickaxe")
+	GameState.grant_gear("backpack")
+	GameState.coins = 750
+	GameState.dollars = 5
+	GameState.coins_changed.emit(GameState.coins)
+	_coins_seen = GameState.coins
+	house.robert_finished_garden()
+	if world.has_method("unlock_pre_autodig_garden"):
+		world.unlock_pre_autodig_garden()
+	player.teleport_home()
+	_activity = "free"
+
+
 func _abort() -> void:
 	# Без онбординга свободная игра бессмысленна: дальше смотрим только то, что успели.
 	_stop = true
@@ -921,6 +1066,7 @@ func _surface() -> void:
 		return
 	if _from_house and _fuel_tool() != "" and FuelTank.fraction(_fuel_tool()) < 0.6:
 		await _visit_station()
+	_maybe_die_once()
 	# Только что из дома — сразу в шахту: иначе то, что дома не решилось (нет денег на еду,
 	# материалы на проект), гоняло бы героя туда-обратно у двери.
 	if not _from_house and _needs_home():
@@ -966,6 +1112,19 @@ func _visit_station() -> void:
 		T.finding("P2", "no_fuel", "бак %s почти пуст, а перегонять нечего (торфа %d, угля %d)" % [tool,
 			GameState.get_item_count("peat") + HouseStorage.count("peat"), GameState.get_item_count("coal") + HouseStorage.count("coal")], _sim)
 	_activity = "surface"
+
+
+## «Охотник за достижениями»: одно достижение — умереть. Раз за прогон, с пустым рюкзаком и запасом
+## монет: спуск по своему стволу без тормоза. Заодно проверяет цену смерти (200 монет, весь лут).
+func _maybe_die_once() -> void:
+	if not bool(G.get("die_once", false)) or _die_tries >= 3 or GameState.max_depth_reached < 60 or GameState.coins < 260:
+		return
+	var ach = load("res://scripts/meta/achievements.gd")
+	if ach != null and _has_static(ach, "is_done") and bool(ach.call("is_done", "die_1")):
+		return
+	_die_tries += 1
+	_no_brake = true
+	T.event(_sim, "die_once", "спуск без тормоза ради достижения «умри»")
 
 
 func _needs_home() -> bool:
@@ -1051,7 +1210,7 @@ func _brake_keys() -> Array:
 	# Как человек: падать свободно и тормозить тягой (−26 кл/с²) так, чтобы у пола было ≤ ~12:
 	# тормозить, если без тяги удар вышел бы сильнее (v² + 2·G·зазор > 150) и до пола уже не
 	# дальше тормозного пути (v² − 100)/52 плюс запас.
-	if not player.has_backpack() or player.vy <= 8.0:
+	if _no_brake or not player.has_backpack() or player.vy <= 8.0:
 		return []
 	var v: float = player.vy
 	var gap: float = float(_floor_gap()) + (float(player.cell_y()) + 1.0 - (float(player.y) + 1.0 / 3.0))
@@ -1099,8 +1258,23 @@ func _should_return() -> String:
 
 ## Чем дома поднять HP: сон и еда HP не лечат (ГДД §7), лечит только таблетка за доллары.
 func _can_heal() -> bool:
+	if _heal_seen or not _medkit().is_empty():
+		return true
 	var g := ShopCatalog.good("full_restore_pill", "dollars")
 	return not g.is_empty() and GameState.dollars >= ShopCatalog.good_price(g, "dollars")
+
+
+## Аптечка за монеты (ветка healing, раунд 4): ищем по каталогу лавки, а не по имени.
+func _medkit() -> Dictionary:
+	for g in ShopCatalog.goods_coins():
+		if not (g is Dictionary):
+			continue
+		var id := String(g.get("id", ""))
+		var eff := String(g.get("effect", ""))
+		if id.contains("medkit") or id.contains("aid") or eff == "heal" or eff == "restore_hp" or eff == "full_restore":
+			if GameState.coins >= ShopCatalog.good_price(g, "coins"):
+				return g
+	return {}
 
 
 func _eat_in_mine() -> void:
@@ -1464,6 +1638,10 @@ func _home_visit() -> void:
 	_spend_skills()
 	_claim_meta()
 	_heal_at_home()
+	if bool(G.get("quests", false)):
+		await _do_quests()
+	if bool(G.get("screens", false)) and _home_visits % 5 == 2:
+		await _visit_screens()
 	if GameState.hunger < float(C["eat_below"]) or _food_in_pack() < int(C["food_stock"]):
 		await _order_and_take_food(GameState.hunger < float(C["eat_below"]))
 	if GameState.stamina < float(C["sleep_below"]) and not _stop:
@@ -1508,9 +1686,23 @@ func _sell() -> void:
 
 
 ## Материалы под ближайший незавершённый проект верстака (ручной бур, бурмобиль, скважина).
+## Рецепты-проекты в порядке стратегии (G.projects: бур → бурмобиль у «глубокого», скважина у «магната»);
+## пустой список — ничего не копить (коллекционер продаёт всё). Без стратегии — порядок каталога.
+func _project_recipes() -> Array:
+	var all: Array = ShopCatalog.recipes()
+	if not G.has("projects"):
+		return all
+	var out: Array = []
+	for want in G["projects"]:
+		for r in all:
+			if String(r.get("id", "")) == String(want) or String(r.get("output", {}).get("id", "")) == String(want):
+				out.append(r)
+	return out
+
+
 func _reserved_materials() -> Dictionary:
 	var keep: Dictionary = {}
-	for r in ShopCatalog.recipes():
+	for r in _project_recipes():
 		var kind := String(r.get("kind", ""))
 		if not ["tool", "machine"].has(kind):
 			continue
@@ -1552,6 +1744,21 @@ func _workbench() -> void:
 			if out_id == FuelTank.block_item() and _fuel_tool() != "":
 				want = FuelTank.in_pack() < 6
 			var n := 0
+			if want and ShopService.can_craft(rid) and _craft_qty_args() >= 2:
+				# ползунок количества (ветка craft-qty, раунд 4): одна сделка на N штук — проверяем, что пришло N
+				var need := clampi(int(_reserved_or_need(out_id)) if out_id == "bronze" else 6, 1, 40)
+				var have0 := GameState.get_item_count(out_id) + HouseStorage.count(out_id)
+				var ss = load("res://scripts/shop/shop_service.gd")
+				var rq: Dictionary = ss.call("craft", rid, need)
+				var got := GameState.get_item_count(out_id) + HouseStorage.count(out_id) - have0
+				if bool(rq.get("ok", false)):
+					n = got
+					T.mark("craft_qty_used", _sim)
+					var per := maxi(1, int(r["output"]["count"]))
+					if got != need * per and got > 0 and got % per == 0 and got / per > need:
+						T.finding("P1", "craft_qty", "заказано %d × «%s», пришло %d" % [need, rid, got], _sim, {}, rid)
+					elif got <= 0:
+						T.finding("P1", "craft_qty", "крафт %d × «%s» сказал «готово», а предметов не прибавилось" % [need, rid], _sim, {}, rid)
 			while want and ShopService.can_craft(rid) and n < 40:
 				ShopService.craft(rid)
 				n += 1
@@ -1571,6 +1778,63 @@ func _workbench() -> void:
 		if n2 > 0:
 			T.event(_sim, "refuel", "%s +%d" % [tool, n2], false)
 			T.mark("first_refuel", _sim)
+	_goal_workbench()
+
+
+## Верстак по стратегии: костюм жары, снаряжение боя, ступени скважины и баков.
+func _goal_workbench() -> void:
+	if bool(G.get("suits", false)) and GameState.max_depth_reached >= 1500:
+		var r: Dictionary = Heat.craft_suit()
+		if bool(r.get("ok", false)):
+			T.mark("suit_%d" % Heat.suit_tier(), _sim)
+			T.event(_sim, "suit", String(r.get("message", "")))
+	if bool(G.get("combat_gear", false)) and GameState.max_depth_reached >= 2500:
+		for id in CombatData.craftable_ids():
+			if CombatService.can_craft(String(id)):
+				var c: Dictionary = CombatService.craft(String(id))
+				if bool(c.get("ok", false)):
+					T.mark("gear:" + String(id), _sim)
+					T.event(_sim, "combat_gear", String(id))
+	if bool(G.get("well_upgrade", false)) and GameState.well_level > 0:
+		var w: Dictionary = IdleWell.upgrade()
+		if bool(w.get("ok", false)):
+			T.mark("well_level_%d" % GameState.well_level, _sim)
+			T.event(_sim, "well", "скважина: уровень %d" % GameState.well_level)
+	for t in ["hand_drill", "drill_rig"]:
+		if GameState.owns_tool(t) and FuelTank.uses_fuel(t) and G.has("projects") and (G["projects"] as Array).has(t):
+			var u: Dictionary = FuelTank.upgrade(t)
+			if bool(u.get("ok", false)):
+				T.event(_sim, "tank", "бак %s: уровень %d" % [t, FuelTank.level(t)])
+
+
+## Сколько аргументов у ShopService.craft (2+ — есть количество: ветка craft-qty).
+func _craft_qty_args() -> int:
+	if _craft_args < 0:
+		_craft_args = 1
+		var ss: Script = load("res://scripts/shop/shop_service.gd")
+		for m in ss.get_script_method_list():
+			if String(m.get("name", "")) == "craft":
+				_craft_args = (m.get("args", []) as Array).size()
+	return _craft_args
+
+
+## Режим жадности (ветка greed, раунд 4): имени API заранее не знаем — пробуем вероятные.
+func _greed_active() -> bool:
+	if _mech == null or _mech == self:
+		_chest_at(Vector2i(-1, -1))   # найдёт MechDirector
+	var objs: Array = [player]
+	if _mech != null and _mech != self:
+		objs.push_front(_mech)
+	for o in objs:
+		for mname in ["is_greed_active", "greed_active", "is_greed"]:
+			if o.has_method(mname):
+				return bool(o.call(mname))
+		for prop in ["greed_active", "greed"]:
+			if prop in o:
+				var v = o.get(prop)
+				if v is bool:
+					return v
+	return false
 
 
 func _reserved_in_pack() -> Dictionary:
@@ -1769,7 +2033,7 @@ func _order_and_take_food(eat: bool) -> void:
 	if eat:
 		var id := HouseFood.best_food_for_now()
 		if id != "":
-			HouseFood.eat(id)
+			_eat_tracked(id, "home")
 			T.event(_sim, "eat", "съел %s дома" % id, false)
 
 
@@ -1779,6 +2043,7 @@ func _sleep() -> void:
 		_activity = "home"
 		return
 	var before := GameState.stamina
+	var hp_before := GameState.hp
 	if not await _house_press("sleep"):
 		_activity = "home"
 		return
@@ -1793,8 +2058,12 @@ func _sleep() -> void:
 		_view()._on_forced_pressed()
 		await _frames_n(3)
 	T.sleeps.append({"t": snappedf(_sim, 0.1), "before": snappedf(before, 0.1), "after": snappedf(GameState.stamina, 0.1),
-		"sec": snappedf(_sim - t0, 0.1)})
+		"sec": snappedf(_sim - t0, 0.1), "hp_before": snappedf(hp_before, 0.1), "hp_after": snappedf(GameState.hp, 0.1)})
 	T.mark("first_sleep", _sim)
+	if GameState.hp > hp_before + 0.5:
+		_heal_seen = true
+		T.mark("first_heal_by_sleep", _sim)
+	await _check_heal_rule(hp_before)
 	if GameState.stamina <= before:
 		var plan := HouseSleep.plan(before, GameState.hunger)
 		if not bool(plan.get("ok", true)):
@@ -1804,6 +2073,34 @@ func _sleep() -> void:
 			T.finding("P1", "sleep", "сон не прибавил бодрости (%.0f → %.0f)" % [before, GameState.stamina], _sim)
 	_activity = "home"
 	await _go_room("hall")
+
+
+## Правило владельца (раунд 4): «при полном сне и еде здоровье восстанавливается до 90–100%».
+## После полного сна доедаем до сытости (что есть в рюкзаке) и сверяем HP — с допуском 85%.
+func _check_heal_rule(hp_before: float) -> void:
+	if GameState.stamina < 95.0 or hp_before >= GameState.get_max_hp() * 0.85:
+		return
+	var guard := 0
+	while GameState.hunger < 90.0 and HouseFood.best_food_for_now() != "" and guard < 4:
+		guard += 1
+		_eat_tracked(HouseFood.best_food_for_now(), "rule")
+	if GameState.hunger >= 85.0 and GameState.hp < GameState.get_max_hp() * 0.85:
+		T.finding("P1", "heal_rule", "после полного сна и еды HP %.0f%% (было %.0f%%), а по правилу — 90–100%%" % [
+			100.0 * GameState.hp / GameState.get_max_hp(), 100.0 * hp_before / GameState.get_max_hp()], _sim, {}, "heal_rule")
+	else:
+		T.mark("heal_rule_ok", _sim)
+
+
+## Съесть с учётом HP: еда лечит (раунд 4) — фиксируем прибавку.
+func _eat_tracked(id: String, where: String) -> void:
+	var hp0 := GameState.hp
+	var h0 := GameState.hunger
+	HouseFood.eat(id)
+	if GameState.hp > hp0 + 0.5:
+		_heal_seen = true
+		T.mark("first_heal_by_food", _sim)
+	T.meals.append({"t": snappedf(_sim, 0.1), "id": id, "where": where, "hunger_before": snappedf(h0, 0.1),
+		"hp_gain": snappedf(GameState.hp - hp0, 0.1)})
 
 
 ## «Закрыл игру и вернулся завтра»: сейв, освобождение main.tscn, мета-часы на сутки
@@ -1865,15 +2162,83 @@ func _heal_at_home() -> void:
 	var low := GameState.hp < GameState.get_max_hp() * float(C["ret_hp"]) / 100.0
 	if not low:
 		return
-	if _can_heal() and String(_view().room_id()) == "hall":
+	var kit := _medkit()
+	if not kit.is_empty() and String(_view().room_id()) == "hall":
+		var hp0 := GameState.hp
+		var rk := ShopService.buy(String(kit.get("id", "")), "coins")
+		if bool(rk.get("ok", false)):
+			T.event(_sim, "heal", "аптечка: HP %.0f → %.0f" % [hp0, GameState.hp])
+			T.mark("first_medkit", _sim)
+			if GameState.hp <= hp0:
+				T.finding("P1", "medkit", "аптечка куплена, а HP не выросло (%.0f → %.0f)" % [hp0, GameState.hp], _sim)
+			return
+	if _can_heal() and String(_view().room_id()) == "hall" and GameState.dollars >= 5:
 		var before := GameState.hp
 		var r := ShopService.buy("full_restore_pill", "dollars")
 		if bool(r.get("ok", false)):
 			T.event(_sim, "heal", "таблетка: HP %.0f → %.0f" % [before, GameState.hp])
 			T.purchases.append({"t": snappedf(_sim, 0.1), "id": "full_restore_pill", "kind": "good", "price": 0, "dollars": true})
 			return
-	T.finding("P2", "no_heal", "HP %.0f/%.0f, а лечиться нечем: сон и еда HP не возвращают, таблетка — только за доллары (их %d)" % [
-		GameState.hp, GameState.get_max_hp(), GameState.dollars], _sim, {}, "no_heal")
+	if not _heal_seen:
+		T.finding("P2", "no_heal", "HP %.0f/%.0f, а лечиться нечем: сон и еда HP не возвращают, таблетка — только за доллары (их %d)" % [
+			GameState.hp, GameState.get_max_hp(), GameState.dollars], _sim, {}, "no_heal")
+
+
+## Порядок веток навыков стратегии: только существующие в data/upgrades.json, остальные — в конце
+## (новые ветки других агентов, например «Жадность», бот прокачает, даже не зная их имени).
+func _skill_order(pref: Array) -> Array:
+	var ids: Array = []
+	var f := FileAccess.open("res://data/upgrades.json", FileAccess.READ)
+	if f != null:
+		var d = JSON.parse_string(f.get_as_text())
+		if d is Dictionary:
+			var br = d.get("branches", [])
+			if br is Array:
+				for b in br:
+					if b is Dictionary and b.has("id"):
+						ids.append(String(b["id"]))
+			elif br is Dictionary:
+				ids = (br as Dictionary).keys()
+	var out: Array = []
+	for id in pref:
+		if ids.is_empty() or ids.has(id):
+			out.append(id)
+	for id in ids:
+		if not out.has(id):
+			out.append(id)
+	return out
+
+
+## Метрика успеха стратегии (растёт — цель движется).
+func _goal_metric() -> float:
+	match String(G.get("metric", "")):
+		"max_depth":
+			return float(GameState.max_depth_reached)
+		"achievements":
+			var ach = load("res://scripts/meta/achievements.gd")
+			return float(ach.call("done_count")) if ach != null and _has_static(ach, "done_count") else 0.0
+		"earned":
+			return float(_earned)
+		"collection":
+			return float(GameState.collected_artifacts.size() * 10 + int(T.event_counts.get("chest_opened", 0)) * 3
+				+ int(T.event_counts.get("mastery_star", 0)) + T.minerals_first.size())
+		"fight":
+			return float(MetaState.counter("monsters") * 10 + GameState.max_depth_reached / 100)
+	return 0.0
+
+
+func _goal_tick() -> void:
+	if G.is_empty():
+		return
+	var m := _goal_metric()
+	if m > _metric_best:
+		_metric_best = m
+		_metric_t = _sim
+	elif _sim - _metric_t > float(G.get("stall_min", 45.0)) * 60.0:
+		T.finding("P2", "goal_stall", "цель «%s» не растёт %.0f игровых минут (метрика %.0f)" % [goal_name,
+			(_sim - _metric_t) / 60.0, m], _sim, {"dump": _dump()}, goal_name)
+		_metric_t = _sim
+	T.goal_curve.append([snappedf(_sim, 0.1), snappedf(m, 0.1)])
 
 
 func _spend_skills() -> void:
@@ -1889,6 +2254,59 @@ func _spend_skills() -> void:
 				break
 		if not spent:
 			break
+
+
+## Задания дня, которые копкой сами не закрываются: «поешь N раз», «выспись», «потрать/купи».
+## Бот делает их дома, как игрок с открытым списком заданий.
+func _do_quests() -> void:
+	var qe = load("res://scripts/meta/quest_engine.gd")
+	if qe == null or not _has_static(qe, "all_quests"):
+		return
+	for q in qe.call("all_quests"):
+		if not (q is Dictionary) or bool(qe.call("is_done", q)):
+			continue
+		match String(q.get("event", "")):
+			"ate":
+				if _food_in_pack() == 0:
+					await _order_and_take_food(false)
+				var id := HouseFood.best_food_for_now()
+				if id == "" and _food_in_pack() > 0:
+					id = String(HouseFood.food_in_inventory()[0]["id"])
+				if id != "" and GameState.hunger < 99.0:
+					_eat_tracked(id, "quest")
+					T.event(_sim, "quest_do", "съел ради задания", false)
+			"slept":
+				if bool(HouseSleep.plan(GameState.stamina, GameState.hunger).get("ok", false)):
+					await _sleep()
+					await _go_room("hall")
+			"spent", "bought":
+				await _order_and_take_food(false)
+				T.event(_sim, "quest_do", "покупка ради задания", false)
+
+
+## Коллекционер заглядывает в музей, журнал и дневник (открыть и закрыть, как игрок).
+func _visit_screens() -> void:
+	_activity = "screens"
+	ProgressScreen.open()
+	await _frames_n(5)
+	if ProgressScreen.is_open():
+		T.mark("opened:progress", _sim)
+		if _shots_on and not T.milestones.has("shot_progress"):
+			T.mark("shot_progress", _sim)
+			await _shot("progress_screen")
+		ProgressScreen.close_screen()
+	else:
+		T.finding("P1", "screen_open", "экран прогресса/музея не открылся из дома", _sim, {}, "progress")
+	var md = main.get_node_or_null("MechDirector")
+	if md != null and md.has_method("open_journal"):
+		md.open_journal()
+		await _frames_n(5)
+		T.mark("opened:journal", _sim)
+		for n in main.find_children("*", "", true, false):
+			if n.has_method("is_open") and n.has_method("close") and String(n.get_script().resource_path if n.get_script() else "").ends_with("journal_screen.gd") and n.is_open():
+				n.close()
+	await _frames_n(3)
+	_activity = "home"
 
 
 ## Мета-слой: забрать готовые задания (через тот же код, что кнопка «Забрать»).
@@ -1985,6 +2403,11 @@ func _check_lines() -> void:
 				why = "латиница в русской реплике"
 			if why != "":
 				T.finding("P3", "story_text", "%s: «%s» (сцена %s)" % [why, t.left(80), sid], _sim, {}, t.left(40))
+
+
+func _ach_done() -> int:
+	var ach = load("res://scripts/meta/achievements.gd")
+	return int(ach.call("done_count")) if ach != null and _has_static(ach, "done_count") else 0
 
 
 func _stop_early() -> bool:

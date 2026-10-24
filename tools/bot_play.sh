@@ -14,7 +14,10 @@
 #   RESUME=build/bot/<метка>/s7_greedy SHOTS=1 tools/bot_play.sh 7 10 greedy
 #                                          # продолжить с сейва прошлого прогона (снимки глубины)
 #
-# Характеры: cautious (осторожный), greedy (жадный), hasty (торопливый).
+# Характеры: cautious (осторожный), greedy (жадный), hasty (торопливый). Вместо характера можно
+# стратегию-цель: deep | achiever | tycoon | collector | fighter (у каждой свой характер по умолчанию;
+# GOAL=deep вместе с характером — стратегия поверх характера). FAST=1 — без онбординга.
+# Ночной прогон пяти стратегий — tools/bot_night.sh.
 # Результат: build/bot/<метка>/ — telemetry.json, log.txt, summary.txt (и shots/ при SHOTS=1);
 # для «all» — ещё общий build/bot/<метка>/ALL.txt. Код возврата 0 — без находок P0.
 # Время: --fixed-fps 31 — кадр = 1/31 игровой секунды, кадры идут так быстро, как тянет
@@ -65,6 +68,11 @@ run_one() {
 	[ -n "${SESSION:-}" ] && args+=(--session="$SESSION")
 	[ -n "${RESUME:-}" ] && args+=(--resume)
 	[ -n "${INPUT:-}" ] && args+=(--input="$INPUT")
+	[ "${FAST:-0}" = 1 ] && args+=(--skip-onboarding)
+	[ -n "${FLUSH:-}" ] && args+=(--flush="$FLUSH")
+	case "$char" in deep|achiever|tycoon|collector|fighter)
+		args=("${args[@]/--char=$char/--goal=$char}") ;; esac
+	[ -n "${GOAL:-}" ] && args+=(--goal="$GOAL")
 	[ "${SHOTS}" = 1 ] && args+=(--shots)
 	timeout $(( WALL + 120 )) "${runner[@]}" "$GODOT" "${extra[@]}" --fixed-fps 31 --path . \
 		res://tests/bot_play.tscn -- "${args[@]}" >"$out/log.txt" 2>&1
@@ -72,7 +80,7 @@ run_one() {
 	python3 tools/bot_report.py "$out" >/dev/null 2>&1 || echo "bot_report.py упал на $out" >"$out/summary.txt"
 }
 export -f run_one
-export GODOT SHOTS WALL TRACE SESSION RESUME INPUT
+export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL
 
 if [ "$SEED" = all ]; then
 	jobs=()

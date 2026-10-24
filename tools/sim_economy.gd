@@ -24,6 +24,9 @@ extends Node
 ##   --artifacts=1|0   1 (по умолчанию): находки артефактов платят монетами и опытом, как в игре
 ##                     (позиции — из ArtifactSpawn по сиду мира); 0 — чистая добыча руды
 ##   --json=путь       сохранить результат (потом сверять до/после правок баланса)
+##   --mech=1|0        1: механики раунда 3 (ГДД §20.1, scripts/mechanics/): тайники, лихорадка азарта,
+##                     двойная добыча мастерства — той же логикой, что в игре (ChestLogic, StreakLogic,
+##                     MasteryLogic). По умолчанию 0 — прежние числа §18 не меняются.
 ##
 ## Модель (всё, что она НЕ учитывает, перечислено — числа это ориентир, не истина):
 ##  * герой копает колонку x=17 (ствол тоннеля Роберта) вниз от первого уровня под
@@ -47,7 +50,7 @@ const UPKEEP_COST_S := 30.0
 const SIDE_TURN_S := 0.4            # тап в сторону
 
 var _opt := {"seeds": 6, "policy": "shaft", "hours": 48.0, "skills": "dig_speed,strength,vision",
-	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": ""}
+	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": "", "mech": "0"}
 
 
 func _ready() -> void:
@@ -78,8 +81,13 @@ func _simulate(seed_value: int) -> Dictionary:
 		"tool": "rusty_pickaxe", "gear": "", "stages": {}, "xp": 0, "level": 1, "points": 0,
 		"pickaxes": ["rusty_pickaxe"], "next_upkeep": UPKEEP_EVERY_S, "cells": 0, "trips": 0,
 		"drill": false, "mile": {}, "max_depth_milestone": 0,
-		"artifacts": [], "dollars": 0, "seed": seed_value, "artifact_coins": 0,
+		"artifacts": [], "dollars": 0, "seed": seed_value, "artifact_coins": 0, "sold": 0,
 	}
+	if String(_opt["mech"]) == "1":
+		var mrng := RandomNumberGenerator.new()
+		mrng.seed = seed_value * 31 + 7
+		s["mech"] = {"streak": StreakLogic.new(), "n": {}, "stars": {}, "opened": {}, "bands": {}, "rng": mrng,
+			"val": {"chest": 0, "fever": 0, "mastery": 0}, "chests": 0, "fevers": 0}
 	# Ступени, которые покупает добытчик, — по стоимости, кирки строго по порядку.
 	var ladder: Array = _build_ladder()
 	var needs: Dictionary = _drill_needs()
@@ -109,6 +117,8 @@ func _simulate(seed_value: int) -> Dictionary:
 		else:
 			_dig_cell(s, world, SHAFT_X, y, true)
 			s["depth"] = y
+			if s.has("mech"):
+				_mech_peek(s, world, y)
 			if lateral:
 				var r: int = Balance.get_vision_radius("vision", int(s["stages"].get("vision", 0)))
 				_lateral_pick(s, world, y, r)
@@ -119,6 +129,8 @@ func _simulate(seed_value: int) -> Dictionary:
 		while s["t"] >= s["next_upkeep"]:
 			s["t"] += UPKEEP_COST_S
 			s["next_upkeep"] += UPKEEP_EVERY_S
+			if s.has("mech"):
+				s["mech"]["streak"].reset()   # поел или поспал — серия прервалась
 
 		var cap: float = Balance.get_max_carry_kg(int(s["stages"].get("strength", 0)))
 		if _weight(s) >= cap * fill or _worth_going_home(s, ladder, needs):
@@ -192,6 +204,8 @@ func _dig_cell(s: Dictionary, world: WorldGen, x: int, y: int, in_shaft: bool) -
 		s["items"][mid] = int(s["items"].get(mid, 0)) + 1
 	if String(_opt["artifacts"]) == "1":
 		_artifact_find(s, x, y)
+	if s.has("mech"):
+		_mech_dug(s, world, x, y, mid, MineralMap.is_loot(tile))
 
 
 ## Находка артефакта в выкопанной клетке: монеты, опыт и награда за закрытую ветку — теми же
@@ -238,6 +252,74 @@ func _lateral_pick(s: Dictionary, world: WorldGen, y: int, radius: int) -> void:
 			break  # ближайшая руда в этом направлении — достаточно
 
 
+# ---------------------------------------------------------------------------
+# Механики раунда 3 (--mech=1): та же логика, что у MechDirector в игре
+# ---------------------------------------------------------------------------
+
+func _mech_dug(s: Dictionary, world: WorldGen, x: int, y: int, mid: String, loot: bool) -> void:
+	var m: Dictionary = s["mech"]
+	var price := Balance.get_mineral_price(mid) if mid != "" else 0
+	if loot and MasteryLogic.is_kind(mid):
+		var n := int(m["n"].get(mid, 0)) + 1
+		m["n"][mid] = n
+		var stars := MasteryLogic.stars_for(mid, n)
+		while int(m["stars"].get(mid, 0)) < stars:
+			m["stars"][mid] = int(m["stars"].get(mid, 0)) + 1
+			s["xp"] += MasteryLogic.star_xp(mid, int(m["stars"][mid]))
+		if (m["rng"] as RandomNumberGenerator).randf() < MasteryLogic.double_chance(int(m["stars"].get(mid, 0))):
+			s["items"][mid] = int(s["items"].get(mid, 0)) + 1
+			m["val"]["mastery"] += price
+	var r: Dictionary = (m["streak"] as StreakLogic).on_dug(y)
+	if bool(r["started"]):
+		m["fevers"] += 1
+	if bool(r["fever_cell"]) and loot and mid != "":
+		s["items"][mid] = int(s["items"].get(mid, 0)) + 1
+		m["val"]["fever"] += price
+	var ch := _mech_chest(s, world, y)
+	if not ch.is_empty() and ch["cell"] == Vector2i(x, y) and not m["opened"].has(ch["cell"]):
+		_mech_open(s, world, ch)
+
+
+func _mech_chest(s: Dictionary, world: WorldGen, y: int) -> Dictionary:
+	var band := ChestLogic.band_of(y)
+	var bands: Dictionary = s["mech"]["bands"]
+	if not bands.has(band):
+		bands[band] = ChestLogic.chest_in_band(world, int(s["seed"]), band)
+	return bands[band]
+
+
+func _mech_open(s: Dictionary, world: WorldGen, ch: Dictionary) -> void:
+	var m: Dictionary = s["mech"]
+	m["opened"][ch["cell"]] = true
+	m["chests"] += 1
+	var loot := ChestLogic.roll_loot(world, int(s["seed"]), ch["cell"], String(ch["tier"]))
+	s["xp"] += int(loot["xp"])
+	for id in loot["items"].keys():
+		if String(id).begins_with("food_"):
+			continue   # еда в симуляторе не учитывается (накладной расход на еду фиксирован)
+		s["items"][id] = int(s["items"].get(id, 0)) + int(loot["items"][id])
+		m["val"]["chest"] += Balance.get_mineral_price(String(id)) * int(loot["items"][id])
+
+
+## Шахта: сундук в ряду героя виден, если он в радиусе обзора ресурсов (как руда в
+## `_lateral_pick`); тогда герой прокапывает к нему ход и возвращается пешком.
+func _mech_peek(s: Dictionary, world: WorldGen, y: int) -> void:
+	var ch := _mech_chest(s, world, y)
+	if ch.is_empty() or s["mech"]["opened"].has(ch["cell"]):
+		return
+	var c: Vector2i = ch["cell"]
+	var r: int = Balance.get_vision_radius("vision", int(s["stages"].get("vision", 0)))
+	var k: int = absi(c.x - SHAFT_X)
+	if c.y != y or k == 0 or k > r:
+		return
+	var side: int = signi(c.x - SHAFT_X)
+	for j in range(1, k):
+		_dig_cell(s, world, SHAFT_X + side * j, y, false)
+	s["t"] += SIDE_TURN_S
+	_dig_cell(s, world, c.x, y, false)
+	s["t"] += 2.0 * float(k - 1) / 4.2
+
+
 func _depth_milestones(s: Dictionary) -> void:
 	var d: int = s["depth"]
 	while s["max_depth_milestone"] + 10 <= d:
@@ -274,6 +356,8 @@ func _level_up(s: Dictionary, order: Array) -> void:
 
 func _trip(s: Dictionary, cap: float, needs: Dictionary, banking: bool) -> void:
 	s["trips"] += 1
+	if s.has("mech"):
+		s["mech"]["streak"].reset()   # подъём на поверхность рвёт серию азарта
 	var gear: String = s["gear"]
 	var depth: float = float(s["depth"])
 	var w := _weight(s)
@@ -299,6 +383,7 @@ func _trip(s: Dictionary, cap: float, needs: Dictionary, banking: bool) -> void:
 				s["items"][id] = have - put
 	for id in s["items"].keys():
 		s["coins"] += Balance.get_mineral_price(String(id)) * int(s["items"][id])
+		s["sold"] += Balance.get_mineral_price(String(id)) * int(s["items"][id])
 	s["items"] = {}
 
 
@@ -402,6 +487,25 @@ func _report(results: Array) -> void:
 		dollars += float(r["dollars"])
 	print("артефакты: в среднем найдено %.1f, монет с них %.0f, премиума %.0f" % [
 		art_n / results.size(), art_coins / results.size(), dollars / results.size()])
+	var sold := 0.0
+	var t_all := 0.0
+	for r in results:
+		sold += float(r["sold"])
+		t_all += float(r["t"])
+	print("продано руды: %.0f монет за прогон, %.0f монет в игровой час" % [sold / results.size(), sold / maxf(1.0, t_all / 3600.0)])
+	if results[0].has("mech"):
+		var v := {"chest": 0.0, "fever": 0.0, "mastery": 0.0}
+		var chests := 0.0
+		var fevers := 0.0
+		for r in results:
+			for k in v.keys():
+				v[k] += float(r["mech"]["val"][k])
+			chests += float(r["mech"]["chests"])
+			fevers += float(r["mech"]["fevers"])
+		var n := float(results.size())
+		print("механики: сундуков %.1f, лихорадок %.1f за прогон; добыча сверху (по прайсу): сундуки %.0f, лихорадка %.0f, мастерство %.0f — %.1f%% проданного" % [
+			chests / n, fevers / n, v["chest"] / n, v["fever"] / n, v["mastery"] / n,
+			(v["chest"] + v["fever"] + v["mastery"]) / maxf(1.0, sold) * 100.0])
 	var r0: Dictionary = results[0]
 	print("конец первого сида: глубина %d, монеты %d, на верстаке %s, прокачка %s, уровень %d, время %s" % [
 		r0["depth"], r0["coins"], str(r0["bank"]), str(r0["stages"]), r0["level"], _fmt(float(r0["t"]))])

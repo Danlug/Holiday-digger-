@@ -30,6 +30,10 @@ func hold(keys: Array) -> void:
 		_release()
 		return
 	var target: Vector2 = hud._stick_center + v * float(hud.stick_r) * 0.9
+	# HUD отпускает джойстик, пока его ввод выключен (катсцена, окно дня, магазин):
+	# человек после этого ставит палец заново — и бот тоже, а не ведёт «мёртвым» пальцем.
+	if _pressed and hud._stick_pointer == -100 and not hud._world_input_blocked():
+		_release()
 	if not _pressed:
 		_send_button(target, true)
 		_pressed = true

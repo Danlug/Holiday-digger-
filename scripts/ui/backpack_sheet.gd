@@ -30,8 +30,8 @@ const TIER_COLORS: Array[Color] = [
 	Color8(0x75, 0x6B, 0x5E), Color8(0x6E, 0xA8, 0x5A), Color8(0x5B, 0x8F, 0xD0),
 	Color8(0xA2, 0x6B, 0xD6), Color8(0xE0, 0xA9, 0x3B)]
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const CARD_BG := Color8(0x1A, 0x14, 0x0F)
-const EDGE := Color8(0x52, 0x40, 0x2D)
+const CARD_BG := ProgressUiKit.SHEET_BG
+const EDGE := ProgressUiKit.EDGE
 
 var _dim: ColorRect
 var _card: PanelContainer
@@ -44,6 +44,7 @@ var _eat_btn: Button
 var _drop_btn: Button
 var _empty_hint: TextureRect
 
+var _closing: bool = false   # шторка уходит (анимация): по смыслу уже закрыта
 var _selected: String = ""
 var _rows: Array = []
 var _slot_buttons: Dictionary = {}
@@ -71,25 +72,25 @@ func _init() -> void:
 # ---------------------------------------------------------------------------
 
 func is_open() -> bool:
-	return visible
+	return visible and not _closing
 
 
 func open() -> void:
 	refresh()
+	_closing = false
 	visible = true
 	Sfx.play("ui_open")
-	if _card != null and is_inside_tree():
-		UiAnim.slide_up(_card, 28.0, 0.2)
-		_dim.modulate.a = 1.0
+	UiAnim.open(_card, UiAnim.Kind.SHEET, self)
 
 
 func close() -> void:
 	close_drop()
-	var was := visible
-	visible = false
+	var was := visible and not _closing
 	_selected = ""
 	if was:
 		Sfx.play("ui_close")
+		_closing = true
+		UiAnim.close(_card, UiAnim.Kind.SHEET, self, func() -> void: _closing = false)
 	closed.emit()
 
 
@@ -169,15 +170,13 @@ func open_drop(id: String, count: int) -> void:
 	_drop_field.text = str(count)
 	_drop_panel.visible = true
 	Sfx.play("ui_open")
-	if is_inside_tree():
-		UiAnim.appear(_drop_card, 0.9, 0.14)
+	UiAnim.open(_drop_card, UiAnim.Kind.POP, _drop_panel)
 
 
 func close_drop() -> void:
 	if _drop_panel != null and _drop_panel.visible:
 		Sfx.play("ui_close")
-	if _drop_panel != null:
-		_drop_panel.visible = false
+		UiAnim.close(_drop_card, UiAnim.Kind.POP, _drop_panel)
 	_drop_id = ""
 
 
@@ -228,14 +227,7 @@ func _build() -> void:
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_card.offset_top = 22.0
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = CARD_BG
-	sb.border_color = EDGE
-	sb.border_width_top = 2
-	sb.border_width_left = 1
-	sb.border_width_right = 1
-	sb.corner_radius_top_left = 12
-	sb.corner_radius_top_right = 12
+	var sb := ProgressUiKit.sheet_box()
 	sb.content_margin_left = 8
 	sb.content_margin_right = 8
 	sb.content_margin_top = 8
@@ -424,12 +416,7 @@ func _make_empty_slot() -> Control:
 	var p := Panel.new()
 	p.custom_minimum_size = Vector2(SLOT, SLOT)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.08, 0.06)
-	sb.border_color = Color(0.2, 0.16, 0.12)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(6)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", ProgressUiKit.box(Color(0.1, 0.08, 0.06), Color(0.2, 0.16, 0.12)))
 	return p
 
 
@@ -464,14 +451,7 @@ func _build_drop_panel() -> void:
 	_drop_card.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_drop_card.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_drop_card.custom_minimum_size = Vector2(190, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = CARD_BG
-	sb.border_color = Color8(0xB8, 0x5A, 0x52)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(10)
-	sb.shadow_color = Color(0, 0, 0, 0.55)
-	sb.shadow_size = 6
+	var sb := ProgressUiKit.popup_box(ProgressUiKit.RED, CARD_BG, 10)
 	_drop_card.add_theme_stylebox_override("panel", sb)
 	_drop_panel.add_child(_drop_card)
 
@@ -532,11 +512,7 @@ func _build_drop_panel() -> void:
 	_drop_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_drop_field.max_length = 6
 	_drop_field.add_theme_font_size_override("font_size", 14)
-	var fsb := StyleBoxFlat.new()
-	fsb.bg_color = Color(0.06, 0.05, 0.04)
-	fsb.border_color = EDGE
-	fsb.set_border_width_all(1)
-	fsb.set_corner_radius_all(6)
+	var fsb := ProgressUiKit.box(ProgressUiKit.INSET_BG, EDGE)
 	fsb.set_content_margin_all(4)
 	_drop_field.add_theme_stylebox_override("normal", fsb)
 	var fsb2 := fsb.duplicate() as StyleBoxFlat

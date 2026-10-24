@@ -59,6 +59,26 @@ static func _of_control(c: Control, final: bool, spec: String) -> Dictionary:
 	return {"rect": r, "node": c, "final": final, "world": false, "spec": spec}
 
 
+## Соседи цели по контейнеру: плитки того же меню, полоски рядом с кнопкой героя.
+## Палец и тост ищут место так, чтобы на них не заходить.
+static func neighbors(node: Control) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if node == null or not is_instance_valid(node):
+		return out
+	var parent := node.get_parent() as Control
+	for _i in 3:
+		if parent == null or not (parent is Container):
+			break
+		for ch: Node in parent.get_children():
+			var c := ch as Control
+			if c != null and c != node and c.is_visible_in_tree() and not c.is_ancestor_of(node) \
+					and c.size.x > 1.0 and c.size.y > 1.0:
+				out.append(c.get_global_rect())
+		node = parent
+		parent = node.get_parent() as Control
+	return out
+
+
 static func hud_control(id: String) -> Control:
 	var h := HintConditions.hud()
 	if h == null:

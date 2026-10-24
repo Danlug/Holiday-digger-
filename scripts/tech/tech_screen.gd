@@ -30,6 +30,7 @@ var _player: Node = null
 var _tab: String = TAB_TANK
 var _tool: String = "hand_drill"
 var _station: bool = false
+var _closing: bool = false   # экран гаснет (анимация): по смыслу уже закрыт
 var _tier_sel: int = 0
 var _tab_buttons: Dictionary = {}
 var _content: VBoxContainer = null
@@ -68,7 +69,7 @@ static func open(tab: String = TAB_TANK, station: bool = false) -> void:
 
 static func is_open() -> bool:
 	var s := instance()
-	return s != null and s.visible
+	return s != null and s.visible and not s._closing
 
 
 static func close_screen() -> void:
@@ -149,13 +150,14 @@ func _build_tabs() -> Control:
 func open_tab(tab: String, station: bool = false) -> void:
 	_tab = tab
 	_station = station or (visible and _station and tab == TAB_TANK)
-	if not visible:
+	if not visible or _closing:
 		_station = station
 		_enter()
 	refresh()
 
 
 func _enter() -> void:
+	_closing = false
 	visible = true
 	Sfx.play("ui_open")
 	if _player != null:
@@ -164,7 +166,7 @@ func _enter() -> void:
 	var hud := get_tree().get_first_node_in_group("hud")
 	if hud != null and hud.has_method("close_inventory"):
 		hud.close_inventory()
-	UiAnim.appear(self, 0.97, 0.12)
+	UiAnim.open(self, UiAnim.Kind.FADE)
 	if not FuelTank.uses_fuel(_tool) or not GameState.owns_tool(_tool):
 		_tool = GameState.current_tool if FuelTank.uses_fuel(GameState.current_tool) else "hand_drill"
 
@@ -176,9 +178,10 @@ func select_tool(tool_id: String) -> void:
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _closing:
 		return
-	visible = false
+	_closing = true
+	UiAnim.close(self, UiAnim.Kind.FADE, null, func() -> void: _closing = false)
 	Sfx.play("ui_close")
 	SaveSystem.save_game()
 
@@ -274,7 +277,7 @@ func _cost_row(parent: Node, cost) -> void:
 	for id in items.keys():
 		var need := int(items[id])
 		var have := TechCost.held(String(id))
-		var chip := TechUi.chip(TechUi.item_icon(String(id)), "%d/%d" % [have, need],
+		var chip := TechUi.chip(TechUi.item_icon_small(String(id)), "%d/%d" % [have, need],
 			TechUi.GREEN if have >= need else TechUi.RED, 16)
 		chip.mouse_filter = Control.MOUSE_FILTER_STOP
 		Tip.bind(chip, TechUi.item_name(String(id)), "Склад и рюкзак", "есть %d из %d" % [have, need])

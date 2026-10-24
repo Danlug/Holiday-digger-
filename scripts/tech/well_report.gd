@@ -20,6 +20,7 @@ var _total: int = 0
 var _double_btn: Button = null
 var _doubled: bool = false
 var _run: int = 0
+var _closing: bool = false   # окно гаснет (анимация): по смыслу уже закрыто
 
 
 static func attach(host: Node) -> WellReport:
@@ -41,7 +42,7 @@ static func instance() -> WellReport:
 
 static func is_open() -> bool:
 	var w := instance()
-	return w != null and w.visible
+	return w != null and w.visible and not w._closing
 
 
 func _ready() -> void:
@@ -73,6 +74,7 @@ func show_report(report: Dictionary) -> void:
 	for c in get_children():
 		c.queue_free()
 	_build()
+	_closing = false
 	visible = true
 	var hud := get_tree().get_first_node_in_group("hud")
 	if hud != null and hud.has_method("close_inventory"):
@@ -81,10 +83,11 @@ func show_report(report: Dictionary) -> void:
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _closing:
 		return
 	_run += 1
-	visible = false
+	_closing = true
+	UiAnim.close(_card, UiAnim.Kind.POP, self, func() -> void: _closing = false)
 	Sfx.play("ui_close")
 
 
@@ -106,10 +109,8 @@ func _build() -> void:
 
 	_card = PanelContainer.new()
 	_card.custom_minimum_size = Vector2(196, 0)
-	var sb := TechUi.box(Color8(0x1A, 0x14, 0x0F), TechUi.GOLD, 8, 10)
-	sb.shadow_color = Color(0, 0, 0, 0.6)
-	sb.shadow_size = 6
-	_card.add_theme_stylebox_override("panel", sb)
+	_card.add_theme_stylebox_override("panel", ProgressUiKit.popup_box(TechUi.GOLD, ProgressUiKit.SHEET_BG, 10))
+	_card.modulate.a = 0.0   # _play проявит карточку через два кадра; без этого она мигала полной
 	center.add_child(_card)
 
 	var v := VBoxContainer.new()
@@ -248,7 +249,7 @@ func _play(run: int) -> void:
 	if run != _run:
 		return
 	if _card != null:
-		UiAnim.appear(_card, 0.9, 0.2)
+		UiAnim.open(_card, UiAnim.Kind.POP)
 	Sfx.play("ui_open")
 	await _wait(0.25)
 	for i in range(_tiles.size()):

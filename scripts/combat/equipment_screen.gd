@@ -78,14 +78,14 @@ func open(tab: String = "gear") -> void:
 	_root.visible = true
 	_rebuild()
 	Sfx.play("ui_open")
-	UiAnim.appear(_root, 0.96, 0.12)
+	UiAnim.open(_root, UiAnim.Kind.FADE)
 
 
 func close() -> void:
 	if not _open:
 		return
 	_open = false
-	_root.visible = false
+	UiAnim.close(_root, UiAnim.Kind.FADE)
 	_freeze(false)
 	Tip.hide_all()
 	Sfx.play("ui_close")

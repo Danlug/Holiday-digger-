@@ -36,6 +36,7 @@ var _tick: float = 0.0
 var _new_ach: Dictionary = {}
 var _road_scroll: MetaHScroll = null
 var _road_centered: bool = false
+var _closing: bool = false   # хаб гаснет (анимация): по смыслу уже закрыт
 
 
 func _ready() -> void:
@@ -51,7 +52,7 @@ func _on_wallet_changed(_v: int) -> void:
 
 
 func is_open() -> bool:
-	return _root != null and _root.visible
+	return _root != null and _root.visible and not _closing
 
 
 func current_tab() -> String:
@@ -66,8 +67,9 @@ func open(tab: String = "") -> void:
 		if Achievements.is_unseen(String(a["id"])):
 			_new_ach[String(a["id"])] = true
 	_road_centered = false
+	_closing = false
 	_root.visible = true
-	UiAnim.appear(_root, 0.96, 0.16)
+	UiAnim.open(_root, UiAnim.Kind.FADE)
 	Sfx.play("ui_open")
 	refresh()
 
@@ -76,7 +78,8 @@ func close() -> void:
 	if not is_open():
 		return
 	Achievements.mark_all_seen()
-	_root.visible = false
+	_closing = true
+	UiAnim.close(_root, UiAnim.Kind.FADE, null, func() -> void: _closing = false)
 	Sfx.play("ui_close")
 	closed.emit()
 

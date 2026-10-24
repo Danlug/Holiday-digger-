@@ -51,7 +51,7 @@ func _build() -> void:
 
 	_column = VBoxContainer.new()
 	_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_column.add_theme_constant_override("separation", 5)
+	_column.add_theme_constant_override("separation", 8)
 	_scroll.add_child(_column)
 
 	_build_card()
@@ -124,8 +124,8 @@ func _build_card() -> void:
 	var wallet := HBoxContainer.new()
 	wallet.add_theme_constant_override("separation", 4)
 	right.add_child(wallet)
-	_coins_tile = HeroUi.make_tile("ui_coin", "0", ProgressUiKit.GOLD, Vector2(0, 22))
-	_dollars_tile = HeroUi.make_tile("ui_dollar", "0", HeroUi.OK, Vector2(0, 22))
+	_coins_tile = HeroUi.make_tile("ui_coin", "0", ProgressUiKit.GOLD, Vector2(0, 24))
+	_dollars_tile = HeroUi.make_tile("ui_dollar", "0", HeroUi.OK, Vector2(0, 24))
 	wallet.add_child(_coins_tile)
 	wallet.add_child(_dollars_tile)
 	Tip.bind(_coins_tile, "Монеты", "Платят за добычу и находки.")
@@ -135,8 +135,8 @@ func _build_card() -> void:
 func _build_stats() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
+	grid.add_theme_constant_override("h_separation", 5)
+	grid.add_theme_constant_override("v_separation", 5)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_column.add_child(grid)
 	for id: String in ["hp", "stamina", "hunger", "strength", "vision", "dig_speed"]:

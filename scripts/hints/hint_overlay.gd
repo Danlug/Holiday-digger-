@@ -28,6 +28,8 @@ var _tap_tween: Tween
 var _shown: bool = false
 var _rect: Rect2 = Rect2()
 var _world: bool = false
+## Соседи цели (плитки меню, полоски у кнопки героя): палец и тост на них не заходят.
+var _blockers: Array[Rect2] = []
 
 
 func _init() -> void:
@@ -56,17 +58,11 @@ func _ready() -> void:
 	_chip = PanelContainer.new()
 	_chip.name = "Chip"
 	_chip.mouse_filter = Control.MOUSE_FILTER_STOP
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.071, 0.055, 0.043, 0.94)
-	sb.border_color = GOLD
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(9)
+	var sb := ProgressUiKit.popup_box(GOLD, Color(0.071, 0.055, 0.043, 0.94))
 	sb.content_margin_left = 6
 	sb.content_margin_right = 7
 	sb.content_margin_top = 3
 	sb.content_margin_bottom = 3
-	sb.shadow_color = Color(0, 0, 0, 0.45)
-	sb.shadow_size = 3
 	_chip.add_theme_stylebox_override("panel", sb)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -119,6 +115,13 @@ func is_showing() -> bool:
 	return _shown
 
 
+## Прямоугольники соседей цели. Зовут до show_hint/track; пустой список — как раньше.
+func set_blockers(rects: Array) -> void:
+	_blockers.clear()
+	for r in rects:
+		_blockers.append(r as Rect2)
+
+
 func chip() -> Control:
 	return _chip
 
@@ -132,10 +135,15 @@ func show_hint(rect: Rect2, world: bool, icon: Texture2D, text: String, tip: Arr
 	_root.visible = true
 	_chip_icon.texture = icon
 	_chip_icon.visible = icon != null
+	# Правило владельца: слова — только в подсказке. Есть значок — тост рисуется им
+	# одним (крупнее), слово остаётся в ярлыке для Tip; нет значка — слово как есть.
 	_chip_label.text = text
-	_chip_label.visible = not text.is_empty()
+	_chip_label.visible = not text.is_empty() and icon == null
+	_chip_icon.custom_minimum_size = Vector2(22, 22) if icon != null and not text.is_empty() else Vector2(16, 16)
 	if tip.size() >= 1:
 		Tip.bind(_chip, String(tip[0]), String(tip[1]) if tip.size() > 1 else "")
+	elif not text.is_empty():
+		Tip.bind(_chip, text)
 	var use_finger := style == "finger" or (style == "" and not world)
 	var use_arrow := style == "arrow" or (style == "" and world)
 	_finger.visible = use_finger
@@ -210,6 +218,7 @@ var bob: Vector2 = Vector2.ZERO:
 			_finger.position = _finger_rest + v
 			_arrow.position = _arrow_rest + v
 var _finger_rest: Vector2 = Vector2.ZERO
+var _finger_bbox: Rect2 = Rect2()
 var _toward: Vector2 = Vector2.UP   # от указателя к цели
 var _arrow_rest: Vector2 = Vector2.ZERO
 
@@ -221,29 +230,80 @@ func _layout() -> void:
 	var occupied: Array[Rect2] = [rect]
 	if _finger.visible:
 		_place_finger(view)
-		occupied.append(Rect2(_finger_rest, _finger.size))
+		occupied.append(_finger_box())
 	if _arrow.visible:
 		_place_arrow(view)
 		occupied.append(Rect2(_arrow_rest, _arrow.size))
 	_place_chip(view, occupied)
 
 
-## Палец касается цели снизу и смотрит вверх; снизу нет места (кнопка у нижней
-## полосы) — касается сверху и смотрит вниз.
+## Палец касается цели с той стороны, где нет соседей: снизу, сверху, слева, справа
+## (по порядку). Раньше он всегда шёл снизу и в открытом меню ложился на плитку под
+## целью. Нигде не свободно — как прежде: снизу, а если там нет места — сверху.
+func _finger_candidate(side: String, view: Rect2) -> Dictionary:
+	var fs := _finger.size
+	var ft := FINGER_TIP
+	var tip := Vector2.ZERO
+	var box := Rect2()
+	var toward := Vector2.UP
+	var rot := 0.0
+	var flip := false
+	var rest := Vector2.ZERO
+	match side:
+		"below":
+			tip = Vector2(clampf(_rect.get_center().x, EDGE + ft.x, view.end.x - EDGE - fs.x + ft.x), _rect.end.y - 4.0)
+			box = Rect2(tip - ft, fs)
+			rest = tip - ft
+		"above":
+			tip = Vector2(clampf(_rect.get_center().x, EDGE + ft.x, view.end.x - EDGE - fs.x + ft.x), _rect.position.y + 4.0)
+			box = Rect2(tip - Vector2(ft.x, fs.y - ft.y), fs)
+			rest = box.position
+			toward = Vector2.DOWN
+			flip = true
+		"left":
+			tip = Vector2(_rect.position.x + 4.0, clampf(_rect.get_center().y, EDGE + ft.x, view.end.y - EDGE - fs.x + ft.x))
+			box = Rect2(tip + Vector2(-(fs.y - ft.y), -ft.x), Vector2(fs.y, fs.x))
+			toward = Vector2.RIGHT
+			rot = PI * 0.5
+			rest = tip - ft
+		_:
+			tip = Vector2(_rect.end.x - 4.0, clampf(_rect.get_center().y, EDGE + fs.x - ft.x, view.end.y - EDGE - ft.x))
+			box = Rect2(tip + Vector2(-ft.y, -(fs.x - ft.x)), Vector2(fs.y, fs.x))
+			toward = Vector2.LEFT
+			rot = -PI * 0.5
+			rest = tip - ft
+	var free := view.grow(-EDGE + 1.0).encloses(box)
+	if free:
+		for o in _blockers:
+			if box.intersects(o):
+				free = false
+				break
+	return {"rest": rest, "box": box, "toward": toward, "rot": rot, "flip": flip, "free": free}
+
+
 func _place_finger(view: Rect2) -> void:
 	var fs := _finger.size
-	var below := _rect.end.y + fs.y - 6.0 <= view.end.y - EDGE
-	var cx := clampf(_rect.get_center().x, EDGE + FINGER_TIP.x, view.end.x - EDGE - fs.x + FINGER_TIP.x)
-	_finger.flip_v = not below
-	if below:
-		var tip := Vector2(cx, _rect.end.y - 4.0)
-		_finger_rest = tip - FINGER_TIP
-		_toward = Vector2.UP
-	else:
-		var tip2 := Vector2(cx, _rect.position.y + 4.0)
-		_finger_rest = tip2 - Vector2(FINGER_TIP.x, fs.y - FINGER_TIP.y)
-		_toward = Vector2.DOWN
+	var pick := {}
+	for side: String in ["below", "above", "left", "right"]:
+		var c := _finger_candidate(side, view)
+		if bool(c["free"]):
+			pick = c
+			break
+	if pick.is_empty():
+		var below := _rect.end.y + fs.y - 6.0 <= view.end.y - EDGE
+		pick = _finger_candidate("below" if below else "above", view)
+	_finger.flip_v = bool(pick["flip"])
+	_finger.pivot_offset = FINGER_TIP
+	_finger.rotation = float(pick["rot"])
+	_toward = pick["toward"]
+	_finger_rest = pick["rest"]
+	_finger_bbox = pick["box"]
 	_finger.position = _finger_rest + bob
+
+
+## Занятое пальцем место на экране с учётом поворота.
+func _finger_box() -> Rect2:
+	return _finger_bbox
 
 
 ## Стрелка над объектом мира (сверху нет места — под ним).
@@ -261,6 +321,13 @@ func _place_arrow(view: Rect2) -> void:
 	_arrow.position = _arrow_rest + bob
 
 
+static func rect_union(rects: Array[Rect2]) -> Rect2:
+	var u: Rect2 = rects[0]
+	for r in rects:
+		u = u.merge(r)
+	return u
+
+
 func _place_chip(view: Rect2, occupied: Array[Rect2]) -> void:
 	var sz := _chip.get_combined_minimum_size()
 	_chip.size = sz
@@ -271,6 +338,17 @@ func _place_chip(view: Rect2, occupied: Array[Rect2]) -> void:
 		Vector2(_rect.end.x + CHIP_GAP, c.y - sz.y * 0.5),                # справа
 		Vector2(_rect.position.x - sz.x - CHIP_GAP, c.y - sz.y * 0.5),    # слева
 	]
+	# Ещё два места: над всем занятым и под ним (палец сверху — тост выше пальца).
+	var union := rect_union(occupied)
+	candidates.append(Vector2(c.x - sz.x * 0.5, union.position.y - sz.y - CHIP_GAP))
+	candidates.append(Vector2(c.x - sz.x * 0.5, union.end.y + CHIP_GAP))
+	# Сползаем вниз вдоль цели: справа и слева от неё, но уже под соседями
+	# (у кнопки героя справа стоят полоски, слева край экрана).
+	var y := _rect.end.y
+	while y < _rect.end.y + 72.0:
+		candidates.append(Vector2(_rect.end.x + CHIP_GAP, y))
+		candidates.append(Vector2(_rect.position.x - sz.x - CHIP_GAP, y))
+		y += 4.0
 	var best := Vector2.ZERO
 	var found := false
 	for cand in candidates:
@@ -281,6 +359,10 @@ func _place_chip(view: Rect2, occupied: Array[Rect2]) -> void:
 		var clash := false
 		for o in occupied:
 			if r.intersects(o.grow(1.0)):
+				clash = true
+				break
+		for o in _blockers:
+			if r.intersects(o):
 				clash = true
 				break
 		if clash:
@@ -307,7 +389,7 @@ func _start_animation(use_finger: bool, use_arrow: bool) -> void:
 	_root.modulate.a = 0.0
 	_tween = create_tween().set_parallel(true)
 	_tween.tween_property(_root, "modulate:a", 1.0, 0.2)
-	UiAnim.appear(_chip, 0.8, 0.2)
+	UiAnim.appear(_chip, UiAnim.POP_FROM, UiAnim.D_IN)
 	_ring.start()
 	if use_finger or use_arrow:
 		_restart_tap()

@@ -5,15 +5,15 @@ extends RefCounted
 ## летящих наград. На плитках — только значки и числа; названия и описания
 ## живут в Tip.
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+const GOLD := ProgressUiKit.GOLD
 const GOLD_LIGHT := Color8(0xFF, 0xE0, 0x66)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
-const DIM := Color8(0x6A, 0x5C, 0x4C)
-const BORDER := Color8(0x3E, 0x31, 0x25)
-const BG := Color(0.071, 0.055, 0.043, 0.97)
-const CARD := Color8(0x1D, 0x17, 0x12)
+const MUTED := ProgressUiKit.MUTED
+const DIM := ProgressUiKit.DIM
+const BORDER := ProgressUiKit.BORDER
+const BG := ProgressUiKit.BG
+const CARD := ProgressUiKit.CARD_BG
 const SLOT := Color8(0x24, 0x1E, 0x2C)
-const GREEN := Color8(0x7F, 0xB8, 0x6B)
+const GREEN := ProgressUiKit.GREEN
 const GREEN_BTN := Color8(0x2F, 0x6B, 0x3B)
 const RED := Color8(0xC2, 0x1E, 0x3A)
 const BLUE := Color8(0x6F, 0xE0, 0xD8)
@@ -70,13 +70,8 @@ static func icon_rect(t: Texture2D, px: float) -> TextureRect:
 	return r
 
 
-static func box(bg: Color, border: Color = BORDER, border_w: int = 1, radius: int = 2) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(border_w)
-	sb.set_corner_radius_all(radius)
-	return sb
+static func box(bg: Color, border: Color = BORDER, border_w: int = 1, radius: int = 6) -> StyleBoxFlat:
+	return ProgressUiKit.box(bg, border, ProgressUiKit.snap_radius(radius), border_w)
 
 
 static func label(text: String, size: int = 9, color: Color = MUTED) -> Label:

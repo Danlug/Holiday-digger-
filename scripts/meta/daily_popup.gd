@@ -20,6 +20,7 @@ var _ad_btn: Button = null
 var _plan: Dictionary = {}
 var _done: bool = false
 var _hero: TextureRect = null
+var _closing: bool = false
 
 
 func _ready() -> void:
@@ -28,27 +29,31 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return visible
+	return visible and not _closing
 
 
 func open() -> void:
 	_plan = DailyReward.plan()
 	_done = false
 	_build()
+	_closing = false
 	visible = true
 	Sfx.play("ui_open")
-	if _card != null:
-		UiAnim.appear(_card, 0.85, 0.22)
+	UiAnim.open(_card, UiAnim.Kind.POP, _root)
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _closing:
 		return
-	visible = false
-	if _root != null:
-		_root.queue_free()
-		_root = null
-	closed.emit()
+	_closing = true
+	var finish := func() -> void:
+		visible = false
+		_closing = false
+		if _root != null:
+			_root.queue_free()
+			_root = null
+		closed.emit()
+	UiAnim.close(_card, UiAnim.Kind.POP, _root, finish)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -78,10 +83,8 @@ func _build() -> void:
 	_root.add_child(center)
 
 	_card = PanelContainer.new()
-	var sb := MetaUiKit.box(MetaUiKit.CARD, MetaUiKit.GOLD, 2, 6)
-	sb.set_content_margin_all(8)
-	sb.shadow_color = Color(0, 0, 0, 0.6)
-	sb.shadow_size = 4
+	var sb := ProgressUiKit.popup_box(MetaUiKit.GOLD, MetaUiKit.CARD, 8)
+	sb.set_border_width_all(2)
 	_card.add_theme_stylebox_override("panel", sb)
 	_card.custom_minimum_size = Vector2(208, 0)
 	center.add_child(_card)

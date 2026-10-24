@@ -109,17 +109,24 @@ static func icon_button(icon: Texture2D, size: Vector2 = Vector2(28, 28), kind: 
 static func wire_feedback(b: Button, sfx: String = "ui_tap") -> void:
 	if b.has_meta(FEEDBACK_META):
 		return
+	wire_sink(b)
+	b.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		Haptics.tap()
+		Sfx.play(sfx))
+
+
+## Только «проседание» под пальцем, без звука и вибро (у кнопки свой отклик).
+static func wire_sink(b: Button) -> void:
+	if b.has_meta(FEEDBACK_META):
+		return
 	b.set_meta(FEEDBACK_META, true)
 	b.resized.connect(func() -> void: b.pivot_offset = b.size * 0.5)
 	b.pivot_offset = b.size * 0.5
 	b.button_down.connect(func() -> void: _sink(b, true))
 	b.button_up.connect(func() -> void: _sink(b, false))
 	b.mouse_exited.connect(func() -> void: _sink(b, false))
-	b.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		Haptics.tap()
-		Sfx.play(sfx))
 
 
 static func _sink(b: Button, down: bool) -> void:
@@ -132,9 +139,9 @@ static func _sink(b: Button, down: bool) -> void:
 	var tw := b.create_tween()
 	b.set_meta(&"_sink_tween", tw)
 	if down:
-		tw.tween_property(b, "scale", Vector2.ONE * 0.92, 0.06)
+		tw.tween_property(b, "scale", Vector2.ONE * UiAnim.TAP_SCALE, 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	else:
-		tw.tween_property(b, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(b, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## Красная цифра в правом верхнем углу кнопки. n <= 0 — прячет значок,

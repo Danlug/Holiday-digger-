@@ -18,11 +18,72 @@ const RED := Color8(0xB8, 0x5A, 0x52)
 const BLUE := Color8(0x6E, 0x93, 0xA8)
 
 
-static func panel_box(bg: Color = PANEL_BG, border: Color = BORDER) -> StyleBoxFlat:
+## --- Единый язык оформления (радиусы, рамки, тени) ---
+## Раньше у однотипных панелей было девять разных радиусов (2…12) и три цвета
+## рамки. Теперь четыре ступени, и всё берёт их отсюда:
+##   R_BAR   — полоски, подсказки, мелкие метки;
+##   R_TILE  — кнопки, слоты, плитки, ячейки;
+##   R_CARD  — карточки, таблетки, тосты, окна-диалоги;
+##   R_SHEET — верхние углы шторок.
+## Рамка 1 пиксель; 2 — только выделенному (выбрано, редкое, верхняя кромка шторки).
+const R_BAR := 3
+const R_TILE := 6
+const R_CARD := 9
+const R_SHEET := 12
+const EDGE := Color8(0x52, 0x40, 0x2D)      # рамка приподнятого: кнопки, шторки, окна
+const SHEET_BG := Color8(0x1A, 0x14, 0x0F)  # фон шторки и окна
+const INSET_BG := Color(0.06, 0.05, 0.04)   # «утопленное»: поля ввода, канавки
+const SHADOW := Color(0, 0, 0, 0.5)
+const CARD_BG := Color8(0x1D, 0x17, 0x12)   # карточка/плитка внутри шторки или окна
+const TEXT_HI := Color8(0xF2, 0xD9, 0x9B)   # заголовок, главное число
+const TEXT := Color8(0xD8, 0xCF, 0xC0)      # обычный светлый текст
+
+
+## Притягивает «любой» радиус к ближайшей ступени: так старые вызовы с радиусом
+## 4, 5, 8, 10 сами становятся одинаковыми, не правя каждый.
+static func snap_radius(r: int) -> int:
+	if r <= 0:
+		return 0
+	if r <= 3:
+		return R_BAR
+	if r <= 7:
+		return R_TILE
+	if r <= 10:
+		return R_CARD
+	return R_SHEET
+
+
+## Скруглённая плашка по ступеням выше. radius — одна из R_*.
+static func box(bg: Color, border: Color = BORDER, radius: int = R_TILE, border_w: int = 1) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border
-	sb.set_border_width_all(1)
+	sb.set_border_width_all(border_w)
+	sb.set_corner_radius_all(radius)
+	return sb
+
+
+## Шторка снизу: скруглены только верхние углы, верхняя кромка в два пикселя.
+static func sheet_box() -> StyleBoxFlat:
+	var sb := box(SHEET_BG, EDGE, 0, 1)
+	sb.border_width_top = 2
+	sb.corner_radius_top_left = R_SHEET
+	sb.corner_radius_top_right = R_SHEET
+	return sb
+
+
+## Окно поверх всего (подтверждение, отчёт, меню): тень отделяет от мира.
+static func popup_box(border: Color = EDGE, bg: Color = SHEET_BG, margin: int = 6) -> StyleBoxFlat:
+	var sb := box(bg, border, R_CARD, 1)
+	sb.set_content_margin_all(margin)
+	sb.shadow_color = SHADOW
+	sb.shadow_size = 4
+	sb.shadow_offset = Vector2(0, 2)
+	return sb
+
+
+static func panel_box(bg: Color = PANEL_BG, border: Color = BORDER) -> StyleBoxFlat:
+	var sb := box(bg, border, R_TILE, 1)
 	sb.content_margin_left = 5
 	sb.content_margin_right = 5
 	sb.content_margin_top = 4
@@ -51,29 +112,12 @@ static func make_wrapped_label(text: String, size: int = 9, color: Color = DIM) 
 	return l
 
 
-## Кнопка в стиле нижней полосы HUD: прозрачная, с рамкой, подсветка золотом.
+## Текстовая кнопка в общем стиле (приподнятая плитка UiBtn с откликом нажатия).
 static func make_button(text: String, font_size: int = 9) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", font_size)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0)
-		sb.border_color = BORDER
-		sb.set_border_width_all(1)
-		sb.content_margin_top = 2
-		sb.content_margin_bottom = 2
-		sb.content_margin_left = 5
-		sb.content_margin_right = 5
-		if state == "pressed" or state == "hover":
-			sb.border_color = GOLD
-		b.add_theme_stylebox_override(state, sb)
-	b.add_theme_color_override("font_color", MUTED)
-	b.add_theme_color_override("font_pressed_color", GOLD)
-	b.add_theme_color_override("font_hover_color", GOLD)
-	b.add_theme_color_override("font_disabled_color", DIM)
-	# Общий отклик нажатия (звук ui_tap, вибро, «проседание») — как у кнопок HUD.
-	UiBtn.wire_feedback(b)
+	UiBtn.style(b)
 	return b
 
 
@@ -82,10 +126,7 @@ static func make_button(text: String, font_size: int = 9) -> Button:
 static func make_bar(parent: Control, width: float, height: float, fill_color: Color) -> ColorRect:
 	var track := Panel.new()
 	track.custom_minimum_size = Vector2(width, height)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.043, 0.035, 0.027, 0.9)
-	sb.border_color = BORDER
-	sb.set_border_width_all(1)
+	var sb := box(Color(0.043, 0.035, 0.027, 0.9), BORDER, R_BAR, 1)
 	track.add_theme_stylebox_override("panel", sb)
 	parent.add_child(track)
 

@@ -17,15 +17,9 @@ func _init() -> void:
 	custom_minimum_size = Vector2(0, 26)
 	for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 		add_theme_stylebox_override(st, StyleBoxEmpty.new())
-	_sb.set_corner_radius_all(5)
+	_sb.set_corner_radius_all(ProgressUiKit.R_TILE)
 	_sb.set_border_width_all(1)
-	button_down.connect(func() -> void:
-		pivot_offset = size * 0.5
-		create_tween().tween_property(self, "scale", Vector2(0.94, 0.94), 0.05))
-	button_up.connect(func() -> void:
-		pivot_offset = size * 0.5
-		var tw := create_tween()
-		tw.tween_property(self, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+	UiBtn.wire_sink(self)   # то же «проседание», что у всех кнопок; звук играет экран вкладок
 
 
 func setup(icon_name_: String, tip_title: String, tip_body: String = "") -> void:

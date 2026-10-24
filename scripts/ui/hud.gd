@@ -63,6 +63,7 @@ var _hunger_bar: HudBar
 var _stamina_bar: HudBar
 var _coins_pill: HudPill
 var _dollars_pill: HudPill
+var _shop_btn: Button   # «Магазин» под кошельком: подсказка и цифра роликов — ShopPlaceHint
 var _load_pill: PanelContainer
 var _load_bar: HudBar
 var _clock_label: Label
@@ -435,6 +436,8 @@ func _build_purse(parent: Control) -> void:
 			return
 		ShopUI.open_premium())
 	box.add_child(shop_btn)
+	_shop_btn = shop_btn
+	ShopPlaceHint.sync_button(_shop_btn)
 
 
 func _make_pill(parent: Control, icon_name: String, color: Color, anchor_id: String) -> HudPill:
@@ -1383,6 +1386,7 @@ func _process(_dt: float) -> void:
 ## Красный бейдж на «•••» — сумма бейджей пунктов меню: новые задания, награды
 ## и т.п. видны, не раскрывая меню.
 func _sync_menu_badge() -> void:
+	ShopPlaceHint.sync_button(_shop_btn)   # правило «где можно покупать»: подсказка и остаток роликов
 	if _more_button == null:
 		return
 	var total := 0

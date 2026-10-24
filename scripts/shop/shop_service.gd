@@ -26,11 +26,87 @@ static func is_at_workshop() -> bool:
 	return GameState.house_is_indoors
 
 
-## Лавка и магазин долларов работают где угодно: доллары "доступны всегда и
-## везде" (ГДД раздел 15), а батончик по сценарию онбординга едят прямо в
-## шахте (раздел 9).
-static func can_shop_here() -> bool:
-	return true
+# ---------------------------------------------------------------------------
+# Где можно покупать снаряжение и еду (заказ владельца, ГДД §15)
+#
+# «Покупать снаряжение и еду можно только дома у двери, либо до 3 раз за рекламу
+# под землёй». Витрину открыть можно откуда угодно (обмен долларов и ролики
+# живут в ней же и от места не зависят), но кирки, ранцы, ступени бура, еда,
+# допинги и гаджеты покупаются по правилу места — его и проверяет can_buy.
+# ---------------------------------------------------------------------------
+
+## Что витрина продаёт «по правилу места» (виды предложений ShopItems): кирки,
+## ранцы, ступени бура, доставка еды и товары лавки (допинги, гаджеты, топливо).
+## Рецепты верстака сюда не входят — это крафт из добытого, он и так только дома
+## (check_craft). Обмен долларов, ролики и продажа тоже вне правила.
+const GATED_KINDS := ["tool", "gear", "drill", "food", "good"]
+
+const PLACE_DOOR := "door"
+const PLACE_HOUSE := "house"
+const PLACE_GARDEN := "garden"
+const PLACE_UNDERGROUND := "underground"
+
+
+## Где сейчас игрок: у входной двери (прихожая дома), в доме (другие комнаты),
+## на огороде (поверхность) или под землёй (с первой выкопанной клетки).
+## Прихожая считается «у двери» целиком: единственная точка магазина там —
+## пузырь «Заказать» у самой двери (data/rooms.json), в других местах шторку
+## из дома не открыть.
+static func purchase_place() -> String:
+	if GameState.house_is_indoors:
+		return PLACE_DOOR if GameState.house_room == "hall" else PLACE_HOUSE
+	return PLACE_UNDERGROUND if GameState.player_depth >= 1 else PLACE_GARDEN
+
+
+static func is_gated(kind: String) -> bool:
+	return GATED_KINDS.has(kind)
+
+
+## Можно ли купить предложение (item — плитка витрины или любой словарь с
+## "kind") в том месте, где стоит игрок: {ok, reason, needs_ad, place, left,
+## limit}. Дома у двери — всегда. Под землёй — пока есть лимит, и тогда
+## needs_ad: покупка идёт за ролик и спишет единицу лимита. В остальных местах
+## и при пустом лимите — отказ с причиной (она же идёт в подсказку плитки).
+## Деньги и вес здесь не проверяются — это дело самой покупки.
+static func can_buy(item: Dictionary) -> Dictionary:
+	var place := purchase_place()
+	var res := {"ok": true, "reason": "", "needs_ad": false, "place": place,
+		"left": ShopRemote.left_today(), "limit": ShopRemote.limit()}
+	if not is_gated(String(item.get("kind", ""))) or place == PLACE_DOOR:
+		return res
+	if place == PLACE_UNDERGROUND:
+		if int(res["left"]) > 0:
+			res["needs_ad"] = true
+		else:
+			res["ok"] = false
+			res["reason"] = "Роликов на сегодня не осталось. Покупки — у входной двери дома."
+		return res
+	res["ok"] = false
+	res["reason"] = "Покупки — у входной двери, в прихожей." if place == PLACE_HOUSE \
+			else "Покупки — у входной двери дома. Под землёй — за ролик."
+	return res
+
+
+## Платная часть удалённой покупки: «ролик» и единица лимита. Зовётся ПОСЛЕ всех
+## проверок покупки (деньги, вес, владение) и ПЕРЕД списанием денег — иначе
+## игрок тратил бы просмотр на покупку, которая всё равно не состоится.
+static func spend_remote_ad(gate: Dictionary) -> bool:
+	return not bool(gate.get("needs_ad", false)) or ShopRemote.watch_ad()
+
+
+## Хватает ли денег (тот же тумблер «бесплатно», что и в GameState.spend_*):
+## нужно, чтобы проверить оплату до ролика, а не после.
+static func _can_afford(currency: String, price: int) -> bool:
+	if GameState.debug_free_shop:
+		return true
+	return (GameState.coins if currency == "coins" else GameState.dollars) >= price
+
+
+static func _emit_bought(id: String, currency: String, remote: bool) -> void:
+	var data := {"id": id, "currency": currency}
+	if remote:
+		data["remote"] = true
+	GameState.emit_event(&"bought", data)
 
 
 # ---------------------------------------------------------------------------
@@ -306,31 +382,37 @@ static func _machine_built(machine_id: String) -> bool:
 static func buy_tool(tool_id: String) -> Dictionary:
 	if Balance.get_tool(tool_id).is_empty():
 		return {"ok": false, "message": "Такого инструмента нет"}
-	if not can_shop_here():
-		return {"ok": false, "message": "Магазин у входной двери"}
+	var gate := can_buy({"kind": "tool"})
+	if not bool(gate["ok"]):
+		return {"ok": false, "message": String(gate["reason"])}
 	if GameState.owns_tool(tool_id):
 		return {"ok": false, "message": "Уже есть"}
 	if Balance.tool_needs_materials(tool_id):
 		return {"ok": false, "message": "Это собирается на верстаке, а не покупается"}
-	# Магазин у входной двери работает откуда угодно (can_shop_here() ==
-	# true всегда), а бурмобиль под землёй бросить нельзя (решение владельца)
-	# — иначе покупка чужой кирки прямо в шахте тихо ссаживала бы героя с
-	# машины мимо единственной точки проверки (GameState.set_current_tool).
+	# Под землёй кирку теперь можно купить за ролик, а бурмобиль там бросить
+	# нельзя (решение владельца) — иначе покупка чужой кирки прямо в шахте тихо
+	# ссаживала бы героя с машины мимо единственной точки проверки
+	# (GameState.set_current_tool).
 	if GameState.current_tool == "drill_rig" and tool_id != "drill_rig" \
 			and GameState.player_depth >= 1 and not GameState.house_is_indoors:
 		return {"ok": false, "message": "Бурмобиль под землёй не бросить — сначала наверх или домой."}
 	var price := Balance.get_tool_cost_coins(tool_id)
 	if price <= 0:
 		return {"ok": false, "message": "Это не продаётся"}
+	if not _can_afford("coins", price):
+		return {"ok": false, "message": "Не хватает монет"}
+	if not spend_remote_ad(gate):
+		return {"ok": false, "message": "Роликов на сегодня не осталось."}
 	if not GameState.spend_coins(price):
 		return {"ok": false, "message": "Не хватает монет"}
 	GameState.grant_tool(tool_id)
 	# Купленная кирка сразу в руках: покупать её и отдельно идти надевать —
 	# лишний шаг. Выбор вручную остаётся на верстаке (верстак = экипировка).
 	GameState.set_current_tool(tool_id)
-	GameState.emit_event(&"bought", {"id": tool_id, "currency": "coins"})
+	_emit_bought(tool_id, "coins", bool(gate["needs_ad"]))
 	SaveSystem.save_game()
-	return {"ok": true, "message": "%s куплена — уже в руках." % Balance.get_tool_name_ru(tool_id)}
+	return {"ok": true, "message": "%s куплена — уже в руках." % Balance.get_tool_name_ru(tool_id),
+		"remote": bool(gate["needs_ad"])}
 
 
 ## Покупка ступени ранца за монеты. Надевается сразу, если быстрее надетой
@@ -338,19 +420,25 @@ static func buy_tool(tool_id: String) -> Dictionary:
 static func buy_gear(gear_id: String) -> Dictionary:
 	if Balance.get_gear(gear_id).is_empty():
 		return {"ok": false, "message": "Такого ранца нет"}
-	if not can_shop_here():
-		return {"ok": false, "message": "Магазин у входной двери"}
+	var gate := can_buy({"kind": "gear"})
+	if not bool(gate["ok"]):
+		return {"ok": false, "message": String(gate["reason"])}
 	if GameState.has_gear(gear_id):
 		return {"ok": false, "message": "Уже есть"}
 	var price := Balance.get_gear_cost_coins(gear_id)
 	if price <= 0:
 		return {"ok": false, "message": "Это не продаётся"}
+	if not _can_afford("coins", price):
+		return {"ok": false, "message": "Не хватает монет"}
+	if not spend_remote_ad(gate):
+		return {"ok": false, "message": "Роликов на сегодня не осталось."}
 	if not GameState.spend_coins(price):
 		return {"ok": false, "message": "Не хватает монет"}
 	GameState.grant_gear(gear_id)
-	GameState.emit_event(&"bought", {"id": gear_id, "currency": "coins"})
+	_emit_bought(gear_id, "coins", bool(gate["needs_ad"]))
 	SaveSystem.save_game()
-	return {"ok": true, "message": "%s куплен." % Balance.get_gear_name_ru(gear_id)}
+	return {"ok": true, "message": "%s куплен." % Balance.get_gear_name_ru(gear_id),
+		"remote": bool(gate["needs_ad"])}
 
 
 # ---------------------------------------------------------------------------
@@ -376,20 +464,26 @@ static func next_drill_upgrade_tier() -> int:
 static func buy_drill_upgrade() -> Dictionary:
 	if not GameState.owns_tool("drill_rig"):
 		return {"ok": false, "message": "Сначала нужен сам бурмобиль"}
-	if not can_shop_here():
-		return {"ok": false, "message": "Магазин у входной двери"}
+	var gate := can_buy({"kind": "drill"})
+	if not bool(gate["ok"]):
+		return {"ok": false, "message": String(gate["reason"])}
 	var tier := next_drill_upgrade_tier()
 	if tier > Balance.get_drill_rig_tier_count():
 		return {"ok": false, "message": "Все ступени бура уже куплены"}
 	var price := Balance.get_drill_rig_tier_cost_coins(tier)
 	if price <= 0:
 		return {"ok": false, "message": "Эта ступень ещё не готова к продаже"}
+	if not _can_afford("coins", price):
+		return {"ok": false, "message": "Не хватает монет"}
+	if not spend_remote_ad(gate):
+		return {"ok": false, "message": "Роликов на сегодня не осталось."}
 	if not GameState.spend_coins(price):
 		return {"ok": false, "message": "Не хватает монет"}
 	GameState.grant_drill_rig_tier(tier)
-	GameState.emit_event(&"bought", {"id": Balance.get_drill_rig_tier_id(tier), "currency": "coins"})
+	_emit_bought(Balance.get_drill_rig_tier_id(tier), "coins", bool(gate["needs_ad"]))
 	SaveSystem.save_game()
-	return {"ok": true, "message": "%s установлен — бур стал быстрее." % Balance.get_drill_rig_tier_name_ru(tier)}
+	return {"ok": true, "message": "%s установлен — бур стал быстрее." % Balance.get_drill_rig_tier_name_ru(tier),
+		"remote": bool(gate["needs_ad"])}
 
 
 ## Списать материал на крафт: сначала со склада, потом из рюкзака. Порядок
@@ -428,6 +522,9 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 	var price := ShopCatalog.good_price(g, currency)
 	if price <= 0:
 		return {"ok": false, "message": "Товар без цены", "effect": ""}
+	var gate := can_buy({"kind": "good"})
+	if not bool(gate["ok"]):
+		return {"ok": false, "message": String(gate["reason"]), "effect": ""}
 
 	# Товар-предмет (data/shop.json, effect "grant_item") ложится в рюкзак:
 	# вес проверяем ДО оплаты, иначе деньги уйдут, а предмет не влезет.
@@ -437,15 +534,20 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 		if Balance.get_mineral_weight(item) * count > _free_weight():
 			return {"ok": false, "message": "Рюкзак не выдержит — разгрузись", "effect": ""}
 
+	var lack := "монет" if currency == "coins" else "долларов"
+	if not _can_afford(currency, price):
+		return {"ok": false, "message": "Не хватает " + lack, "effect": ""}
+	if not spend_remote_ad(gate):
+		return {"ok": false, "message": "Роликов на сегодня не осталось.", "effect": ""}
 	var paid := GameState.spend_coins(price) if currency == "coins" else GameState.spend_dollars(price)
 	if not paid:
-		return {"ok": false, "message": "Не хватает " + ("монет" if currency == "coins" else "долларов"), "effect": ""}
+		return {"ok": false, "message": "Не хватает " + lack, "effect": ""}
 
 	var effect := String(g.get("effect", ""))
 	var message := apply_effect(g)
-	GameState.emit_event(&"bought", {"id": good_id, "currency": currency})
+	_emit_bought(good_id, currency, bool(gate["needs_ad"]))
 	SaveSystem.save_game()
-	return {"ok": true, "message": message, "effect": effect}
+	return {"ok": true, "message": message, "effect": effect, "remote": bool(gate["needs_ad"])}
 
 
 ## Эффект расходника применяется сразу при покупке, а не кладётся в

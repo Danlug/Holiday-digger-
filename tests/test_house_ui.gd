@@ -78,6 +78,19 @@ func check(label: String, ok: bool) -> void:
 		print("[FAIL] " + label)
 
 
+## Заказ еды делается у входной двери (ГДД §15, ShopService.can_buy): на миг
+## ставим флаги «в прихожей», героя и вид не двигая. Раньше заказ шёл откуда угодно.
+func _order_at_door(id: String) -> Dictionary:
+	var indoors := GameState.house_is_indoors
+	var room := GameState.house_room
+	GameState.house_is_indoors = true
+	GameState.house_room = "hall"
+	var r := HouseSystem.order_food(id)
+	GameState.house_is_indoors = indoors
+	GameState.house_room = room
+	return r
+
+
 func _leave() -> void:
 	if GameState.house_is_indoors:
 		house.exit_to_door()
@@ -480,7 +493,7 @@ func _test_delivery_flow() -> void:
 	var badge: HouseDeliveryBadge = house._delivery_badge
 	badge.reset()
 
-	var result := HouseSystem.order_food("food_buldak")
+	var result := _order_at_door("food_buldak")
 	check("заказ принят", bool(result["ok"]))
 	check("значок курьера показан и едет", badge.is_visible_now() and badge.state() == "transit"
 		and badge.orders_in_flight() == 1)
@@ -520,6 +533,6 @@ func _test_delivery_flow() -> void:
 
 	# Еду, которую нельзя унести, не доставляют: её съедают на месте.
 	GameState.set_hunger(20.0)
-	var eaten := HouseSystem.order_food("food_steak")
+	var eaten := _order_at_door("food_steak")
 	check("стейк съеден на месте, курьер не выезжал", bool(eaten["ok"]) and badge.orders_in_flight() == 0)
 	badge.reset()

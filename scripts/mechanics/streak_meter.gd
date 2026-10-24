@@ -15,6 +15,7 @@ const COL_FILL := Color8(0xF0, 0x7A, 0x1E)
 const COL_FILL_HI := Color8(0xFF, 0xC8, 0x3A)
 const COL_FEVER := Color8(0xFF, 0xE5, 0x7A)
 const COL_FEVER_DEEP := Color8(0xF0, 0x9A, 0x1E)
+const COL_GREED := Color8(0xFF, 0xC8, 0x3A)
 const ROW_GAP := 3.0          # = separation столбика полосок в hud.gd
 
 var streak: StreakLogic = null
@@ -125,10 +126,10 @@ func _draw() -> void:
 		var col := COL_FILL
 		if greed:
 			var low := streak.greed_left < 1.0
-			col = COL_FEVER
+			col = COL_GREED
 			if not Settings.reduce_motion:
-				col = col.lerp(Color.WHITE, 0.2 + 0.2 * sin(_time * 9.0)) if not low \
-					else (COL_FEVER if sin(_time * 18.0) > 0.0 else COL_FEVER_DEEP)
+				col = col.lerp(COL_FEVER, 0.5 + 0.5 * sin(_time * 9.0)) if not low \
+					else (COL_GREED if sin(_time * 18.0) > 0.0 else COL_FEVER_DEEP)
 		_fill.bg_color = col
 		draw_style_box(_fill, Rect2(inner.position, Vector2(fw, inner.size.y)))
 		draw_rect(Rect2(inner.position.x + 1, inner.position.y, maxf(fw - 2, 0.0), 2),

@@ -152,6 +152,21 @@ func _greed_run() -> void:
 	await _shot("greed_run")
 	main.player.set_intent(0, false, false)
 	main.player.release_control()
+	# бег вбок по прокопанному ходу: штрихи скорости за героем
+	var p = main.player
+	var cy: int = p.cell_y()
+	for x in range(3, 29):
+		main.world.dig_cell(x, cy)
+	main.fog.reveal_around(16.0, float(cy), 9, 9)
+	p.x = 4.5
+	p.vx = 0.0
+	p.vy = 0.0
+	await _frames(4)
+	p.set_intent(1, false, false)
+	await _frames(5)
+	await _shot("greed_side")
+	p.set_intent(0, false, false)
+	p.release_control()
 	d.streak.reset()
 	await _frames(30)
 

@@ -20,6 +20,18 @@ extends RefCounted
 ##
 ## Подсказка рисуется на своём CanvasLayer поверх всего, не перехватывает ввод,
 ## прижимается к краям вьюпорта и сама гаснет через несколько секунд.
+##
+## Режим «по тапу» (аддитивный, hover и долгое нажатие работают как раньше):
+##
+##   Tip.bind_tap(icon, "Железо", "Есть: 3 из 10")
+##   Tip.bind_tap(icon, "Железо", "Есть: 3 из 10", "", card)   # панель над card
+##
+## Обычное короткое нажатие открывает ту же панель и держит её открытой, пока
+## не будет повторный тап по этому же месту, тап в любое другое место или
+## ~6 с. Тап не вызывает swallowed() и сам действие не совершает: кнопки
+## «купить/отмена» этим режимом не связываем. Тап вне панели, закрывший её,
+## помечает dismissed_by_tap() на ~0.25 с — окна с «тап по фону закрывает»
+## проверяют его, чтобы одним касанием не закрыть и подсказку, и окно.
 
 const HOVER_DELAY := 0.22
 const LONG_PRESS := 0.38
@@ -28,6 +40,9 @@ const AFTER_RELEASE := 1.8
 const MOVE_CANCEL_PX := 12.0
 const MAX_WIDTH := 152.0
 const META := &"_tip_data"
+const TAP_META := &"_tip_tap"
+const ANCHOR_META := &"_tip_anchor"
+const TAP_HIDE := 6.0
 
 const COL_BG := Color8(0x17, 0x13, 0x0F, 0xF2)
 const COL_BORDER := Color8(0xE0, 0xA9, 0x3B)
@@ -46,6 +61,10 @@ static var _swallow_until_ms: int = 0
 static var _press_active: bool = false
 static var _press_moved: float = 0.0
 static var _shown_by_press: bool = false
+static var _tap_pinned: bool = false
+static var _pin_token: int = 0
+static var _dismissed_until_ms: int = 0
+static var _watcher: Node = null
 
 
 ## Привязывает подсказку. Повторный вызов на том же Control только обновляет
@@ -64,10 +83,27 @@ static func bind(ctrl: Control, title: String, body: String = "", extra: String 
 	ctrl.mouse_entered.connect(func() -> void: _on_enter(ctrl))
 	ctrl.mouse_exited.connect(func() -> void: _on_exit(ctrl))
 	ctrl.gui_input.connect(func(ev: InputEvent) -> void: _on_input(ctrl, ev))
-	ctrl.tree_exiting.connect(func() -> void: _on_exit(ctrl))
+	ctrl.tree_exiting.connect(func() -> void: _on_gone(ctrl))
 	ctrl.visibility_changed.connect(func() -> void:
 		if not ctrl.is_visible_in_tree():
-			_on_exit(ctrl))
+			_on_gone(ctrl))
+
+
+## Подсказка, которая раскрывается обычным тапом (и по-прежнему по наведению и
+## долгому нажатию). Повторный вызов только обновляет текст. anchor — не
+## обязательный Control: панель встаёт над ним (а не над самим значком), чтобы
+## не закрывать содержимое окна, в котором значок лежит.
+static func bind_tap(ctrl: Control, title: String, body: String = "", extra: String = "",
+		anchor: Control = null) -> void:
+	if ctrl == null:
+		return
+	bind(ctrl, title, body, extra)
+	if anchor != null:
+		ctrl.set_meta(ANCHOR_META, anchor)
+	if ctrl.has_meta(TAP_META):
+		return
+	ctrl.set_meta(TAP_META, {"down": false, "pos": Vector2.ZERO})
+	ctrl.gui_input.connect(func(ev: InputEvent) -> void: _on_tap_input(ctrl, ev))
 
 
 static func set_text(ctrl: Control, title: String, body: String = "", extra: String = "") -> void:
@@ -77,15 +113,27 @@ static func set_text(ctrl: Control, title: String, body: String = "", extra: Str
 static func unbind(ctrl: Control) -> void:
 	if ctrl != null and ctrl.has_meta(META):
 		ctrl.set_meta(META, {"title": "", "body": "", "extra": ""})
-		_on_exit(ctrl)
+		_on_gone(ctrl)
 
 
 static func swallowed() -> bool:
 	return Time.get_ticks_msec() < _swallow_until_ms
 
 
+## Истинна ~0.25 с после того, как тап вне закрыл подсказку «по тапу».
+static func dismissed_by_tap() -> bool:
+	return Time.get_ticks_msec() < _dismissed_until_ms
+
+
+## Подсказка сейчас открыта тапом (а не наведением и не долгим нажатием).
+static func is_pinned() -> bool:
+	return _tap_pinned and is_showing()
+
+
 static func hide_all() -> void:
 	_token += 1
+	_pin_token += 1
+	_tap_pinned = false
 	_shown_by_press = false
 	_press_active = false
 	_owner_ctrl = null
@@ -105,6 +153,8 @@ static func show_now(ctrl: Control) -> void:
 static func _on_enter(ctrl: Control) -> void:
 	if not _has_text(ctrl) or _press_active:
 		return
+	if _tap_pinned and _owner_ctrl == ctrl:
+		return
 	var token := _bump()
 	var tree := ctrl.get_tree()
 	if tree == null:
@@ -116,12 +166,22 @@ static func _on_enter(ctrl: Control) -> void:
 
 
 static func _on_exit(ctrl: Control) -> void:
+	if _tap_pinned and _owner_ctrl == ctrl:
+		return   # открытую тапом подсказку мышь, ушедшая с места, не гасит
 	if _owner_ctrl == ctrl or _owner_ctrl == null:
 		if _press_active and _shown_by_press:
 			return
 		hide_all()
 	else:
 		_bump()
+
+
+## Control исчез из дерева или скрылся: подсказку гасим в любом режиме.
+static func _on_gone(ctrl: Control) -> void:
+	if _tap_pinned and _owner_ctrl == ctrl:
+		hide_all()
+	else:
+		_on_exit(ctrl)
 
 
 static func _on_input(ctrl: Control, ev: InputEvent) -> void:
@@ -167,6 +227,105 @@ static func _on_input(ctrl: Control, ev: InputEvent) -> void:
 			_press_moved += (ev as InputEventScreenDrag).relative.length()
 
 
+## Короткое нажатие без сдвига. Касание на телефоне приходит дважды (само
+## касание и эмулированная мышь): оба нажатия взводят «down», первое же
+## отпускание его сбрасывает — второе отпускание тапом уже не считается.
+static func _on_tap_input(ctrl: Control, ev: InputEvent) -> void:
+	if not _has_text(ctrl):
+		return
+	var pressed := false
+	if ev is InputEventScreenTouch:
+		pressed = ev.pressed
+	elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+		pressed = ev.pressed
+	else:
+		return
+	var d: Dictionary = ctrl.get_meta(TAP_META)
+	if pressed:
+		d["down"] = true
+		d["pos"] = _ev_pos(ev)
+		return
+	if not bool(d["down"]):
+		return
+	d["down"] = false
+	if _ev_pos(ev).distance_to(d["pos"]) > MOVE_CANCEL_PX:
+		return   # палец поехал — это прокрутка, не тап
+	if swallowed():
+		return   # долгое нажатие уже показало подсказку
+	tap_toggle(ctrl)
+
+
+## То, что делает тап: открыть подсказку или, если она уже открыта тапом на
+## этом месте, закрыть. Открытая наведением просто «закрепляется».
+static func tap_toggle(ctrl: Control) -> void:
+	if not _has_text(ctrl):
+		return
+	if is_pinned() and _owner_ctrl == ctrl:
+		hide_all()
+		Sfx.play("ui_close")
+		return
+	_show(ctrl)
+	if not is_showing():
+		return
+	_tap_pinned = true
+	_pin_timer()
+	_pop_in()
+	Sfx.play("ui_tap")
+	Haptics.tap()
+
+
+## Лёгкое «выскакивание» панели при тапе — подтверждает, что тап принят.
+static func _pop_in() -> void:
+	if Settings.reduce_motion or _panel == null:
+		return
+	_panel.pivot_offset = _panel.size * 0.5
+	_panel.scale = Vector2(0.92, 0.92)
+	_panel.modulate.a = 0.0
+	var tw := _panel.create_tween().set_parallel(true)
+	tw.tween_property(_panel, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_panel, "modulate:a", 1.0, 0.08)
+
+
+static func _ev_pos(ev: InputEvent) -> Vector2:
+	if ev is InputEventMouse:
+		return (ev as InputEventMouse).position
+	if ev is InputEventScreenTouch:
+		return (ev as InputEventScreenTouch).position
+	return Vector2.ZERO
+
+
+static func _pin_timer() -> void:
+	_pin_token += 1
+	var mine := _pin_token
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	await tree.create_timer(TAP_HIDE).timeout
+	if mine == _pin_token and _tap_pinned:
+		hide_all()
+
+
+## Любое нажатие мимо открытой тапом подсказки её закрывает (событие не
+## «съедается»: кнопка под пальцем сработает как обычно).
+static func _on_global_input(ev: InputEvent) -> void:
+	if not _tap_pinned or not is_showing():
+		return
+	if not ((ev is InputEventMouseButton or ev is InputEventScreenTouch) and ev.pressed):
+		return
+	var pos := _ev_pos(ev)
+	if _owner_ctrl != null and is_instance_valid(_owner_ctrl) and _owner_ctrl.is_visible_in_tree():
+		var local := _owner_ctrl.get_global_transform_with_canvas().affine_inverse() * pos
+		if Rect2(Vector2.ZERO, _owner_ctrl.size).has_point(local):
+			return
+	_dismissed_until_ms = Time.get_ticks_msec() + 250
+	hide_all()
+
+
+class _Watcher extends Node:
+	func _input(ev: InputEvent) -> void:
+		Tip._on_global_input(ev)
+
+
 static func _has_text(ctrl: Control) -> bool:
 	if ctrl == null or not is_instance_valid(ctrl) or not ctrl.has_meta(META):
 		return false
@@ -194,6 +353,9 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	_layer.layer = 128
 	_layer.name = "TipLayer"
 	tree.root.add_child(_layer)
+	_watcher = _Watcher.new()
+	_watcher.name = "TipWatcher"
+	_layer.add_child(_watcher)
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.visible = false
@@ -264,15 +426,23 @@ static func _show(ctrl: Control) -> void:
 		return
 	_ensure_panel(tree)
 	_owner_ctrl = ctrl
+	_tap_pinned = false
+	_panel.scale = Vector2.ONE
+	_panel.modulate.a = 1.0
 	_fill(ctrl)
 	_panel.visible = true
 	_panel.reset_size()
 	var vp := ctrl.get_viewport().get_visible_rect()
 	var r := ctrl.get_global_rect()
+	var anchor := r
+	if ctrl.has_meta(ANCHOR_META):
+		var a: Variant = ctrl.get_meta(ANCHOR_META)
+		if a is Control and is_instance_valid(a) and (a as Control).is_inside_tree():
+			anchor = (a as Control).get_global_rect()
 	var sz := _panel.get_combined_minimum_size()
-	var pos := Vector2(r.position.x + r.size.x * 0.5 - sz.x * 0.5, r.position.y - sz.y - 4.0)
+	var pos := Vector2(r.position.x + r.size.x * 0.5 - sz.x * 0.5, anchor.position.y - sz.y - 4.0)
 	if pos.y < vp.position.y + 2.0:
-		pos.y = r.end.y + 4.0
+		pos.y = anchor.end.y + 4.0
 	pos.x = clampf(pos.x, vp.position.x + 2.0, maxf(vp.position.x + 2.0, vp.end.x - sz.x - 2.0))
 	pos.y = clampf(pos.y, vp.position.y + 2.0, maxf(vp.position.y + 2.0, vp.end.y - sz.y - 2.0))
 	_panel.position = pos

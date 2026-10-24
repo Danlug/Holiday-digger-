@@ -38,6 +38,13 @@ var _shade_key := Vector3i(-99999, -99999, -1)
 var _shade_rects := PackedVector2Array()   # позиция клетки (x, y в мировых клетках)
 var _shade_masks := PackedInt32Array()     # бит 1 — сверху, 2 — слева, 4 — справа, 8 — снизу
 var _ramps: Dictionary = {}
+var _grid := PackedByteArray()
+var _grid_x := 0
+var _grid_y := 0
+var _grid_w := 0
+var _grid_h := 0
+var _grid_ver := -1
+var _grid_world: WorldGen = null
 
 
 func update(cam: Vector2, view_w: int, view_h: int) -> void:
@@ -124,12 +131,31 @@ func _rebuild_shade(world: WorldGen, x0: int, y0: int, cols: int, rows: int) -> 
 	_shade_rects.clear()
 	_shade_masks.clear()
 	var w := cols + 2
+	var h := rows + 2
+	var ox := x0 - 1
+	var oy := y0 - 1
+	# Окно «порода/не порода» двигается по миру: при той же версии мира старые клетки берём из прошлого окна,
+	# get_tile зовём только для новой полосы (иначе ~170 вызовов на каждую смену клетки камеры).
+	var reuse := _grid_ver == world.version and _grid_w == w and _grid_h == h \
+			and absi(ox - _grid_x) < w and absi(oy - _grid_y) < h and world == _grid_world
 	var solid := PackedByteArray()
-	solid.resize(w * (rows + 2))
-	for j in range(rows + 2):
+	solid.resize(w * h)
+	for j in range(h):
+		var oj := oy + j - _grid_y
 		for i in range(w):
-			var t := world.get_tile(x0 - 1 + i, y0 - 1 + j)
-			solid[j * w + i] = 1 if (t != TileTypes.Type.EMPTY and t != TileTypes.Type.LAVA) else 0
+			var oi := ox + i - _grid_x
+			if reuse and oi >= 0 and oi < w and oj >= 0 and oj < h:
+				solid[j * w + i] = _grid[oj * w + oi]
+			else:
+				var t := world.get_tile(ox + i, oy + j)
+				solid[j * w + i] = 1 if (t != TileTypes.Type.EMPTY and t != TileTypes.Type.LAVA) else 0
+	_grid = solid
+	_grid_x = ox
+	_grid_y = oy
+	_grid_w = w
+	_grid_h = h
+	_grid_ver = world.version
+	_grid_world = world
 	for j in range(rows):
 		for i in range(cols):
 			var k := (j + 1) * w + (i + 1)

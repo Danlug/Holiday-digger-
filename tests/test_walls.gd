@@ -73,6 +73,14 @@ func _check_textures() -> void:
 		check("%s: шов по X бесшовный (%.2f <= %.2f)" % [wall, seam, p98 * 1.15], seam <= p98 * 1.15 + 0.01)
 
 
+## Маска теней клетки (0 — записи нет).
+func _mask_of(db: DeepBackdrop, x: int, y: int) -> int:
+	for n in range(db._shade_rects.size()):
+		if db._shade_rects[n] == Vector2(x, y):
+			return db._shade_masks[n]
+	return 0
+
+
 func _check_edge_shade() -> void:
 	GameState.world_seed = 777
 	var world := WorldGen.new(777)
@@ -106,6 +114,20 @@ func _check_edge_shade() -> void:
 		check("тень справа — если справа порода", (m & 4 != 0) == rt)
 		check("тень снизу — если под клеткой порода", (m & 8 != 0) == dn)
 	check("тени есть только у пустых клеток (у каждой записи есть бит)", db._shade_masks.size() == db._shade_rects.size() and not (0 in db._shade_masks))
+	# окно сдвинулось на клетку: прежние клетки берутся из кэша, результат тот же, что при полном пересчёте
+	var before := _mask_of(db, x, y)
+	db.update(Vector2(x - 2, y - 6), 7, 14)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check("после сдвига камеры маска той же клетки не изменилась", _mask_of(db, x, y) == before)
+	# копнули клетку над ней: версия мира выросла, у нижней клетки пропала тень сверху, у новой — появилась
+	world.dig_cell(x, y - 1)
+	db.update(Vector2(x - 2, y - 6), 7, 14)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if before & 1:
+		check("после раскопки сверху у клетки нет тени сверху", _mask_of(db, x, y) & 1 == 0)
+	check("у раскопанной клетки нет тени снизу: под ней пустота", _mask_of(db, x, y - 1) & 8 == 0)
 	var far := Vector2(x + 40, y + 40)
 	check("далёкая порода без пустот теней не даёт", not db._shade_rects.has(far))
 	holder.queue_free()

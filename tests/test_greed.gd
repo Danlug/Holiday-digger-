@@ -64,6 +64,7 @@ func _ready() -> void:
 	_test_fall_damage()
 	_test_collisions()
 	_test_jump_and_fly()
+	_test_camera()
 	await _test_director()
 	_test_save_and_tree()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -262,6 +263,50 @@ func _test_jump_and_fly() -> void:
 	check("прыжок в жадности — та же высота (%.2f кл.), только быстрее" % (float(FLOOR_Y) - 0.34 - top),
 		float(FLOOR_Y) - 0.34 - top > 1.8)
 	p.queue_free()
+
+
+## Камера (CameraRig, как в main.gd) успевает за ×7: герой не уходит за край кадра
+## 7×15 клеток ни на бегу по коридору, ни в падении на 30 к/с.
+func _test_camera() -> void:
+	for dt in [DT, 0.033]:
+		var a := Arena.new()
+		a.fill(0, FLOOR_Y, 31, FLOOR_Y, TileTypes.Type.STONE)
+		var p = _player(a)
+		p.x = 2.5
+		p.y = float(FLOOR_Y) - 0.34
+		p.on_ground = true
+		p.greed_mult = 7.0
+		p.set_intent(1, false, false)
+		var rig := CameraRig.new()
+		var worst := 0.0
+		for i in range(int(0.9 / dt)):
+			p.physics_tick(dt)
+			var cam := rig.step(p, 7.0, 15.0, 30, dt)
+			if p.x > 4.0 and p.x < 28.0:   # у края мира камера упирается в него сама
+				worst = maxf(worst, absf(p.x - (cam.x + 3.5)))
+		check("бег ×7 (%.0f к/с): герой не дальше %.2f кл. от середины кадра (край — 3.5)" % [1.0 / dt, worst], worst < 2.6)
+		p.queue_free()
+		var b := Arena.new()
+		b.fill(0, FLOOR_Y, 31, FLOOR_Y, TileTypes.Type.STONE)
+		var q = _player(b)
+		q.x = 15.5
+		q.y = float(FLOOR_Y) - 120.0
+		q.vy = 0.0
+		q.on_ground = false
+		q.greed_mult = 7.0
+		GameState.debug_invincible = true
+		var rig2 := CameraRig.new()
+		var below := 0.0   # насколько герой ниже середины кадра (отставание камеры)
+		var above := 0.0   # выше середины — камера смотрит вперёд, вниз по падению
+		for i in range(int(1.5 / dt)):
+			q.physics_tick(dt)
+			var cam2 := rig2.step(q, 7.0, 15.0, 30, dt)
+			below = maxf(below, q.y - (cam2.y + 7.5))
+			above = maxf(above, (cam2.y + 7.5) - q.y)
+		GameState.debug_invincible = false
+		check("падение ×7 (%.0f к/с): камера не отстаёт (герой ниже середины на %.2f кл., выше — на %.2f; край — 7.5)" % [
+			1.0 / dt, below, above], below < 3.0 and above < 6.5)
+		q.queue_free()
 
 
 func _test_director() -> void:

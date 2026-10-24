@@ -11,7 +11,8 @@ extends Node
 ##
 ## Сцены: food picks tech sell sell_empty sell_remote premium equip equip_away
 ## card card_poor card_recipe bignum scroll sale_anim many new tip tech_locked drill
-## card_info_open card_recipe_chip card_recipe_long (описание по тапу в карточке).
+## card_info_open card_recipe_chip card_recipe_long card_info_long card_pulse
+## (описание по тапу в карточке; card_pulse — «i» в разгаре пульсации).
 
 var _out_dir := "/tmp/shop_shots"
 var _only: Array[String] = []
@@ -59,6 +60,8 @@ func _ready() -> void:
 	await _scene("card_info_open", _s_card_info_open)
 	await _scene("card_recipe_chip", _s_card_recipe_chip)
 	await _scene("card_recipe_long", _s_card_recipe_long)
+	await _scene("card_info_long", _s_card_info_long)
+	await _scene("card_pulse", _s_card_pulse)
 	print("test_screenshot_shop: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -303,6 +306,36 @@ func _s_card_recipe_long() -> void:
 	var chips := _tap_targets()
 	Tip.tap_toggle(chips[3])
 	await _frames(3)
+
+
+## Длинные название и описание товара: панель переносит строки и остаётся в окне.
+func _s_card_info_long() -> void:
+	GameState.max_depth_reached = 1200
+	GameState.coins = 900
+	_ui.open(ShopUI.TAB_TECH)
+	await _frames(2)
+	var t: ShopTile = _ui._tiles["recipe:hand_drill"]
+	var o: Dictionary = t.offer.duplicate(true)
+	o["title"] = "Топливный блок из каменного угля (большой)"
+	o["body"] = "Горит дольше торфяного брикета и греет ровнее: хватает на целую смену под землёй, даже в лаве."
+	o["extra"] = "Не хватает материалов: Геотермальный кристалл"
+	_ui._on_tile_pressed(o, t)
+	await _frames(6)
+	Tip.tap_toggle(_tap_targets()[0])
+	await _frames(3)
+
+
+## Первое знакомство: «i» пульсирует, описание ещё закрыто.
+func _s_card_pulse() -> void:
+	Settings.reduce_motion = false
+	GameState.ext_set(ShopUI.CARD_INFO_KEY, {})
+	GameState.coins = 1200
+	_ui.open(ShopUI.TAB_PICKS)
+	await _frames(2)
+	var t: ShopTile = _ui._tiles["tool:iron_pickaxe"]
+	_ui._on_tile_pressed(t.offer, t)
+	await get_tree().create_timer(0.58).timeout
+	Settings.reduce_motion = true
 
 
 func _frames(n: int) -> void:

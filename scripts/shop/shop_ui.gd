@@ -92,6 +92,7 @@ var _card: Control = null
 var _card_offer: Dictionary = {}
 var _card_ok: Button = null
 var _card_panel: Control = null   # плашка карточки: над ней встаёт описание по тапу
+var _info_pulse: Tween = null     # пульсация «i», пока игрок не научился тапать
 
 var _notice_panel: Panel
 var _notice_label: Label
@@ -1041,25 +1042,33 @@ func _bind_card_info(preview: ShopTile, side: Control, offer: Dictionary) -> voi
 	var badge := ShopArt.rect(ShopArt.tex("glyph_info"),
 		Vector2(ShopTile.W - 17.0, ShopTile.H - 17.0), Vector2(14, 14))
 	preview.add_child(badge)
-	var learned: bool = bool((GameState.ext_get(CARD_INFO_KEY, {}) as Dictionary).get("tapped", false))
 	preview.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		if not learned:
-			learned = true
-			var st: Dictionary = GameState.ext_get(CARD_INFO_KEY, {})
-			st["tapped"] = true
-			GameState.ext_set(CARD_INFO_KEY, st)
-		badge.scale = Vector2.ONE)
-	if learned or ShopFx.reduced():
+		if not Tip.swallowed():
+			_learn_card_info(badge))
+	if _card_info_learned() or ShopFx.reduced():
 		return
 	badge.pivot_offset = badge.size * 0.5
-	var tw := badge.create_tween()
-	tw.tween_interval(0.4)
+	_info_pulse = badge.create_tween()
+	_info_pulse.tween_interval(0.4)
 	for i in 3:
-		tw.tween_property(badge, "scale", Vector2(1.3, 1.3), 0.22).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(badge, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE)
-		tw.tween_interval(0.25)
+		_info_pulse.tween_property(badge, "scale", Vector2(1.3, 1.3), 0.22).set_trans(Tween.TRANS_SINE)
+		_info_pulse.tween_property(badge, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE)
+		_info_pulse.tween_interval(0.25)
+
+
+func _card_info_learned() -> bool:
+	return bool((GameState.ext_get(CARD_INFO_KEY, {}) as Dictionary).get("tapped", false))
+
+
+func _learn_card_info(badge: Control) -> void:
+	if _info_pulse != null and _info_pulse.is_valid():
+		_info_pulse.kill()
+	if is_instance_valid(badge):
+		badge.scale = Vector2.ONE
+	if not _card_info_learned():
+		var st: Dictionary = GameState.ext_get(CARD_INFO_KEY, {})
+		st["tapped"] = true
+		GameState.ext_set(CARD_INFO_KEY, st)
 
 
 func _card_can_confirm(offer: Dictionary) -> bool:

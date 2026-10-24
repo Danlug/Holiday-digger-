@@ -35,6 +35,7 @@ const DAY := Color(0.30, 0.20, 0.12)
 
 var _shade: ColorRect
 var _sprite: TextureRect
+var _sprite_next: TextureRect   # следующий кадр дыхания, проявляется поверх (hero-anim)
 var _zs: Control
 var _pill: Control
 var _icon: TextureRect
@@ -92,6 +93,10 @@ func _init() -> void:
 	_sprite.offset_top = -140
 	_sprite.offset_bottom = 120
 	add_child(_sprite)
+	# Дыхание нарисовано 8 кадрами на 2 кадра/с: без перетекания оно ступенчатое.
+	_sprite_next = _sprite.duplicate()
+	_sprite_next.self_modulate.a = 0.0
+	add_child(_sprite_next)
 
 	_dawn = ShopArt.rect(HouseArt.tex("sun"), Vector2.ZERO, Vector2(DAWN_PX, DAWN_PX))
 	_dawn.modulate.a = 0.0
@@ -283,6 +288,7 @@ func _apply(p: float) -> void:
 	# Спящий появляется вместе с затемнением и уходит на рассвете, а на его
 	# месте всплывает солнце (или месяц) с тёплым ореолом.
 	_sprite.modulate.a = fade_in * (1.0 - smoothstep(0.0, 1.0, clampf(dawn_t * 1.6, 0.0, 1.0)))
+	_sprite_next.modulate.a = _sprite.modulate.a
 	var rise := smoothstep(0.0, 1.0, clampf((dawn_t - 0.25) / 0.75, 0.0, 1.0))
 	var w := size.x if size.x > 0.0 else 224.0
 	var h_screen := size.y if size.y > 0.0 else 480.0
@@ -357,7 +363,16 @@ func _update_frame() -> void:
 		atlas.atlas = _sheet
 		atlas.region = Rect2(idx * fw, 0, fw, fh)
 		_sprite.texture = atlas
+		var nxt := AtlasTexture.new()
+		nxt.atlas = _sheet
+		nxt.region = Rect2(((idx + 1) % frames) * fw, 0, fw, fh)
+		_sprite_next.texture = nxt
+		# вторая половина кадра — плавный переход в следующий
+		var frac: float = fposmod(_t * fps, 1.0)
+		_sprite_next.self_modulate.a = 0.0 if Settings.reduce_motion else smoothstep(0.4, 1.0, frac)
 	elif _static != null:
 		_sprite.texture = _static
+		_sprite_next.texture = null
 	else:
 		_sprite.texture = null
+		_sprite_next.texture = null

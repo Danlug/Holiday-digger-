@@ -719,6 +719,50 @@ def gen_full_restore_pill():
     cv.save("item_full_restore_pill")
 
 
+def gen_energy_bar_icon():
+    """Энергетический батончик: фиолетовая обёртка с золотыми гофрированными
+    краями и крупной молнией поверх. Молния выступает за обёртку и обведена
+    тёмным — читается и в 32x32, и в 16x16; не путать с белковым батончиком
+    (красно-оранжевая наклонная обёртка) и энергетиком (синяя банка)."""
+    cv = Cv()
+    y0, y1 = 10, 22          # обёртка по высоте, включительно
+    x0, x1 = 1, 30           # вместе с гофрой
+    # тело обёртки: три тона по высоте
+    cv.rect(x0 + 3, y0, x1 - 3, y1, rgba("#6A3FA8"))
+    cv.rect(x0 + 3, y0, x1 - 3, y0 + 3, rgba("#9468D8"))
+    cv.rect(x0 + 3, y0 + 4, x1 - 3, y0 + 5, rgba("#7E52C0"))
+    cv.rect(x0 + 3, y1 - 3, x1 - 3, y1, rgba("#4A2A80"))
+    cv.rect(x0 + 3, y1 - 1, x1 - 3, y1, rgba("#38206A"))
+    # золотая гофра по краям: рёбра фольги и зубчатый срез
+    for (gx0, gx1, tip) in ((x0, x0 + 3, -1), (x1 - 3, x1, 1)):
+        cv.rect(gx0, y0 + 1, gx1, y1 - 1, rgba("#E8B32E"))
+        for gx in range(gx0, gx1 + 1):
+            cv.rect(gx, y0 + 1, gx, y1 - 1, rgba("#E8B32E") if (gx - gx0) % 2 == 0 else rgba("#B07A18"))
+        cv.rect(gx0, y0 + 1, gx1, y0 + 2, rgba("#FFE066"))
+        cv.rect(gx0, y1 - 2, gx1, y1 - 1, rgba("#9A6A14"))
+        outer = gx0 if tip < 0 else gx1
+        for gy in range(y0 + 1, y1, 2):      # зубцы по внешнему краю
+            cv.px(outer, gy, (0, 0, 0, 0))
+    # складка обёртки у гофры
+    for cx in (x0 + 4, x1 - 4):
+        cv.rect(cx, y0 + 1, cx, y1 - 1, rgba("#4A2A80"))
+    # блик на плёнке
+    cv.px(x0 + 6, y0 + 1, WHITE)
+    cv.px(x0 + 7, y0 + 1, WHITE)
+    cv.px(x1 - 5, y1 - 2, rgba("#9468D8"))
+    # молния: тёмная подложка (контур по 8 направлениям) + золото + блик
+    bolt = [(18, 6), (11, 17), (15, 17), (12, 26), (22, 14), (18, 14), (21, 6)]
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if dx or dy:
+                cv.poly([(x + dx, y + dy) for x, y in bolt], OUT)
+    cv.poly(bolt, rgba("#FFE066"))
+    cv.poly([(18, 7), (12, 16), (15, 16), (17, 10)], rgba("#FFF8C8"))
+    cv.poly([(16, 19), (13, 25), (21, 15), (17, 15)], rgba("#E8B32E"))
+    cv.outline()
+    cv.save("item_energy_bar")
+
+
 def gen_food():
     # белковый батончик: наклонная обёртка с полосой и надорванным концом
     cv = Cv()
@@ -798,24 +842,7 @@ def gen_food():
     cv.outline()
     cv.save("item_energy_drink")
 
-    # премиум-батончик: золотая обёртка со звездой
-    cv = Cv()
-    ang = -0.5
-    cv.poly(rot_rect(16, 16, 25, 12, ang), rgba("#E8B32E"))
-    cv.poly(rot_rect(16, 14, 25, 4, ang), rgba("#FFE066"))
-    cv.poly(rot_rect(16, 19, 25, 3, ang), rgba("#B07A18"))
-    star = []
-    for i in range(10):
-        a = i / 10 * 2 * math.pi - math.pi / 2
-        r = 4.5 if i % 2 == 0 else 2
-        star.append((16 + math.cos(a) * r, 16 + math.sin(a) * r))
-    cv.poly(star, rgba("#C21E3A"))
-    cv.px(15, 14, rgba("#FF8A9A"))
-    cv.poly([(25, 8), (28, 9), (27, 13), (24, 12)], rgba("#6B4428"))
-    cv.px(7, 21, WHITE)
-    cv.px(8, 21, WHITE)
-    cv.outline()
-    cv.save("item_energy_bar")
+    gen_energy_bar_icon()
 
     # таблетка полного восстановления: капсула 💊 с плюсом (рисует gen_full_restore_pill)
     gen_full_restore_pill()

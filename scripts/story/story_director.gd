@@ -83,6 +83,7 @@ func boot() -> void:
 	StoryText.load_locale(_pick_locale())
 	StoryData.ensure_loaded()
 	StoryState.load_from_disk()
+	_sync_story_gear()
 
 	_find_game_nodes()
 
@@ -332,9 +333,11 @@ func _check_triggers() -> void:
 
 	# Заправка (решение владельца): после разговора с бабкой (сцена Роберта —
 	# первый её звонок) и после того, как завёлся ручной бур. Раньше ставить
-	# нечего: без бура топливо некуда лить.
+	# нечего: без бура топливо некуда лить. Бур — в собственности, а не «рецепт
+	# открыт на сотне» (docs/PLAYTEST.md, P1.4); собирают его в мастерской, и
+	# сцена ждёт, пока её закроют, — иначе встала бы поверх открытого окна.
 	if StoryState.is_seen("robert") and not StoryState.is_seen("fuel_station") \
-			and player != null and player.has_hand_drill():
+			and FuelRefinery.owns_fuel_tool() and not _modal_open():
 		StoryState.enqueue("fuel_station")
 		return
 
@@ -703,6 +706,13 @@ func _release_control() -> void:
 # Эффекты сцены
 # ---------------------------------------------------------------------------
 
+## Сейвы до эффекта "gear": сцену «Ранец» пропустили, флаг стоит, а ранца в
+## собственности нет — герой с тех пор не выходил из дома.
+func _sync_story_gear() -> void:
+	if StoryState.has_flag("backpack_owned") and not GameState.has_gear("backpack"):
+		GameState.grant_gear("backpack")
+
+
 func _apply_effects(effects: Array) -> void:
 	for e in effects:
 		match String(e.get("do", "")):
@@ -715,6 +725,12 @@ func _apply_effects(effects: Array) -> void:
 				var tool_id := String(e.get("id", ""))
 				GameState.grant_tool(tool_id)
 				GameState.set_current_tool(tool_id)
+			"gear":
+				# Ранец из сцены — сразу в собственность, а не флагом до первого
+				# кадра героя на воле: пропущенные «Смерть → Ранец → Роберт»
+				# кончаются в доме, где герой заморожен, и витрина у двери
+				# продавала подаренный ранец за 100 (docs/PLAYTEST.md, P1.1).
+				GameState.grant_gear(String(e.get("id", "")))
 			"coins":
 				GameState.add_coins(int(e.get("n", 0)))
 			"dollars":

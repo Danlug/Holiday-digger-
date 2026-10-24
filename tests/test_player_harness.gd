@@ -493,12 +493,12 @@ func _test_gear_unlock_by_depth() -> void:
 	check("надет ранец — тяга снова пропеллерная", not player.has_jetpack())
 	GameState.owned_gear.clear()
 	GameState.current_gear = ""
-	check("на глубине 100 открывается ручной бур", player.has_hand_drill())
-	check("бурмобиля на глубине 100 ещё нет", not player.has_drill_rig())
+	check("на глубине 100 открывается ручной бур", player.hand_drill_unlocked())
+	check("бурмобиля на глубине 100 ещё нет", not player.drill_rig_unlocked())
 	GameState.max_depth_reached = player.RIG_DEPTH - 1
-	check("на клетку выше порога бурмобиля ещё нет", not player.has_drill_rig())
+	check("на клетку выше порога бурмобиля ещё нет", not player.drill_rig_unlocked())
 	GameState.max_depth_reached = player.RIG_DEPTH
-	check("на глубине 1000 открывается бурмобиль", player.has_drill_rig())
+	check("на глубине 1000 открывается бурмобиль", player.drill_rig_unlocked())
 
 	# Ступень должна не только открыться, но и включиться: сам бурмобиль в
 	# руках героя — это другой инструмент с другой скоростью копки. Владение

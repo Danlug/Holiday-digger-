@@ -225,7 +225,7 @@ var _credit_ttl: float = 0.0
 func _ready() -> void:
 	_announced_backpack = has_backpack()
 	_announced_jetpack = has_jetpack()
-	_announced_rig = has_drill_rig()
+	_announced_rig = drill_rig_unlocked()
 
 
 # ---------------------------------------------------------------------------
@@ -331,19 +331,23 @@ func flight_tier() -> int:
 	return int(Balance.unwrap(Balance.get_gear(GameState.current_gear).get("tier", 0)))
 
 
-func has_hand_drill() -> bool:
+## Открыт ли рецепт ручного бура по глубине (JET_DEPTH) — «можно собрать», а
+## не «есть»: владение — GameState.owns_tool("hand_drill"). Прежнее имя
+## has_hand_drill() путало одно с другим, и сцена «Заправка» играла на сотой
+## метке без бура (docs/PLAYTEST.md, P1.4).
+func hand_drill_unlocked() -> bool:
 	return GameState.max_depth_reached >= JET_DEPTH
 
 
 ## Открыт ли рецепт бурмобиля по глубине (RIG_DEPTH). Открытие рецепта и
-## владение — разные вещи: has_drill_rig() говорит "можно собрать", а
+## владение — разные вещи: drill_rig_unlocked() говорит "можно собрать", а
 ## GameState.owned_tools.has("drill_rig") — "уже стоит в гараже". Само
 ## владение решает, ходит ли герой пешком или ездит (см. блок ниже:
 ## "бурмобиль как транспорт", start_rig_boarding и _check_rig_surface_exit).
 ## Перегрев машины из
 ## ГДД раздела 5 по-прежнему не реализован — числа не заданы владельцем
 ## (см. balance.json -> survival.hazards.drill_overheat).
-func has_drill_rig() -> bool:
+func drill_rig_unlocked() -> bool:
 	return GameState.max_depth_reached >= RIG_DEPTH
 
 
@@ -609,7 +613,7 @@ func _check_gear_unlocks() -> void:
 	if has_jetpack() and not _announced_jetpack:
 		_announced_jetpack = true
 		gear_unlocked.emit("jetpack")
-	if has_drill_rig() and not _announced_rig:
+	if drill_rig_unlocked() and not _announced_rig:
 		_announced_rig = true
 		gear_unlocked.emit("drill_rig")
 		if GameState.current_tool != "drill_rig":

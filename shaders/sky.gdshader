@@ -21,6 +21,7 @@ const vec2 NEAR_TILE = vec2(288.0, 384.0);
 uniform vec2 cam_px = vec2(0.0);                  // камера в мировых px
 uniform vec3 parallax = vec3(0.45, 0.62, 0.80);   // far, mid, near: доля движения камеры, доходящая до слоя
 
+uniform float body_shift = 0.0;                   // дрейф светил при ходьбе (экранные px по x)
 uniform float horizon_y = 0.0;                    // Y кромки земли
 uniform float grad_len = 130.0;                   // масштаб градиента по высоте, px
 uniform vec3 col_horizon = vec3(0.5, 0.83, 0.96);
@@ -98,7 +99,7 @@ void fragment() {
 	col = mix(col, col_zenith, smoothstep(0.45, 1.0, u));
 
 	if (twilight > 0.0) {
-		float hv = exp(-alt / 120.0);
+		float hv = exp(-alt / 175.0);
 		float dx = (sp.x - tw_x) / tw_spread;
 		float side = exp(-dx * dx);
 		vec3 tc = mix(tw_col_low, tw_col_high, smoothstep(0.0, 1.0, alt / 300.0));
@@ -107,13 +108,13 @@ void fragment() {
 
 	float moon_dim = 0.0;
 	if (moon_glow.w > 0.0) {
-		float md = distance(sp, moon_glow.xy);
+		float md = distance(sp - vec2(body_shift, 0.0), moon_glow.xy);
 		float r = moon_glow.z;
 		col += moon_col * moon_glow.w * (0.85 * exp(-md * md / (r * r)) + 0.30 * exp(-md / (r * 2.4)));
 		moon_dim = moon_glow.w * smoothstep(r * 3.2, r * 0.5, md);
 	}
 	if (sun_glow.w > 0.0) {
-		float sd = distance(sp, sun_glow.xy);
+		float sd = distance(sp - vec2(body_shift, 0.0), sun_glow.xy);
 		float r = sun_glow.z;
 		col += sun_col * sun_glow.w * (0.70 * exp(-sd * sd / (r * r)) + 0.30 * exp(-sd / (r * 1.7)));
 	}

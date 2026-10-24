@@ -6,8 +6,9 @@ extends Node2D
 ##  * _quad — один прямоугольник с шейдером shaders/sky.gdshader: градиент, тёплая полоса зари, свечение
 ##    светил, Млечный Путь и три слоя звёзд (art/env/sky/*.png, рисует tools/gen_sky.py). Мерцание — в шейдере
 ##    из фазы текселя, звёзд на спрайты не режем. Прямоугольник статичен, меняются только uniform'ы.
-##  * _celestial — спрайты солнца (art/env/sun.png) и луны (атлас 8 фаз art/env/moon.png). Слой «прибит» к
-##    экрану (солнце и месяц не улетают из кадра, когда герой поднимается), дуга считается в экранных px.
+##  * _celestial/_bodies — спрайты солнца (art/env/sun.png) и луны (атлас 8 фаз art/env/moon.png). Слой «прибит» к
+##    экрану (солнце и месяц не улетают из кадра, когда герой поднимается), дуга считается в экранных px,
+##    камера двигает только позицию слоя.
 ##  * _fx — падающие звёзды, тоже в экранных координатах.
 ## Небо — ребёнок ViewRoot, рисуется раньше Backdrop (горы, лес, забор), поэтому светила садятся ЗА лес.
 ##
@@ -32,8 +33,8 @@ const MOON_FRAMES := 8
 const MOON_FRAME_PX := 112.0
 
 ## Ширина полосы и доля сдвига камеры слоя _celestial — контракт, который проверяет tests/test_backdrop.gd
-## (задание владельца: «небо на 10% шире горы, параллакс на 10% меньше»). Светила его компенсируют (см.
-## _celestial_local_x) и стоят на своих экранных координатах дуги с лёгким дрейфом CELESTIAL_DRIFT.
+## (задание владельца: «небо на 10% шире горы, параллакс на 10% меньше»). Светила (дочерний слой _bodies) его
+## компенсируют и стоят на своих экранных координатах дуги с лёгким дрейфом CELESTIAL_DRIFT.
 const SKY_W_LOGICAL: float = Backdrop.MOUNTAIN_W_LOGICAL * 1.1        # 880
 const SKY_PARALLAX_X: float = Backdrop.MOUNTAIN_PARALLAX_X * 0.9      # 0.315
 const CELESTIAL_DRIFT := 0.06
@@ -45,14 +46,16 @@ const STAR_PARALLAX := Vector3(0.45, 0.62, 0.80)
 ## Дуга светил в экранных px при опорной камере (герой стоит на огороде, верх экрана на 6.5 клетки выше
 ## земли; кромка леса там на y≈125). Горизонт ниже кромки леса на радиус светила — восход и заход
 ## происходят ЗА лесом, а не у края экрана. По x дуга идёт от X_RISE к X_SET ширины экрана.
-const SUN_HORIZON_Y := 204.0
-const SUN_APEX_Y := 78.0
+const SUN_HORIZON_Y := 192.0
+const SUN_APEX_Y := 70.0
+## Спрайт солнца (75 px с лучами) в полоске неба над лесом велик — чуть уменьшен, чтобы утром оно не пряталось за деревьями до полудня.
+const SUN_SCALE := 0.85
 const MOON_HORIZON_Y := 170.0
 const MOON_APEX_Y := 62.0
 const ARC_X_RISE := 0.07
 const ARC_X_SET := 0.82
 ## Показатель при синусе высоты: меньше 1 — дуга сплюснута у краёв, светило дольше держится над горой.
-const ARC_FLATNESS := 0.75
+const ARC_FLATNESS := 0.6
 
 ## Палитра: день — прежний ровный голубой (решение владельца 2026-09-21), ночь — три тона по высоте.
 const NIGHT_HORIZON := Color8(0x30, 0x20, 0x78)
@@ -64,8 +67,8 @@ const DUSK_MID := Color(0.26, 0.30, 0.66)
 const DUSK_ZENITH := Color(0.12, 0.18, 0.52)
 const DUSK_LOW := Color(1.0, 0.50, 0.20)
 const DUSK_HIGH := Color(0.78, 0.26, 0.50)
-const DAWN_LOW := Color(1.0, 0.70, 0.44)
-const DAWN_HIGH := Color(0.74, 0.46, 0.68)
+const DAWN_LOW := Color(1.0, 0.62, 0.36)
+const DAWN_HIGH := Color(0.86, 0.48, 0.64)
 const MOON_GLOW_COLOR := Color(0.62, 0.72, 1.0)
 
 ## Падающие звёзды: редко, только в полной темноте.
@@ -75,6 +78,7 @@ const METEOR_GAP_MAX := 75.0
 var _mat: ShaderMaterial
 var _quad: Node2D
 var _celestial: Node2D
+var _bodies: Node2D
 var _fx: Node2D
 var _tex_sun: Texture2D
 var _tex_moon: Texture2D
@@ -89,7 +93,7 @@ var _rect_horizon_y: float = 0.0
 var _rect_top_y: float = -float(SKY_HEIGHT) * float(TILE)
 
 var _screen_w_px: float = 224.0
-var _cam_px: Vector2 = Vector2.ZERO
+var _cam_px: Vector2 = Vector2.ZERO  # камера в мировых px (для катсцены — ноль)
 var _underground: bool = false
 var _last_hour: float = -100.0
 var _last_night: int = -100
@@ -126,10 +130,16 @@ func _ready() -> void:
 
 	_celestial = Node2D.new()
 	_celestial.name = "Celestial"
-	# Месяц и солнце плывут с долями пикселя: линейный фильтр держит край ровным, ближайший сосед «ползал» бы.
-	_celestial.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_celestial.draw.connect(_draw_celestial)
+	# Месяц и солнце плывут с долями пикселя: линейный фильтр (у слоя _bodies) держит край ровным, ближайший
+	# сосед «ползал» бы.
 	add_child(_celestial)
+	# Солнце и луна рисуются в экранных координатах (локальные = экранные), поэтому камера двигает только
+	# позицию этого слоя, а не заставляет его перерисовываться.
+	_bodies = Node2D.new()
+	_bodies.name = "Bodies"
+	_bodies.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_bodies.draw.connect(_draw_celestial)
+	_celestial.add_child(_bodies)
 
 	_fx = Node2D.new()
 	_fx.name = "Meteors"
@@ -174,6 +184,7 @@ func set_scene_rect(width_px: float, horizon_y: float, top_y: float) -> void:
 	_cam_px = Vector2.ZERO
 	if _celestial != null:
 		_celestial.position = Vector2.ZERO
+		_bodies.position = Vector2.ZERO
 	if _quad != null:
 		_quad.queue_redraw()
 	_uniforms.clear()
@@ -196,11 +207,15 @@ func set_camera(cam: Vector2, view_w_cells: int) -> void:
 		return
 	var cam_px := cam * float(TILE)
 	_celestial.position = Vector2((1.0 - SKY_PARALLAX_X) * cam_px.x, cam_px.y)
+	# Слой _celestial едет с параллаксом SKY_PARALLAX_X; светилам возвращаем экранные координаты дуги
+	# и добавляем лёгкий дрейф при ходьбе — одной позицией, без перерисовки.
+	var cam_mid: float = float(WorldGen.GARDEN_X_MIN + WorldGen.WIDTH) * 0.5 * float(TILE) - _screen_w_px * 0.5
+	var drift: float = -CELESTIAL_DRIFT * (cam_px.x - cam_mid)
+	_bodies.position = Vector2(SKY_PARALLAX_X * cam_px.x + drift, 0.0)
 	_fx.position = cam_px
-	if cam_px != _cam_px:
-		_cam_px = cam_px
-		_set_u("cam_px", cam_px)
-		_place_celestial()
+	_cam_px = cam_px
+	_set_u("cam_px", cam_px)
+	_set_u("body_shift", drift)
 
 
 func _process(delta: float) -> void:
@@ -265,11 +280,7 @@ func _tri(day: Color, dusk: Color, night: Color, p: float) -> Color:
 
 ## Дуга: x идёт от X_RISE к X_SET ширины экрана, y — синус высоты от горизонта (за лесом) к зениту.
 func _arc(u: float, y_horizon: float, y_apex: float) -> Vector2:
-	var drift: float = 0.0
-	if not _mode_scene:
-		var cam_mid: float = float(WorldGen.GARDEN_X_MIN + WorldGen.WIDTH) * 0.5 * float(TILE) - _screen_w_px * 0.5
-		drift = -CELESTIAL_DRIFT * (_cam_px.x - cam_mid)
-	var x: float = _screen_w_px * lerpf(ARC_X_RISE, ARC_X_SET, u) + drift
+	var x: float = _screen_w_px * lerpf(ARC_X_RISE, ARC_X_SET, u)
 	var y: float = y_horizon - (y_horizon - y_apex) * pow(maxf(sin(PI * u), 0.0), ARC_FLATNESS)
 	return Vector2(x, y)
 
@@ -318,8 +329,8 @@ func _place_celestial() -> void:
 		if _moon_alt >= 0.0:
 			lit = _day_cycle.moon_illumination() * smoothstep(0.0, 0.25, _moon_alt)
 		_clouds_view.set_moon_light(_moon_screen, lit)
-	if _celestial != null:
-		_celestial.queue_redraw()
+	if _bodies != null:
+		_bodies.queue_redraw()
 
 
 func _draw_quad() -> void:
@@ -333,13 +344,6 @@ func _draw_quad() -> void:
 	_quad.draw_rect(rect, COLOR_DAY if _mat == null else Color.WHITE, true)
 
 
-## Локальный x слоя _celestial для экранного x: слой сам едет с параллаксом SKY_PARALLAX_X, компенсируем его.
-func _celestial_local_x(screen_x: float) -> float:
-	if _mode_scene:
-		return screen_x
-	return screen_x + SKY_PARALLAX_X * _cam_px.x
-
-
 func _draw_celestial() -> void:
 	if _day_cycle == null:
 		return
@@ -350,31 +354,31 @@ func _draw_celestial() -> void:
 
 
 func _draw_sun() -> void:
-	var pos := Vector2(_celestial_local_x(_sun_screen.x), _sun_screen.y)
+	var pos := _sun_screen
 	var low := 1.0 - smoothstep(0.0, 0.5, _sun_alt)
 	# Низкое солнце крупнее и краснее — ровно то, что видно на закате.
-	var k: float = 1.0 + 0.16 * low
+	var k: float = SUN_SCALE * (1.0 + 0.16 * low)
 	var tint := Color(1.0, 1.0, 1.0).lerp(Color(1.0, 0.66, 0.46), low)
 	if _tex_sun != null:
 		var w: float = _tex_sun.get_width() / ART_SCALE_TEX * k
 		var h: float = _tex_sun.get_height() / ART_SCALE_TEX * k
-		_celestial.draw_texture_rect(_tex_sun, Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h)), false, tint)
+		_bodies.draw_texture_rect(_tex_sun, Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h)), false, tint)
 	else:
-		_celestial.draw_circle(pos, 11.0 * k, Color8(0xFF, 0xD9, 0x6B))
+		_bodies.draw_circle(pos, 11.0 * k, Color8(0xFF, 0xD9, 0x6B))
 
 
 func _draw_moon() -> void:
-	var pos := Vector2(_celestial_local_x(_moon_screen.x), _moon_screen.y)
+	var pos := _moon_screen
 	if _tex_moon == null:
-		_celestial.draw_circle(pos, 17.0, Color8(0xE9, 0xEE, 0xF4))
+		_bodies.draw_circle(pos, 17.0, Color8(0xE9, 0xEE, 0xF4))
 		return
 	var size: float = MOON_FRAME_PX / ART_SCALE_TEX
 	var src := Rect2(float(_moon_phase) * MOON_FRAME_PX, 0.0, MOON_FRAME_PX, MOON_FRAME_PX)
 	# Лёгкий наклон: к рассвету серп разворачивается вслед за уходящим вниз солнцем.
 	var tilt: float = lerpf(0.5, -0.5, clampf(_moon_u, 0.0, 1.0))
-	_celestial.draw_set_transform(pos, tilt, Vector2.ONE)
-	_celestial.draw_texture_rect_region(_tex_moon, Rect2(Vector2(-size, -size) * 0.5, Vector2(size, size)), src)
-	_celestial.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_bodies.draw_set_transform(pos, tilt, Vector2.ONE)
+	_bodies.draw_texture_rect_region(_tex_moon, Rect2(Vector2(-size, -size) * 0.5, Vector2(size, size)), src)
+	_bodies.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 # ---------------------------------------------------------------------------

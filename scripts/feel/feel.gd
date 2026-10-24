@@ -10,6 +10,7 @@ const CONFIG_PATH := "res://data/feel.json"
 static var _cfg: Dictionary = {}
 static var _cfg_loaded: bool = false
 static var _num_cache: Dictionary = {}   # путь → число: num() зовут каждый кадр, обход словаря с split() там лишний
+static var _profile_cache: Dictionary = {}   # id инструмента → профиль ощущения (зовут каждый кадр копки)
 
 
 static func config() -> Dictionary:
@@ -51,6 +52,7 @@ static func num(path: String, default: float) -> float:
 ## Сбросить кэш чисел (тесты, подменяющие config()).
 static func clear_cache() -> void:
 	_num_cache.clear()
+	_profile_cache.clear()
 
 
 static func flag(path: String, default: bool) -> bool:
@@ -66,6 +68,8 @@ static func flag(path: String, default: bool) -> bool:
 ## микро-тряска). Лопата → мягко и редко, кирка → резко, бур → дробь, бурмобиль →
 ## низкий гул. Неизвестный инструмент → кирка.
 static func tool_profile(tool_id: String) -> Dictionary:
+	if _profile_cache.has(tool_id):
+		return _profile_cache[tool_id]
 	var key := "pickaxe"
 	if tool_id == "shovel":
 		key = "shovel"
@@ -79,6 +83,7 @@ static func tool_profile(tool_id: String) -> Dictionary:
 		for k in out.keys():
 			if p.has(k):
 				out[k] = float(p[k])
+	_profile_cache[tool_id] = out
 	return out
 
 

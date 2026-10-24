@@ -79,6 +79,8 @@ var goal_name := ""               # пусто — без стратегии (к
 var G: Dictionary = {}
 var _char_given := false
 var _skip_onb := false
+var _cp_sec := 0.0                # сейв-«снимок» каждые N игровых секунд (для снимков рендером утром)
+var _next_cp := 0.0
 var _flush_sec := 600.0           # телеметрия на диск каждые N игровых секунд (ночной прогон не теряет итог)
 var _next_flush := 600.0
 var _metric_best := -1.0
@@ -175,6 +177,8 @@ func _ready() -> void:
 			goal_name = a.substr(7)
 		elif a == "--skip-onboarding":
 			_skip_onb = true
+		elif a.begins_with("--checkpoint="):
+			_cp_sec = float(a.substr(13)) * 60.0
 		elif a.begins_with("--flush="):
 			_flush_sec = float(a.substr(8)) * 60.0
 		elif a.begins_with("--out="):
@@ -265,6 +269,7 @@ func _run() -> void:
 
 	_coins_seen = GameState.coins
 	_next_flush = _flush_sec
+	_next_cp = _cp_sec if _cp_sec > 0.0 else INF
 	if _resume and StoryState.is_seen("robert"):
 		T.mark("resumed", _sim)
 		T.meta["resumed_from"] = {"max_depth": GameState.max_depth_reached, "coins": GameState.coins, "tool": GameState.current_tool}
@@ -1649,6 +1654,9 @@ func _home_visit() -> void:
 	if _stop or not GameState.house_is_indoors:
 		return
 	await _go_room("hall")
+	if _sim >= _next_cp and not _stop:
+		_next_cp = _sim + _cp_sec
+		_checkpoint()
 	if _sim >= _next_session and not _stop:
 		await _session_restart()
 		return   # новая сессия начинается у дома снаружи — дальше решает основной цикл
@@ -2103,6 +2111,25 @@ func _eat_tracked(id: String, where: String) -> void:
 		"hp_gain": snappedf(GameState.hp - hp0, 0.1)})
 
 
+## Копия сейва в <out>/cp_<минута>/xdg/… — с неё ночной сценарий снимает кадры настоящим рендером
+## (tools/bot_night.sh → RESUME=… SHOTS=1). Структура повторяет XDG_DATA_HOME.
+func _checkpoint() -> void:
+	SaveSystem.save_game()
+	var ud := OS.get_user_data_dir()
+	var xdg := OS.get_environment("XDG_DATA_HOME")
+	if xdg.is_empty() or not ud.begins_with(xdg):
+		return
+	var dst := _out.path_join("cp_%04d" % int(_sim / 60.0)).path_join("xdg") + ud.substr(xdg.length())
+	DirAccess.make_dir_recursive_absolute(dst)
+	var d := DirAccess.open(ud)
+	if d == null:
+		return
+	for f in d.get_files():
+		if f.ends_with(".json") or f.ends_with(".bak") or f.ends_with(".cfg"):
+			DirAccess.copy_absolute(ud.path_join(f), dst.path_join(f))
+	T.event(_sim, "checkpoint", "сейв для снимков: глубина %d" % GameState.max_depth_reached, false)
+
+
 ## «Закрыл игру и вернулся завтра»: сейв, освобождение main.tscn, мета-часы на сутки
 ## вперёд (ежедневная награда и задания), новая main.tscn с загрузкой. Прогресс обязан
 ## пережить это без потерь — иначе P0.
@@ -2241,15 +2268,29 @@ func _goal_tick() -> void:
 	T.goal_curve.append([snappedf(_sim, 0.1), snappedf(m, 0.1)])
 
 
+## Очки — по приоритету стратегии: первая не прокачанная до конца ветка, если по карману; если
+## дороже, чем есть, но копится за пару уровней, — копим (не тратим на младшую); если ветку не даёт
+## требование (новое дерево навыков) — следующая.
 func _spend_skills() -> void:
 	var guard := 0
 	while GameState.skill_points_available > 0 and guard < 40:
 		guard += 1
 		var spent := false
 		for b in C["skills"]:
+			var br := Balance.get_upgrade_branch(String(b))
+			if br.is_empty() or GameState.get_skill_stage(String(b)) >= int(br.get("stages", 0)):
+				continue
+			var cost := Balance.get_upgrade_stage_cost(String(b), GameState.get_skill_stage(String(b)) + 1)
+			if cost < 0:
+				continue
+			if GameState.skill_points_available < cost:
+				if cost <= GameState.skill_points_available + 3:
+					break   # копим на приоритетную
+				continue
 			if GameState.spend_skill_point(String(b)):
 				T.event(_sim, "skill", String(b), false)
 				T.mark("first_skill", _sim)
+				T.mark("skill:" + String(b), _sim)
 				spent = true
 				break
 		if not spent:

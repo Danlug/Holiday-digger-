@@ -70,6 +70,7 @@ run_one() {
 	[ -n "${INPUT:-}" ] && args+=(--input="$INPUT")
 	[ "${FAST:-0}" = 1 ] && args+=(--skip-onboarding)
 	[ -n "${FLUSH:-}" ] && args+=(--flush="$FLUSH")
+	[ -n "${CP:-}" ] && args+=(--checkpoint="$CP")
 	case "$char" in deep|achiever|tycoon|collector|fighter)
 		args=("${args[@]/--char=$char/--goal=$char}") ;; esac
 	[ -n "${GOAL:-}" ] && args+=(--goal="$GOAL")
@@ -80,7 +81,7 @@ run_one() {
 	python3 tools/bot_report.py "$out" >/dev/null 2>&1 || echo "bot_report.py упал на $out" >"$out/summary.txt"
 }
 export -f run_one
-export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL
+export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL CP
 
 if [ "$SEED" = all ]; then
 	jobs=()

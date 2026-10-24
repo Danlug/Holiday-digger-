@@ -72,7 +72,9 @@ func _fresh() -> void:
 	GameState.drill_rig_tier = 0
 	GameState.debug_free_shop = false
 	GameState.house_is_indoors = true
-	GameState.house_room = "workshop"
+	# Витрина тут — магазин у входной двери: покупки возможны только в прихожей
+	# (ГДД §15, ShopService.can_buy; раньше тест стоял в мастерской, а покупки шли откуда угодно).
+	GameState.house_room = "hall"
 	GameState.ad_daily_counts.clear()
 	GameState.house_free_orders_used_today = 0
 	ShopCatalog.reload()

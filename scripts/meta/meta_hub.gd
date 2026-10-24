@@ -287,7 +287,7 @@ func _build_tasks() -> void:
 		lock.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		_vbox.add_child(lock)
 		return
-	_vbox.add_child(_section_head("calendar", "Ежедневные", "Новые задания каждый день в 00:00 UTC. Справа — время до обновления.", "day"))
+	_vbox.add_child(_section_head("calendar", "Ежедневные", "Новые задания каждый день в полночь. Справа — время до обновления.", "day"))
 	for q in daily:
 		_vbox.add_child(_quest_card(q))
 	_vbox.add_child(_bonus_card())

@@ -1,6 +1,7 @@
 class_name MetaAds
 extends RefCounted
-## «×2» за rewarded-ролик на ежедневной награде и заданиях.
+## Rewarded-ролики мета-слоя: «×2» на ежедневной награде и заданиях, замена
+## задания дня сверх бесплатной.
 ##
 ## Лимиты — по существующей схеме: Balance.get_ad_daily_limit(id) читает
 ## data/balance.json -> ads.daily_limits, использования копит
@@ -15,6 +16,7 @@ extends RefCounted
 
 const DAILY := "daily_reward_double"
 const QUEST := "quest_reward_double"
+const REROLL := "quest_reroll"
 
 
 static func limit(placement: String) -> int:
@@ -27,6 +29,9 @@ static func limit(placement: String) -> int:
 	var q: Dictionary = MetaData.quests().get("ad_double", {})
 	if String(q.get("placement", "")) == placement:
 		return int(q.get("daily_limit", 0))
+	var rr: Dictionary = MetaData.quests().get("daily", {}).get("reroll", {})
+	if String(rr.get("ad_placement", "")) == placement:
+		return int(rr.get("ad_daily_limit", 0))
 	return 0
 
 

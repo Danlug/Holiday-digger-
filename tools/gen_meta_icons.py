@@ -485,6 +485,82 @@ def g_ad(img):
     return img
 
 
+# ------------------------------------------- ежедневные задания (ветка daily-tasks)
+
+@icon
+def g_spend(img):
+    """«Потрать монеты»: развязанный кошель, из которого вылетают монеты."""
+    poly(img, [(7, 17), (11, 13), (21, 13), (25, 17), (27, 24), (24, 29), (8, 29), (5, 24)], C("soil_warm"))
+    poly(img, [(7, 17), (11, 13), (14, 13), (11, 20), (10, 29), (8, 29), (5, 24)], shade(C("soil_warm"), 1.18))
+    poly(img, [(22, 15), (25, 17), (27, 24), (24, 29), (20, 29)], C("soil_shadow"))
+    rect(img, 10, 12, 22, 14, C("soil_shadow"))
+    line(img, [(12, 12), (9, 9)], C("parchment_border"), 1)
+    line(img, [(20, 12), (23, 9)], C("parchment_border"), 1)
+    for cx, cy in ((12, 7), (19, 4), (25, 9)):
+        ell(img, cx, cy, 3, 2, shade(C("coin"), 0.75))
+        ell(img, cx, cy - 1, 3, 2, C("coin"))
+        dot(img, cx - 1, cy - 2, C("coin_light"))
+    rect(img, 14, 20, 18, 22, C("coin"))
+    return img
+
+
+@icon
+def g_reroll(img):
+    """Замена задания: две стрелки по кругу."""
+    import math
+    col, dark = C("diamond_base"), shade(C("diamond_base"), 0.7)
+    for a0, a1 in ((200, 340), (20, 160)):
+        pts = []
+        for i in range(13):
+            a = math.radians(a0 + (a1 - a0) * i / 12)
+            pts.append((16 + 10 * math.cos(a), 16 + 10 * math.sin(a)))
+        line(img, pts, dark, 4)
+        line(img, pts, col, 2)
+    poly(img, [(23, 5), (29, 12), (21, 13)], col)
+    poly(img, [(9, 27), (3, 20), (11, 19)], col)
+    return img
+
+
+@icon
+def g_tasks(img):
+    """Кнопка ежедневных заданий на экране: дощечка со списком и звезда дня."""
+    g_clipboard(img)
+    rect(img, 11, 22, 12, 23, C("parchment_border"))
+    cx, cy, ro, ri = 24, 8, 7.5, 3.2
+    import math
+    pts = []
+    for i in range(10):
+        a = -math.pi / 2 + i * math.pi / 5
+        r = ro if i % 2 == 0 else ri
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    poly(img, pts, C("gold_base"))
+    poly(img, [pts[0], pts[1], (cx, cy), pts[9]], C("gold_light"))
+    return img
+
+
+@icon
+def g_chest_open(img):
+    """Сундук дня готов: крышка откинута, внутри золото и свет."""
+    poly(img, [(5, 3), (27, 3), (28, 10), (4, 10)], shade(C("wood"), 1.2))
+    rect(img, 5, 3, 27, 4, C("wood_dark"))
+    for x in (9, 21):
+        rect(img, x, 3, x + 2, 10, C("iron_tool"))
+    rect(img, 4, 11, 28, 14, C("gold_light"))
+    ell(img, 10, 13, 4, 2, C("coin"))
+    ell(img, 21, 12, 4, 2, C("coin"))
+    ell(img, 16, 11, 3, 2, C("coin_light"))
+    rect(img, 4, 15, 28, 28, C("wood"))
+    rect(img, 4, 15, 28, 17, C("wood_dark"))
+    for x in (8, 22):
+        rect(img, x, 15, x + 2, 28, C("iron_tool"))
+    rect(img, 4, 26, 28, 28, C("wood_dark"))
+    rect(img, 13, 17, 19, 22, C("gold_base"))
+    rect(img, 15, 18, 17, 20, C("hair"))
+    sparkle(img, 6, 7, C("gold_light"))
+    sparkle(img, 27, 13)
+    return img
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     for name, fn in ICONS.items():

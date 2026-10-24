@@ -22,6 +22,7 @@ extends Node
 
 const Telemetry := preload("res://tests/bot/bot_telemetry.gd")
 const Nav := preload("res://tests/bot/bot_nav.gd")
+const Stick := preload("res://tests/bot/bot_stick.gd")
 
 const CHARS := {
 	# ret_* — когда возвращаться домой; side — на сколько клеток в сторону идти за видимой
@@ -48,7 +49,8 @@ const SAMPLE_SEC := 30.0
 
 var T = Telemetry.new()
 var nav = Nav.new()
-var bot := BotPlayer.new()
+var bot: BotPlayer = BotPlayer.new()
+var _input_mode := "keys"         # keys — WASD; stick — экранный джойстик пальцем (tests/bot/bot_stick.gd)
 var C: Dictionary = {}
 var char_name := "cautious"
 var main: Node2D
@@ -133,6 +135,8 @@ func _ready() -> void:
 			_shots_on = true
 		elif a == "--short":
 			_short = true
+		elif a.begins_with("--input="):
+			_input_mode = a.substr(8)
 		elif a == "--resume":
 			_resume = true
 		elif a.begins_with("--wall="):
@@ -180,9 +184,12 @@ func _run() -> void:
 		return
 	nav.world = world
 	nav.dig_cost = _nav_dig_cost
+	if _input_mode == "stick":
+		Settings.control_mode = "stick"
+		bot = Stick.new(hud)
 	_end = _minutes * 60.0
 	_next_session = _session_min * 60.0 if _session_min > 0.0 else INF
-	T.meta = {"seed": _seed, "character": char_name, "minutes_target": _minutes, "short": _short,
+	T.meta = {"seed": _seed, "character": char_name, "input": _input_mode, "minutes_target": _minutes, "short": _short,
 		"build": _build_label(), "fixed_fps_hint": "--fixed-fps 31", "started_utc": Time.get_datetime_string_from_system(true)}
 	_connect_signals()
 	_last_us = Time.get_ticks_usec()
@@ -319,6 +326,12 @@ func _step() -> void:
 	_resume_us = _last_us
 
 
+## Тап в координатах вьюпорта: BotPlayer.tap шлёт событие как есть, а движок считает его
+## координатами окна (headless — 64×64) — переводим, иначе тап по цели катсцены мажет.
+func _tap(pos: Vector2) -> void:
+	bot.tap(get_viewport().get_final_transform() * pos)
+
+
 func _frames_n(n: int) -> void:
 	for _i in range(n):
 		await _step()
@@ -379,7 +392,7 @@ func _auto_story() -> void:
 	if not playing:
 		return
 	var text := String(cs._line.text) if cs._line != null else ""
-	if not text.is_empty():
+	if not text.is_empty() and not bool(cs._typing):   # только допечатанные реплики
 		T.add_line(sid, text)
 	if _sim - _last_tap < float(C["tap"]):
 		return
@@ -393,13 +406,13 @@ func _auto_story() -> void:
 	if bool(C["skip"]) and skip != null and skip.visible and skip.is_visible_in_tree() and _skip_tries < 6:
 		_skip_tries += 1
 		var c := skip.get_global_rect().get_center()
-		bot.tap(c)
-		bot.tap(c)
+		_tap(c)
+		_tap(c)
 		return
 	if cs._tap_target != null and cs._tap_target.visible:
-		bot.tap(cs._tap_target.get_global_rect().get_center())
+		_tap(cs._tap_target.get_global_rect().get_center())
 	else:
-		bot.tap(Vector2(112.0, 300.0))
+		_tap(Vector2(112.0, 300.0))
 
 
 ## Окна, которые всплывают сами и держат героя: человек их закрывает, бот тоже — и меряет,
@@ -1707,6 +1720,9 @@ func _session_restart() -> void:
 	house = HouseSystem.instance
 	nav.world = world
 	_death_card = null
+	if bot is Stick:
+		bot.release_all()
+		bot.hud = hud
 	_connect_player()
 	var after := {"coins": GameState.coins, "max_depth": GameState.max_depth_reached, "tool": GameState.current_tool,
 		"gear": GameState.current_gear, "level": GameState.level, "artifacts": GameState.collected_artifacts.size(),
@@ -1789,6 +1805,7 @@ static func _has_static(s: Script, method: String) -> bool:
 # ---------------------------------------------------------------------------
 
 func _final_checks() -> void:
+	_check_lines()
 	if _sim < 60.0:
 		return
 	# Чего так и не случилось из ожидаемого за эту длину.
@@ -1830,6 +1847,28 @@ func _final_checks() -> void:
 	T.meta["coins_on_food"] = spent_food
 	if earned > 0 and spent_food > earned * 0.25:
 		T.finding("P2", "food_cost", "еда съела %d%% дохода" % int(100.0 * spent_food / earned), _sim)
+
+
+## Реплики катсцен, которые бот видел: сырые ключи перевода, подстановки, мусор.
+func _check_lines() -> void:
+	var raw := RegEx.new()
+	raw.compile("^[a-z0-9_]+\\.[a-z0-9_.]+$")
+	var latin := RegEx.new()
+	latin.compile("[A-Za-z]{4,}")
+	for sid in T.lines.keys():
+		for line in T.lines[sid]:
+			var t := String(line)
+			var why := ""
+			if raw.search(t) != null:
+				why = "сырой ключ перевода"
+			elif t.contains("%s") or t.contains("%d") or t.contains("{") or t.contains("}"):
+				why = "неподставленный шаблон"
+			elif t.contains("  ") or t.begins_with(" ") or t.ends_with(" "):
+				why = "лишние пробелы"
+			elif latin.search(t) != null and not t.contains("SOS"):
+				why = "латиница в русской реплике"
+			if why != "":
+				T.finding("P3", "story_text", "%s: «%s» (сцена %s)" % [why, t.left(80), sid], _sim, {}, t.left(40))
 
 
 func _stop_early() -> bool:

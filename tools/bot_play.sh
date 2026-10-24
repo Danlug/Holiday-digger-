@@ -9,6 +9,7 @@
 #   OUT=/каталог JOBS=3 WALL=1800 tools/bot_play.sh ...
 #   SESSION=60 tools/bot_play.sh 7 240     # каждые 60 игровых минут «закрыл игру, вернулся завтра»
 #                                          # (сейв → новая main.tscn → загрузка, мета-сутки +1)
+#   INPUT=stick tools/bot_play.sh 7 30       # управлять экранным джойстиком (мышь как палец), не WASD
 #   TRACE=5 tools/bot_play.sh ...           # строка состояния в лог каждые 5 игровых секунд
 #   RESUME=build/bot/<метка>/s7_greedy SHOTS=1 tools/bot_play.sh 7 10 greedy
 #                                          # продолжить с сейва прошлого прогона (снимки глубины)
@@ -63,6 +64,7 @@ run_one() {
 	[ -n "${TRACE:-}" ] && args+=(--trace="$TRACE")
 	[ -n "${SESSION:-}" ] && args+=(--session="$SESSION")
 	[ -n "${RESUME:-}" ] && args+=(--resume)
+	[ -n "${INPUT:-}" ] && args+=(--input="$INPUT")
 	[ "${SHOTS}" = 1 ] && args+=(--shots)
 	timeout $(( WALL + 120 )) "${runner[@]}" "$GODOT" "${extra[@]}" --fixed-fps 31 --path . \
 		res://tests/bot_play.tscn -- "${args[@]}" >"$out/log.txt" 2>&1
@@ -70,7 +72,7 @@ run_one() {
 	python3 tools/bot_report.py "$out" >/dev/null 2>&1 || echo "bot_report.py упал на $out" >"$out/summary.txt"
 }
 export -f run_one
-export GODOT SHOTS WALL TRACE SESSION RESUME
+export GODOT SHOTS WALL TRACE SESSION RESUME INPUT
 
 if [ "$SEED" = all ]; then
 	jobs=()

@@ -144,14 +144,13 @@ func _death() -> void:
 	GameState.level = 12
 	GameState.max_depth_reached = 640
 	GameState.player_depth = 410
-	StoryState.set_flag("gold_sold", true)
+	# флаг gold_sold не ставим: он включает мета-слой, и окно дня ляжет поверх карточки (open() флаг не проверяет)
 	var rep := DeathCard.build_report(GameState.inventory.duplicate(), 410, "fall")
 	var card: DeathCard = main.get_node("FeelDirector").card
 	card.open(rep)
 	await _frames(14)
 	await _shot("death_card")
 	card.close()
-	StoryState.set_flag("gold_sold", false)
 
 
 func _walk() -> void:

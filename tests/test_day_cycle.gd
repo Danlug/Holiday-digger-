@@ -1,6 +1,6 @@
 extends Node
 ## test_day_cycle — проверка автозагрузки DayCycle (scripts/core/day_cycle.gd)
-## и звёздного атласа (art/env/stars.png, см. tools/import_stars.py).
+## и слоёв звёзд неба (art/env/sky/*, см. tools/gen_sky.py; подробные проверки неба — tests/test_sky.gd).
 ##
 ## Запускается СЦЕНОЙ (обращается к автозагрузкам GameState/DayCycle, а в
 ## режиме --script их нет, см. docs/BUILD.md и tests/test_house.gd):
@@ -167,28 +167,17 @@ func _test_grade_and_sky_and_stars_and_sun_moon() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Атлас звёзд
+# Графика звёздного неба
 # ---------------------------------------------------------------------------
 
 func _test_star_atlas() -> void:
-	check("атлас art/env/stars.png существует", ResourceLoader.exists("res://art/env/stars.png"))
-	check("метаданные art/env/stars.json существуют",
-		FileAccess.file_exists("res://art/env/stars.json"))
-	if not FileAccess.file_exists("res://art/env/stars.json"):
-		return
-	var f := FileAccess.open("res://art/env/stars.json", FileAccess.READ)
-	var parsed = JSON.parse_string(f.get_as_text())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		check("stars.json — валидный JSON-словарь", false)
-		return
-	var regions: Array = parsed.get("regions", [])
-	check("в атласе минимум 15 звёзд (%d)" % regions.size(), regions.size() >= 15)
-	var all_small := true
-	for r in regions:
-		if int(r.get("w", 0)) > 21 or int(r.get("h", 0)) > 21:
-			all_small = false
-			break
-	check("каждый регион звезды ≤ 21 px по стороне", all_small)
+	# Прежний атлас спрайтов-заплаток (art/env/stars.png + stars.json) заменён тремя слоями-тайлами:
+	# звёзды рисуются шейдером из текстур art/env/sky/stars_{far,mid,near}.png (tools/gen_sky.py).
+	for layer in ["far", "mid", "near"]:
+		check("слой звёзд %s существует" % layer, ResourceLoader.exists("res://art/env/sky/stars_%s.png" % layer))
+	check("Млечный Путь существует", ResourceLoader.exists("res://art/env/sky/milkyway.png"))
+	check("метаданные неба art/env/sky/sky.json существуют", FileAccess.file_exists("res://art/env/sky/sky.json"))
+	check("атлас фаз луны art/env/moon.png существует", ResourceLoader.exists("res://art/env/moon.png"))
 
 
 # ---------------------------------------------------------------------------
@@ -196,12 +185,18 @@ func _test_star_atlas() -> void:
 # ---------------------------------------------------------------------------
 
 func _test_star_async_phases() -> void:
+	# Мерцание считает шейдер из фазы текселя (канал G): у звёзд слоя должно быть много РАЗНЫХ фаз.
+	var img := Image.load_from_file(ProjectSettings.globalize_path("res://art/env/sky/stars_mid.png"))
+	var phases: Dictionary = {}
+	if img != null and not img.is_empty():
+		for y in range(0, img.get_height(), 2):
+			for x in range(0, img.get_width(), 2):
+				var px := img.get_pixel(x, y)
+				if px.r > 0.0:
+					phases[int(px.g * 255.0)] = true
+	check("у звёзд слоя много разных фаз мерцания (%d)" % phases.size(), phases.size() > 40)
 	var sky := preload("res://scripts/world/sky_view.gd").new()
 	add_child(sky)
 	sky.set_scene_rect(224.0, 300.0, 0.0)
-	check("SkyView заспавнил звёзды", sky.debug_star_count() > 0)
-	if sky.debug_star_count() >= 2:
-		var t0: float = sky.debug_star_timer(0)
-		var t1: float = sky.debug_star_timer(1)
-		check("у двух звёзд разные фазовые сдвиги (не синхронны)", absf(t0 - t1) > 0.01)
+	check("SkyView знает число звёзд в слоях", sky.debug_star_count() > 0)
 	sky.queue_free()

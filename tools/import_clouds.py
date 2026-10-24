@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""import_clouds.py — вырезает облака, солнце и месяц из одного исходника.
+"""import_clouds.py — вырезает облака и солнце из одного исходника.
+
+ВНИМАНИЕ: месяц отсюда больше не вырезается. Его бокс _MOON_BOX захватывал звёздочки рядом с серпом, а ключ
+фона по JPEG оставлял светлую кайму — так получался «мусор вокруг месяца». Луна (8 фаз) и звёзды рисуются
+с нуля скриптом tools/gen_sky.py. У солнца та же кайма была россыпью точек вокруг лучей — теперь после
+ключа остаётся только самая большая связная фигура (_keep_largest).
 
 Источник: art/_source/sky_clouds_sun_moon_sheet.jpg (1024×521). Разметка
 листа (см. отчёт агента, найдено программно по цвету фона):
@@ -9,7 +14,7 @@
   * Справа снизу — прямоугольная плашка (463,262)-(1024,521) на ЧУТЬ более
     светлом голубом (167,223,250): в ней солнце, месяц (со звёздочками
     рядом — свой фон, органично, не отделяем) и маленький квадрат-образец
-    со звёздами (тот достаётся отдельно, см. tools/import_stars.py —
+    со звёздами (больше не вырезается: звёзды рисует tools/gen_sky.py —
     квадрат не облако и не светило).
   * Подпись «1 2 3 4 5» — внутри той же плашки, под месяцем/квадратом;
     вырезается по bbox плашки и в атлас не попадает (мы берём только
@@ -19,7 +24,7 @@
 import_backdrops.py::cut_sky (там нужна связность от кромки листа из-за
 залезающего в кадр неба с обеих сторон гор): здесь порог по расстоянию до
 эталонного цвета фона с мягким рэмпом на кромке (тот же приём, что в
-import_stars.py::_alpha_and_color, векторно и с двумя разными фонами).
+удалённом import_stars.py, векторно и с двумя разными фонами).
 БЕЗ гауссова размытия альфы (в отличие от cut_sky): tools/import_art.py:
 shrink() считает пиксель «непрозрачным» уже при alpha>0 (см. её `if a:` —
 это дешёвый coverage-трюк для персонажей с изначально жёсткой альфой), и
@@ -32,7 +37,7 @@ _tight_alpha_bbox() в кадр попадает весь прямоугольн
 Результат:
   art/env/clouds/cloud_1.png … cloud_12.png — по одному облаку на файл,
     RGBA, без квантования палитры (см. tools/import_art.py::shrink).
-  art/env/sun.png, art/env/moon.png — то же самое для светил.
+  art/env/sun.png — то же самое для солнца (art/env/moon.png делает tools/gen_sky.py).
 
 Бокс-координаты подобраны вручную по связным компонентам исходника (see
 _CLOUD_BOXES/_SUN_BOX/_MOON_BOX) — лист не меняется между запусками,
@@ -116,6 +121,40 @@ def _cut(rgb: np.ndarray, ref: np.ndarray) -> np.ndarray:
     return np.dstack([rgb, alpha])
 
 
+def _keep_largest(rgba: np.ndarray, floor: int = 24) -> np.ndarray:
+    """Оставляет только самую большую связную фигуру (8-связность по альфе > floor), остальное — прозрачно.
+    Ключ фона по JPEG даёт вокруг фигуры одиночные светлые точки; они не часть рисунка."""
+    h, w = rgba.shape[:2]
+    mask = rgba[..., 3] > floor
+    label = np.zeros((h, w), np.int32)
+    sizes = {}
+    n = 0
+    for y0 in range(h):
+        for x0 in range(w):
+            if not mask[y0, x0] or label[y0, x0]:
+                continue
+            n += 1
+            stack = [(y0, x0)]
+            label[y0, x0] = n
+            count = 0
+            while stack:
+                y, x = stack.pop()
+                count += 1
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        ny, nx = y + dy, x + dx
+                        if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not label[ny, nx]:
+                            label[ny, nx] = n
+                            stack.append((ny, nx))
+            sizes[n] = count
+    if not sizes:
+        return rgba
+    keep = max(sizes, key=sizes.get)
+    out = rgba.copy()
+    out[label != keep, 3] = 0
+    return out
+
+
 def _crop_box(im: Image.Image, box, pad: int) -> Image.Image:
     w, h = im.size
     x0, y0, x1, y1 = box
@@ -135,7 +174,8 @@ def _tight_alpha_bbox(rgba: Image.Image) -> Image.Image:
 
 
 def _save_shape(name: str, im_source: Image.Image, box, ref: np.ndarray,
-                 target_logical_w: int, out_path: str, report: list, pad: int = PAD) -> None:
+                 target_logical_w: int, out_path: str, report: list, pad: int = PAD,
+                 single_shape: bool = False) -> None:
     crop = _crop_box(im_source, box, pad)
     rgb = np.asarray(crop.convert("RGB")).astype(np.uint8)
     rgba_arr = _cut(rgb, ref)
@@ -152,6 +192,8 @@ def _save_shape(name: str, im_source: Image.Image, box, ref: np.ndarray,
             f"— эталон ref={ref.tolist()} не совпадает с настоящим фоном под этой "
             f"фигурой; проверь bbox/эталон в _CLOUD_BOXES/_SUN_BOX/_MOON_BOX")
 
+    if single_shape:
+        rgba_arr = _keep_largest(rgba_arr)
     cut = Image.fromarray(rgba_arr, "RGBA")
     cut = _tight_alpha_bbox(cut)
 
@@ -180,9 +222,7 @@ def main() -> None:
         _save_shape(name, im, box, SKY_BG, target_w, out_path, report, pad)
 
     _save_shape("sun", im, _SUN_BOX, SUN_BG, SUN_LOGICAL_W,
-                os.path.join(OUT_ENV_DIR, "sun.png"), report, _SUN_PAD)
-    _save_shape("moon", im, _MOON_BOX, MOON_BG, MOON_LOGICAL_W,
-                os.path.join(OUT_ENV_DIR, "moon.png"), report, _MOON_PAD)
+                os.path.join(OUT_ENV_DIR, "sun.png"), report, _SUN_PAD, single_shape=True)
 
     print("\n".join(report))
     print(f"\nоблаков сохранено: {len(_CLOUD_BOXES)}")

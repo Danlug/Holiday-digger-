@@ -29,7 +29,8 @@ const SHARED := {
 	"stamina": "res://art/ui/icons/stamina.png",   # тот же рисунок, что у полоски бодрости и экрана героя
 }
 ## Предметы-награды без собственной иконки показываются значком энергии.
-const ITEM_ICON := {"energy_drink": "stamina", "energy_bar": "stamina"}
+## У энергетического батончика есть нарисованный значок с молнией (art/ui/shop/).
+const ITEM_ICON := {"energy_drink": "stamina"}
 
 static var _tex: Dictionary = {}
 
@@ -55,6 +56,8 @@ static func reward_tex(key: String, item_id: String = "") -> Texture2D:
 		"points":
 			return tex("star")
 		"item":
+			if item_id == "energy_bar":
+				return ShopArt.tex("item_energy_bar")
 			return tex(String(ITEM_ICON.get(item_id, "gift")))
 	return tex("gift")
 

@@ -33,6 +33,7 @@ var shots: Array = []
 var frame_ms: PackedFloat32Array = PackedFloat32Array()
 var spikes: Array = []
 var burned_ms := 0.0
+var bot_ms := 0.0                        # время самого бота (план, детекторы, досыпание) — вычтено из кадров
 var _interesting: Array = []             # моменты «что-то произошло» для детектора скуки
 var _trip: Dictionary = {}
 var _finding_keys: Dictionary = {}
@@ -163,7 +164,7 @@ func frame_stats() -> Dictionary:
 	return {"frames": n, "avg_ms": snappedf(sum / n, 0.01), "p50_ms": snappedf(float(arr[n / 2]), 0.01),
 		"p95_ms": snappedf(float(arr[int(n * 0.95)]), 0.01), "p99_ms": snappedf(float(arr[int(n * 0.99)]), 0.01),
 		"max_ms": snappedf(float(arr[n - 1]), 0.01), "spikes_over_%d_ms" % int(SPIKE_MS): spikes.size(),
-		"bot_burned_real_ms": snappedf(burned_ms, 1.0)}
+		"bot_burned_real_ms": snappedf(burned_ms, 1.0), "bot_logic_ms": snappedf(bot_ms, 1.0)}
 
 
 func to_dict(end_t: float) -> Dictionary:

@@ -63,6 +63,7 @@ var _minutes := 30.0
 var _out := ""
 var _shots_on := false
 var _short := false
+var _resume := false              # продолжить с сейва в XDG_DATA_HOME (tools/bot_play.sh RESUME=…)
 var _wall_cap := 1800.0
 var _max_depth_stop := 0
 
@@ -110,6 +111,7 @@ var _session_min := 0.0           # каждые N игровых минут —
 var _next_session := 0.0
 var _sessions := 0
 var _input_lost_t := 0.0
+var _resume_us := 0
 var _next_trace := 0.0
 
 
@@ -131,6 +133,8 @@ func _ready() -> void:
 			_shots_on = true
 		elif a == "--short":
 			_short = true
+		elif a == "--resume":
+			_resume = true
 		elif a.begins_with("--wall="):
 			_wall_cap = float(a.substr(7))
 		elif a.begins_with("--session="):
@@ -158,7 +162,8 @@ func _run() -> void:
 		_seed, char_name, _minutes, str(Engine.get_frames_per_second())])
 	_wall0 = Time.get_ticks_msec()
 	_rng.seed = _seed
-	_clean_slate()
+	if not _resume:
+		_clean_slate()
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames_n(4)
@@ -181,9 +186,14 @@ func _run() -> void:
 		"build": _build_label(), "fixed_fps_hint": "--fixed-fps 31", "started_utc": Time.get_datetime_string_from_system(true)}
 	_connect_signals()
 	_last_us = Time.get_ticks_usec()
+	_resume_us = _last_us
 	_progress_t = 0.0
 
-	await _onboarding()
+	if _resume and StoryState.is_seen("robert"):
+		T.mark("resumed", _sim)
+		T.meta["resumed_from"] = {"max_depth": GameState.max_depth_reached, "coins": GameState.coins, "tool": GameState.current_tool}
+	else:
+		await _onboarding()
 	if not _stop:
 		await _free_play()
 	_finish()
@@ -236,6 +246,8 @@ func _connect_signals() -> void:
 func _finish() -> void:
 	bot.release_all()
 	var wall := (Time.get_ticks_msec() - _wall0) / 1000.0
+	if GameState.is_alive:
+		SaveSystem.save_game()   # с этого сейва можно продолжить: tools/bot_play.sh RESUME=…
 	_final_checks()
 	T.meta["sim_seconds"] = snappedf(_sim, 0.1)
 	T.meta["wall_seconds"] = snappedf(wall, 0.1)
@@ -267,10 +279,13 @@ func _finish() -> void:
 # ---------------------------------------------------------------------------
 
 func _step() -> void:
+	# Всё, что бот делал с прошлого кадра (план, детекторы, досыпание реального времени), —
+	# не время кадра игры: вычитаем. Остаток — кадр движка и скриптов игры (и соседи по CPU).
+	var bot_us := Time.get_ticks_usec() - _resume_us
 	await get_tree().process_frame
 	var now_us := Time.get_ticks_usec()
-	# досыпание бота (тяга, стан, анти-дребезг) — не время кадра игры
-	var cpu_ms := float(now_us - _last_us - _burn_us_frame) / 1000.0
+	var cpu_ms := float(now_us - _last_us - bot_us) / 1000.0
+	T.bot_ms += float(bot_us) / 1000.0
 	_last_us = now_us
 	_burn_us_frame = 0
 	_frames += 1
@@ -301,6 +316,7 @@ func _step() -> void:
 		_stop = true
 	if _sim >= _end + 600.0 and not _stop:
 		_stop = true   # страховка: свободная игра должна была кончиться раньше
+	_resume_us = _last_us
 
 
 func _frames_n(n: int) -> void:
@@ -975,11 +991,17 @@ func _descend() -> void:
 ## Тормоз тягой в свободном падении — только если до дна далеко: у самого пола зажатое
 ## «вверх» в момент касания становится прыжком, и герой скачет на месте.
 func _brake_keys() -> Array:
-	# Урона нет до высоты 5 клеток (balance.json → fall_damage), это скорость √(2·16·5) ≈ 12.6:
-	# человек падает свободно и подтормаживает у этого предела.
-	if not player.has_backpack() or player.vy <= 10.0:
+	# Урона нет до высоты 5 клеток (balance.json → fall_damage): скорость удара ≤ √(2·16·5) ≈ 12.6.
+	# Как человек: падать свободно и тормозить тягой (−26 кл/с²) так, чтобы у пола было ≤ ~12:
+	# тормозить, если без тяги удар вышел бы сильнее (v² + 2·G·зазор > 150) и до пола уже не
+	# дальше тормозного пути (v² − 100)/52 плюс запас.
+	if not player.has_backpack() or player.vy <= 8.0:
 		return []
-	return [KEY_W] if _floor_gap() >= 3 else []
+	var v: float = player.vy
+	var gap: float = float(_floor_gap()) + (float(player.cell_y()) + 1.0 - (float(player.y) + 1.0 / 3.0))
+	if v * v + 32.0 * gap > 150.0 and gap <= (v * v - 100.0) / 52.0 + 2.5:
+		return [KEY_W]
+	return []
 
 
 func _floor_gap() -> int:
@@ -1084,8 +1106,8 @@ func _mine() -> void:
 			keys = _keys_for_step(cell, path[1])
 		if not player.on_ground:
 			keys.erase(KEY_S)
-			if player.vy > 10.0 and _floor_gap() >= 3 and player.has_backpack() and not keys.has(KEY_W):
-				keys.append(KEY_W)   # долгое падение (каверна, обвал) — тормоз тягой
+			if not keys.has(KEY_W) and not _brake_keys().is_empty():
+				keys.append(KEY_W)   # падение (ствол, каверна, обвал) — тормоз тягой до безопасной скорости
 		bot.hold(keys)
 		await _step()
 	bot.release_all()

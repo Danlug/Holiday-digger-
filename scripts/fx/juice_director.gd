@@ -190,11 +190,11 @@ func _tick_player(delta: float) -> void:
 	if d != null:
 		if not _was_digging:
 			_was_digging = true
-			_next_hit = Juice.num("dig.hit_period_s", 0.38) * 0.5
+			_next_hit = Feel.hit_period(GameState.current_tool) * 0.5
 		var t: float = d["t"]
 		var total: float = d["total"]
 		if t >= _next_hit:
-			_next_hit += Juice.num("dig.hit_period_s", 0.38)
+			_next_hit += Feel.hit_period(GameState.current_tool)
 			if t < total - 0.12:
 				_dig_strike(d)
 	else:
@@ -219,7 +219,9 @@ func _dig_strike(d: Dictionary) -> void:
 	var center := Vector2(float(d["x"]) * 32.0 + 16.0, float(d["y"]) * 32.0 + 16.0)
 	var toward := (Vector2(player.x, player.y) * 32.0 - center)
 	var spot := center + (toward.normalized() * 13.0 if toward.length() > 1.0 else Vector2.ZERO)
-	Sfx.play(_dig_sound(tile), randf_range(0.9, 1.0), Juice.num("dig.hit_db", -7.0))
+	# высота и громкость удара зависят от инструмента: лопата глуше и выше, бур дробит, бурмобиль гудит
+	var prof := Feel.tool_profile(GameState.current_tool)
+	Sfx.play(_dig_sound(tile), randf_range(0.9, 1.0) * float(prof["pitch"]), float(prof["db"]))
 	_dig_burst(tile, spot, 0.4)
 
 
@@ -349,7 +351,8 @@ func _on_picked(item: String, count: int) -> void:
 	if player == null:
 		return
 	var at := _head() + Vector2(randf_range(-7.0, 7.0), randf_range(-4.0, 2.0))
-	Fx.float_icon(at, _item_icon(item), "+%d" % count, COL_RARE if rare else COL_ITEM)
+	# подряд добытое одно и то же сливается в одно «+N» (aaa-feel); старые заглушки Fx метода не знают
+	Fx.float_stack(item, at, _item_icon(item), count, COL_RARE if rare else COL_ITEM, Feel.num("loot.stack_window_s", 0.75))
 	if rare:
 		Fx.burst("spark", at, 1.0)
 

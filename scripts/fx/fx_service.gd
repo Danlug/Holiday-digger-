@@ -365,9 +365,9 @@ func _make_popup() -> Node2D:
 	return root
 
 
-func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color) -> void:
+func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color) -> Node2D:
 	if icon == null and text.is_empty():
-		return
+		return null
 	var root: Node2D
 	if not _popup_free.is_empty():
 		root = _popup_free.pop_back()
@@ -413,6 +413,35 @@ func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color) -> void:
 	tw.tween_property(root, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(root, "modulate:a", 0.0, 0.4).set_delay(0.55)
 	tw.chain().tween_callback(_recycle_popup.bind(root))
+	return root
+
+
+## «+N» со слиянием (aaa-feel): подряд добытое одно и то же (key) в окне window_s
+## складывается в одно всплывающее число, которое «подпрыгивает» при каждой
+## добавке, а не в стопку одинаковых «+1». Возвращает накопленное число.
+func float_stack(key: String, pos: Vector2, icon: Texture2D, add: int, color: Color = Color.WHITE,
+		window_s: float = 0.75) -> int:
+	var now := Time.get_ticks_msec()
+	var total := add
+	var base := pos
+	var e: Variant = _stack.get(key)
+	if typeof(e) == TYPE_DICTIONARY:
+		var old_root: Node2D = e["root"]
+		# пул мог отдать этот узел другому числу — сверяем надпись
+		if now <= int(e["until"]) and is_instance_valid(old_root) and old_root.visible \
+				and (old_root.get_node("Text") as Label).text == "+%d" % int(e["count"]):
+			total += int(e["count"])
+			base = e["base"]
+			var old_tw: Tween = _popup_tween.get(old_root)
+			if old_tw != null and old_tw.is_valid():
+				old_tw.kill()
+			_recycle_popup(old_root)
+	var root := _popup(base, icon, "+%d" % total, color)
+	_stack[key] = {"root": root, "count": total, "until": now + int(window_s * 1000.0), "base": base}
+	return total
+
+
+var _stack: Dictionary = {}   # key -> {root, count, until, base}
 
 
 func _recycle_popup(root: Node2D) -> void:

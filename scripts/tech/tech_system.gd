@@ -305,9 +305,8 @@ func _hotspot_tick() -> void:
 	if target == "" or hud == null:
 		return
 	var view_cells: Vector2i = hud.get_view_cells()
-	var cam_x: float = clampf(player.x - float(view_cells.x) / 2.0, 0.0, maxf(0.0, float(WorldGen.WIDTH - view_cells.x)))
-	var cam_y: float = maxf(player.y - float(view_cells.y) / 2.0, -float(SKY_HEIGHT))
-	var head := Vector2(player.x - cam_x, player.y - cam_y - 1.0) * TILE
+	var cam := CameraRig.for_overlay(player.x, player.y, float(view_cells.x), float(view_cells.y), SKY_HEIGHT)
+	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
 	_hot_btn.position = head - Vector2(_hot_btn.custom_minimum_size.x * 0.5, _hot_btn.custom_minimum_size.y + 4.0)
 
 

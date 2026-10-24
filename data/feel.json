@@ -1,0 +1,48 @@
+{
+	"_comment": "Числа «ощущения игры» (ветка aaa-feel): отзывчивость управления, камера, удар по породе, добыча, смерть. Владелец их не задавал — все предложения агента (proposed), подбор по ощущениям; правила ГДД они не меняют, только отклик. Читает Feel.num(путь, запасное).",
+	"controls": {
+		"coyote_s": { "value": 0.09, "proposed": true, "note": "после схода с уступа прыжок ещё можно нажать столько секунд (≈5 кадров): палец на стекле запаздывает" },
+		"jump_buffer_s": { "value": 0.12, "proposed": true, "note": "нажатие «вверх» за столько секунд до приземления не пропадает, а срабатывает на земле" },
+		"key_last_wins": { "value": true, "proposed": true, "note": "клавиатура: при зажатых A и D идёт та, что нажата позже (раньше обе гасили друг друга — герой вставал на смене направления)" }
+	},
+	"camera": {
+		"follow_tau_x_s": { "value": 0.10, "proposed": true, "note": "постоянная времени сглаживания камеры по X" },
+		"follow_tau_y_s": { "value": 0.07, "proposed": true },
+		"lead_x_cells": { "value": 0.55, "proposed": true, "note": "упреждение по взгляду героя, пока он идёт" },
+		"lead_x_tau_s": { "value": 0.30, "proposed": true },
+		"fall_look_gain": { "value": 0.10, "proposed": true, "note": "при падении камера смотрит вниз: клеток на каждую клетку/с выше порога" },
+		"fall_look_from": { "value": 6.0, "proposed": true, "note": "клеток/с, с которых начинается взгляд вниз" },
+		"fall_look_max": { "value": 3.0, "proposed": true },
+		"rise_look_gain": { "value": 0.06, "proposed": true },
+		"rise_look_max": { "value": 1.5, "proposed": true },
+		"dig_look_down": { "value": 0.6, "proposed": true, "note": "копка вниз: камера чуть вперёд по ходу шахты" },
+		"lead_y_tau_s": { "value": 0.22, "proposed": true },
+		"snap_cells": { "value": 6.0, "proposed": true, "note": "дальше этого расстояния от цели камера не плывёт, а прыгает (телепорт, респавн, сцена)" },
+		"punch_decay_s": { "value": 0.34, "proposed": true },
+		"punch_max": { "value": 0.07, "proposed": true, "note": "потолок наезда: +7% масштаба" }
+	},
+	"dig": {
+		"hitstop_min_total_s": { "value": 0.9, "proposed": true, "note": "микро-пауза только на долгой породе: на скорострельном буре она была бы помехой" },
+		"hitstop_s": { "value": 0.045, "proposed": true },
+		"hitstop_share": { "value": 0.04, "proposed": true, "note": "не больше этой доли времени самой клетки" },
+		"hitstop_credit_ttl_s": { "value": 0.35, "proposed": true, "note": "пауза засчитывается в следующую клетку, если копка продолжилась: темп копки (ГДД §5) не меняется" },
+		"crack_dark_from": { "value": 0.10, "proposed": true },
+		"crack_dark_to": { "value": 0.34, "proposed": true },
+		"tool": {
+			"shovel": { "hit_period_s": 0.42, "pitch": 1.12, "db": -8.0, "micro_shake": 0.0 },
+			"pickaxe": { "hit_period_s": 0.38, "pitch": 1.0, "db": -7.0, "micro_shake": 0.0 },
+			"hand_drill": { "hit_period_s": 0.16, "pitch": 1.25, "db": -11.0, "micro_shake": 0.8 },
+			"drill_rig": { "hit_period_s": 0.12, "pitch": 0.8, "db": -9.0, "micro_shake": 1.1 }
+		}
+	},
+	"loot": {
+		"stack_window_s": { "value": 0.75, "proposed": true, "note": "подряд добытое одно и то же сливается в одно «+N»" },
+		"fly_min_price": { "value": 20, "proposed": true, "note": "добыча дороже этого летит в рюкзак иконкой" },
+		"epic_price": { "value": 600, "proposed": true, "note": "дороже этого — «момент»: вспышка, наезд камеры, вибро" },
+		"epic_hitstop_s": { "value": 0.07, "proposed": true }
+	},
+	"death": {
+		"card_min_value": { "value": 1, "proposed": true, "note": "карточка потерь показывается, если потеряно хоть что-то или были сохранённые вещи" },
+		"auto_hide_s": { "value": 7.0, "proposed": true }
+	}
+}

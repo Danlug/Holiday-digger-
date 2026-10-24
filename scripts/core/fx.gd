@@ -31,6 +31,18 @@ static func float_icon(world_pos: Vector2, icon: Texture2D, text: String = "", c
 	_call("float_icon", [world_pos, icon, text, color])
 
 
+## «+N» со слиянием: подряд добытое одно и то же (key) складывается в одно число.
+## Заглушки сервиса в старых тестах метода не знают — вызов тогда молча пропускается.
+static func float_stack(key: String, world_pos: Vector2, icon: Texture2D, add: int,
+		color: Color = Color.WHITE, window_s: float = 0.75) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var n := tree.get_first_node_in_group(GROUP)
+	if n != null and n.has_method("float_stack"):
+		n.callv("float_stack", [key, world_pos, icon, add, color, window_s])
+
+
 static func shake(strength: float = 4.0, duration: float = 0.2) -> void:
 	_call("shake", [strength, duration])
 

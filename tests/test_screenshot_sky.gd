@@ -4,16 +4,18 @@ extends Node
 ##
 ##   XDG_DATA_HOME=$PWD/.godot/xdg xvfb-run -a -s "-screen 0 1280x1024x24" \
 ##       godot --path . res://tests/test_screenshot_sky.tscn --rendering-driver opengl3 \
-##       --resolution 448x960 -- /каталог 18,19,20,22,1,5 [день=3] [высота_героя_в_клетках=0]
+##       --resolution 448x960 -- /каталог 18,19,20,22,1,5 [день=3] [высота_героя_в_клетках=0] [кадров_ожидания=8]
 ##
 ## Аргументы после "--": каталог, часы через запятую (дробные можно: 19.5), номера дней через запятую (фаза луны от дня),
-## высота героя над землёй в клетках (0 — стоит на земле; подъём показывает параллакс звёзд).
+## высота героя над землёй в клетках (0 — стоит на земле; подъём показывает параллакс звёзд), число кадров ожидания
+## перед каждым снимком (чтобы поймать мерцание в разные моменты: одинаковые часы, большая пауза).
 ## Файлы: <каталог>/h<HH><MM>_d<день>.png
 
 var _out_dir := "/tmp/sky_shots"
 var _hours: Array = [12.0]
 var _days: Array = [1]
 var _lift := 0.0
+var _dwell := 8
 
 
 func _ready() -> void:
@@ -30,6 +32,8 @@ func _ready() -> void:
 			_days.append(s.to_int())
 	if args.size() >= 4:
 		_lift = args[3].to_float()
+	if args.size() >= 5:
+		_dwell = args[4].to_int()
 
 	StoryState.mark_seen("intro_grandpa")
 	StoryState.mark_seen("intro_boy")
@@ -56,7 +60,7 @@ func _ready() -> void:
 				GameState.game_clock_hours += 24.0
 			player.vx = 0.0
 			player.vy = 0.0
-			for i in range(8):
+			for i in range(_dwell):
 				await get_tree().process_frame
 			var img := get_viewport().get_texture().get_image()
 			var hh := int(floor(h))

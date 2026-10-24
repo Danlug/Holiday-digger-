@@ -129,6 +129,10 @@ func _scene_ores(depth: int, with_ores: bool = true) -> void:
 	await _frames(8)
 	main.fog.reveal_around(main.player.x, main.player.y, 8, 6)
 	await _frames(30)
+	var sh = main.view_root.get_node_or_null("ContactShadows")
+	if sh != null:
+		print("тень героя: видима ", sh._hero.visible, " поз ", sh._hero.position, " масштаб ", sh._hero.scale, " a ", sh._hero.modulate.a,
+				" земля ", sh._ground_row, " герой y ", snappedf(main.player.y, 0.01), " в дереве ", sh._hero.is_visible_in_tree(), " глоб ", sh._hero.global_position, " tex ", sh._hero.texture, " тени-видимы ", sh.visible, " z ", sh._hero.z_index)
 	_set_light(false)
 	await _frames(3)
 	await _shot("%s_%d_off" % ["ores" if with_ores else "depth", depth])

@@ -14,7 +14,8 @@ const HH := 1.0 / 3.0           # полувысота хитбокса геро
 const HW := 0.3
 const SCAN := 9                 # дальше этого вниз землю не ищем — тени нет
 const TEX_PATH := "res://art/fx/shadow_blob.png"
-const BASE_W := 20.0            # ширина тени героя на земле, px
+const TEX_W := 28.0             # ширина текстуры тени (art/fx/shadow_blob.png), px
+const BASE_W := 28.0            # ширина тени героя на земле, px: шире плеч, иначе ступни закрывают её целиком
 const RIG_TEX := "res://art/env/drill_mobile_parked.png"
 
 var player: Node = null
@@ -73,8 +74,8 @@ func _update_hero(hide: bool) -> void:
 	var rig: bool = player.has_method("is_in_rig") and bool(player.is_in_rig())
 	var w := BASE_W * (1.9 if rig else 1.0) * lerpf(1.0, 0.5, k)
 	_hero.visible = true
-	_hero.position = Vector2(px * TILE, gy - 1.5).floor()
-	_hero.scale = Vector2(w / 24.0, lerpf(1.0, 0.55, k))
+	_hero.position = Vector2(px * TILE, gy + 2.0).floor()   # пятно лежит на верхней грани земли: на тёмной стене тень не видна
+	_hero.scale = Vector2(w / TEX_W, lerpf(1.0, 0.55, k))
 	_hero.modulate.a = lerpf(1.0, 0.25, k)
 
 
@@ -97,6 +98,6 @@ func _update_rig(hide: bool) -> void:
 		return
 	var cell: Vector2i = GameState.rig_parked_at
 	_rig.visible = true
-	_rig.position = Vector2((cell.x + 0.5) * TILE, cell.y * TILE - 1.0).floor()
-	_rig.scale = Vector2(_rig_w * 0.9 / 24.0, 1.3)
+	_rig.position = Vector2((cell.x + 0.5) * TILE, cell.y * TILE + 2.0).floor()
+	_rig.scale = Vector2(_rig_w * 0.9 / TEX_W, 1.3)
 	_rig.modulate.a = 1.0

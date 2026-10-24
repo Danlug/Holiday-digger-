@@ -35,12 +35,12 @@ def halo(n=96):
     return Image.fromarray(img)
 
 
-def shadow(w=24, h=8):
+def shadow(w=28, h=9):
     """Контактная тень: плотное ядро, редкий дизеринг по краю. Чёрная, цвет не нужен."""
     yy, xx = np.mgrid[0:h, 0:w]
     r = np.hypot((xx - (w - 1) / 2.0) / (w / 2.0), (yy - (h - 1) / 2.0) / (h / 2.0))
-    prof = np.where(r >= 1.0, 0.0, 0.62 * np.clip(1.0 - r ** 2.4, 0, 1))
-    a = dither_levels(prof, 4)
+    prof = np.where(r >= 1.0, 0.0, 0.82 * np.clip(1.0 - r ** 2.0, 0, 1))
+    a = dither_levels(prof, 5)
     img = np.zeros((h, w, 4), np.uint8)
     img[..., 3] = np.round(a * 255).astype(np.uint8)
     return Image.fromarray(img)
@@ -74,7 +74,7 @@ def main():
     halo().save(os.path.join(OUT, "glow_soft.png"))
     shadow().save(os.path.join(OUT, "shadow_blob.png"))
     eye().save(os.path.join(OUT, "glow_eye.png"))
-    print("art/fx: glow_soft.png 96x96, shadow_blob.png 24x8, glow_eye.png 9x9")
+    print("art/fx: glow_soft.png 96x96, shadow_blob.png 28x9, glow_eye.png 9x9")
 
 
 if __name__ == "__main__":

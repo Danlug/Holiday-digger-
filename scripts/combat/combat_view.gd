@@ -21,6 +21,7 @@ var _add_mat: CanvasItemMaterial = null
 var _boss_shadow: Sprite2D = null
 var _boss_glow: Sprite2D = null
 const SHADOW_PATH := "res://art/fx/shadow_blob.png"
+const SHADOW_TEX_W := 28.0
 const HALO_PATH := "res://art/fx/glow_soft.png"
 const POP_TIME := 0.22      # появление: вырастает и проявляется
 var _boss_sprite: Sprite2D = null
@@ -204,9 +205,9 @@ func _decorate(m: Monster, s: Sprite2D, tint: Color) -> void:
 			var h := maxf(float(row2) * TILE - foot_y, 0.0)
 			var f := clampf(h / 96.0, 0.0, 1.0)
 			sh.visible = true
-			sh.position = Vector2(m.x * TILE, float(row2) * TILE - 1.5).floor()
+			sh.position = Vector2(m.x * TILE, float(row2) * TILE + 2.0).floor()
 			var w := (m.hw * 2.0 + 0.25) * TILE * lerpf(1.0, 0.55, f)
-			sh.scale = Vector2(w / 24.0, lerpf(1.0, 0.6, f))
+			sh.scale = Vector2(w / SHADOW_TEX_W, lerpf(1.0, 0.6, f))
 			sh.modulate.a = lerpf(1.0, 0.3, f) * ease * (1.0 - clampf((m.t - 0.2) / 0.5, 0.0, 1.0) * (1.0 if m.state == "dying" else 0.0))
 	# телеграф удара: красный ореол, плотнее к концу замаха (читается и в темноте)
 	var gl: Sprite2D = ex["gl"]
@@ -252,8 +253,8 @@ func _decorate_boss(boss: BossLogic, sheet: MonsterSheet, tint: Color) -> void:
 		_boss_glow = _make_extra(_halo_tex, true)
 	var dead: bool = boss.state == BossLogic.DEAD
 	_boss_shadow.visible = _shadow_tex != null and not dead
-	_boss_shadow.position = Vector2(boss.center_x * TILE, boss.floor_y * TILE - 1.5).floor()
-	_boss_shadow.scale = Vector2(sheet.frame_w * 0.62 / 24.0, 1.7)
+	_boss_shadow.position = Vector2(boss.center_x * TILE, boss.floor_y * TILE + 2.0).floor()
+	_boss_shadow.scale = Vector2(sheet.frame_w * 0.62 / SHADOW_TEX_W, 1.7)
 	_boss_shadow.modulate.a = 1.0
 	var tele: bool = boss.state == BossLogic.TELEGRAPH
 	_boss_glow.visible = tele and _halo_tex != null

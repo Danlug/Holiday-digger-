@@ -184,13 +184,13 @@ func test_in_main() -> void:
 	var hero_shadow: Sprite2D = shadows._hero
 	check("герой стоит на земле: тень включена у ног", hero_shadow.visible)
 	var gy := float(shadows._ground_row) * 32.0
-	check("тень лежит на верхней грани земли под героем", absf(hero_shadow.position.y - (gy - 1.5)) <= 1.0 and shadows._ground_row == cy + 4)
+	check("тень лежит на верхней грани земли под героем", absf(hero_shadow.position.y - (gy + 2.0)) <= 1.0 and shadows._ground_row == cy + 4)
 	var a_ground := hero_shadow.modulate.a
 	p.y -= 2.5   # прыжок: до земли ~2,5 клетки
 	for _i in range(3):
 		shadows._process(0.016)
 	check("в воздухе тень на той же земле, но бледнее и уже", hero_shadow.visible and hero_shadow.modulate.a < a_ground - 0.2
-			and hero_shadow.scale.x < 20.0 / 24.0 and absf(hero_shadow.position.y - (gy - 1.5)) <= 1.0)
+			and hero_shadow.scale.x < 0.9 and absf(hero_shadow.position.y - (gy + 2.0)) <= 1.0)
 	var px_save: float = p.x
 	p.x = 15.5
 	p.y = -12.0   # высоко в небе над огородом

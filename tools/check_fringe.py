@@ -325,6 +325,7 @@ def main():
     ap.add_argument("files", nargs="*")
     ap.add_argument("--hero", action="store_true", help="art/character/** (зона героя)")
     ap.add_argument("--sheet", help="записать контрольный лист в этот PNG")
+    ap.add_argument("--sheet-dir", help="листы по группам реестра (предметы, дом, огород, небо) в каталог")
     ap.add_argument("--before", help="каталог-копия ДО чистки (для листа «было/стало»)")
     ap.add_argument("--after", default=ROOT, help="откуда брать «стало» (по умолчанию — репозиторий)")
     ap.add_argument("--scale", type=int, default=3)
@@ -351,6 +352,18 @@ def main():
     if args.sheet:
         rows = sheet_rows(files, args.before, args.scale, args.max_w, args.after)
         print("лист:", args.sheet, contact_sheet(rows, args.sheet))
+    if args.sheet_dir:
+        os.makedirs(args.sheet_dir, exist_ok=True)
+        groups = {"items": ("art/items/", "art/ui/"), "env": ("art/env/",),
+                  "garden": ("art/env/garden/",), "sky": ("art/env/clouds/", "art/env/sun")}
+        for g, prefixes in groups.items():
+            part = [f for f in files if f.startswith(prefixes)
+                    and (g != "env" or f.count("/") == 2 and "sun" not in f)]
+            if not part:
+                continue
+            out = os.path.join(args.sheet_dir, f"{'ba' if args.before else 'fringe'}_{g}.png")
+            rows = sheet_rows(part, args.before, args.scale, args.max_w, args.after)
+            print("лист:", out, contact_sheet(rows, out))
     if args.strict and bad:
         sys.exit(1)
 

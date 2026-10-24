@@ -105,6 +105,7 @@ func _connect_signals() -> void:
 			player.fell.connect(_on_fell)
 	if fx != null:
 		fx.flier_landed.connect(_on_flier_landed)
+		fx.magnet_target = _chest
 
 
 func _exit_tree() -> void:
@@ -136,10 +137,49 @@ func _process(delta: float) -> void:
 	if player != null and is_instance_valid(player):
 		_tick_player(delta)
 	_tick_coin_sound()
+	_tick_transitions()
 	_music_timer -= delta
 	if _music_timer <= 0.0:
 		_music_timer = 0.4
 		_tick_music()
+
+
+## Переходы: затемнение при выходе из дома и входе в шахту, цветная вспышка на смене пояса глубины.
+## Первый кадр только запоминает состояние — вспышек при загрузке игры нет.
+var _tr_ready: bool = false
+var _tr_indoors: bool = false
+var _tr_belt: int = 0
+var _tr_underground: bool = false
+var _tr_depth: int = 0
+
+
+func _tick_transitions() -> void:
+	var indoors := GameState.house_is_indoors
+	var depth := int(GameState.player_depth)
+	var belt := Biomes.index_at(depth)
+	var underground := depth >= 6 if not _tr_underground else depth >= 2
+	if not _tr_ready:
+		_tr_ready = true
+		_tr_indoors = indoors
+		_tr_belt = belt
+		_tr_underground = underground
+		_tr_depth = depth
+		return
+	var jumped := absi(depth - _tr_depth) > 40   # телепорт, респаун, падение сквозь пояс: без вспышек
+	_tr_depth = depth
+	if indoors != _tr_indoors:
+		_tr_indoors = indoors
+		Fx.flash(Color(0.02, 0.01, 0.01, 0.9), 0.4)    # дверь: выезжаем из чёрного
+	elif underground != _tr_underground:
+		_tr_underground = underground
+		if not jumped:
+			Fx.flash(Color(0.02, 0.01, 0.01, 0.42 if underground else 0.3), 0.32)
+	if belt != _tr_belt:
+		var deeper := belt > _tr_belt
+		_tr_belt = belt
+		if GameState.is_alive and not indoors and not jumped:
+			var tc: Color = LightLayer.belt_colors(float(depth)).torch
+			Fx.flash(Color(tc.r, tc.g, tc.b, 0.3 if deeper else 0.18), 0.55)
 
 
 func _feet() -> Vector2:
@@ -159,7 +199,10 @@ func _tick_player(delta: float) -> void:
 	if on_ground and not _prev_on_ground and _prev_vy > Juice.num("steps.land_min_speed", 3.0) and not frozen:
 		var k := clampf(_prev_vy / 20.0, 0.25, 1.0)
 		Sfx.play("land", 1.0 - 0.18 * k, linear_to_db(k))
-		Fx.burst("poof", _feet(), 0.4 + k)
+		Fx.burst("poof", _feet(), 0.3 + 0.5 * k)
+		# пыль стелется по земле в обе стороны, сильнее при жёстком приземлении
+		Fx.burst("land_dust_l", _feet() + Vector2(-5, 0), 0.5 + k)
+		Fx.burst("land_dust_r", _feet() + Vector2(5, 0), 0.5 + k)
 		if k > 0.6:
 			Fx.shake(2.0 * k, 0.12)
 			Haptics.tap()
@@ -244,12 +287,40 @@ func _dig_sound(tile: int) -> String:
 func _dig_burst(tile: int, pos: Vector2, amount: float) -> void:
 	if tile == TileTypes.Type.DIRT or tile == TileTypes.Type.PEAT:
 		Fx.burst("dig_dirt", pos, amount)
+		Fx.burst("dig_puff", pos, amount)
 	elif tile == TileTypes.Type.STONE or HEAVY_TILES.has(tile):
 		Fx.burst("dig_stone", pos, amount)
+		Fx.burst("dig_puff", pos, amount * 0.8)
+		if HEAVY_TILES.has(tile):
+			Fx.burst("spark", pos, amount * 0.6)   # твёрдая порода искрит под кайлом
 	elif tile == TileTypes.Type.GOLD_ORE:
 		Fx.burst("dig_gold", pos, amount)
+		Fx.burst("ore_glint", pos, amount, COL_GOLD)
 	else:
-		Fx.burst("dig_ore", pos, amount, _accent(tile))
+		var accent := _accent(tile)
+		Fx.burst("dig_ore", pos, amount, accent)
+		Fx.burst("ore_glint", pos, amount, accent if accent.a > 0.0 else COL_RARE)
+
+
+## Блёстки добычи летят к герою магнитом (FxService.magnet): цвет — вкрапления руды, у золота золотой.
+func _magnet(tile: int, pos: Vector2) -> void:
+	var n := fx if fx != null else get_tree().get_first_node_in_group(Fx.GROUP)
+	if n == null or not n.has_method("magnet") or player == null:
+		return
+	var col := COL_ITEM
+	if tile == TileTypes.Type.GOLD_ORE:
+		col = COL_GOLD
+	elif tile != TileTypes.Type.DIRT and tile != TileTypes.Type.PEAT and tile != TileTypes.Type.STONE:
+		var a := _accent(tile)
+		if a.a > 0.0:
+			col = a.lightened(0.3)
+	n.call("magnet", pos, col, 3)
+
+
+func _chest() -> Vector2:
+	if player == null or not is_instance_valid(player):
+		return Vector2.ZERO
+	return Vector2(player.x, player.y - 0.15) * 32.0
 
 
 func _accent(tile: int) -> Color:
@@ -266,6 +337,8 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			var pos: Vector2 = data.get("pos", Vector2.ZERO)
 			Sfx.play(_dig_sound(tile))
 			_dig_burst(tile, pos, 1.3)
+			if bool(data.get("loot", false)):
+				_magnet(tile, pos)
 			if HEAVY_TILES.has(tile) or tile == TileTypes.Type.STONE:
 				Fx.shake(Juice.num("dig.heavy_shake_px", 2.5), Juice.num("dig.heavy_shake_s", 0.12))
 			if HEAVY_TILES.has(tile):
@@ -280,6 +353,8 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			var hp: Vector2 = data.get("pos", _feet())
 			Sfx.play("hit_enemy")
 			Fx.burst("hit_enemy", hp, 1.0)
+			Fx.burst("hit_flash", hp, 1.0)   # белая вспышка попадания поверх красных брызг
+			Fx.burst("spark", hp, 0.6)
 			var dmg := int(data.get("damage", 0))
 			if dmg > 0:
 				Fx.float_text(hp + Vector2(0, -10), str(dmg), COL_DMG)
@@ -287,6 +362,9 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			var mp: Vector2 = data.get("pos", _feet())
 			Sfx.play("enemy_die")
 			Fx.burst("enemy_die", mp, 1.0)
+			Fx.burst("die_smoke", mp + Vector2(0, -4), 1.0)
+			Fx.burst("hit_flash", mp, 1.0)
+			Fx.burst("spark", mp, 0.8)
 			Fx.shake(1.5, 0.1)
 			Haptics.tap()
 		&"boss_started":
@@ -321,6 +399,12 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			Fx.shake(2.0, 0.4)
 			Haptics.thud()
 		&"quake":
+			if player != null:
+				# с потолка сыплются камни и пыль: два залпа по бокам от героя и облако у пола
+				Fx.burst("rock_fall", _head() + Vector2(-52, -96), 1.0)
+				Fx.burst("rock_fall", _head() + Vector2(46, -110), 1.0)
+				Fx.burst("dig_puff", _head() + Vector2(0, -80), 1.4)
+				Fx.burst("poof", _feet(), 1.2)
 			Sfx.play("quake")
 			Fx.shake(5.0, 1.8)
 			Haptics.buzz(220)
@@ -353,6 +437,7 @@ func _on_picked(item: String, count: int) -> void:
 	var at := _head() + Vector2(randf_range(-7.0, 7.0), randf_range(-4.0, 2.0))
 	# подряд добытое одно и то же сливается в одно «+N» (aaa-feel); старые заглушки Fx метода не знают
 	Fx.float_stack(item, at, _item_icon(item), count, COL_RARE if rare else COL_ITEM, Feel.num("loot.stack_window_s", 0.75))
+	Fx.burst("pickup_glint", at, 1.0 if rare else 0.6)
 	if rare:
 		Fx.burst("spark", at, 1.0)
 
@@ -437,6 +522,7 @@ func _hurt(dmg: float, max_hp: float, k: float) -> void:
 func _on_fell(damage: float, _speed: float) -> void:
 	Sfx.play("thud", 1.0, linear_to_db(clampf(damage / 20.0, 0.4, 1.0)))
 	Fx.burst("poof", _feet(), 1.4)
+	Fx.burst("dig_stone", _feet(), 0.8)
 
 
 func _on_hunger(h: float) -> void:
@@ -493,6 +579,8 @@ func _on_artifact(_id: String) -> void:
 
 func _on_jump() -> void:
 	Sfx.play("jump")
+	if player != null:
+		Fx.burst("jump_puff", _feet(), 1.0)
 
 
 # ---------------------------------------------------------------------------

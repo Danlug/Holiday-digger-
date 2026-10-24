@@ -30,6 +30,8 @@ var _white_tex: Texture2D
 var _slot_wx: PackedInt32Array = PackedInt32Array()
 var _slot_wy: PackedInt32Array = PackedInt32Array()
 var _slot_lava: PackedByteArray = PackedByteArray()
+var _slot_glow: PackedByteArray = PackedByteArray()      # вид свечения клетки (LightLayer.GLOW_TILES), 0 — не светится
+var _cell_glow: int = 0         # результат последнего _paint_cell: светится ли клетка (читает _paint_rect)
 var _slot_epoch: PackedInt32Array = PackedInt32Array()   # какой «эпохе перекраски» принадлежит рисунок слота
 var _paint_epoch: int = 0
 var _stale_active: bool = false
@@ -99,6 +101,9 @@ var _overlay: Node2D  # дочерний узел с кастомным _draw() 
 ## сквозь них видна стена пояса. Включает main.gd — без стены (тесты, сцены без
 ## неё) пустота рисуется как раньше, иначе в дырах просвечивало бы небо.
 var deep_backdrop_active: bool = false
+## Растения огорода качает ветер, а рисует их живая поверхность (SurfaceLife выставляет флаг при входе в
+## дерево): в этом overlay они пропускаются. Нет SurfaceLife — всё рисуется здесь, как раньше.
+var decor_external: bool = false
 # Цвета «серой» разведанной породы по поясам (ГДД §4.2): считаются один раз.
 var _gray_solid: PackedColorArray = PackedColorArray()
 var _gray_empty: PackedColorArray = PackedColorArray()
@@ -159,6 +164,9 @@ func _rebuild_pool() -> void:
 	_slot_wy.fill(-1073741824)
 	_slot_lava.resize(_pool.size())
 	_slot_lava.fill(0)
+	_slot_glow.resize(_pool.size())
+	_slot_glow.fill(0)
+	_glow_list_dirty = true
 	_slot_epoch.resize(_pool.size())
 	_slot_epoch.fill(-1)
 	_stale_active = false
@@ -328,6 +336,9 @@ func _paint_rect(rx: int, ry: int, rw: int, rh: int) -> void:
 			if _slot_lava[si] != lava:
 				_slot_lava[si] = lava
 				_lava_list_dirty = true
+			if _slot_glow[si] != _cell_glow:
+				_slot_glow[si] = _cell_glow
+				_glow_list_dirty = true
 	stat_cells_painted += rw * rh
 
 
@@ -384,6 +395,27 @@ func lava_cells() -> Array:
 			if _slot_lava[si] != 0:
 				_lava_list.append(Vector2i(_slot_wx[si], _slot_wy[si]))
 	return _lava_list
+
+
+var _glow_list: Array = []
+var _glow_list_dirty: bool = true
+## Растёт при каждой пересборке списка светящихся клеток: слой света перерисовывает ореолы только тогда.
+var glow_version: int = 0
+
+
+## Разведанные светящиеся клетки окна (Vector3i: x, y, вид свечения — LightLayer.GLOW_TILES): руды, у
+## которых слой света рисует ореол. Тем же приёмом, что lava_cells(): список живёт, пока не изменился
+## состав слотов, обход окна и get_tile ради света не нужны.
+func glow_cells() -> Array:
+	if _glow_list_dirty:
+		_glow_list_dirty = false
+		glow_version += 1
+		_glow_list = []
+		for si in range(_slot_glow.size()):
+			var g: int = _slot_glow[si]
+			if g != 0:
+				_glow_list.append(Vector3i(_slot_wx[si], _slot_wy[si], g))
+	return _glow_list
 
 
 ## Смена кадра лавы: трогаем только спрайты, где сейчас лава (их единицы), и только раз в такт.
@@ -484,6 +516,7 @@ func _sky_color(wy: int) -> Color:
 
 ## Выставляет спрайт под клетку (wx, wy). Возвращает true, если там анимированная лава.
 func _paint_cell(s: Sprite2D, wx: int, wy: int) -> bool:
+	_cell_glow = 0
 	# Небо (wy < 0) тайлами больше не красится: сплошная заливка закрывала бы
 	# гору и забор (Backdrop), которые лежат между небом и тайлами. Градиент
 	# неба рисует SkyView (первый слой ViewRoot) — тем же _sky_color(wy),
@@ -537,6 +570,7 @@ func _paint_cell(s: Sprite2D, wx: int, wy: int) -> bool:
 		s.visible = false   # сквозь пустоту видна стена пояса
 		return false
 	var tex: Texture2D
+	_cell_glow = LightLayer.GLOW_TILES.get(type, 0)   # свет идёт только от разведанной (FULL) клетки
 	var is_lava := type == TileTypes.Type.LAVA
 	if is_lava:
 		tex = TileArt.lava_texture(wx, wy, _lava_tick if _lava_tick >= 0 else TileArt.lava_tick())
@@ -595,6 +629,8 @@ func _draw_garden_decor() -> void:
 			continue
 		var name := world.garden_decor_at(wx)
 		if name.is_empty():
+			continue
+		if decor_external and SurfaceLife.SWAY_DECOR.has(name):
 			continue
 		var tex := TileArt.garden_texture(name)
 		if tex == null:

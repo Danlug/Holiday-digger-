@@ -251,7 +251,11 @@ func _process(delta: float) -> void:
 	sky_view.set_camera(cam, _view_w())
 
 	if not GameState.is_alive:
-		_handle_death()
+		# Пока герой падает (hero-anim), возрождение ждёт: иначе смерть — это
+		# мгновенный перескок камеры домой, и показать нечего.
+		var cv_dying := view_root.get_node_or_null("CharacterView")
+		if cv_dying == null or not cv_dying.has_method("death_playing") or not cv_dying.death_playing():
+			_handle_death()
 	# Отложенное землетрясение ждёт не следующего тика таймера обвалов, а
 	# самого героя: "как только вылез" — это про его шаг, а не про минуту.
 	_apply_pending_earthquake_if_safe()

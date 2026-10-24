@@ -1545,7 +1545,7 @@
 				},
 				{
 					"t": "item",
-					"icon": "res://art/ui/icon_stamina.png",
+					"icon": "res://art/ui/shop/item_energy_bar.png",
 					"name": "item.energy_bar",
 					"text": "sleep2.item_text"
 				},

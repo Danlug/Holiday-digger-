@@ -159,14 +159,15 @@ func _test_chest_tiers() -> void:
 		var t := ChestLogic.pick_tier(SEED, b, y)
 		if (t == "iron" and y < 120) or (t == "gold" and y < 300):
 			low_bad += 1
-		if y >= 300 and y < 1500:
-			counts[t] += 1
+	# доли ступеней на 300–1500: 3000 бросков (полоса как ключ броска, глубина по кругу)
+	for b in range(3000):
+		counts[ChestLogic.pick_tier(SEED, b, 300 + (b * 7) % 1200)] += 1
 	check("железо не мельче 120, золото не мельче 300", low_bad == 0)
 	var n := float(counts["wood"] + counts["iron"] + counts["gold"])
 	var gold_share := float(counts["gold"]) / n
 	var wood_share := float(counts["wood"]) / n
 	check("на 300–1500 дерево чаще всего (%.0f%%), золото редкое (%.1f%%)" % [wood_share * 100.0, gold_share * 100.0],
-		wood_share > 0.5 and gold_share > 0.02 and gold_share < 0.15)
+		wood_share > 0.55 and wood_share < 0.8 and gold_share > 0.04 and gold_share < 0.1)
 
 
 func _test_chest_loot() -> void:

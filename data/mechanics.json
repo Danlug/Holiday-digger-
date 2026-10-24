@@ -17,11 +17,11 @@
   "tiers": [
    {"id": "wood", "y_min": 20, "weight": {"value": 70, "proposed": true}, "value_cells": {"value": 3, "proposed": true}, "items": [2, 8], "xp_bonus": {"value": 15, "proposed": true}, "food": "food_bar", "food_chance": {"value": 0.35, "proposed": true}},
    {"id": "iron", "y_min": 120, "weight": {"value": 24, "proposed": true}, "value_cells": {"value": 10, "proposed": true}, "items": [3, 14], "xp_bonus": {"value": 40, "proposed": true}, "food": "food_bar", "food_chance": {"value": 0.5, "proposed": true}},
-   {"id": "gold", "y_min": 300, "weight": {"value": 6, "proposed": true}, "value_cells": {"value": 45, "proposed": true}, "items": [5, 24], "xp_bonus": {"value": 120, "proposed": true}, "food": "food_buldak", "food_chance": {"value": 1.0, "proposed": true}, "gem": true}
+   {"id": "gold", "y_min": 300, "weight": {"value": 6, "proposed": true}, "value_cells": {"value": 35, "proposed": true}, "items": [5, 24], "xp_bonus": {"value": 120, "proposed": true}, "food": "food_buldak", "food_chance": {"value": 1.0, "proposed": true}, "gem": true}
   ],
-  "_tiers_note": "Ценность сундука задана в «клетках»: value_cells × средняя выручка клетки породы на этой глубине (Σ доля руды × цена, по настоящему составу), ±25%. Так сундук одинаково весом на 100 и на 2000 — момент находки, а не кошелёк: деревянный ≈ 3 клетки копки, окованный ≈ 10, золотой ≈ 45 и самоцвет (проверено tools/sim_economy.gd --mech=1, ГДД §20.1). items — сколько штук не меньше/не больше. Самоцвет золотого сундука — сверх ценности.",
+  "_tiers_note": "Ценность сундука задана в «клетках»: value_cells × средняя выручка клетки породы на этой глубине (Σ доля руды × цена, по настоящему составу), ±25%. Так сундук одинаково весом на 100 и на 2000 — момент находки, а не кошелёк: деревянный ≈ 3 клетки копки, окованный ≈ 10, золотой ≈ 35 и самоцвет (проверено tools/sim_economy.gd --mech=1, ГДД §20.1). items — сколько штук не меньше/не больше. Самоцвет золотого сундука — сверх ценности.",
   "value_spread": {"value": 0.25, "proposed": true},
-  "deep_shift_per_1000": {"value": [-6, 3, 1.5], "proposed": true, "note": "на каждую 1000 клеток глубины веса ступеней сдвигаются к железу и золоту (дерево не ниже 30)"},
+  "deep_shift_per_1000": {"value": [-3, 2, 1], "proposed": true, "note": "на каждую 1000 клеток глубины веса ступеней сдвигаются к железу и золоту (дерево не ниже 30): на 3000 — 61/30/9"},
   "gems_by_depth": [
    {"y_min": 300, "id": "diamond", "count": 1},
    {"y_min": 2000, "id": "ruby", "count": 1},

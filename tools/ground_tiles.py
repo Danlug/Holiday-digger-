@@ -326,16 +326,15 @@ def _dirt(v):
     hair_px = []
     if spec["root"]:
         for _ in range(40):
-            x, y = rng.uniform(5, G - 6), rng.uniform(3, 9)
-            th = math.pi / 2 + rng.uniform(-0.7, 0.7)
+            # плавная S-кривая сверху вниз: на каждый шаг вниз смещение по x не больше клетки (линия связная)
+            x0, y0 = rng.uniform(6, G - 7), int(rng.integers(2, 9))
+            amp, ph = rng.uniform(1.0, 1.6), rng.uniform(0, math.tau)
+            drift = rng.uniform(-0.25, 0.25)
             pts = []
             ok = True
-            for _s in range(int(rng.integers(9, 14))):
-                th += rng.normal(0.0, 0.3)
-                th = math.pi / 2 + (th - math.pi / 2) * 0.9
-                x += math.cos(th)
-                y += math.sin(th)
-                px_, py_ = int(round(x)), int(round(y))
+            for k in range(int(rng.integers(10, 15))):
+                px_ = int(round(x0 + drift * k + amp * math.sin(ph + 0.55 * k)))
+                py_ = y0 + k
                 if not (1 <= px_ < G - 1 and 1 <= py_ < G - 2) or occ[py_, px_]:
                     ok = False
                     break

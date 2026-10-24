@@ -679,6 +679,8 @@ var ext: Dictionary = {}
 ##   sold           {coins: int, count: int}   — сделка в мастерской
 ##   bought         {id: String, currency: String} — покупка в магазине
 ##   fuel_used / refueled {amount: float}      — топливо бура
+##   fuel_refined   {raw: String, used: int, blocks: int, to_pack: int, to_storage: int}
+##                  — перегонка на станции заправки (торф/уголь -> топливные блоки)
 ##   monster_killed {id: String, depth: int, pos: Vector2}
 ##   boss_defeated  {id: String}
 ##   quest_done     {id: String}

@@ -50,7 +50,7 @@ func _ready() -> void:
 
 
 func station_visible() -> bool:
-	return StoryState.has_flag("fuel_station_built") and GameState.era != "grandpa"
+	return FuelRefinery.station_built()
 
 
 func well_visible() -> bool:

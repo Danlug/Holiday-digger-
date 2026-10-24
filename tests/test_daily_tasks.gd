@@ -290,6 +290,8 @@ func _test_chest_and_streak() -> void:
 	var d0 := GameState.dollars
 	QuestEngine.claim_bonus()
 	check("доллар выдан (в недельный потолок)", GameState.dollars == d0 + 1)
+	Achievements.evaluate()
+	check("достижение «Ни дня без задания» — за 7 дней серии", Achievements.is_done("tasks_streak_7") and not Achievements.is_done("tasks_streak_30"))
 
 
 func _test_reroll() -> void:

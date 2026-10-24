@@ -937,15 +937,15 @@ func _build_strip() -> void:
 ## стрелки по бокам) — свой маленький триггер «Тест» стоит НАД полосой слева,
 ## зеркально «•••» справа, и раскрывается вверх, не занимая места, пока закрыт.
 ##
-## Релиз-гейт (задание владельца, релиз-харденинг 2026-09-21): панель даёт
-## бесплатные монеты/бессмертие/телепорт/мгновенную копку — реальный игрок
-## никогда не должен её увидеть. OS.has_feature("debug") истинно в редакторе
-## и debug-экспортах (в том числе headless-тестах — годо-бинарь без шаблонов
-## релиза сам по себе debug), и ложно в release-экспорте (App Store/Google
-## Play). Поэтому в release-сборке _debug_panel остаётся null — единственное
-## место, где на неё ссылаются (_input ниже), уже проверяет на null.
+## Релиз-гейт (задание владельца, релиз-харденинг 2026-09-21; раунд 4 —
+## «можешь убрать кнопку „Тест“»): панель даёт бесплатные монеты/бессмертие/
+## телепорт/мгновенную копку — реальный игрок никогда не должен её увидеть.
+## Где она есть, решает DebugPanel.allowed(): только отладочная сборка
+## (редактор, debug-экспорт, headless-тесты) и без флага --no-debug-panel.
+## В release-сборке _debug_panel остаётся null — единственное место, где на
+## неё ссылаются (_input ниже), уже проверяет на null.
 func _build_debug_panel() -> void:
-	if not OS.has_feature("debug"):
+	if not DebugPanel.allowed():
 		return
 	_debug_panel = DebugPanel.new()
 	_debug_panel.name = "DebugPanel"
@@ -1372,6 +1372,7 @@ func _process(_dt: float) -> void:
 		_stick.queue_redraw()
 		_knob.queue_redraw()
 		_update_depth()
+	_release_pointers_if_blocked()
 	_update_clock()
 	_menu_badge_timer -= _dt
 	if _menu_badge_timer <= 0.0:
@@ -2001,7 +2002,7 @@ func _input(event: InputEvent) -> void:
 	# иначе было бы нечем, кроме повторного попадания в ту же кнопку.
 	if _dismiss_on_outside_press(event):
 		return
-	if player == null or _inv_sheet.visible or _settings_sheet.visible or ProgressScreen.is_open() or is_more_menu_open() or TechSystem.is_modal_open():
+	if player == null or _world_input_blocked():
 		return
 
 	# Тестовая панель (debug_panel.gd) плавает НАД нижней полосой, то есть
@@ -2136,6 +2137,33 @@ func _release_stick() -> void:
 	if player != null:
 		player.release_control()
 	_position_knob(null)
+
+
+## Касания мира до джойстика сейчас не доходят: ввод HUD выключили снаружи
+## (катсцена, окно дня, задания, снаряжение, журнал, магазин) или поверх
+## открыт свой экран.
+func _world_input_blocked() -> bool:
+	return not is_processing_input() or (_inv_sheet != null and _inv_sheet.visible) \
+		or (_settings_sheet != null and _settings_sheet.visible) or ProgressScreen.is_open() \
+		or is_more_menu_open() or TechSystem.is_modal_open()
+
+
+## Пока ввод заблокирован, отпускание пальца сюда не доходит: занятый указатель
+## оставался бы занятым, и первое касание после катсцены или окна отбрасывалось,
+## пока палец не сдвинется (docs/PLAYTEST.md, P1.2). Отпускаем здесь — одним
+## местом за всех, кто глушит ввод, а не в каждом окне.
+func _release_pointers_if_blocked() -> void:
+	if _stick_pointer == -100 and _touch_pointer == -100 and not _has_touch:
+		return
+	if not _world_input_blocked():
+		return
+	if _stick_pointer != -100:
+		_release_stick()
+	if _touch_pointer != -100 or _has_touch:
+		_touch_pointer = -100
+		_has_touch = false
+		if player != null:
+			player.release_control()
 
 
 func _handle_hold_input(event: InputEvent) -> void:

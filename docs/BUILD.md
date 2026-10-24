@@ -4,13 +4,16 @@
 
 Тестовая отладочная панель («Тест» в углу HUD — мгновенная копка/бессмертие/
 полёт 300/бесплатный магазин/телепорт домой/динамит 3×3, см. `scripts/ui/
-debug_panel.gd`) теперь строится только когда `OS.has_feature("debug")`
-истинно (`scripts/ui/hud.gd:_build_debug_panel`). Это верно в редакторе и в
-debug-экспортах (в том числе во всех headless-тестах — сам движок без
-release-шаблонов ведёт себя как debug-сборка), и ложно в **release**-экспорте
-(App Store/Google Play) — то есть в собранной для сдачи игре панели не будет
-вовсе, а не просто спрятана. Флаги в `GameState` (`debug_instant_dig` и
-остальные) и сигнал `debug_action_triggered` оставлены как есть: без панели их
+debug_panel.gd`) теперь строится только когда `DebugPanel.allowed()`:
+`OS.is_debug_build()` и нет флага запуска `-- --no-debug-panel`
+(`scripts/ui/hud.gd:_build_debug_panel`). Отладочная сборка — это редактор и
+debug-экспорты (в том числе все headless-тесты — сам движок без
+release-шаблонов ведёт себя как debug-сборка); ложно это в **release**-экспорте
+(веб-релиз `tools/build_web.sh` — это `--export-release`, App Store/Google
+Play) — то есть в собранной для сдачи игре панели не будет вовсе, а не просто
+спрятана. Флаг `--no-debug-panel` прячет её и в отладке: им пользуется
+`tools/bot_play.sh`, чтобы на снимках бота не было кнопки поверх породы.
+Флаги в `GameState` (`debug_instant_dig` и остальные) и сигнал `debug_action_triggered` оставлены как есть: без панели их
 некому включить, сохранение их не трогает, `reset_progress()` тоже — они
 инертны и нужны только `tests/test_debug_panel.gd`, который создаёт `DebugPanel`
 напрямую в обход `hud.gd`.

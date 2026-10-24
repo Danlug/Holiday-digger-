@@ -66,6 +66,7 @@ run_one() {
 	[ -n "${RESUME:-}" ] && args+=(--resume)
 	[ -n "${INPUT:-}" ] && args+=(--input="$INPUT")
 	[ "${SHOTS}" = 1 ] && args+=(--shots)
+	args+=(--no-debug-panel)   # без кнопки «Тест» поверх породы на снимках (DebugPanel.allowed)
 	timeout $(( WALL + 120 )) "${runner[@]}" "$GODOT" "${extra[@]}" --fixed-fps 31 --path . \
 		res://tests/bot_play.tscn -- "${args[@]}" >"$out/log.txt" 2>&1
 	echo $? >"$out/exit_code"

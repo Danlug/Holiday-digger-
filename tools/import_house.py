@@ -43,6 +43,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 from import_art import shrink  # noqa: E402  премультиплированный LANCZOS + unsharp
+from defringe import BG_HOUSE, defringe  # noqa: E402
 
 SRC = ROOT / "art/_source/house_modern.jpg"
 OUT = ROOT / "art/env/house_rich.png"
@@ -180,7 +181,7 @@ def main() -> None:
     # он не даёт серому фону просочиться в цвет краевых пикселей при
     # уменьшении — обычный resize смешал бы альфу и цвет наивно, и по контуру
     # остался бы серый ореол. Палитру не квантуем — colors=0 по умолчанию.
-    small = shrink(crop, (out_w, out_h))
+    small = defringe(shrink(crop, (out_w, out_h)), bg=BG_HOUSE)   # светлая кайма подложки
     small.save(OUT)
 
     entrance_x = int(round(out_w * ENTRANCE_FRACTION))

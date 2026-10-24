@@ -30,6 +30,9 @@ from collections import deque
 
 from PIL import Image, ImageFilter
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from defringe import BG_CHARACTERS, defringe  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Во сколько раз текстуры подробнее игровых координат.
@@ -999,7 +1002,9 @@ def main(sheet_path):
         out = Image.new("RGBA", size, (0, 0, 0, 0))
         out.alpha_composite(img, ((size[0] - img.size[0]) // 2,
                                   (size[1] - img.size[1]) // 2))
-        written.append(save(out, name))
+        # светлая кайма от подложки листа (tools/defringe.py); кадры
+        # персонажей ниже не чистятся — они в зоне перерисовки героя
+        written.append(save(defringe(out, bg=BG_CHARACTERS), name))
 
     # Колотая кирка переехала в tools/import_pickaxes.py — туда же, где
     # делается целая ржавая, и по тем же координатам её бойка. Здесь она

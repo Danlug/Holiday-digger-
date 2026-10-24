@@ -336,7 +336,17 @@ func _finish() -> void:
 		print("  %7.1f  %s" % [row[1], row[0]])
 	print("кадров %d, игровых секунд %.0f, настенных %.1f" % [_frames, _sim, wall])
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
-	get_tree().quit(0 if failures == 0 and not _dead else 1)
+	_quit_quietly(0 if failures == 0 and not _dead else 1)
+
+
+## Выход сразу после звука (награда задания дня за «поел») оставлял проигрывания
+## в аудиосервере: под нагрузкой поток микшера не успевал их убрать, и в логе
+## появлялось «resources still in use at exit». Глушим и даём потоку четверть секунды.
+func _quit_quietly(code: int) -> void:
+	for p in get_tree().root.find_children("*", "AudioStreamPlayer", true, false):
+		(p as AudioStreamPlayer).stop()
+	await get_tree().create_timer(0.25, true, false, true).timeout
+	get_tree().quit(code)
 
 
 func _phase_intro() -> void:

@@ -34,6 +34,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from import_art import shrink  # noqa: E402
+from defringe import defringe  # noqa: E402
 from import_drill import (BAND_RIG_SIDE, background_mask, cut,  # noqa: E402
                           drop_slivers, frame_columns, tone_match)
 
@@ -72,6 +73,8 @@ def main():
     img = Image.new("RGBA", (BOX, BOX), (0, 0, 0, 0))
     img.alpha_composite(small, ((BOX - tw) // 2, (BOX - th) // 2))
 
+    # лист тёмный — светлая кайма тут только от подрезки резкости
+    img = defringe(img, bg=None)
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     img.save(OUT_PATH)
     print("бурмобиль %d×%d -> %d×%d в кадре %d×%d -> %s"

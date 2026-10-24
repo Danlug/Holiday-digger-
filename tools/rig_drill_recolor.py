@@ -69,6 +69,9 @@ import sys
 import numpy as np
 from PIL import Image
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from defringe import defringe  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHAR_DIR = os.path.join(ROOT, "art", "character")
 ITEMS_DIR = os.path.join(ROOT, "art", "items")
@@ -342,7 +345,8 @@ def _recolor_icon(src_path, out_path, target_h, target_s, target_v):
     arr = np.array(im)
     mask = _icon_drill_mask(arr)
     out = _recolor_pixels(arr, mask, target_h, target_s, target_v)
-    Image.fromarray(out).save(out_path)
+    # посветлевший металл не должен вернуть кайму, снятую с исходника
+    defringe(Image.fromarray(out), bg=None).save(out_path)
 
 
 # ---------------------------------------------------------------------------

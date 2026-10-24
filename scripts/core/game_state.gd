@@ -326,9 +326,10 @@ func _check_level_up() -> void:
 	while level < level_cap and xp >= _xp_needed_for_next_level():
 		xp -= _xp_needed_for_next_level()
 		level += 1
-		var points_awarded := int(Balance.upgrades.get("skill_points", {}).get("per_level", 1))
-		if level % 5 == 0:
-			points_awarded += int(Balance.upgrades.get("skill_points", {}).get("bonus_every_5th_level", 2))
+		# Очки растут с уровнем (ГДД §11, раунд 4); пометка правила — чтобы
+		# top_up_skill_points не доплатил этому сейву второй раз.
+		var points_awarded := Balance.skill_points_for_level(level)
+		ext[SKILL_POINTS_EXT] = SKILL_POINTS_RULE
 		skill_points_available += points_awarded
 		leveled_up.emit(level, points_awarded)
 		skill_points_changed.emit(skill_points_available)
@@ -343,11 +344,41 @@ func get_skill_stage(branch_id: String) -> int:
 	return int(skill_stages.get(branch_id, 0))
 
 
+## Невыполненные требования-предки ветки: [{branch, stage}] (пусто — можно качать).
+func unmet_skill_requirements(branch_id: String) -> Array:
+	var out: Array = []
+	for r: Dictionary in Balance.get_upgrade_requirements(branch_id):
+		if get_skill_stage(r["branch"]) < int(r["stage"]):
+			out.append(r)
+	return out
+
+
+const SKILL_POINTS_EXT := "skill_points_rule"
+const SKILL_POINTS_RULE := 2
+
+## Сейв, набравший уровни по старому правилу (одно очко за уровень), получает
+## разницу с нынешним один раз — иначе ветеран отставал бы от новичка того же
+## уровня. Купленные ступени не трогаем. Зовёт SaveSystem после загрузки.
+func top_up_skill_points() -> int:
+	if int(ext.get(SKILL_POINTS_EXT, 1)) >= SKILL_POINTS_RULE:
+		return 0
+	var diff := maxi(0, Balance.skill_points_total(level) - Balance.skill_points_total(level, true))
+	# До 10-го уровня правила совпадают: пометку не пишем, сейв остаётся как был.
+	if diff > 0:
+		ext[SKILL_POINTS_EXT] = SKILL_POINTS_RULE
+		skill_points_available += diff
+		skill_points_changed.emit(skill_points_available)
+	return diff
+
+
 ## Тратит одно очко прокачки на следующую ступень ветки branch_id.
-## Возвращает false, если очков не хватает или ветка уже на максимуме.
+## Возвращает false, если очков не хватает, ветка уже на максимуме или
+## не открыта ветка-предок (поле requires в upgrades.json).
 func spend_skill_point(branch_id: String) -> bool:
 	var branch := Balance.get_upgrade_branch(branch_id)
 	if branch.is_empty():
+		return false
+	if not unmet_skill_requirements(branch_id).is_empty():
 		return false
 	var max_stages := int(branch.get("stages", 0))
 	var current_stage := get_skill_stage(branch_id)

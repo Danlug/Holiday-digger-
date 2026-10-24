@@ -68,9 +68,9 @@ func _build() -> void:
 	_points_label = ProgressUiKit.make_label("0", 15, ProgressUiKit.GOLD)
 	_points_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip_row.add_child(_points_label)
-	Tip.bind(_points_chip, "Очки навыков",
-		"Даются за уровень: одно очко и по два на каждом пятом. На все ветки целиком их не хватит — выбирай, кем быть.",
-		"К сотому уровню набирается около 140 очков")
+	Tip.bind(_points_chip, "Очки навыков", points_rule_text(),
+		"К сотому уровню — %d очков, всё дерево стоит %d" % [Balance.skill_points_total(100),
+			Balance.get_upgrade_tree_total_cost()])
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -105,12 +105,29 @@ func _build() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Полоса прокрутки съедала 8 из 216 точек ширины — девятой ветке не хватало места.
+	# Прокрутка остаётся: перетаскивание (DragScroll) и колесо.
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	column.add_child(scroll)
 	DragScroll.attach(scroll)
 
 	tree = SkillTree.new()
 	tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(tree)
+
+
+## Правило очков словами — из тех же чисел, что считает Balance (ГДД §11).
+static func points_rule_text() -> String:
+	var parts: PackedStringArray = []
+	var from := 2
+	var sp: Dictionary = Balance.upgrades.get("skill_points", {})
+	for tier in Balance.unwrap(sp.get("per_level_tiers", [])):
+		var to := int(tier.get("up_to_level", 100))
+		parts.append("%d–%d ур. — по %d" % [from, to, int(tier.get("points", 1))])
+		from = to + 1
+	var bonus := int(Balance.unwrap(sp.get("bonus_every_5th_level", 2)))
+	return "Даются за уровень, и чем выше уровень, тем больше: %s; каждый пятый — ещё +%d. На все ветки не хватит — выбирай, кем быть." % [
+		"; ".join(parts), bonus]
 
 
 func _process(delta: float) -> void:

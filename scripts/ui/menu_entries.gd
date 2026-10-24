@@ -14,7 +14,7 @@ static func register() -> void:
 	MenuRegistry.add("workshop", {
 		"icon": UiIcons.tex("workshop"),
 		"title": "Мастерская",
-		"body": "Продажа, верстак, лавка",
+		"body": func() -> String: return ShopPlaceHint.menu_body(),
 		"order": 10,
 		"on_press": func() -> void: ShopUI.open_shop(),
 	})

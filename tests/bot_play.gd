@@ -1021,6 +1021,9 @@ func _descend() -> void:
 		if _busy_story() or GameState.house_is_indoors:
 			break
 		bot.hold(_brake_keys())
+		if _trace > 0.0 and _trace < 0.2:
+			print("[desc] t=%.2f y=%.3f vy=%.2f thrust='%s' keys=%s gap=%d tool=%s ground=%s" % [_sim, player.y, player.vy,
+				player.thrust, str(bot._down.keys()), _floor_gap(), GameState.current_tool, str(player.on_ground)])
 		await _step()
 	bot.release_all()
 	if GameState.hp < hp0 - 20.0:
@@ -1779,7 +1782,12 @@ func _sleep() -> void:
 		"sec": snappedf(_sim - t0, 0.1)})
 	T.mark("first_sleep", _sim)
 	if GameState.stamina <= before:
-		T.finding("P1", "sleep", "сон не прибавил бодрости (%.0f → %.0f)" % [before, GameState.stamina], _sim)
+		var plan := HouseSleep.plan(before, GameState.hunger)
+		if not bool(plan.get("ok", true)):
+			# отказ по правилу сна (голодным не уснёшь / бодрость почти полная) — не баг, а событие
+			T.event(_sim, "sleep_refused", String(plan.get("reason", "")))
+		else:
+			T.finding("P1", "sleep", "сон не прибавил бодрости (%.0f → %.0f)" % [before, GameState.stamina], _sim)
 	_activity = "home"
 	await _go_room("hall")
 

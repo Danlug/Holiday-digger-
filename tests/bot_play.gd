@@ -109,6 +109,7 @@ var _trace := 0.0
 var _death_card: Node = null
 var _from_house := false
 var _frame_events: Array = []
+var _mech: Object = null
 var _session_min := 0.0           # каждые N игровых минут — «закрыл игру, вернулся завтра»
 var _next_session := 0.0
 var _sessions := 0
@@ -918,6 +919,8 @@ func _surface() -> void:
 	if StoryState.is_seen("grave_call") and not StoryState.has_flag("diary_found"):
 		await _visit_grave()
 		return
+	if _from_house and _fuel_tool() != "" and FuelTank.fraction(_fuel_tool()) < 0.6:
+		await _visit_station()
 	# Только что из дома — сразу в шахту: иначе то, что дома не решилось (нет денег на еду,
 	# материалы на проект), гоняло бы героя туда-обратно у двери.
 	if not _from_house and _needs_home():
@@ -926,6 +929,29 @@ func _surface() -> void:
 			await _enter_door()
 		return
 	await _descend()
+
+
+## Станция в огороде (ветка fuel-station): перегнать торф/уголь в блоки и залить бак.
+func _visit_station() -> void:
+	_activity = "station"
+	var tool := _fuel_tool()
+	var ref = load("res://scripts/tech/fuel_refinery.gd") if ResourceLoader.exists("res://scripts/tech/fuel_refinery.gd") else null
+	if ref == null or not _has_static(ref, "refine"):
+		return
+	if not await _walk_to_x(float(WorldGen.FUEL_STATION_X) + 1.0, 40.0, 0.4):
+		return
+	var made := 0
+	for raw in ["peat", "coal"]:
+		var r: Dictionary = ref.call("refine", raw, 99)
+		made += int(r.get("made", 0))
+	var n := FuelTank.refuel(tool, "pack") + FuelTank.refuel(tool, "storage")
+	T.event(_sim, "station", "перегнано %d, залито %d (бак %.0f%%)" % [made, n, FuelTank.fraction(tool) * 100.0], false)
+	if made > 0 or n > 0:
+		T.mark("first_station", _sim)
+	elif FuelTank.fraction(tool) < 0.2:
+		T.finding("P2", "no_fuel", "бак %s почти пуст, а перегонять нечего (торфа %d, угля %d)" % [tool,
+			GameState.get_item_count("peat") + HouseStorage.count("peat"), GameState.get_item_count("coal") + HouseStorage.count("coal")], _sim)
+	_activity = "surface"
 
 
 func _needs_home() -> bool:
@@ -1251,10 +1277,23 @@ func _nav_dig_cost(x: int, y: int) -> int:
 func _is_loot_visible(x: int, y: int) -> bool:
 	if x < 0 or x >= WorldGen.WIDTH or y < 1:
 		return false
-	var t := world.get_tile(x, y)
-	if not (TileTypes.is_ore(t) and MineralMap.is_loot(t)):
+	if main.fog.get_state(x, y) != FogOfWar.State.FULL:
 		return false
-	return main.fog.get_state(x, y) == FogOfWar.State.FULL
+	var t := world.get_tile(x, y)
+	if TileTypes.is_ore(t) and MineralMap.is_loot(t):
+		return true
+	# тайник (ветка aaa-mechanics): сундук виден в полном обзоре, как руда
+	return t != TileTypes.Type.EMPTY and _chest_at(Vector2i(x, y))
+
+
+func _chest_at(c: Vector2i) -> bool:
+	if _mech == null:
+		_mech = main.get_node_or_null("MechDirector")
+		if _mech == null:
+			_mech = self   # нет механики — больше не искать
+	if _mech == self or not _mech.has_method("chest_at"):
+		return false
+	return not (_mech.chest_at(c) as Dictionary).is_empty()
 
 
 func _diggable(x: int, y: int) -> bool:
@@ -1437,6 +1476,8 @@ func _sell() -> void:
 		var id := String(row["id"])
 		if HouseConfig.is_food(id) or id == FuelTank.block_item():
 			continue
+		if (id == "peat" or id == "coal") and _fuel_tool() != "":
+			continue   # сырьё для станции: бак бура
 		var n := int(row["count"]) - int(keep.get(id, 0))
 		if n > 0:
 			items[id] = n
@@ -1772,6 +1813,7 @@ func _session_restart() -> void:
 	house = HouseSystem.instance
 	nav.world = world
 	_death_card = null
+	_mech = null
 	if bot is Stick:
 		bot.release_all()
 		bot.hud = hud

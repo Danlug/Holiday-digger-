@@ -27,6 +27,7 @@ ALLOW = [
     re.compile(r"resources still in use at exit"),
     # звук под xvfb без звуковой карты — окружение, не игра
     re.compile(r"audio_driver_alsa|All audio drivers failed|init_output_device|pulseaudio", re.I),
+    re.compile(r"V-Sync mode"),
 ]
 
 MILESTONES = [
@@ -70,7 +71,8 @@ def scan_log(path):
         return out, 0
     lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
     for i, line in enumerate(lines):
-        if any(a.search(line) for a in ALLOW):
+        ctx_all = " ".join(lines[i:i + 3])
+        if any(a.search(ctx_all) for a in ALLOW):
             continue
         for kind, rx in ERR_PATTERNS:
             if rx.search(line):
@@ -187,8 +189,37 @@ def merge(base):
     print("\n".join(rows))
 
 
+def md_table(dirs):
+    """Строки таблицы для docs/PLAYTEST.md по каталогам прогонов (s<сид>_<характер>)."""
+    head = ("| Прогон | Ввод | Игровых мин | Глубина | Кирка / ранец в конце | Доход, монет/ч | Железная кирка | "
+            "Глубина 100 / 200 / 500 / 1000 | Смертей | Застреваний (P0) | Подъём, % времени |")
+    out = [head, "|" + "---|" * 11]
+    for d in dirs:
+        p = os.path.join(d, "telemetry.json")
+        if not os.path.exists(p):
+            continue
+        tel = json.load(open(p, encoding="utf-8"))
+        m = tel.get("meta", {})
+        es = m.get("end_state", {})
+        ms = tel.get("milestones", {})
+        act = tel.get("activity_seconds", {})
+        tot = sum(act.values()) or 1
+        p0 = sum(1 for x in tel.get("findings", []) if x.get("sev") == "P0")
+        deaths = sum(1 for x in tel.get("deaths", []) if not x.get("scripted"))
+        def at(k):
+            return mmss(ms[k]) if k in ms else "—"
+        out.append("| %s | %s | %d | %s | %s / %s | %s | %s | %s / %s / %s / %s | %d | %d | %d%% |" % (
+            os.path.basename(d.rstrip("/")), m.get("input", "keys"), round(float(m.get("sim_seconds", 0)) / 60),
+            es.get("max_depth"), es.get("tool"), es.get("gear") or "—", m.get("income_per_hour"), at("buy:iron_pickaxe"),
+            at("depth_100"), at("depth_200"), at("depth_500"), at("depth_1000"), deaths, p0,
+            round(100 * act.get("ascend", 0) / tot)))
+    print("\n".join(out))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) >= 3 and sys.argv[1] == "--merge":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--md":
+        md_table(sys.argv[2:])
+    elif len(sys.argv) >= 3 and sys.argv[1] == "--merge":
         merge(sys.argv[2])
     elif len(sys.argv) >= 2:
         txt, _ = summarize(sys.argv[1])

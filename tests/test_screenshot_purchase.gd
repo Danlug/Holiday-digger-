@@ -2,6 +2,7 @@ extends Node
 ## test_screenshot_purchase — не автотест, а инструмент глаз: витрина по правилу
 ## «где можно покупать» (ГДД §15): под землёй плитки с бейджем «осталось N/3» и
 ## значком ролика, без роликов и на огороде — замок и причина, у двери — как раньше.
+## Плитки за доллары (раунд 4) — везде как у двери: без замка, «N/3» и ролика.
 ## Нужен настоящий рендер; «родной» размер вьюпорта 224×480, вдвое крупнее
 ## читается лучше:
 ##
@@ -12,7 +13,8 @@ extends Node
 ##
 ## Сцены: door_food door_picks under_food under_picks under_premium under_card
 ## under_empty_picks under_empty_food garden_food garden_food_clean garden_picks
-## garden_premium garden_premium_clean (_clean — плашка-причина уже погасла).
+## garden_premium garden_premium_clean (_clean — плашка-причина уже погасла)
+## under_empty_premium under_premium_card (покупка за доллары в шахте без роликов).
 
 var _out_dir := "/tmp/purchase_shots"
 var _only: Array[String] = []
@@ -50,6 +52,8 @@ func _ready() -> void:
 	await _scene("garden_picks", _s_garden_picks)
 	await _scene("garden_premium", _s_garden_premium)
 	await _scene("garden_premium_clean", _s_garden_premium_clean)
+	await _scene("under_empty_premium", _s_under_empty_premium)
+	await _scene("under_premium_card", _s_under_premium_card)
 	print("test_screenshot_purchase: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -166,6 +170,22 @@ func _s_garden_premium_clean() -> void:
 	_ui.open(ShopUI.SCREEN_PREMIUM)
 	await _frames(2)
 	_ui._notice_panel.visible = false
+
+
+func _s_under_empty_premium() -> void:
+	_place("underground")
+	_burn_ads()
+	_ui.open(ShopUI.SCREEN_PREMIUM)
+
+
+func _s_under_premium_card() -> void:
+	_place("underground")
+	_burn_ads()
+	_ui.open(ShopUI.SCREEN_PREMIUM)
+	await _frames(2)
+	var t: ShopTile = _ui._tiles["good:dollars:teleport_watch"]
+	_ui._on_tile_pressed(t.offer, t)
+	await _frames(6)
 
 
 func _frames(n: int) -> void:

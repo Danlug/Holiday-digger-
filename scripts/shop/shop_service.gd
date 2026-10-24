@@ -279,12 +279,15 @@ static func invest(recipe_id: String) -> Dictionary:
 	return {"ok": true, "moved": moved, "message": "На склад ушло: " + ", ".join(parts)}
 
 
-## Чего не хватает для рецепта: {"ok": bool, "missing": {id: сколько ещё},
+## Чего не хватает для рецепта (count — сколько раз подряд, у переработки
+## больше одного): {"ok": bool, "missing": {id: сколько ещё},
 ## "missing_coins": int, "locked": bool, "reason": String}.
-static func check_craft(recipe_id: String) -> Dictionary:
+static func check_craft(recipe_id: String, count: int = 1) -> Dictionary:
 	var r := ShopCatalog.recipe(recipe_id)
 	if r.is_empty():
 		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false, "reason": "Нет такого рецепта"}
+	if count < 1 or (count > 1 and not is_batch(recipe_id)):
+		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false, "reason": "Это делается по одной"}
 	if not is_at_workshop():
 		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false,
 			"reason": "Верстак дома, в подвале"}
@@ -298,21 +301,16 @@ static func check_craft(recipe_id: String) -> Dictionary:
 
 	var missing: Dictionary = {}
 	for id in r["inputs"].keys():
-		var need := int(r["inputs"][id])
+		var need := int(r["inputs"][id]) * count
 		var have := held_for(recipe_id, String(id))  # склад + рюкзак
 		if have < need:
 			missing[String(id)] = need - have
-	var missing_coins: int = maxi(0, int(r["coins"]) - GameState.coins)
+	var missing_coins: int = maxi(0, int(r["coins"]) * count - GameState.coins)
 	if not missing.is_empty() or missing_coins > 0:
 		return {"ok": false, "missing": missing, "missing_coins": missing_coins, "locked": false,
 			"reason": "Не хватает материалов"}
-
-	# Плавка и перегонка кладут результат в тот же рюкзак, из которого взяли
-	# сырьё. Бронза тяжелее металлолома, и на полном рюкзаке крафт может не
-	# влезть по весу — это надо поймать ДО списания ингредиентов.
-	if String(r["kind"]) == "item" and _weight_delta(r) > _free_weight():
-		return {"ok": false, "missing": {}, "missing_coins": 0, "locked": false,
-			"reason": "Рюкзак не выдержит — разгрузись"}
+	# Места проверять незачем: у переработки то, что не влезло в рюкзак,
+	# ложится на склад (craft_plan), а склад предела не имеет.
 	return {"ok": true, "missing": {}, "missing_coins": 0, "locked": false, "reason": ""}
 
 
@@ -320,13 +318,87 @@ static func can_craft(recipe_id: String) -> bool:
 	return bool(check_craft(recipe_id)["ok"])
 
 
-## Крафт: списывает вложенное (у инструментов) или ингредиенты из рюкзака (у
-## расходников) и монеты, выдаёт результат. Возвращает {ok, message}.
+## Переработка — рецепт, который можно повторять сколько угодно (kind "item":
+## плавка бронзы и любой будущий слиток). Слово владельца, раунд 4: «тупо
+## делать по одному — надо ползунок». Инструмент и машина — разовые, по одной.
+static func is_batch(recipe_id: String) -> bool:
+	var r := ShopCatalog.recipe(recipe_id)
+	return not r.is_empty() and String(r["kind"]) == "item"
+
+
+## Сколько раз рецепт можно сделать прямо сейчас — верх ползунка. Считают
+## материалы (склад + рюкзак, ГДД §14) и монеты; место не считает: результат
+## ложится туда, откуда взято сырьё, а лишнее сверх рюкзака — на склад.
+## Разовый рецепт — 0 или 1.
+static func max_craft(recipe_id: String) -> int:
+	if not is_batch(recipe_id):
+		return 1 if can_craft(recipe_id) else 0
+	var base := check_craft(recipe_id, 1)
+	if not bool(base["ok"]):
+		return 0
+	var r := ShopCatalog.recipe(recipe_id)
+	var most := -1
+	for id in r["inputs"].keys():
+		var fit := held_for(recipe_id, String(id)) / maxi(1, int(r["inputs"][id]))
+		most = fit if most < 0 else mini(most, fit)
+	var coins := int(r["coins"])
+	if coins > 0 and not GameState.debug_free_shop:
+		most = GameState.coins / coins if most < 0 else mini(most, GameState.coins / coins)
+	return maxi(most, 0)
+
+
+## Раскладка пачки из count переработок ДО списания — по ней крафт работает,
+## а карточка показывает итог. Сырьё берётся сначала со склада, потом из
+## рюкзака (_consume_input). Результат — туда, откуда пришло его сырьё, как у
+## перегонки на станции (FuelRefinery): штука, целиком сделанная из рюкзачного
+## сырья, — в рюкзак, пока он выдерживает вес и стопку; остальное — на склад.
+## Так ползунок не упирается в рюкзак, а склад не становится чёрным ходом в
+## рюкзак (ГДД §14). Возвращает {from_storage: {id: n}, from_pack: {id: n},
+## made, to_pack, to_storage, coins}.
+static func craft_plan(recipe_id: String, count: int) -> Dictionary:
+	var r := ShopCatalog.recipe(recipe_id)
+	var plan := {"from_storage": {}, "from_pack": {}, "made": 0, "to_pack": 0, "to_storage": 0, "coins": 0}
+	if r.is_empty() or count <= 0:
+		return plan
+	var pack_units := count
+	var freed := 0.0
+	for id in r["inputs"].keys():
+		var per := maxi(1, int(r["inputs"][id]))
+		var total := per * count
+		var st := mini(total, HouseStorage.count(String(id)))
+		plan["from_storage"][String(id)] = st
+		plan["from_pack"][String(id)] = total - st
+		# Склад тратится первым, значит рюкзачное сырьё — у последних штук пачки.
+		pack_units = mini(pack_units, (total - st) / per)
+		freed += Balance.get_mineral_weight(String(id)) * float(total - st)
+	var out_id := String(r["output"]["id"])
+	var per_out := int(r["output"]["count"])
+	plan["made"] = per_out * count
+	plan["coins"] = int(r["coins"]) * count
+	# Сколько из рюкзачной части реально влезет — те же правила, что у
+	# GameState.add_item, но на рюкзак, уже облегчённый на списанное сырьё.
+	var want := pack_units * per_out
+	var room: int = maxi(0, Balance.get_mineral_max_stack(out_id) - GameState.get_item_count(out_id))
+	var w := Balance.get_mineral_weight(out_id)
+	if w > 0.0:
+		var free := GameState.get_max_carry_kg() - GameState.get_total_weight() + freed
+		room = mini(room, int(floor(free / w)) if free > 0.0 else 0)
+	plan["to_pack"] = mini(want, room)
+	plan["to_storage"] = int(plan["made"]) - int(plan["to_pack"])
+	return plan
+
+
+## Крафт: списывает материалы (склад, потом рюкзак) и монеты, выдаёт
+## результат. count > 1 — только у переработки (is_batch), и пачка проходит
+## целиком или не проходит вовсе: всё проверяется до первого списания.
+## Возвращает {ok, message, count (сколько вышло), used {id: n}, to_pack, to_storage}.
 ## Без материалов не крафтит и ничего не трогает.
-static func craft(recipe_id: String) -> Dictionary:
-	var check := check_craft(recipe_id)
+static func craft(recipe_id: String, count: int = 1) -> Dictionary:
+	var check := check_craft(recipe_id, count)
 	if not bool(check["ok"]):
-		return {"ok": false, "message": String(check["reason"])}
+		return {"ok": false, "message": String(check["reason"]), "count": 0}
+	if is_batch(recipe_id):
+		return _craft_batch(recipe_id, count)
 
 	var r := ShopCatalog.recipe(recipe_id)
 	for id in r["inputs"].keys():
@@ -339,27 +411,57 @@ static func craft(recipe_id: String) -> Dictionary:
 		return {"ok": false, "message": "Не хватает монет"}
 
 	var out_id := String(r["output"]["id"])
-	var out_count := int(r["output"]["count"])
 	var message := ""
 	if String(r["kind"]) == "tool":
 		GameState.grant_tool(out_id)
 		GameState.set_current_tool(out_id)
 		message = "%s собрана и уже в руках." % String(r["name_ru"])
-	elif String(r["kind"]) == "machine":
+	else:
 		# Машина не берётся в руки и не кладётся в рюкзак: она стоит у дома.
 		# Собранная скважина сразу начинает отсчёт — иначе первый же забор
 		# выдал бы доход за всё время, что игрок прожил до неё.
 		GameState.well_level = 1
 		GameState.well_last_collect_unix = int(Time.get_unix_time_from_system())
 		message = "%s собрана. Теперь она копает сама." % String(r["name_ru"])
-	else:
-		var added := GameState.add_item(out_id, out_count)
-		if added < out_count:
-			# Вес проверен заранее, значит упёрлись в потолок стака (99).
-			return {"ok": false, "message": "Больше в стопку не влезет"}
-		message = "+%d %s" % [out_count, ShopCatalog.item_name(out_id)]
+	GameState.emit_event(&"crafted", {"recipe": recipe_id, "item": out_id, "count": 1,
+		"to_pack": 0, "to_storage": 0})
 	SaveSystem.save_game()
-	return {"ok": true, "message": message}
+	return {"ok": true, "message": message, "count": 1, "used": (r["inputs"] as Dictionary).duplicate(),
+		"to_pack": 0, "to_storage": 0}
+
+
+## Пачка переработки одной транзакцией. Всё, что может отказать (материалы,
+## монеты), проверено в check_craft до первого списания, а результату место
+## есть всегда (склад) — поэтому отказа посередине пачки не бывает.
+static func _craft_batch(recipe_id: String, count: int) -> Dictionary:
+	var r := ShopCatalog.recipe(recipe_id)
+	var plan := craft_plan(recipe_id, count)
+	for id in (plan["from_pack"] as Dictionary).keys():
+		if GameState.get_item_count(String(id)) < int(plan["from_pack"][id]) \
+				or HouseStorage.count(String(id)) < int(plan["from_storage"][id]):
+			return {"ok": false, "message": "Материалы кончились", "count": 0}
+	if int(plan["coins"]) > 0 and not GameState.spend_coins(int(plan["coins"])):
+		return {"ok": false, "message": "Не хватает монет", "count": 0}
+
+	var used: Dictionary = {}
+	for id in (plan["from_pack"] as Dictionary).keys():
+		HouseStorage.consume(String(id), int(plan["from_storage"][id]))
+		var from_pack := int(plan["from_pack"][id])
+		if from_pack > 0:
+			GameState.remove_item(String(id), from_pack)
+		used[String(id)] = int(plan["from_storage"][id]) + from_pack
+
+	var out_id := String(r["output"]["id"])
+	var made := int(plan["made"])
+	var to_pack := GameState.add_item(out_id, int(plan["to_pack"])) if int(plan["to_pack"]) > 0 else 0
+	var to_storage := made - to_pack
+	if to_storage > 0:
+		HouseStorage.store_directly(out_id, to_storage)
+	GameState.emit_event(&"crafted", {"recipe": recipe_id, "item": out_id, "count": made,
+		"to_pack": to_pack, "to_storage": to_storage})
+	SaveSystem.save_game()
+	return {"ok": true, "message": "+%d %s" % [made, ShopCatalog.item_name(out_id)], "count": made,
+		"used": used, "to_pack": to_pack, "to_storage": to_storage}
 
 
 ## Построена ли машина. Скважина — единственная на сегодня, и её состояние
@@ -498,14 +600,6 @@ static func _consume_input(id: String, amount: int) -> bool:
 
 static func _free_weight() -> float:
 	return GameState.get_max_carry_kg() - GameState.get_total_weight()
-
-
-## На сколько килограммов потяжелеет рюкзак от одного крафта.
-static func _weight_delta(r: Dictionary) -> float:
-	var delta := Balance.get_mineral_weight(String(r["output"]["id"])) * int(r["output"]["count"])
-	for id in r["inputs"].keys():
-		delta -= Balance.get_mineral_weight(String(id)) * int(r["inputs"][id])
-	return delta
 
 
 # ---------------------------------------------------------------------------

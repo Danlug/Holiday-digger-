@@ -12,6 +12,9 @@ const MUTED := Color8(0x9D, 0x8B, 0x73)
 const DIM := Color8(0x6A, 0x5C, 0x4C)
 const BORDER := Color8(0x3E, 0x31, 0x25)
 const BG := Color(0.071, 0.055, 0.043, 0.97)
+## Фон полноэкранных экранов (герой, техника, хаб, снаряжение): непрозрачный, иначе сквозь
+## него светятся полоса HUD, джойстик и тосты мира.
+const BG_SOLID := Color(0.071, 0.055, 0.043, 1.0)
 const PANEL_BG := Color(0.11, 0.09, 0.07, 1.0)
 const GREEN := Color8(0x7F, 0xB8, 0x6B)
 const RED := Color8(0xB8, 0x5A, 0x52)
@@ -34,6 +37,9 @@ const EDGE := Color8(0x52, 0x40, 0x2D)      # рамка приподнятог�
 const SHEET_BG := Color8(0x1A, 0x14, 0x0F)  # фон шторки и окна
 const INSET_BG := Color(0.06, 0.05, 0.04)   # «утопленное»: поля ввода, канавки
 const SHADOW := Color(0, 0, 0, 0.5)
+## Нижняя полоса вкладок полноэкранных экранов (герой, техника, хаб, снаряжение): одна высота,
+## в зоне большого пальца.
+const TAB_BAR_H := 30
 const CARD_BG := Color8(0x1D, 0x17, 0x12)   # карточка/плитка внутри шторки или окна
 const TEXT_HI := Color8(0xF2, 0xD9, 0x9B)   # заголовок, главное число
 const TEXT := Color8(0xD8, 0xCF, 0xC0)      # обычный светлый текст

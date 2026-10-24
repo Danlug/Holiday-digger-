@@ -40,6 +40,7 @@ var _closing: bool = false   # хаб гаснет (анимация): по см
 
 
 func _ready() -> void:
+	add_to_group("meta_hub")
 	layer = 92  # выше HUD, дома и шторок; ниже окна ежедневной награды (94) и экрана героя (95)
 	_build()
 	_root.visible = false
@@ -111,44 +112,31 @@ func _build() -> void:
 	add_child(_root)
 
 	var bg := ColorRect.new()
-	bg.color = MetaUiKit.BG
+	bg.color = ProgressUiKit.BG_SOLID
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(bg)
 
-	var head := HBoxContainer.new()
-	head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	head.offset_left = 6
-	head.offset_right = -6
-	head.offset_top = 4
-	head.offset_bottom = 44
-	head.add_theme_constant_override("separation", 4)
-	_root.add_child(head)
+	# Вкладки внизу, в зоне большого пальца и в том же виде, что у экрана героя.
+	var specs: Array = []
 	for t in [TAB_TASKS, TAB_ACH, TAB_ROAD]:
-		var b := UiBtn.icon_button(MetaUiKit.tex(TAB_ICONS[t]), Vector2(46, 40), UiBtn.Kind.NORMAL, 32)
-		var tab_id: String = t
-		b.pressed.connect(func() -> void:
-			if Tip.swallowed():
-				return
-			_set_tab(tab_id))
-		Tip.bind(b, TAB_TIPS[t][0], TAB_TIPS[t][1])
-		head.add_child(b)
-		_tab_buttons[t] = b
-	var gap := Control.new()
-	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(gap)
-	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(34, 34), UiBtn.Kind.NORMAL, 16)
-	x.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	Tip.bind(x, "Закрыть")
-	head.add_child(x)
+		specs.append([t, MetaUiKit.tex(TAB_ICONS[t]), TAB_TIPS[t][0], TAB_TIPS[t][1]])
+	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab, close)
+	_tab_buttons = bar.get_meta("buttons")
+	for t in _tab_buttons.keys():
+		(_tab_buttons[t] as HeroTabButton).badge_color = Color8(0xD0, 0x45, 0x3C)   # красный: есть что забрать
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_left = 6
+	bar.offset_right = -6
+	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
+	bar.offset_bottom = -4
+	_root.add_child(bar)
 
 	var wallet := HBoxContainer.new()
 	wallet.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	wallet.offset_left = 8
 	wallet.offset_right = -8
-	wallet.offset_top = 48
-	wallet.offset_bottom = 64
+	wallet.offset_top = 8
+	wallet.offset_bottom = 26
 	wallet.add_theme_constant_override("separation", 10)
 	_root.add_child(wallet)
 	for k in [["coins", "coin", "Монеты"], ["dollars", "dollar", "Доллары"], ["points", "star", "Очки трофеев"]]:
@@ -163,8 +151,8 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 8
 	_scroll.offset_right = -8
-	_scroll.offset_top = 70
-	_scroll.offset_bottom = -6
+	_scroll.offset_top = 32
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
@@ -204,11 +192,10 @@ func refresh() -> void:
 		TAB_ROAD:
 			_build_road()
 	for t in _tab_buttons.keys():
-		var b: Button = _tab_buttons[t]
-		b.modulate = Color.WHITE if t == _tab else Color(0.62, 0.62, 0.62)
-	UiBtn.set_badge(_tab_buttons[TAB_TASKS], QuestEngine.claimable_count())
-	UiBtn.set_badge(_tab_buttons[TAB_ACH], Achievements.unseen_count() if _tab != TAB_ACH else 0)
-	UiBtn.set_badge(_tab_buttons[TAB_ROAD], TrophyRoad.claimable().size())
+		(_tab_buttons[t] as HeroTabButton).set_selected(t == _tab)
+	(_tab_buttons[TAB_TASKS] as HeroTabButton).set_badge(QuestEngine.claimable_count())
+	(_tab_buttons[TAB_ACH] as HeroTabButton).set_badge(Achievements.unseen_count() if _tab != TAB_ACH else 0)
+	(_tab_buttons[TAB_ROAD] as HeroTabButton).set_badge(TrophyRoad.claimable().size())
 	_sync_wallet()
 	_update_timers()
 	_scroll.scroll_vertical = keep

@@ -36,6 +36,10 @@ func _ready() -> void:
 			director.cutscene.skip()
 		await _wait(0.4)
 	StoryState.set_flag("gold_sold")
+	# Все сюжетные сцены считаем сыгранными: иначе «Бабка звонит из Таиланда» ложится
+	# поверх экранов мета-слоя и кадр показывает не их.
+	for sid in StoryData.scene_ids():
+		StoryState.mark_seen(String(sid))
 	# Не reset_progress(): он шлёт max_depth_changed(0), и режиссёр начинает сюжет заново.
 	GameState.ext.clear()
 	MetaClock.override_unix = BASE_DAY * MetaClock.DAY + 40000

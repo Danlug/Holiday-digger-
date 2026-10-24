@@ -524,9 +524,7 @@ func _build_drop_panel() -> void:
 	_drop_field.text_changed.connect(_on_drop_field_changed)
 	_drop_field.text_submitted.connect(func(_t): apply_drop())
 	field_row.add_child(_drop_field)
-	var all_btn := UiBtn.icon_button(null, Vector2(40, 28))
-	all_btn.text = "Всё"
-	all_btn.add_theme_font_size_override("font_size", 10)
+	var all_btn := UiBtn.icon_button(UiIcons.tex("max"), Vector2(40, 28))
 	Tip.bind(all_btn, "Все", "Выбросить всю стопку")
 	all_btn.pressed.connect(func(): _drop_slider.value = _drop_max)
 	field_row.add_child(all_btn)

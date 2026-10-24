@@ -13,7 +13,7 @@ const MUTED := Color8(0x9D, 0x8B, 0x73)
 const DIM := Color8(0x5A, 0x50, 0x44)
 const RED := Color8(0xC4, 0x52, 0x4A)
 const GREEN := Color8(0x7F, 0xB8, 0x6B)
-const BG := Color(0.071, 0.055, 0.043, 0.98)
+const BG := ProgressUiKit.BG_SOLID
 const TILE_BG := Color8(0x26, 0x1E, 0x16)
 const TIER_COLORS := {
 	0: Color8(0xF2, 0xD9, 0x9B),
@@ -138,8 +138,6 @@ func _rebuild() -> void:
 	page.add_theme_constant_override("separation", 5)
 	_root.add_child(page)
 
-	page.add_child(_build_header())
-
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -155,34 +153,19 @@ func _rebuild() -> void:
 		_build_gear_tab()
 	else:
 		_build_forge_tab()
+	page.add_child(_build_header())   # вкладки внизу, в зоне большого пальца — как на экране героя
 
 
 func _build_header() -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
 	var specs := [["gear", CombatData.ui_icon("equip"), "Снаряжение", "Что надето и что есть"],
 		["forge", UiIcons.tex("workshop"), "Ковка", "Собрать броню и оружие из глубинных материалов. Верстак дома"]]
-	for sp in specs:
-		var b := UiBtn.icon_button(sp[1], Vector2(34, 28), UiBtn.Kind.ACCENT if _tab == sp[0] else UiBtn.Kind.NORMAL, 16)
-		Tip.bind(b, sp[2], sp[3])
-		var key: String = sp[0]
-		b.pressed.connect(func() -> void:
-			if Tip.swallowed() or _tab == key:
-				return
-			_tab = key
-			_rebuild())
-		row.add_child(b)
-		_tab_buttons[key] = b
-	var sp_fill := Control.new()
-	sp_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(sp_fill)
-	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(34, 28), UiBtn.Kind.NORMAL, 16)
-	Tip.bind(x, "Закрыть")
-	x.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	row.add_child(x)
-	return row
+	var bar := HeroTabButton.make_bar(specs, _tab, func(key: String) -> void:
+		if _tab == key:
+			return
+		_tab = key
+		_rebuild(), close)
+	_tab_buttons = bar.get_meta("buttons")
+	return bar
 
 
 # ---------------------------------------------------------------------------

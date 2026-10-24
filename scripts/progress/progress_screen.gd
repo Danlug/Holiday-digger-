@@ -29,7 +29,7 @@ const TAB_MUSEUM := "museum"
 # Рекорды переехали внутрь вкладки героя; старое имя оставлено для вызовов извне.
 const TAB_RECORDS := "records"
 
-const TAB_BAR_H := 26
+const TAB_BAR_H := ProgressUiKit.TAB_BAR_H
 
 static var _instance: ProgressScreen = null
 
@@ -206,7 +206,7 @@ func setup(player, hud) -> void:
 func _build() -> void:
 	var bg := ColorRect.new()
 	# Непрозрачный: сквозь прежние 0.97 просвечивали тосты и мир под экраном.
-	bg.color = Color(ProgressUiKit.BG.r, ProgressUiKit.BG.g, ProgressUiKit.BG.b, 1.0)
+	bg.color = ProgressUiKit.BG_SOLID
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 

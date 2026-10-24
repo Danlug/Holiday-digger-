@@ -113,12 +113,12 @@ func _build_header() -> Control:
 		var chip := MetaUiKit.chip(MetaUiKit.tex("up"), "+%d%%" % pct, MetaUiKit.GREEN, 14, 9)
 		Tip.bind(chip, "Бонус серии", "Каждая пройденная неделя подряд добавляет к монетам и опыту.", "+%d%%" % pct)
 		h.add_child(chip)
-	var x := Button.new()
-	x.text = "×"
-	x.add_theme_font_size_override("font_size", 16)
-	x.custom_minimum_size = Vector2(28, 28)
-	UiBtn.style(x, UiBtn.Kind.GHOST)
-	x.pressed.connect(close)
+	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 28), UiBtn.Kind.GHOST)   # тот же крестик, что у шторок
+	Tip.bind(x, "Закрыть")
+	x.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		close())
 	h.add_child(x)
 	Tip.bind(h.get_child(0) as Control, "Серия", "Дней подряд. Пропуск в один день серию не рвёт, два — рвёт.", str(int(_plan["streak"])))
 	return h
@@ -243,14 +243,17 @@ func _build_buttons() -> Control:
 	h.add_theme_constant_override("separation", 6)
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	_claim_btn = Button.new()
-	_claim_btn.text = "Забрать"
-	_claim_btn.icon = MetaUiKit.tex("check")
-	_claim_btn.add_theme_constant_override("icon_max_width", 16)
-	_claim_btn.add_theme_font_size_override("font_size", 11)
+	_claim_btn.icon = MetaUiKit.tex("check")      # «Забрать» — крупная галочка, слово в Tip
+	_claim_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_claim_btn.add_theme_constant_override("icon_max_width", 32)
+	Tip.bind(_claim_btn, "Забрать")
 	_claim_btn.custom_minimum_size = Vector2(112, 34)
 	_claim_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_style_cta(_claim_btn, MetaUiKit.GREEN_BTN)
-	_claim_btn.pressed.connect(func() -> void: _claim(1.0))
+	_claim_btn.pressed.connect(func() -> void:
+		if Tip.swallowed():
+			return
+		_claim(1.0))
 	h.add_child(_claim_btn)
 
 	_ad_btn = Button.new()

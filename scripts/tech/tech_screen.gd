@@ -88,7 +88,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 	var bg := ColorRect.new()
-	bg.color = Color(0.071, 0.055, 0.043, 0.98)
+	bg.color = ProgressUiKit.BG_SOLID
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var column := VBoxContainer.new()
@@ -99,11 +99,11 @@ func _ready() -> void:
 	column.offset_bottom = -6
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
-	column.add_child(_build_tabs())
 	_content = VBoxContainer.new()
 	_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", 6)
 	column.add_child(_content)
+	column.add_child(_build_tabs())   # вкладки внизу, в зоне большого пальца — как на экране героя
 	_fx_layer = Control.new()
 	_fx_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -118,33 +118,15 @@ func _fit() -> void:
 
 
 func _build_tabs() -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	var defs := [
-		[TAB_TANK, "icon_tank", "Топливо", "Бак бура и бурмобиля, заправка"],
-		[TAB_SUIT, "suit_1", "Костюм", "Защита от жары и лавы"],
-		[TAB_WELL, "icon_well", "Скважина", "Копает сама, пока тебя нет"],
+	var specs := [
+		[TAB_TANK, TechUi.tex("icon_tank"), "Топливо", "Бак бура и бурмобиля, заправка"],
+		[TAB_SUIT, TechUi.tex("suit_1"), "Костюм", "Защита от жары и лавы"],
+		[TAB_WELL, TechUi.tex("icon_well"), "Скважина", "Копает сама, пока тебя нет"],
 	]
-	for d in defs:
-		var b := UiBtn.icon_button(TechUi.tex(String(d[1])), Vector2(44, 32), UiBtn.Kind.NORMAL, 24)
-		Tip.bind(b, String(d[2]), String(d[3]))
-		b.pressed.connect(func() -> void:
-			if Tip.swallowed():
-				return
-			open_tab(String(d[0]), _station))
-		row.add_child(b)
-		_tab_buttons[String(d[0])] = b
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(spacer)
-	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(32, 32), UiBtn.Kind.NORMAL, 16)
-	Tip.bind(x, "Закрыть")
-	x.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		close())
-	row.add_child(x)
-	return row
+	var bar := HeroTabButton.make_bar(specs, _tab,
+		func(key: String) -> void: open_tab(key, _station), close)
+	_tab_buttons = bar.get_meta("buttons")
+	return bar
 
 
 func open_tab(tab: String, station: bool = false) -> void:
@@ -206,8 +188,7 @@ func refresh() -> void:
 		_content.remove_child(c)
 		c.queue_free()
 	for key in _tab_buttons.keys():
-		var b: Button = _tab_buttons[key]
-		UiBtn.set_kind(b, UiBtn.Kind.ACCENT if key == _tab else UiBtn.Kind.NORMAL)
+		(_tab_buttons[key] as HeroTabButton).set_selected(key == _tab)
 	match _tab:
 		TAB_SUIT: _build_suit()
 		TAB_WELL: _build_well()
@@ -396,7 +377,10 @@ func _source_row(parent: Node, source: String, icon: Texture2D, have: int, allow
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 	var one := _text_button("+1", UiBtn.Kind.NORMAL, 34)
-	var all := _text_button("МАКС", UiBtn.Kind.ACCENT, 48)
+	var all := _text_button("", UiBtn.Kind.ACCENT, 48)
+	all.icon = UiIcons.tex("max")      # «до максимума» — значок, слова нет
+	all.add_theme_constant_override("icon_max_width", 16)
+	all.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for b in [one, all]:
 		(b as Button).disabled = not allowed
 		Tip.bind(b, "Залить %s" % ("один блок" if b == one else "сколько влезет"), title,

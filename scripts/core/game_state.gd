@@ -211,13 +211,15 @@ func get_max_hp() -> float:
 	return float(Balance.get_max_hp(get_skill_stage("hp")))
 
 
-## Смерть: теряются все минералы, кроме чёрного ящика (см. GDD раздел 7).
+## Смерть: теряются все минералы, кроме чёрного ящика (см. GDD раздел 7),
+## и 200 монет «скорой» (решение владельца, раунд 4; не в минус — Healing).
 func die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
 	inventory.clear()
 	inventory_changed.emit()
+	Healing.charge_death_fee()
 	died.emit()
 
 
@@ -697,8 +699,10 @@ var ext: Dictionary = {}
 ##                  штук, у земли и камня (mineral "") — ×mult опыта
 ##   spent          {currency: String, amount: int} — списание в spend_coins/spend_dollars (любая
 ##                  покупка, еда, крафт; «бесплатно» отладки не считается)
-##   ate            {id: String, hunger: float, stamina: float} — герой поел (рюкзак или стол дома,
-##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено
+##   ate            {id: String, hunger: float, stamina: float, hp: float} — герой поел (рюкзак или стол дома,
+##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
+##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
+##   ambulance      {coins: int} — смерть: «скорая забрала» монеты (до 200, не в минус), перед сигналом died
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)

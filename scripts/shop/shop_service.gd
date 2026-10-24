@@ -564,11 +564,15 @@ static func apply_effect(g: Dictionary) -> String:
 				GameState.set_stamina(GameState.stamina + stamina)
 			if hunger > 0.0:
 				GameState.set_hunger(GameState.hunger + hunger)
+			var hp := Healing.food_hp_percent(String(g.get("id", "")))   # еда лечит (раунд 4, healing)
+			Healing.heal_percent(hp)
 			var parts: Array = []
 			if stamina > 0.0:
 				parts.append("+%d%% бодрости" % int(stamina))
 			if hunger > 0.0:
 				parts.append("+%d%% сытости" % int(hunger))
+			if hp > 0:
+				parts.append("+%d%% здоровья" % hp)
 			return "%s: %s" % [name_ru, ", ".join(parts)]
 		"full_restore":
 			GameState.heal(GameState.get_max_hp())

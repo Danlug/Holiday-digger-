@@ -1918,11 +1918,19 @@ func _eat_from_inventory(id: String) -> void:
 		toast(String(res.get("reason", "")))
 		Sfx.play("ui_deny")
 		return
-	toast_parts([
+	var parts: Array = [
 		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": Color8(0xE8, 0x7E, 0x6E)},
 		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": Color8(0xE8, 0xC5, 0x47)},
-	], 2.0)
-	Sfx.play("eat")
+	]
+	# Еда и аптечка лечат (раунд 4, healing): +HP в тосте, у аптечки — только он.
+	var medkit := Healing.is_medkit(id)
+	var hp_pct := int(round(100.0 * float(res.get("hp", 0.0)) / maxf(1.0, GameState.get_max_hp())))
+	if medkit:
+		parts.clear()
+	if hp_pct > 0 or medkit:
+		parts.append({"icon": "hp", "text": "+%d" % hp_pct, "color": Color8(0xE8, 0x6A, 0x6A)})
+	toast_parts(parts, 2.0)
+	Sfx.play("heal" if medkit else "eat")
 	_render_inventory()
 	_sync_all()
 

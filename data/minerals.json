@@ -1154,6 +1154,21 @@
 			"notes": "донатный допинг (GDD п.7): 100% бодрости + 50% голода; им же система учит есть при втором истощении (GDD п.9)"
 		},
 		{
+			"id": "medkit",
+			"name_ru": "Аптечка",
+			"category": "medical",
+			"price_coins": 0,
+			"weight_kg": {
+				"value": 0.5,
+				"proposed": true,
+				"note": "вес не задан владельцем; аптечка легче обеда (пельмени 1 кг), но заметна: пять аптечек в рюкзаке — это 2.5 кг руды, оставленной в шахте"
+			},
+			"max_stack": 99,
+			"hazard": [],
+			"sellable": false,
+			"notes": "раунд 4 (healing): продаётся в лавке за монеты (data/shop.json → goods_coins), применяется из рюкзака той же кнопкой, что еда; сколько лечит — data/healing.json → medkit"
+		},
+		{
 			"id": "fuel_block",
 			"name_ru": "Топливный блок",
 			"category": "crafted",

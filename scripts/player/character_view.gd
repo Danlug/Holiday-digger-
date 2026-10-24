@@ -1131,6 +1131,10 @@ func _process(delta: float) -> void:
 	var key: String = sheet_name
 	if mode == "air" or mode == "hurt":
 		key = "%s#%d" % [sheet_name, phase_frame]
+	elif mode == "dig" and _dig_cached_base.begins_with("dig_pick") \
+			and phase_frame == int(HeroAnim.num("dig.pick.impact", 3.0)):
+		# Кирка проносится сверху вниз за один кадр: прежняя поза тает следом — смаз удара.
+		key = sheet_name + "#hit"
 	if key != _cur_key:
 		if _cur_key != "" and _sprite.texture != null and mode != "rigdig" and mode != "rigfly":
 			_start_ghost()

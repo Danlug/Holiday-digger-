@@ -224,6 +224,8 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(_out)
 	if _shots_on:
 		DirAccess.make_dir_recursive_absolute(_out.path_join("shots"))
+		if _resume:
+			_next_periodic_shot = 20.0   # снимок с копии сейва (ночной прогон): кадр состояния сразу
 	_run()
 
 
@@ -417,7 +419,10 @@ func _step() -> void:
 		_next_periodic_shot += 300.0
 		_shot("periodic_%04d" % int(_sim / 60.0))
 	if (Time.get_ticks_msec() - _wall0) / 1000.0 > _wall_cap and not _stop:
-		T.finding("P2", "wall_cap", "прогон упёрся в лимит настенного времени %.0f с" % _wall_cap, _sim)
+		if _minutes >= 9999.0:
+			T.event(_sim, "wall_end", "ночной прогон: настенное время %.0f с вышло" % _wall_cap)   # плановый конец
+		else:
+			T.finding("P2", "wall_cap", "прогон упёрся в лимит настенного времени %.0f с" % _wall_cap, _sim)
 		_stop = true
 	if _sim >= _end + 600.0 and not _stop:
 		_stop = true   # страховка: свободная игра должна была кончиться раньше

@@ -1097,10 +1097,14 @@ func _should_return() -> String:
 	return ""
 
 
-## Чем дома поднять HP: сон и еда HP не лечат (ГДД §7), лечит только таблетка за доллары.
+## Чем дома поднять HP: с раунда 4 лечат сон и еда, аптечка продаётся за монеты, таблетка за
+## доллары — полное восстановление (ГДД §7 «Лечение»). Сон есть всегда — лечиться есть чем.
 func _can_heal() -> bool:
-	var g := ShopCatalog.good("full_restore_pill", "dollars")
-	return not g.is_empty() and GameState.dollars >= ShopCatalog.good_price(g, "dollars")
+	return true
+
+
+func _hp_low() -> bool:
+	return GameState.hp < GameState.get_max_hp() * float(C["ret_hp"]) / 100.0
 
 
 func _eat_in_mine() -> void:
@@ -1463,14 +1467,16 @@ func _home_visit() -> void:
 	await _shop()
 	_spend_skills()
 	_claim_meta()
-	_heal_at_home()
-	if GameState.hunger < float(C["eat_below"]) or _food_in_pack() < int(C["food_stock"]):
-		await _order_and_take_food(GameState.hunger < float(C["eat_below"]))
-	if GameState.stamina < float(C["sleep_below"]) and not _stop:
+	if GameState.hunger < float(C["eat_below"]) or _food_in_pack() < int(C["food_stock"]) \
+			or (_hp_low() and GameState.hunger < 60.0):
+		await _order_and_take_food(GameState.hunger < float(C["eat_below"]) or _hp_low())
+	# сон лечит (раунд 4): раненый ложится и с полной бодростью
+	if (GameState.stamina < float(C["sleep_below"]) or _hp_low()) and not _stop:
 		await _sleep()
 	if _stop or not GameState.house_is_indoors:
 		return
 	await _go_room("hall")
+	_heal_at_home()   # после сна: если HP всё ещё мало — аптечка, потом таблетка
 	if _sim >= _next_session and not _stop:
 		await _session_restart()
 		return   # новая сессия начинается у дома снаружи — дальше решает основной цикл
@@ -1779,6 +1785,7 @@ func _sleep() -> void:
 		_activity = "home"
 		return
 	var before := GameState.stamina
+	var hp_before := GameState.hp
 	if not await _house_press("sleep"):
 		_activity = "home"
 		return
@@ -1793,9 +1800,11 @@ func _sleep() -> void:
 		_view()._on_forced_pressed()
 		await _frames_n(3)
 	T.sleeps.append({"t": snappedf(_sim, 0.1), "before": snappedf(before, 0.1), "after": snappedf(GameState.stamina, 0.1),
-		"sec": snappedf(_sim - t0, 0.1)})
+		"sec": snappedf(_sim - t0, 0.1), "hp_before": snappedf(hp_before, 0.1), "hp_after": snappedf(GameState.hp, 0.1)})
 	T.mark("first_sleep", _sim)
-	if GameState.stamina <= before:
+	if GameState.hp > hp_before + 0.5:
+		T.event(_sim, "heal", "сон: HP %.0f → %.0f" % [hp_before, GameState.hp])
+	if GameState.stamina <= before and GameState.hp <= hp_before:
 		var plan := HouseSleep.plan(before, GameState.hunger)
 		if not bool(plan.get("ok", true)):
 			# отказ по правилу сна (голодным не уснёшь / бодрость почти полная) — не баг, а событие
@@ -1862,18 +1871,23 @@ func _session_restart() -> void:
 
 
 func _heal_at_home() -> void:
-	var low := GameState.hp < GameState.get_max_hp() * float(C["ret_hp"]) / 100.0
-	if not low:
+	if not _hp_low():
 		return
-	if _can_heal() and String(_view().room_id()) == "hall":
+	if String(_view().room_id()) == "hall":
 		var before := GameState.hp
+		var price := ShopCatalog.good_price(ShopCatalog.good("medkit", "coins"), "coins")
+		if bool(ShopService.buy("medkit", "coins").get("ok", false)):
+			T.purchases.append({"t": snappedf(_sim, 0.1), "id": "medkit", "kind": "good", "price": price})
+			if bool(HouseFood.eat("medkit").get("ok", false)):
+				T.event(_sim, "heal", "аптечка: HP %.0f → %.0f" % [before, GameState.hp])
+				return
 		var r := ShopService.buy("full_restore_pill", "dollars")
 		if bool(r.get("ok", false)):
 			T.event(_sim, "heal", "таблетка: HP %.0f → %.0f" % [before, GameState.hp])
 			T.purchases.append({"t": snappedf(_sim, 0.1), "id": "full_restore_pill", "kind": "good", "price": 0, "dollars": true})
 			return
-	T.finding("P2", "no_heal", "HP %.0f/%.0f, а лечиться нечем: сон и еда HP не возвращают, таблетка — только за доллары (их %d)" % [
-		GameState.hp, GameState.get_max_hp(), GameState.dollars], _sim, {}, "no_heal")
+	T.finding("P2", "no_heal", "HP %.0f/%.0f после сна, а лечиться нечем: на аптечку нет монет (%d), на таблетку — долларов (%d)" % [
+		GameState.hp, GameState.get_max_hp(), GameState.coins, GameState.dollars], _sim, {}, "no_heal")
 
 
 func _spend_skills() -> void:

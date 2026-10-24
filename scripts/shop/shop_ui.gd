@@ -127,8 +127,8 @@ static func open_shop() -> void:
 	instance.open(TAB_FOOD)
 
 
-## Витрина за доллары: открывается откуда угодно (обмен, ролики-награды), но
-## гаджеты в ней покупаются по правилу места — ShopService.can_buy (ГДД §15).
+## Витрина за доллары: открывается и покупает откуда угодно, без ролика
+## (решение владельца, раунд 4; ShopService.is_dollar_purchase, ГДД §15).
 static func open_premium() -> void:
 	if instance == null:
 		push_warning("ShopUI: магазин не подключён к сцене (см. scripts/main.gd)")
@@ -187,12 +187,16 @@ func open(tab: String = TAB_FOOD) -> void:
 
 ## Витрину открыли вне двери и не под землёй (меню или «Магазин» на огороде):
 ## плитки заперты, и сразу говорим почему. Под землёй не нужно — там плитки с
-## бейджем роликов, а отказ при пустом лимите объясняет сама плитка.
+## бейджем роликов, а отказ при пустом лимите объясняет сама плитка. Вкладке
+## без запертых местом плиток (за доллары всё покупается где угодно) объяснять
+## нечего.
 func _announce_place(tab: String) -> void:
 	if tab == SCREEN_EQUIP or tab == TAB_SELL:
 		return
 	var gate := ShopService.can_buy({"kind": "good"})
-	if not bool(gate["ok"]) and String(gate["place"]) != ShopService.PLACE_UNDERGROUND:
+	if bool(gate["ok"]) or String(gate["place"]) == ShopService.PLACE_UNDERGROUND:
+		return
+	if _tiles.values().any(func(t: ShopTile) -> bool: return t.offer.has("lock_reason")):
 		notice(String(gate["reason"]), 3.2)
 
 

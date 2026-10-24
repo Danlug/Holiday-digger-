@@ -31,23 +31,49 @@ const C_SPARK := [Color("FFE066"), Color("FFFFFF"), Color("FFB34D")]
 
 ## Виды частиц. n — число частиц при amount=1; tex — рисунок частицы;
 ## curve — как меняется размер (shrink/grow/none); fade — гаснуть к концу.
+const C_SMOKE := [Color("3A3633"), Color("5A5550"), Color("7C766E")]
+const C_SHARD := [Color("5A2438"), Color("8E3A4E"), Color("C21E3A"), Color("FF5570"), Color("FFD0D8")]
+const C_GLINT := [Color("FFFFFF"), Color("FFF2B0"), Color("BDF6FF")]
+
+## Виды частиц. n — число частиц при amount=1; tex — рисунок частицы; curve — как меняется размер
+## (shrink/grow/none); fade — гаснуть к концу; spin — вращение в град/с (±); add — аддитивное смешивание
+## (искры и блёстки светятся, а не красят). Порода и осколки — «кусочки» (chip) с гравитацией и вращением,
+## пыль — мягкие облачка (puff), искры и блёстки — лучики (glint).
 const PRESETS := {
-	"dig_dirt": {"n": 9, "life": 0.55, "vmin": 35.0, "vmax": 95.0, "spread": 75.0, "dir": Vector2(0, -1), "grav": 430.0,
-		"smin": 0.8, "smax": 1.4, "tex": "px", "cols": C_SOIL, "curve": "shrink", "fade": false},
+	"dig_dirt": {"n": 8, "life": 0.55, "vmin": 35.0, "vmax": 95.0, "spread": 75.0, "dir": Vector2(0, -1), "grav": 430.0,
+		"smin": 0.8, "smax": 1.4, "tex": "chip", "cols": C_SOIL, "curve": "shrink", "fade": false, "spin": 520.0},
 	"dig_stone": {"n": 8, "life": 0.5, "vmin": 40.0, "vmax": 110.0, "spread": 80.0, "dir": Vector2(0, -1), "grav": 460.0,
-		"smin": 0.8, "smax": 1.4, "tex": "px", "cols": C_STONE, "curve": "shrink", "fade": false},
-	"dig_ore": {"n": 10, "life": 0.55, "vmin": 40.0, "vmax": 115.0, "spread": 85.0, "dir": Vector2(0, -1), "grav": 440.0,
-		"smin": 0.8, "smax": 1.5, "tex": "px", "cols": C_STONE, "curve": "shrink", "fade": false},
-	"dig_gold": {"n": 13, "life": 0.65, "vmin": 40.0, "vmax": 125.0, "spread": 90.0, "dir": Vector2(0, -1), "grav": 400.0,
-		"smin": 0.5, "smax": 1.0, "tex": "dia", "cols": C_GOLD, "curve": "shrink", "fade": false},
+		"smin": 0.8, "smax": 1.4, "tex": "chip", "cols": C_STONE, "curve": "shrink", "fade": false, "spin": 640.0},
+	"dig_ore": {"n": 9, "life": 0.55, "vmin": 40.0, "vmax": 115.0, "spread": 85.0, "dir": Vector2(0, -1), "grav": 440.0,
+		"smin": 0.8, "smax": 1.5, "tex": "chip", "cols": C_STONE, "curve": "shrink", "fade": false, "spin": 600.0},
+	"dig_gold": {"n": 11, "life": 0.65, "vmin": 40.0, "vmax": 125.0, "spread": 90.0, "dir": Vector2(0, -1), "grav": 400.0,
+		"smin": 0.5, "smax": 1.0, "tex": "chip", "cols": C_GOLD, "curve": "shrink", "fade": false, "spin": 560.0},
+	"dig_puff": {"n": 5, "life": 0.6, "vmin": 6.0, "vmax": 24.0, "spread": 100.0, "dir": Vector2(0, -1), "grav": -10.0,
+		"smin": 0.7, "smax": 1.2, "tex": "puff", "cols": C_DUST, "curve": "grow", "fade": true, "damp": 24.0},
+	"ore_glint": {"n": 5, "life": 0.42, "vmin": 25.0, "vmax": 70.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": 0.0,
+		"smin": 0.7, "smax": 1.1, "tex": "glint", "cols": C_GLINT, "curve": "shrink", "fade": true, "damp": 90.0, "add": true},
+	"pickup_glint": {"n": 6, "life": 0.55, "vmin": 12.0, "vmax": 46.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": -30.0,
+		"smin": 0.6, "smax": 1.0, "tex": "glint", "cols": C_GLINT, "curve": "shrink", "fade": true, "damp": 40.0, "add": true},
 	"spark": {"n": 8, "life": 0.32, "vmin": 60.0, "vmax": 150.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": 0.0,
-		"smin": 0.7, "smax": 1.2, "tex": "px", "cols": C_SPARK, "curve": "shrink", "fade": false, "damp": 120.0},
+		"smin": 0.7, "smax": 1.2, "tex": "px", "cols": C_SPARK, "curve": "shrink", "fade": false, "damp": 120.0, "add": true},
 	"poof": {"n": 7, "life": 0.5, "vmin": 8.0, "vmax": 32.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": -14.0,
-		"smin": 0.6, "smax": 1.2, "tex": "dot", "cols": C_DUST, "curve": "grow", "fade": true, "damp": 30.0},
+		"smin": 0.6, "smax": 1.2, "tex": "puff", "cols": C_DUST, "curve": "grow", "fade": true, "damp": 30.0},
+	"land_dust_l": {"n": 5, "life": 0.45, "vmin": 22.0, "vmax": 58.0, "spread": 22.0, "dir": Vector2(-1, -0.18), "grav": -6.0,
+		"smin": 0.7, "smax": 1.2, "tex": "puff", "cols": C_DUST, "curve": "grow", "fade": true, "damp": 70.0},
+	"land_dust_r": {"n": 5, "life": 0.45, "vmin": 22.0, "vmax": 58.0, "spread": 22.0, "dir": Vector2(1, -0.18), "grav": -6.0,
+		"smin": 0.7, "smax": 1.2, "tex": "puff", "cols": C_DUST, "curve": "grow", "fade": true, "damp": 70.0},
+	"jump_puff": {"n": 4, "life": 0.38, "vmin": 10.0, "vmax": 30.0, "spread": 160.0, "dir": Vector2(0, -0.4), "grav": 0.0,
+		"smin": 0.5, "smax": 0.9, "tex": "puff", "cols": C_DUST, "curve": "grow", "fade": true, "damp": 60.0},
+	"rock_fall": {"n": 7, "life": 0.9, "vmin": 6.0, "vmax": 40.0, "spread": 40.0, "dir": Vector2(0, 1), "grav": 520.0,
+		"smin": 0.8, "smax": 1.6, "tex": "chip", "cols": C_STONE, "curve": "none", "fade": false, "spin": 480.0},
 	"hit_enemy": {"n": 9, "life": 0.3, "vmin": 70.0, "vmax": 150.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": 220.0,
-		"smin": 0.8, "smax": 1.3, "tex": "px", "cols": C_RED, "curve": "shrink", "fade": false},
-	"enemy_die": {"n": 18, "life": 0.7, "vmin": 40.0, "vmax": 130.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": 120.0,
-		"smin": 0.6, "smax": 1.3, "tex": "dot", "cols": C_RED, "curve": "shrink", "fade": true, "damp": 60.0},
+		"smin": 0.8, "smax": 1.3, "tex": "px", "cols": C_RED, "curve": "shrink", "fade": false, "add": true},
+	"enemy_die": {"n": 16, "life": 0.7, "vmin": 40.0, "vmax": 130.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": 160.0,
+		"smin": 0.9, "smax": 1.7, "tex": "chip", "cols": C_SHARD, "curve": "shrink", "fade": true, "damp": 50.0, "spin": 500.0},
+	"hit_flash": {"n": 2, "life": 0.14, "vmin": 0.0, "vmax": 5.0, "spread": 180.0, "dir": Vector2(0, -1), "grav": 0.0,
+		"smin": 1.7, "smax": 2.3, "tex": "glint", "cols": [Color.WHITE, Color("FFE9B0")], "curve": "shrink", "fade": true, "add": true},
+	"die_smoke": {"n": 6, "life": 0.8, "vmin": 8.0, "vmax": 28.0, "spread": 120.0, "dir": Vector2(0, -1), "grav": -26.0,
+		"smin": 0.8, "smax": 1.4, "tex": "puff", "cols": C_SMOKE, "curve": "grow", "fade": true, "damp": 26.0},
 	"levelup": {"n": 28, "life": 1.1, "vmin": 50.0, "vmax": 160.0, "spread": 70.0, "dir": Vector2(0, -1), "grav": 150.0,
 		"smin": 0.5, "smax": 1.1, "tex": "dia", "cols": C_LEVEL, "curve": "shrink", "fade": true, "damp": 40.0},
 	"coins": {"n": 8, "life": 0.85, "vmin": 70.0, "vmax": 140.0, "spread": 55.0, "dir": Vector2(0, -1), "grav": 400.0,
@@ -55,7 +81,7 @@ const PRESETS := {
 	"heal": {"n": 10, "life": 0.95, "vmin": 10.0, "vmax": 36.0, "spread": 45.0, "dir": Vector2(0, -1), "grav": -36.0,
 		"smin": 0.6, "smax": 1.0, "tex": "plus", "cols": C_HEAL, "curve": "none", "fade": true},
 	"fire": {"n": 14, "life": 0.6, "vmin": 15.0, "vmax": 48.0, "spread": 28.0, "dir": Vector2(0, -1), "grav": -90.0,
-		"smin": 0.6, "smax": 1.3, "tex": "dot", "cols": C_FIRE, "curve": "shrink", "fade": false},
+		"smin": 0.6, "smax": 1.3, "tex": "dot", "cols": C_FIRE, "curve": "shrink", "fade": false, "add": true},
 }
 
 const TEX_PATTERNS := {
@@ -63,6 +89,9 @@ const TEX_PATTERNS := {
 	"dot": [".##.", "####", "####", ".##."],
 	"plus": ["..#..", "..#..", "#####", "..#..", "..#.."],
 	"dia": ["..#..", ".###.", "#####", ".###.", "..#.."],
+	"chip": [".##", "###", "##."],
+	"puff": [".##.", "####", "####", ".##."],
+	"glint": ["..#..", "..#..", "##.##", "..#..", "..#.."],
 }
 
 var max_particles: int = 220
@@ -79,6 +108,7 @@ var _curves: Dictionary = {}
 var _fade_ramp: Gradient
 var _ramps: Dictionary = {}
 var _palette_cache: Dictionary = {}
+var _mat_add: CanvasItemMaterial
 
 var _popups: Array[Node2D] = []
 var _popup_free: Array[Node2D] = []
@@ -90,6 +120,13 @@ var _flash_tween: Tween
 var _fly_layer: CanvasLayer
 var _fliers_active: int = 0
 var _coin_tex: Texture2D
+
+## Магнит добычи: блёстки летят от выкопанной клетки к герою, разгоняясь (как будто тянет). Спрайты — пул
+## в этом же узле (мировые координаты); точку героя отдаёт magnet_target (его выставляет JuiceDirector).
+const MAG_MAX := 10
+var magnet_target: Callable = Callable()
+var _mag: Array = []
+var _mag_free: Array = []
 
 var _shake_amp: float = 0.0
 var _shake_dur: float = 0.0
@@ -107,7 +144,9 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		density = Juice.num("fx.web_density", 0.7)
 	_build_textures()
-	_build_pool(int(Juice.num("fx.emitters", 14.0)))
+	_mat_add = CanvasItemMaterial.new()
+	_mat_add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_build_pool(int(Juice.num("fx.emitters", 18.0)))
 
 	_flash_layer = CanvasLayer.new()
 	_flash_layer.layer = LAYER_FLASH
@@ -195,7 +234,8 @@ func burst(kind: String, pos: Vector2, amount: float = 1.0, tint: Color = Color(
 	var pr: Dictionary = PRESETS.get(kind, {})
 	if pr.is_empty() or _emitters.is_empty():
 		return
-	var n := int(round(float(pr["n"]) * amount * density))
+	var calm := Settings.reduce_motion and kind != "levelup" and kind != "heal" and kind != "coins"
+	var n := int(round(float(pr["n"]) * amount * density * (0.5 if calm else 1.0)))
 	n = clampi(n, 0, 60)
 	if n < 1:
 		return
@@ -234,6 +274,12 @@ func burst(kind: String, pos: Vector2, amount: float = 1.0, tint: Color = Color(
 	e.damping_min = damp * 0.6
 	e.damping_max = damp
 	e.lifetime_randomness = 0.3
+	var spin := float(pr.get("spin", 0.0))
+	e.angle_min = -180.0 if spin > 0.0 else 0.0
+	e.angle_max = 180.0 if spin > 0.0 else 0.0
+	e.angular_velocity_min = -spin if not calm else 0.0
+	e.angular_velocity_max = spin if not calm else 0.0
+	e.material = _mat_add if bool(pr.get("add", false)) else null
 	e.texture = _tex[pr["tex"]]
 	e.scale_amount_curve = _curves.get(pr["curve"])
 	e.color_ramp = _fade_ramp if pr["fade"] else null
@@ -249,8 +295,12 @@ func _ramp_for(kind: String, cols: Array, tint: Color) -> Gradient:
 	var key := kind
 	var colors: Array = cols
 	if tint.a > 0.0:
-		# Руда: серые осколки породы плюс вкрапления её цвета.
-		colors = [C_STONE[1], C_STONE[2], tint, tint, tint.lightened(0.35)]
+		if kind == "ore_glint" or kind == "pickup_glint":
+			# блёстки руды: её цвет, светлее и белый
+			colors = [tint.lightened(0.25), tint.lightened(0.6), Color.WHITE]
+		else:
+			# Руда: серые осколки породы плюс вкрапления её цвета.
+			colors = [C_STONE[1], C_STONE[2], tint, tint, tint.lightened(0.35)]
 		key = ""
 	elif _ramps.has(key):
 		return _ramps[key]
@@ -329,6 +379,64 @@ func _avg(items: Array) -> Color:
 		b += c.b
 	var k := float(maxi(items.size(), 1))
 	return Color(r / k, g / k, b / k)
+
+
+# ---------------------------------------------------------------------------
+# Магнит добычи
+# ---------------------------------------------------------------------------
+
+func active_magnets() -> int:
+	return _mag.size()
+
+
+## Пускает count блёсток цвета tint из мировой точки from к герою. «Меньше движения» и пустой магнит_target — ничего.
+func magnet(from: Vector2, tint: Color, count: int = 3) -> void:
+	if Settings.reduce_motion or not magnet_target.is_valid() or _emitters.is_empty():
+		return
+	for i in range(count):
+		if _mag.size() >= MAG_MAX:
+			return
+		var sp: Sprite2D
+		if not _mag_free.is_empty():
+			sp = _mag_free.pop_back()
+		else:
+			sp = Sprite2D.new()
+			sp.texture = _tex["dia"]
+			sp.material = _mat_add
+			add_child(sp)
+		sp.visible = false
+		sp.modulate = tint
+		_mag.append({"s": sp, "from": from + Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0)),
+				"t": 0.0, "dur": randf_range(0.34, 0.5), "delay": float(i) * 0.05, "bend": randf_range(-14.0, 14.0),
+				"last": i == count - 1, "tint": tint})
+
+
+func _tick_magnet(dt: float) -> void:
+	var target: Vector2 = magnet_target.call() if magnet_target.is_valid() else Vector2.ZERO
+	var i := _mag.size() - 1
+	while i >= 0:
+		var m: Dictionary = _mag[i]
+		var sp: Sprite2D = m.s
+		m.delay = float(m.delay) - dt
+		if float(m.delay) > 0.0:
+			i -= 1
+			continue
+		m.t = float(m.t) + dt / float(m.dur)
+		var u := clampf(float(m.t), 0.0, 1.0)
+		var e := u * u * (1.0 + 0.6 * (1.0 - u))     # медленный старт, рывок к герою
+		var from: Vector2 = m.from
+		var dir := target - from
+		var side := dir.orthogonal().normalized() * float(m.bend) * sin(PI * u)
+		sp.position = (from.lerp(target, e) + side).round()
+		sp.scale = Vector2.ONE * lerpf(0.9, 0.5, u)
+		sp.visible = true
+		if u >= 1.0:
+			if bool(m.last):
+				burst("pickup_glint", target, 0.5, m.tint)
+			sp.visible = false
+			_mag_free.append(sp)
+			_mag.remove_at(i)
+		i -= 1
 
 
 # ---------------------------------------------------------------------------
@@ -442,6 +550,8 @@ func is_shaking() -> bool:
 
 
 func _process(delta: float) -> void:
+	if not _mag.is_empty():
+		_tick_magnet(delta)
 	if _shake_amp <= 0.0:
 		return
 	_shake_t += delta

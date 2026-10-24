@@ -35,7 +35,28 @@ static func attach(host: Node) -> Node:
 	director.sfx = sfx
 	director.fx = fx
 	host.add_child(director)
+	_attach_world_light(host, world_root)
 	return director
+
+
+## Свет и тени мира (ветка «world-fx»): тоже «сок», поэтому подключаются здесь же и не требуют строки
+## в main.gd. Нужны мир, его рендер и герой; в хосте без них (тесты с заглушкой) тихо пропускаются.
+static func _attach_world_light(host: Node, world_root: Node) -> void:
+	if not ("world_view" in host and "player" in host and "world" in host):
+		return
+	if host.world_view == null or host.player == null or host.world == null:
+		return
+	if world_root.get_node_or_null("LightLayer") != null:
+		return
+	var shadows := ContactShadows.new()
+	shadows.player = host.player
+	shadows.world = host.world
+	world_root.add_child(shadows)
+	world_root.move_child(shadows, host.player.get_index())   # над тайлами и домом, под героем
+	var light := LightLayer.new()
+	light.world_view = host.world_view
+	light.player = host.player
+	world_root.add_child(light)
 
 
 static func config() -> Dictionary:

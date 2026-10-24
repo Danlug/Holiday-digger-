@@ -10,8 +10,19 @@ const SLASH_SIZE := Vector2(48, 48)
 const SLASH_TIME := 0.2
 
 var director: CombatDirector = null
+var _dt: float = 0.016
 
 var _sprites: Dictionary = {}
+## Вид монстра сверх спрайта: контактная тень, ореол телеграфа атаки, возраст для «появления».
+var _extras: Dictionary = {}
+var _shadow_tex: Texture2D = null
+var _halo_tex: Texture2D = null
+var _add_mat: CanvasItemMaterial = null
+var _boss_shadow: Sprite2D = null
+var _boss_glow: Sprite2D = null
+const SHADOW_PATH := "res://art/fx/shadow_blob.png"
+const HALO_PATH := "res://art/fx/glow_soft.png"
+const POP_TIME := 0.22      # появление: вырастает и проявляется
 var _boss_sprite: Sprite2D = null
 var _slash_tex: Texture2D = null
 var _slash_checked := false
@@ -23,11 +34,16 @@ const COL_STRIKE := Color(1.0, 0.86, 0.5)
 
 func _ready() -> void:
 	z_index = 1
+	_shadow_tex = load(SHADOW_PATH) if ResourceLoader.exists(SHADOW_PATH) else null
+	_halo_tex = load(HALO_PATH) if ResourceLoader.exists(HALO_PATH) else null
+	_add_mat = CanvasItemMaterial.new()
+	_add_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
 	if director == null or director.player == null:
 		return
+	_dt = dt
 	_sync_monsters()
 	_sync_boss()
 	var drawing: bool = not director.slashes.is_empty() or director.boss != null
@@ -56,9 +72,11 @@ func _sync_monsters() -> void:
 		var sheet := MonsterSheet.get_sheet(m.id)
 		if sheet.texture == null:
 			s.visible = false
+			_hide_extras(m)
 			continue
 		s.visible = _fog_visible(int(floor(m.x)), int(floor(m.y)))
 		if not s.visible:
+			_hide_extras(m)
 			continue
 		s.texture = sheet.texture
 		var anim: String = m.anim_name()
@@ -81,11 +99,16 @@ func _sync_monsters() -> void:
 			tint = Color(2.2, 2.2, 2.2)
 		if m.state == "dying":
 			tint.a = clampf(1.0 - (m.t - 0.35) / 0.35, 0.0, 1.0)
-		s.modulate = tint
+		_decorate(m, s, tint)
 	for m: Monster in _sprites.keys():
 		if not live.has(m):
 			(_sprites[m] as Sprite2D).queue_free()
 			_sprites.erase(m)
+			var ex: Dictionary = _extras.get(m, {})
+			for k in ["sh", "gl"]:
+				if ex.has(k) and is_instance_valid(ex[k]):
+					(ex[k] as Node).queue_free()
+			_extras.erase(m)
 
 
 func _sync_boss() -> void:
@@ -93,6 +116,9 @@ func _sync_boss() -> void:
 	if boss == null:
 		if _boss_sprite != null:
 			_boss_sprite.visible = false
+		if _boss_shadow != null:
+			_boss_shadow.visible = false
+			_boss_glow.visible = false
 		return
 	if _boss_sprite == null:
 		_boss_sprite = Sprite2D.new()
@@ -130,6 +156,114 @@ func _sync_boss() -> void:
 	if boss.state == BossLogic.DEAD:
 		tint.a = clampf(1.0 - (director.boss_death_t - 1.6) / 1.2, 0.0, 1.0)
 	_boss_sprite.modulate = tint
+	_decorate_boss(boss, sheet, tint)
+
+
+## Тень, ореол телеграфа, появление и «сжатие» при попадании — всё поверх готового спрайта монстра.
+func _decorate(m: Monster, s: Sprite2D, tint: Color) -> void:
+	var ex: Dictionary = _extras.get(m, {})
+	if ex.is_empty():
+		ex = {"age": 0.0, "key": -1, "row": -1}
+		ex["sh"] = _make_extra(_shadow_tex, false)
+		ex["gl"] = _make_extra(_halo_tex, true)
+		_extras[m] = ex
+		if not Settings.reduce_motion and m.state != "dormant":
+			Fx.burst("poof", Vector2(m.x, m.y + m.hh) * TILE, 0.7)   # вылез: облачко пыли у ног
+	var calm := Settings.reduce_motion
+	ex["age"] = float(ex["age"]) + _dt
+	var pop := 1.0 if calm else clampf(float(ex["age"]) / POP_TIME, 0.0, 1.0)
+	var ease := 1.0 - (1.0 - pop) * (1.0 - pop)
+	var base_scale := s.scale
+	var k := clampf(m.flash / 0.12, 0.0, 1.0) if not calm else 0.0
+	# появление: от 70% размера; попадание: чуть приплюснут и шире, ноги на месте
+	s.scale = Vector2(base_scale.x * (0.7 + 0.3 * ease) * (1.0 + 0.14 * k), base_scale.y * (0.7 + 0.3 * ease) * (1.0 - 0.08 * k))
+	var fh := MonsterSheet.get_sheet(m.id).frame_h
+	s.position.y += fh * 0.5 * (1.0 - s.scale.y / base_scale.y) if MonsterSheet.get_sheet(m.id).anchor_feet else 0.0
+	tint.a *= ease
+	s.modulate = tint
+
+	# земля под монстром — для тени (у летунов она внизу, и тень «показывает» высоту)
+	var foot_y := (m.y + m.hh) * TILE
+	var cx := int(floor(m.x))
+	var cy := int(floor(m.y + m.hh))
+	var key := cx * 4099 + cy
+	if int(ex["key"]) != key:
+		ex["key"] = key
+		var row := -1
+		for r in range(maxi(cy, 1), cy + 8):
+			if director.cw.solid(cx, r):
+				row = r
+				break
+		ex["row"] = row
+	var sh: Sprite2D = ex["sh"]
+	if sh != null:
+		var row2: int = ex["row"]
+		if row2 < 0 or m.state == "dormant" or m.state == "dead":
+			sh.visible = false
+		else:
+			var h := maxf(float(row2) * TILE - foot_y, 0.0)
+			var f := clampf(h / 96.0, 0.0, 1.0)
+			sh.visible = true
+			sh.position = Vector2(m.x * TILE, float(row2) * TILE - 1.5).floor()
+			var w := (m.hw * 2.0 + 0.25) * TILE * lerpf(1.0, 0.55, f)
+			sh.scale = Vector2(w / 24.0, lerpf(1.0, 0.6, f))
+			sh.modulate.a = lerpf(1.0, 0.3, f) * ease * (1.0 - clampf((m.t - 0.2) / 0.5, 0.0, 1.0) * (1.0 if m.state == "dying" else 0.0))
+	# телеграф удара: красный ореол, плотнее к концу замаха (читается и в темноте)
+	var gl: Sprite2D = ex["gl"]
+	if gl != null:
+		if m.telegraph and _halo_tex != null:
+			var wind := maxf(m.attack_cfg("windup", 0.4), 0.1)
+			var prog := clampf(m.t / wind, 0.0, 1.0)
+			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 60.0) if not calm else 1.0
+			gl.visible = true
+			gl.position = s.position
+			var d := maxf(m.hw, m.hh) * 2.0 * TILE * 2.6
+			gl.scale = Vector2(d, d) / HALO_PX
+			gl.modulate = Color(1.0, 0.28, 0.14, (0.28 + 0.4 * prog) * (0.75 + 0.25 * pulse))
+		else:
+			gl.visible = false
+
+
+const HALO_PX := 96.0
+
+
+func _make_extra(tex: Texture2D, additive: bool) -> Sprite2D:
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	sp.z_index = -1
+	sp.visible = false
+	if additive:
+		sp.material = _add_mat
+	add_child(sp)
+	return sp
+
+
+func _hide_extras(m: Monster) -> void:
+	var ex: Dictionary = _extras.get(m, {})
+	for k in ["sh", "gl"]:
+		if ex.has(k) and ex[k] != null:
+			(ex[k] as Sprite2D).visible = false
+
+
+## Босс: широкая тень на полу арены и красное свечение, пока идёт замах (TELEGRAPH).
+func _decorate_boss(boss: BossLogic, sheet: MonsterSheet, tint: Color) -> void:
+	if _boss_shadow == null:
+		_boss_shadow = _make_extra(_shadow_tex, false)
+		_boss_glow = _make_extra(_halo_tex, true)
+	var dead: bool = boss.state == BossLogic.DEAD
+	_boss_shadow.visible = _shadow_tex != null and not dead
+	_boss_shadow.position = Vector2(boss.center_x * TILE, boss.floor_y * TILE - 1.5).floor()
+	_boss_shadow.scale = Vector2(sheet.frame_w * 0.62 / 24.0, 1.7)
+	_boss_shadow.modulate.a = 1.0
+	var tele: bool = boss.state == BossLogic.TELEGRAPH
+	_boss_glow.visible = tele and _halo_tex != null
+	if _boss_glow.visible:
+		var prog := clampf(boss.t / maxf(boss._tele, 0.01), 0.0, 1.0)
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 70.0) if not Settings.reduce_motion else 1.0
+		_boss_glow.position = _boss_sprite.position
+		var d := sheet.frame_h * 1.25
+		_boss_glow.scale = Vector2(d, d) / HALO_PX
+		_boss_glow.modulate = Color(1.0, 0.24, 0.1, (0.25 + 0.4 * prog) * (0.75 + 0.25 * pulse))
 
 
 func _draw() -> void:

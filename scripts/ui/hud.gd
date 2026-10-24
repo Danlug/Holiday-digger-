@@ -180,7 +180,7 @@ func are_gauges_visible() -> bool:
 ## Экранная позиция (проектные единицы вьюпорта) центра элемента HUD — её
 ## берёт Fx.fly_to, чтобы монеты и предметы летели ровно в кошелёк/рюкзак.
 ## id: "coins", "dollars", "backpack", "hp", "hunger", "stamina", "menu",
-## "depth". Неизвестный id — центр экрана.
+## "depth", "tasks" (кнопка ежедневных заданий). Неизвестный id — центр экрана.
 ##
 ## Назван не get_anchor: у Control такой метод уже есть (get_anchor(Side) ->
 ## float), и GDScript не даёт его переопределить. Снаружи удобнее статический
@@ -277,6 +277,7 @@ func _build_gauges(parent: Control) -> void:
 	_stamina_bar = _make_gauge(bars, Color8(0xE8, 0xC5, 0x47), "stamina", "stamina")
 
 	_build_quest_button(box)
+	_anchors["tasks"] = DailyTasksButton.mount(box).button   # ежедневные задания (ветка daily-tasks, scripts/meta/); до онбординга скрыта
 
 
 func _make_gauge(parent: Control, color: Color, icon_name: String, anchor_id: String) -> HudBar:

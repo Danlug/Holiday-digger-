@@ -40,7 +40,8 @@ func _ready() -> void:
 	svc._poll()
 	check("флаг gold_sold включает мета-слой", MetaState.is_unlocked())
 	check("после включения выданы задания дня и недели",
-		(MetaState.sub("quests")["daily"] as Array).size() == 3 and (MetaState.sub("quests")["weekly"] as Array).size() == 2)
+		(MetaState.sub("quests")["daily"] as Array).size() == int(MetaData.quests()["daily"]["count"])
+		and (MetaState.sub("quests")["weekly"] as Array).size() == 2)
 	check("накопленное до включения выдано достижениями («Первый комок»)", Achievements.is_done("dug_1") and GameState.coins >= 50)
 	var ids: Array = []
 	for e in MenuRegistry.entries():

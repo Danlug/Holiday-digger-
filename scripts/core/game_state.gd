@@ -384,6 +384,7 @@ func spend_coins(amount: int) -> bool:
 		return false
 	coins -= amount
 	coins_changed.emit(coins)
+	emit_event(&"spent", {"currency": "coins", "amount": amount})   # задание «потрать N монет» (scripts/meta/)
 	return true
 
 
@@ -403,6 +404,7 @@ func spend_dollars(amount: int) -> bool:
 		return false
 	dollars -= amount
 	dollars_changed.emit(dollars)
+	emit_event(&"spent", {"currency": "dollars", "amount": amount})
 	return true
 
 
@@ -691,6 +693,10 @@ var ext: Dictionary = {}
 ##   chest_opened   {cell: Vector2i, tier: String, items: Dictionary, xp: int} — открыт тайник (scripts/mechanics)
 ##   fever_started  {cells: int} / fever_ended {} — лихорадка азарта: следующие клетки с двойной добычей
 ##   mastery_star   {item: String, star: int, xp: int} — звезда мастерства породы
+##   spent          {currency: String, amount: int} — списание в spend_coins/spend_dollars (любая
+##                  покупка, еда, крафт; «бесплатно» отладки не считается)
+##   ate            {id: String, hunger: float, stamina: float} — герой поел (рюкзак или стол дома,
+##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "proposed": true,
- "_legend": "Мета-слой (ветка «meta»): достижения. ВСЕ числа — предложение агента, не решение владельца (конвенция проекта: proposed). Названия и описания показываются ТОЛЬКО в подсказке Tip (решение владельца: на плитках — иконки и числа). tier: 1 бронза, 2 серебро, 3 золото; tier задаёт и рамку плитки, и очки дороги трофеев (points_by_tier). counter — счётчик мета-слоя: живые читаются из GameState (max_depth, level, artifacts, branches), остальные копятся по событиям шины (dug, dug_dirt, dug_stone, dug_ore, picked, kinds, m:<id>, sold_coins, sold_items, sales, bought, deaths, refueled, monsters, story_beats, quests, perfect_days, streak_best). Награда выдаётся сразу при получении.",
+ "_legend": "Мета-слой (ветка «meta»): достижения. ВСЕ числа — предложение агента, не решение владельца (конвенция проекта: proposed). Названия и описания показываются ТОЛЬКО в подсказке Tip (решение владельца: на плитках — иконки и числа). tier: 1 бронза, 2 серебро, 3 золото; tier задаёт и рамку плитки, и очки дороги трофеев (points_by_tier). counter — счётчик мета-слоя: живые читаются из GameState (max_depth, level, artifacts, branches), остальные копятся по событиям шины (dug, dug_dirt, dug_stone, dug_ore, picked, kinds, m:<id>, sold_coins, sold_items, sales, bought, deaths, refueled, monsters, story_beats, quests, perfect_days, streak_best, quest_streak_best — серия дней с открытым сундуком заданий). Награда выдаётся сразу при получении.",
  "points_by_tier": [1, 3, 5],
  "_road_note": "Дорога трофеев: очки копятся от достижений (points_by_tier) и от заданий (quests.json -> points). Ступень открывается на at очках (накопительно), награду забирают нажатием. big — крупный приз (плитка-сундук). Одноразовая: доллары здесь выдаются один раз за ступень и в недельный потолок не входят.",
  "road": [
@@ -102,6 +102,10 @@
   {"id": "streak_7", "glyph": "flame", "tier": 2, "counter": "streak_best", "target": 7, "reward": {"coins": 1000, "xp": 400},
    "name_ru": "Неделя с лопатой", "desc_ru": "Заходи за ежедневной наградой 7 дней подряд."},
   {"id": "streak_30", "glyph": "flame", "tier": 3, "counter": "streak_best", "target": 30, "reward": {"coins": 4000, "dollars": 2, "xp": 2000},
-   "name_ru": "Месяц каникул", "desc_ru": "Заходи за ежедневной наградой 30 дней подряд."}
+   "name_ru": "Месяц каникул", "desc_ru": "Заходи за ежедневной наградой 30 дней подряд."},
+  {"id": "tasks_streak_7", "glyph": "chest_open", "tier": 2, "counter": "quest_streak_best", "target": 7, "reward": {"coins": 1500, "xp": 600},
+   "name_ru": "Ни дня без задания", "desc_ru": "Открой сундук ежедневных заданий 7 дней подряд."},
+  {"id": "tasks_streak_30", "glyph": "chest_open", "tier": 3, "counter": "quest_streak_best", "target": 30, "reward": {"coins": 6000, "xp": 3000},
+   "name_ru": "Каникулы по расписанию", "desc_ru": "Открой сундук ежедневных заданий 30 дней подряд."}
  ]
 }

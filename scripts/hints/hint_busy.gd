@@ -64,7 +64,7 @@ static func _modal_open(tree: SceneTree) -> bool:
 	if ShopUI.instance != null and ShopUI.instance.is_open():
 		return true
 	var m := MetaService.instance
-	if m != null and is_instance_valid(m) and (m.hub.is_open() or m.popup.is_open()):
+	if m != null and is_instance_valid(m) and (m.hub.is_open() or m.popup.is_open() or (m.tasks != null and m.tasks.is_open())):   # tasks — окно ежедневных заданий
 		return true
 	for name in ["settings", "backpack", "diary", "equipment"]:
 		if HintConditions.screen_open(name):

@@ -91,6 +91,11 @@ func _test_max_by_materials() -> void:
 	GameState.inventory["scrap"] = 99
 	GameState.inventory["iron_ore"] = 99
 	check("полный рюкзак не режет MAX (99 + 23 = 122)", ShopService.max_craft("bronze") == 122)
+	var pill := ""
+	for o in ShopItems.recipe_offers():
+		if String(o["key"]) == "recipe:bronze":
+			pill = String((o["pill"] as Dictionary).get("text", ""))
+	check("на плитке плавки — на сколько хватает (×122)", pill == "×122")
 
 
 func _test_max_needs_workshop() -> void:

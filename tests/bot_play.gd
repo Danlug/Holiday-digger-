@@ -938,6 +938,20 @@ func _visit_station() -> void:
 	var ref = load("res://scripts/tech/fuel_refinery.gd") if ResourceLoader.exists("res://scripts/tech/fuel_refinery.gd") else null
 	if ref == null or not _has_static(ref, "refine"):
 		return
+	# Станция стоит правее устья тоннеля: пешком от двери герой проваливается в шахту —
+	# перепрыгиваем устье, как человек (прыжок с тягой).
+	var mouth_x := float(world.tunnel_mouth().x)
+	if player.x < mouth_x:
+		if not await _walk_to_x(mouth_x - 1.0, 40.0, 0.2):
+			return
+		var t0 := _sim
+		while player.x < mouth_x + 1.3 and _sim - t0 < 6.0 and player.y < 1.6:
+			bot.hold([KEY_D, KEY_W] if player.x < mouth_x + 0.9 else [KEY_D])
+			await _step()
+		bot.release_all()
+		if player.y >= 1.6:
+			T.finding("P2", "station_path", "до станции заправки не дойти пешком: путь от двери идёт через устье тоннеля", _sim)
+			return
 	if not await _walk_to_x(float(WorldGen.FUEL_STATION_X) + 1.0, 40.0, 0.4):
 		return
 	var made := 0

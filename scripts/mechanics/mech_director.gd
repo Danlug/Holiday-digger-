@@ -243,7 +243,9 @@ func _on_fever_started() -> void:
 	Haptics.buzz(70)
 	Fx.flash(Color(1.0, 0.85, 0.3, 0.22), 0.25)
 	if player != null:
-		Fx.burst("levelup", Vector2(float(player.x) * 32.0, float(player.y) * 32.0 - 12.0), 1.0)
+		var head := Vector2(float(player.x) * 32.0, float(player.y) * 32.0 - 12.0)
+		Fx.burst("levelup", head, 1.0)
+		Fx.float_icon(head + Vector2(0, -14), Mechanics.tex("fever"), "×2", COL_GOLD)
 	Feel.punch(0.02)
 	GameState.emit_event(&"fever_started", {"cells": streak.fever_cells})
 	fever_started.emit()
@@ -296,6 +298,16 @@ func open_chest(cell: Vector2i, tier: String) -> Dictionary:
 	if tier == "gold":
 		Fx.flash(Color(1.0, 0.9, 0.5, 0.25), 0.2)
 	Feel.punch(0.015 if tier == "wood" else 0.03)
+	# добыча «вылетает» из сундука в рюкзак: по значку на вид, до трёх штук веером
+	if not Settings.reduce_motion:
+		var from := _to_screen(pos)
+		var shown := 0
+		for id in items.keys():
+			var got_n := int(items[id]) - int(left.get(id, 0))
+			if got_n <= 0 or shown >= 5:
+				continue
+			shown += 1
+			Fx.fly_to(UiIcons.item_small(String(id), 16), from, HudAnchors.get_anchor("backpack"), mini(got_n, 3))
 	if not left.is_empty():
 		_full_warned[MechState.cell_key(cell)] = true
 		Fx.float_icon(pos + Vector2(0, -20), UiIcons.tex("weight"), "Полно", Color("FF8A6A"))

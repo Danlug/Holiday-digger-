@@ -655,6 +655,70 @@ def rot_rect(cx, cy, w, h, ang):
     return out
 
 
+def gen_full_restore_pill():
+    """Таблетка полного восстановления: классическая капсула 💊 — вытянутая, по диагонали «/»,
+    красная и белая половинки, шов, глянцевый блик и белый плюс с контуром на красной половине.
+    Свет сверху-слева идёт поперёк оси капсулы, поэтому ступени тона ложатся полосами вдоль неё.
+    Рисуем по маске «стадиона» (отрезок + два полукруга), без сглаживания: кромка держится
+    ступенькой в 45 градусов. Плюс вертикальный, не повёрнутый, с толщиной штриха в 2 пикселя и
+    на чётной сетке: при показе в 16x16 (тост, мелкий слот) он остаётся плюсом 5x5, а не крошится."""
+    R, LEN = 7.0, 33.0               # радиус и полная длина капсулы
+    HALF = LEN / 2 - R               # половина прямой части
+    S = 0.70710678                   # ось «/»: вдоль (S, -S), поперёк (S, S)
+    red = [rgba(h) for h in ("#FF8A9A", "#EC4A63", "#C9213D", "#A31A35", "#7A1230")]
+    wht = [rgba(h) for h in ("#FFFFFF", "#F5F8FB", "#DDE4EE", "#B4C0D2", "#8896AE")]
+    seam = rgba("#3A1220")
+    ink = rgba("#4A0A1A")            # контур плюса темнее самой тёмной ступени красного
+    cv = Cv()
+    for y in range(32):
+        for x in range(32):
+            dx, dy = x + 0.5 - 16, y + 0.5 - 16
+            u, v = S * (dx - dy), S * (dx + dy)
+            au = abs(u) - HALF
+            r = abs(v) if au <= 0 else math.hypot(au, v)
+            if r > R:
+                continue
+            t = v / R                          # -1 сверху-слева ... +1 снизу-справа
+            lo = (-0.55, 0.12, 0.58) if u < 0 else (-0.2, 0.3, 0.66)
+            i = 1 if t < lo[0] else 2 if t < lo[1] else 3 if t < lo[2] else 4
+            if r > R - 1.0 and t > 0.2:
+                i = 4                          # нижняя кромка: самый тёмный ободок
+            cv.px(x, y, (red if u < 0 else wht)[i])
+    # шов: красная половинка чуть «надета» на белую — тёмная черта и тень от ободка на белой стороне
+    for y in range(32):
+        for x in range(32):
+            k = x - y
+            c = cv.get(x, y)
+            if not c[3]:
+                continue
+            if k == 0:
+                cv.px(x, y, seam)
+            elif k == 1 and c in wht:
+                cv.px(x, y, wht[min(wht.index(c) + 1, 4)])
+    # глянцевый блик вдоль света: яркая черта на красной половине и короче — на белой
+    def gloss(u0, u1, v, c):
+        for k in range(int((u1 - u0) / S) + 1):
+            u = u0 + k * S
+            xx, yy = int(math.floor(16 + S * (u + v))), int(math.floor(16 + S * (v - u)))
+            if cv.get(xx, yy)[3]:
+                cv.px(xx, yy, c)
+    gloss(-14.5, -8.5, -4.6, red[0])
+    gloss(3.0, 8.0, -4.1, wht[0])
+    # плюс: белый, штрих 2 пикселя, длина 10, центр на узле чётной сетки (11, 21)
+    cx, cy = 11, 21
+    cross = {(x, y) for x in range(cx - 5, cx + 5) for y in (cy - 1, cy)}
+    cross |= {(x, y) for y in range(cy - 5, cy + 5) for x in (cx - 1, cx)}
+    for (x, y) in cross:
+        for ox in (-1, 0, 1):
+            for oy in (-1, 0, 1):
+                if (x + ox, y + oy) not in cross:
+                    cv.px(x + ox, y + oy, ink)
+    for (x, y) in cross:
+        cv.px(x, y, WHITE)
+    cv.outline()
+    cv.save("item_full_restore_pill")
+
+
 def gen_food():
     # белковый батончик: наклонная обёртка с полосой и надорванным концом
     cv = Cv()
@@ -753,23 +817,8 @@ def gen_food():
     cv.outline()
     cv.save("item_energy_bar")
 
-    # таблетка полного восстановления: капсула, крест и искры
-    cv = Cv()
-    cap = rot_rect(16, 16, 22, 11, -0.7)
-    cv.poly(cap, WHITE)
-    half = rot_rect(11, 21, 11, 11, -0.7)
-    cv.poly(rot_rect(10.5, 19.6, 12, 11, -0.7), rgba("#C21E3A"))
-    cv.poly(rot_rect(21.5, 12.4, 10, 11, -0.7), rgba("#F4F7FA"))
-    cv.line([(8, 14), (14, 9)], rgba("#FF8A9A"), 1)
-    cv.line([(17, 12), (22, 8)], WHITE, 1)
-    cv.rect(26, 4, 27, 8, rgba("#4DE094"))
-    cv.rect(24, 6, 29, 7, rgba("#4DE094"))
-    cv.px(5, 6, rgba("#FFE066"))
-    cv.px(4, 7, rgba("#FFE066"))
-    cv.px(6, 7, rgba("#FFE066"))
-    cv.px(5, 8, rgba("#FFE066"))
-    cv.outline()
-    cv.save("item_full_restore_pill")
+    # таблетка полного восстановления: капсула 💊 с плюсом (рисует gen_full_restore_pill)
+    gen_full_restore_pill()
 
     # часы-телепорт: ремешок, золотой корпус, синий циферблат со стрелками
     cv = Cv()

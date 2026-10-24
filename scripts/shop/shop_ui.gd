@@ -1041,6 +1041,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	_card_ok.pressed.connect(_confirm_card)
 	Tip.bind(_card_ok, String(offer["title"]), String(offer["body"]), String(offer["extra"]))
 	btns.add_child(_card_ok)
+	ProjectsScreen.decorate_card(panel, offer)   # ветка guidance: кнопка «цепочка» → экран «Проекты»
 
 	if ShopFx.reduced():
 		return

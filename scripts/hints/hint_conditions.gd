@@ -18,7 +18,7 @@ const FUNCTIONS := [
 	"skill_points", "artifacts", "menu_new", "daily_ready", "quest_claimable", "achievement_unseen",
 	"station_ready", "refine_ready", "tank_empty", "heat_over", "well_ready", "grave_news", "diary_unread",
 	"load_high", "sellable", "craft_ready", "tool_affordable", "hungry_food", "has_gear",
-	"combat_craftable", "combat_unworn",
+	"combat_craftable", "combat_unworn", "project_open",
 	"on_surface", "flag", "scene_seen", "depth", "event", "ext_true", "screen_open", "near_world",
 ]
 
@@ -108,6 +108,9 @@ static func _fn(name: String, p: Dictionary) -> bool:
 			return combat_craftable() != ""
 		"combat_unworn":
 			return combat_unworn() != ""
+		# --- проекты (ветка guidance): рецепт открылся, а постройки ещё нет ---
+		"project_open":
+			return ProjectChain.is_open(String(p.get("id", "")))
 		# --- общие ---
 		"on_surface":
 			return not GameState.house_is_indoors and GameState.player_depth <= int(_num(p, "max", 0))
@@ -314,6 +317,8 @@ static func screen_open(name: String) -> bool:
 			var cd = CombatService.director
 			var es = cd.get("equip_screen") if cd != null and is_instance_valid(cd) else null
 			return es != null and bool(es.call("is_open"))
+		"projects":
+			return ProjectsScreen.is_open_any()
 		"meta":
 			var m := MetaService.instance
 			return m != null and (m.hub.is_open() or m.popup.is_open() or (m.tasks != null and m.tasks.is_open()))

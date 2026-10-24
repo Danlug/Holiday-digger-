@@ -539,6 +539,7 @@ static func sell_offers(selected: Dictionary, remote: bool) -> Array:
 			"color": ShopArt.COL_GOLD}
 		if not remote:
 			o["selected"] = bool(selected.get(id, false))
+		ProjectChain.decorate_offer(o, id)   # «нужно для бура: 40/100» (ветка guidance)
 		out.append(o)
 	return out
 

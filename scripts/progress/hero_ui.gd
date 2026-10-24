@@ -22,6 +22,7 @@ const BRANCH_COLORS := {
 	"strength": Color8(0x8A, 0xA0, 0xD0),
 	"luck_multiplier": Color8(0xC0, 0x8A, 0xFF),
 	"luck_chance": Color8(0x58, 0xC2, 0x6A),
+	"greed": Color8(0xF0, 0x7A, 0x1E),   # ветка «Жадность»: цвет шкалы азарта (scripts/mechanics/streak_meter.gd)
 }
 
 

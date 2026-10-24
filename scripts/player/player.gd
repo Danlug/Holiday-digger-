@@ -209,6 +209,10 @@ var _rig_transition_durations: Array = []  # их длительности в с
 
 var frozen: bool = false       # true во время сцены смерти/катсцен — герой не управляется
 
+## Режим жадности (ГДД §20.1, scripts/mechanics/): MechDirector ставит множитель на
+## время режима. Больше 1 — клетка копается с первого удара, ход/полёт/падение быстрее.
+var greed_mult: float = 1.0
+
 # --- Отклик управления и копки (ветка aaa-feel; числа — data/feel.json) ---
 # Койот-время: прыжок можно нажать на пару кадров позже схода с уступа. Буфер:
 # «вверх», нажатое чуть раньше приземления, срабатывает на земле. Микро-пауза
@@ -649,8 +653,11 @@ func physics_tick(dt: float) -> void:
 	else:
 		_apply_intent(dt)
 
-	_move_x(dt)
-	_move_y(dt)
+	# Жадность ×N — N обычных шагов движения за кадр: та же траектория (и тот же
+	# урон от падения), только быстрее; столкновения проверяются на каждом шаге.
+	for _greed_step in maxi(1, roundi(greed_mult)):
+		_move_x(dt)
+		_move_y(dt)
 
 	# Счётчик кадров идёт ВСЕГДА. Пока он тикал только при копке и ходьбе,
 	# покой, падение и полёт стояли на первом кадре и выглядели статикой.
@@ -924,7 +931,8 @@ func _jump(coyote: bool = false) -> void:
 	on_ground = false
 	_coyote_left = 0.0
 	_jump_buffer_left = 0.0
-	_fly_arm_at_msec = Time.get_ticks_msec() + JUMP_TO_FLY_MS
+	# в жадности прыжок проходит в greed_mult раз быстрее — и тяга взводится так же
+	_fly_arm_at_msec = Time.get_ticks_msec() + JUMP_TO_FLY_MS / maxf(greed_mult, 1.0)
 	jumped.emit()
 
 
@@ -1194,6 +1202,9 @@ func _start_dig(tx: int, ty: int) -> void:
 			# Лава — 5 с вне зависимости от инструмента (решение владельца): цена в HP
 			# считается из этого времени (Heat.lava_cell_cost_hp).
 			total = Heat.lava_dig_seconds()
+	# Жадность: клетка — с первого удара. Лава — нет: её 5 с и цена в HP (решение владельца).
+	if greed_mult > 1.0 and type != TileTypes.Type.LAVA:
+		total = minf(total, GreedRules.dig_seconds(GameState.current_tool))
 
 	# Кредит микро-паузы: если копка идёт подряд, пауза уже «съела» часть времени
 	# следующей клетки — возвращаем её, чтобы темп копки не менялся.

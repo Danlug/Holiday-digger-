@@ -14,6 +14,7 @@ extends RefCounted
 ##   движение  : step step_grass step_stone jump land fly_start fly_stop fly_loop thud
 ##   герой     : hurt die respawn eat drink heal warn_low
 ##   прогресс  : pickup pickup_rare levelup skill_buy artifact quest_done reward
+##   механики  : greed_start greed_end (жадность азарта, scripts/mechanics/)
 ##   мир       : quake collapse lava_hiss door phone explosion
 ##   бой       : swing hit_enemy enemy_die boss_roar hurt_armor
 ##   музыка    : mus_surface mus_mine_1 mus_mine_2 mus_deep mus_boss mus_story

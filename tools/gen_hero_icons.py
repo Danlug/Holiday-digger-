@@ -2,7 +2,7 @@
 """gen_hero_icons.py — иконки экрана героя 16×16 → art/ui/hero/<имя>.png.
 
 Вкладки (шлем, узлы навыков, амфора, крестик), ветки прокачки (глаз, кирка,
-сердце, молния, окорок, гиря, подкова, клевер), служебные значки (замок,
+сердце, молния, окорок, гиря, подкова, клевер, пламя жадности), служебные значки (замок,
 галочка, звезда, глубина, самоцвет, рюкзак, монета, кубок, сундук) и пять
 самоцветов-гнёзд Перчатки Мироздания.
 
@@ -131,6 +131,16 @@ def sk_luck_chance(S):
     S.pxs([(4, 4), (9, 4), (4, 9), (9, 9)], C("#a8f0b0"))
 
 
+def sk_greed(S):
+    # Жадность: пламя азарта с самородком (как значок шкалы азарта в HUD).
+    S.poly([(8, 0), (11, 3), (13, 7), (14, 11), (12, 14), (8, 15), (4, 14), (2, 11), (2, 8), (4, 9),
+            (5, 5), (6, 7)], C("#f07a1e"))
+    S.poly([(8, 4), (10, 7), (11, 10), (10, 13), (6, 13), (5, 11), (6, 8), (7, 9)], C("#ffc83a"), bevel=False)
+    S.ell(8, 11, 2, 2, GOLD)
+    S.pxs([(7, 10)], GOLD_L)
+    S.pxs([(9, 2), (12, 7)], C("#ffb060"))
+
+
 def ui_lock(S):
     S.ell(8, 5, 3, 3, STEEL_D, bevel=False)
     S.ell(8, 5, 1, 1, OUT, bevel=False)
@@ -235,7 +245,7 @@ GEM_COLORS = {
 
 ICONS = [
     tab_hero, tab_skills, tab_museum, tab_close,
-    sk_vision, sk_dig_speed, sk_hp, sk_stamina, sk_hunger, sk_strength, sk_luck_multiplier, sk_luck_chance,
+    sk_vision, sk_dig_speed, sk_hp, sk_stamina, sk_hunger, sk_strength, sk_luck_multiplier, sk_luck_chance, sk_greed,
     ui_lock, ui_check, ui_star, ui_depth, ui_gem, ui_bag, ui_coin, ui_dollar, ui_trophy, ui_chest, ui_xp, ui_pip,
 ]
 

@@ -299,6 +299,9 @@ static func effect_text(branch: Dictionary, stage: int) -> String:
 		"table_dual":
 			var chance := Balance.get_luck_chance_percent(stage)
 			return "земля %.0f%%, ресурс %.0f%%" % [chance["earth"], chance["resource"]]
+		"greed":
+			# ветка «Жадность» (scripts/mechanics/greed_rules.gd): секунды режима и порог шкалы
+			return "жадность %d с, шкала %d клеток" % [roundi(GreedRules.seconds(stage)), GreedRules.threshold(stage)]
 		_:
 			return String(branch.get("notes", ""))
 

@@ -123,7 +123,7 @@ func _streak(fever: bool) -> void:
 	_stand_left_of(Vector2i(ch["cell"].x, ch["cell"].y))
 	d.streak.reset()
 	var y: int = ch["cell"].y
-	for i in range(55 if fever else 31):
+	for i in range(d.streak.fever_at + 4 if fever else 37):
 		d.streak.on_dug(y)
 	main.player.digging = {"x": int(main.player.x) + 1, "y": y, "t": 0.3, "total": 1.0, "type": TileTypes.Type.DIRT}
 	await _frames(40)

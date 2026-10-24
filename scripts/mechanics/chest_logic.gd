@@ -149,16 +149,24 @@ static func roll_loot(world: WorldGen, world_seed: int, cell: Vector2i, tier: St
 		var misses := 0
 		# тянем руду, пока ценность не набрана; штуку, с которой сундук перевалил бы
 		# за верх разброса, перетягиваем (алмаз в деревянном сундуке на 300 — это
-		# два «сундука» сразу), и после нескольких промахов останавливаемся
+		# два «сундука» сразу), и после нескольких промахов останавливаемся. Поэтому
+		# самоцветы глубины попадают в окованные и золотые сундуки, а не в деревянные
 		while n < hi and (n < lo or got < target) and misses < 6:
 			var pick := _draw(pool, total, rng)
 			var price := float(pick["price"])
-			if got + price > cap and n > 0:
+			if got + price > cap:
 				misses += 1
 				continue
 			items[pick["id"]] = int(items.get(pick["id"], 0)) + 1
 			got += price
 			n += 1
+		if n == 0:
+			# всё в породе дороже ценности сундука: одна штука самого дешёвого
+			var cheap: Dictionary = pool[0]
+			for p in pool:
+				if float(p["price"]) < float(cheap["price"]):
+					cheap = p
+			items[cheap["id"]] = 1
 	if bool(row.get("gem", false)):
 		var gem := _gem_for(cell.y)
 		if not gem.is_empty():

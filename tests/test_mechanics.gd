@@ -192,13 +192,13 @@ func _test_chest_loot() -> void:
 	check("ртуть, уран, торф и уголь из сундука не выпадают", forbidden == 0)
 	check("в каждом золотом сундуке самоцвет (%d из 200)" % gems, gems >= 200)
 	check("еда в сундуках бывает (%d)" % food, food > 100)
-	# ценность — «value_cells клеток копки» на любой глубине: в клетках она одна и та же
+	# ценность — «value_cells клеток копки» (у деревянного 3, но не меньше двух штук) на любой глубине
 	for y in [60, 300, 1200, 2500]:
 		var sum := 0.0
 		for i in range(80):
 			sum += float(ChestLogic.loot_value(ChestLogic.roll_loot(world, SEED, Vector2i(i % 32, y), "wood")["items"]))
 		var cells := sum / 80.0 / ChestLogic.cell_value(world, y)
-		check("деревянный сундук на %d ≈ 20 клеток копки (%.1f)" % [y, cells], cells > 14.0 and cells < 34.0)
+		check("деревянный сундук на %d ≈ 3 клетки копки (%.1f)" % [y, cells], cells > 1.5 and cells < 10.0)
 	# сундук-тайник не превращается в кошелёк: монет он не даёт вовсе
 	check("монет в добыче нет (только руда, еда, опыт)", not (a["items"] as Dictionary).has("coins"))
 
@@ -206,19 +206,22 @@ func _test_chest_loot() -> void:
 func _test_streak() -> void:
 	var s := StreakLogic.new()
 	var started := 0
-	for i in range(49):
+	var at := s.fever_at
+	var cells := s.fever_cells
+	check("лихорадка из данных: %d клеток подряд → %d двойных" % [at, cells], at == 60 and cells == 5)
+	for i in range(at - 1):
 		started += int(s.on_dug(40)["started"])
-	check("49 клеток — ещё не лихорадка", started == 0 and s.count == 49 and not s.in_fever())
+	check("%d клеток — ещё не лихорадка" % (at - 1), started == 0 and s.count == at - 1 and not s.in_fever())
 	var r := s.on_dug(40)
-	check("50-я клетка запускает лихорадку", bool(r["started"]) and s.in_fever() and s.fever_left == 6)
-	check("сама 50-я клетка не двойная", not bool(r["fever_cell"]))
+	check("%d-я клетка запускает лихорадку" % at, bool(r["started"]) and s.in_fever() and s.fever_left == cells)
+	check("сама клетка-порог не двойная", not bool(r["fever_cell"]))
 	var fever_cells := 0
 	var ended := false
-	for i in range(6):
+	for i in range(cells):
 		var q := s.on_dug(40)
 		fever_cells += int(q["fever_cell"])
 		ended = ended or bool(q["ended"])
-	check("ровно 6 клеток в лихорадке", fever_cells == 6 and ended and not s.in_fever())
+	check("ровно %d клеток в лихорадке" % cells, fever_cells == cells and ended and not s.in_fever())
 	check("после лихорадки серия с нуля", s.count == 0)
 	# пауза
 	for i in range(10):
@@ -228,7 +231,7 @@ func _test_streak() -> void:
 	s.on_dug(40)
 	check("клетка обнуляет паузу", s.idle == 0.0 and s.count == 11)
 	check("пауза дольше 2.5 с — серия сгорает", s.tick(2.6, false, true) and s.count == 0)
-	for i in range(55):
+	for i in range(at + 2):
 		s.on_dug(40)
 	check("лихорадка сгорает на паузе тоже", s.in_fever() and s.tick(3.0, false, true) and not s.in_fever())
 	for i in range(5):
@@ -359,12 +362,12 @@ func _test_director() -> void:
 	d.step(0.3)
 	check("рядом и есть место — остаток в рюкзаке", MechState.chest_left(cell2).is_empty() and not GameState.inventory.is_empty())
 
-	# лихорадка: 50 клеток подряд, потом руда — двойная
+	# лихорадка: fever_at клеток подряд, потом руда — двойная
 	GameState.inventory.clear()
 	d.streak.reset()
-	for i in range(50):
+	for i in range(d.streak.fever_at):
 		_dug(Vector2i(i % 32, 60), "", false)
-	check("50 клеток — лихорадка", d.streak.in_fever() and int(d.stats["fevers"]) == 1)
+	check("%d клеток подряд — лихорадка" % d.streak.fever_at, d.streak.in_fever() and int(d.stats["fevers"]) == 1)
 	GameState.add_item("silver", 1)   # копка кладёт свою штуку сама (Player), режиссёр — сверху
 	_dug(Vector2i(5, 61), "silver", true)
 	check("руда в лихорадке — вторая штука сверху", GameState.get_item_count("silver") == 2)

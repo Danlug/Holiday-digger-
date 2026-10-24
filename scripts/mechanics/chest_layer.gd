@@ -22,6 +22,7 @@ var _anims: Dictionary = {}      # Vector2i → секунд с начала о�
 var _entries: Array = []          # [{cell, tier, frame, alpha, left_icon}]
 var _sig: int = 0
 var _time: float = 0.0
+var _scan_left: float = 0.0
 
 
 func _ready() -> void:
@@ -46,11 +47,16 @@ func _process(delta: float) -> void:
 		_anims[c] = float(_anims[c]) + delta
 		if float(_anims[c]) > OPEN_S:
 			_anims.erase(c)
-	var sig := _collect()
+	# окрестность героя пересматривается 10 раз в секунду: туман открывает клетки
+	# по ходу, задержка в 0.1 с незаметна, а кадр мира не платит за обход полос
+	_scan_left -= delta
 	var animated := not _anims.is_empty() or (_has_bob() and not Settings.reduce_motion)
-	if sig != _sig or animated:
-		_sig = sig
-		queue_redraw()
+	if _scan_left <= 0.0 or animated:
+		_scan_left = 0.1
+		var sig := _collect()
+		if sig != _sig or animated:
+			_sig = sig
+			queue_redraw()
 
 
 func _has_bob() -> bool:

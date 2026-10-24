@@ -29,6 +29,7 @@ var _icon: Texture2D
 var _icon_fever: Texture2D
 var _edge: Control
 var _sb := StyleBoxFlat.new()
+var _place_left: float = 0.0
 
 
 func _ready() -> void:
@@ -62,13 +63,25 @@ func wanted() -> bool:
 
 func _process(delta: float) -> void:
 	_time += delta
-	_place()
 	var target := 1.0 if wanted() else 0.0
+	if target <= 0.0 and _alpha <= 0.0:
+		if visible:
+			visible = false
+			mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if _edge != null and is_instance_valid(_edge):
+				_edge.visible = false
+		return   # шкала спит: ни перерисовки, ни поиска якоря
+	_place_left -= delta
+	if _place_left <= 0.0:
+		_place_left = 0.5   # якорь HUD двигается только при повороте экрана — раз в полсекунды хватает
+		_place()
 	if Settings.reduce_motion:
 		_alpha = target
 	else:
 		_alpha = move_toward(_alpha, target, delta * (6.0 if target > 0.0 else 2.0))
-	visible = _alpha > 0.01
+	if _alpha <= 0.01:
+		_alpha = 0.0
+	visible = _alpha > 0.0
 	# Tip держит палец, только пока шкала видна: невидимая не должна ловить касание мира
 	mouse_filter = Control.MOUSE_FILTER_STOP if visible else Control.MOUSE_FILTER_IGNORE
 	modulate.a = _alpha

@@ -17,15 +17,15 @@ var fever_left: int = 0     # сколько клеток лихорадки о�
 var idle: float = 0.0       # секунд без копки подряд
 var fevers: int = 0         # сколько раз лихорадка начиналась (статистика журнала и тестов)
 
-var fever_at: int = 50
-var fever_cells: int = 6
+var fever_at: int = 60
+var fever_cells: int = 5
 var idle_break_s: float = 2.5
 var min_depth: int = 6
 
 
 func _init() -> void:
-	fever_at = maxi(1, int(MechData.num("streak", "fever_at", 50)))
-	fever_cells = maxi(1, int(MechData.num("streak", "fever_cells", 6)))
+	fever_at = maxi(1, int(MechData.num("streak", "fever_at", 60)))
+	fever_cells = maxi(1, int(MechData.num("streak", "fever_cells", 5)))
 	idle_break_s = MechData.num("streak", "idle_break_s", 2.5)
 	min_depth = int(MechData.num("streak", "min_depth", 6))
 

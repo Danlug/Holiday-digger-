@@ -265,6 +265,15 @@ func _scenarios() -> Dictionary:
 				if not GameState.owned_tools.has("hand_drill"):
 					GameState.owned_tools.append("hand_drill"),
 			"off": func() -> void: GameState.player_depth = 12},
+		"refine_ready": {
+			"on": func() -> void:
+				GameState.story_flags["fuel_station_built"] = true
+				GameState.player_depth = 0
+				if not GameState.owned_tools.has("hand_drill"):
+					GameState.owned_tools.append("hand_drill")
+				GameState.inventory.erase("fuel_block")
+				GameState.inventory["peat"] = FuelRefinery.per_block("peat") * 2,
+			"off": func() -> void: GameState.inventory["fuel_block"] = 2},
 		"tank_empty": {
 			"on": func() -> void:
 				GameState.current_tool = "hand_drill"

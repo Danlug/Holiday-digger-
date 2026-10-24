@@ -1,7 +1,7 @@
 class_name TechWorld
 extends Node2D
-## Объекты мира ветки «Техника»: станция заправки и скважина-качалка на огороде
-## и тёплое свечение клеток лавы. Узел лежит в ViewRoot сразу за WorldView и едет
+## Объекты мира ветки «Техника»: станция заправки с перегонным кубом и
+## скважина-качалка на огороде и тёплое свечение клеток лавы. Узел лежит в ViewRoot сразу за WorldView и едет
 ## с камерой, как дом.
 ##
 ## Свечение — мягкие аддитивные пятна поверх лавы (отдельный дочерний узел с
@@ -19,6 +19,7 @@ var world: WorldGen = null
 var fog: FogOfWar = null
 
 var _station_tex: Texture2D
+var _still_tex: Array = []
 var _well_tex: Array = []
 var _glow_tex: Texture2D
 var _glow_node: Node2D
@@ -31,6 +32,8 @@ var _last_cam: Vector2i = Vector2i(-9999, -9999)
 func _ready() -> void:
 	name = "TechWorld"
 	_station_tex = TechUi.tex("station")
+	for i in range(2):
+		_still_tex.append(TechUi.tex("still_%d" % i))
 	for i in range(4):
 		_well_tex.append(TechUi.tex("well_%d" % i))
 	_glow_tex = TechUi.tex("glow")
@@ -50,7 +53,7 @@ func _ready() -> void:
 
 
 func station_visible() -> bool:
-	return StoryState.has_flag("fuel_station_built") and GameState.era != "grandpa"
+	return FuelRefinery.station_built()
 
 
 func well_visible() -> bool:
@@ -106,11 +109,28 @@ func _rebuild_lava() -> void:
 func _draw() -> void:
 	if station_visible() and _station_tex != null:
 		draw_texture(_station_tex, Vector2(WorldGen.FUEL_STATION_X * TILE, TILE * 0.5 - SPRITE_H))
+		_draw_still()
 	if well_visible():
 		var frame: int = WELL_SEQUENCE[int(_t * WELL_FPS) % WELL_SEQUENCE.size()]
 		var tex: Texture2D = _well_tex[frame]
 		if tex != null:
 			draw_texture(tex, Vector2(WorldGen.WELL_X * TILE, TILE * 0.5 - SPRITE_H))
+
+
+## Перегонный куб правее колонки (станция = перегонка + заправка): огонь в топке
+## мигает, из колпака идёт пар. Нижний ряд куба — на одной линии с плитой станции.
+func _draw_still() -> void:
+	var tex: Texture2D = _still_tex[int(_t * 5.0) % 2] if _still_tex.size() == 2 else null
+	if tex == null:
+		return
+	var origin := Vector2((WorldGen.FUEL_STATION_X + 2) * TILE, TILE * 0.5 - 41.0)
+	draw_texture(tex, origin)
+	if Settings.reduce_motion:
+		return
+	for i in range(3):
+		var k := fmod(_t * 0.45 + float(i) / 3.0, 1.0)
+		var p := origin + Vector2(13.0 - 6.0 * k + sin(_t * 2.0 + float(i) * 2.1) * 1.5, 2.0 - 22.0 * k)
+		draw_circle(p.round(), 1.5 + 2.5 * k, Color(0.92, 0.9, 0.86, 0.5 * (1.0 - k)))
 
 
 func _draw_glow() -> void:

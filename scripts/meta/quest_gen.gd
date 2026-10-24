@@ -31,6 +31,17 @@ static func tier_for(max_depth: int) -> int:
 	return t
 
 
+## Шаблон годится игроку этой ступени: вид задания, диапазон ступеней и
+## «событие уже было на шине» (requires_seen).
+static func _eligible(t: Dictionary, kind: String, tier: int, seen: Dictionary) -> bool:
+	if not (t.get("kinds", []) as Array).has(kind):
+		return false
+	if tier < int(t.get("min_tier", 0)) or tier > int(t.get("max_tier", 99)):
+		return false
+	var need := String(t.get("requires_seen", ""))
+	return need == "" or bool(seen.get(need, false))
+
+
 ## kind: "daily"|"weekly"; period — номер суток или недели; seen — {event: true}.
 static func generate(kind: String, period: int, world_seed: int, max_depth: int, seen: Dictionary) -> Array:
 	var q: Dictionary = MetaData.quests()
@@ -38,17 +49,13 @@ static func generate(kind: String, period: int, world_seed: int, max_depth: int,
 	var tier := tier_for(max_depth)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash_seed("%s|%d|%d" % [kind, period, world_seed])
+	if _has_pools(cfg):
+		return _generate_slots(kind, period, cfg, tier, max_depth, seen, rng)
 
 	var pool: Array = []
 	for t in q["templates"]:
-		if not (t.get("kinds", []) as Array).has(kind):
-			continue
-		if tier < int(t.get("min_tier", 0)) or tier > int(t.get("max_tier", 99)):
-			continue
-		var need := String(t.get("requires_seen", ""))
-		if need != "" and not seen.get(need, false):
-			continue
-		pool.append(t)
+		if _eligible(t, kind, tier, seen):
+			pool.append(t)
 
 	var out: Array = []
 	var used_groups := {}
@@ -69,6 +76,92 @@ static func generate(kind: String, period: int, world_seed: int, max_depth: int,
 		used_groups[pick["group"]] = true
 		used_ids[pick["id"]] = true
 		out.append(_make(kind, period, i, pick, slots[mini(i, slots.size() - 1)], cfg, tier, max_depth))
+	return out
+
+
+static func _has_pools(cfg: Dictionary) -> bool:
+	for sl in cfg.get("slots", []):
+		if (sl as Dictionary).has("pool"):
+			return true
+	return false
+
+
+## Ежедневные — по слотам (копка, продажа, трата, забота, «охота»): у каждого
+## слота свой пул шаблонов с весами, так в наборе дня всегда есть копка и нет
+## двух заданий об одном.
+static func _generate_slots(kind: String, period: int, cfg: Dictionary, tier: int, max_depth: int,
+		seen: Dictionary, rng: RandomNumberGenerator) -> Array:
+	var out: Array = []
+	var used := {}
+	var slots: Array = cfg["slots"]
+	for i in range(mini(int(cfg.get("count", slots.size())), slots.size())):
+		var slot: Dictionary = slots[i]
+		var pick := _pick_from_pool(slot, kind, tier, seen, used, rng)
+		if pick.is_empty():
+			continue
+		used[pick["id"]] = true
+		out.append(_make(kind, period, i, pick, slot, cfg, tier, max_depth))
+	return out
+
+
+static func _pool_candidates(slot: Dictionary, kind: String, tier: int, seen: Dictionary, exclude: Dictionary) -> Array:
+	var cands: Array = []
+	var pool: Dictionary = slot.get("pool", {})
+	for tid in pool.keys():
+		if exclude.has(tid):
+			continue
+		var t := MetaData.template(String(tid))
+		if t.is_empty() or not _eligible(t, kind, tier, seen):
+			continue
+		var w := float(pool[tid])
+		if w > 0.0:
+			var c := t.duplicate()
+			c["weight"] = w
+			cands.append(c)
+	return cands
+
+
+static func _pick_from_pool(slot: Dictionary, kind: String, tier: int, seen: Dictionary,
+		exclude: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	var cands := _pool_candidates(slot, kind, tier, seen, exclude)
+	if cands.is_empty():
+		return {}
+	return _weighted(cands, rng)
+
+
+## Есть ли чем заменить задание слота (другой шаблон пула, которого нет в наборе дня).
+static func can_reroll(q: Dictionary, day_set: Array, seen: Dictionary) -> bool:
+	return not _pool_candidates(_slot_cfg(q), String(q["kind"]), int(q["tier"]), seen, _tpls_of(day_set)).is_empty()
+
+
+## Замена задания: другой шаблон того же слота, детерминированно от (сутки, сид,
+## слот, номер замены) — переустановка не даёт «перебросить» ещё раз.
+static func reroll(q: Dictionary, day_set: Array, world_seed: int, max_depth: int, seen: Dictionary, n: int) -> Dictionary:
+	var kind := String(q["kind"])
+	var day := int(String(q["id"]).split(":")[1])
+	var slot_idx := int(q["slot"])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash_seed("%s|%d|%d|reroll|%d|%d" % [kind, day, world_seed, slot_idx, n])
+	var tier := int(q["tier"])
+	var pick := _pick_from_pool(_slot_cfg(q), kind, tier, seen, _tpls_of(day_set), rng)
+	if pick.is_empty():
+		return {}
+	var cfg: Dictionary = MetaData.quests()[kind]
+	var nq := _make(kind, day, slot_idx, pick, _slot_cfg(q), cfg, tier, max_depth)
+	nq["id"] = "%s:%d:%d:r%d" % [kind, day, slot_idx, n]
+	return nq
+
+
+static func _slot_cfg(q: Dictionary) -> Dictionary:
+	var slots: Array = MetaData.quests().get(String(q["kind"]), {}).get("slots", [])
+	var i := int(q.get("slot", 0))
+	return slots[i] if i >= 0 and i < slots.size() else {}
+
+
+static func _tpls_of(day_set: Array) -> Dictionary:
+	var out := {}
+	for q in day_set:
+		out[String(q["tpl"])] = true
 	return out
 
 

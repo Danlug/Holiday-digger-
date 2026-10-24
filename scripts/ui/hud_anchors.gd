@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ##   Fx.fly_to(icon, from_screen, HudAnchors.get_anchor("coins"), 5)
 ##
-## id: coins, dollars, backpack, hp, hunger, stamina, menu, depth. Координаты —
+## id: coins, dollars, backpack, hp, hunger, stamina, menu, depth, tasks. Координаты —
 ## проектные единицы вьюпорта (224×480), центр элемента. Без HUD в дереве
 ## (тесты, --script) отдаёт центр экрана — летящая иконка не улетит в угол.
 ## Статический, а не метод HUD: HUD — Control, а у Control уже есть свой

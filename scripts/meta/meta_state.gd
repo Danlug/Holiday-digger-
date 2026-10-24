@@ -8,11 +8,13 @@ extends RefCounted
 ## JSON возвращает числа как float — все чтения приводятся через int().
 ##
 ## Схема:
-##   hw        — высшая отметка суток (UTC), «сегодня» не идёт назад
+##   hw        — высшая отметка местных суток, «сегодня» не идёт назад
 ##   unlocked  — онбординг пройден (первая продажа золота), мета включена
 ##   daily     — last (сутки последней награды), streak, best, pos (индекс
 ##               следующей плитки 0..6), cycles (пройденных недель подряд)
-##   quests    — day, week, daily[], weekly[], bonus_claimed
+##   quests    — day, week, daily[], weekly[], bonus_claimed; streak {n, last, best} —
+##               дни подряд с открытым сундуком; rerolls/free_rerolls — замены за
+##               сутки; opened — сутки, когда набор дня открывали (бейдж «новое»)
 ##   c         — счётчики событий (dug, picked, sold_coins, …)
 ##   minerals  — добыча по видам {id: штук}
 ##   ach       — получено {id: сутки}; seen — просмотрено игроком {id: true}
@@ -29,7 +31,8 @@ static func _fresh() -> Dictionary:
 	return {
 		"v": VERSION, "hw": 0, "unlocked": false,
 		"daily": {"last": -1, "streak": 0, "best": 0, "pos": 0, "cycles": 0},
-		"quests": {"day": -1, "week": -1, "daily": [], "weekly": [], "bonus_claimed": false},
+		"quests": {"day": -1, "week": -1, "daily": [], "weekly": [], "bonus_claimed": false,
+			"streak": {"n": 0, "last": -1, "best": 0}, "rerolls": 0, "free_rerolls": 0, "opened": -1},
 		"c": {}, "minerals": {}, "ach": {}, "seen": {}, "pts": 0, "road": [],
 		"wk_dollars": {"week": -1, "n": 0}, "events": {},
 	}
@@ -66,10 +69,10 @@ static func geti(d: Dictionary, key: String, default: int = 0) -> int:
 	return int(d.get(key, default))
 
 
-## Сегодняшние сутки UTC, не меньше когда-либо виденных (см. MetaClock).
+## Сегодняшние местные сутки, не меньше когда-либо виденных (см. MetaClock).
 static func today() -> int:
 	var s := root()
-	var real := MetaClock.real_day()
+	var real := MetaClock.local_day()
 	var hw := int(s["hw"])
 	if real < hw:
 		return hw

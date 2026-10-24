@@ -16,7 +16,7 @@ static var _warned: Dictionary = {}
 ## Известные имена условий (тест следит, что правила из JSON не ссылаются на опечатки).
 const FUNCTIONS := [
 	"skill_points", "artifacts", "menu_new", "daily_ready", "quest_claimable", "achievement_unseen",
-	"station_ready", "tank_empty", "heat_over", "well_ready", "grave_news", "diary_unread",
+	"station_ready", "refine_ready", "tank_empty", "heat_over", "well_ready", "grave_news", "diary_unread",
 	"load_high", "sellable", "craft_ready", "tool_affordable", "hungry_food", "has_gear",
 	"combat_craftable", "combat_unworn",
 	"on_surface", "flag", "scene_seen", "depth", "event", "ext_true", "screen_open", "near_world",
@@ -68,8 +68,9 @@ static func _fn(name: String, p: Dictionary) -> bool:
 			return MetaState.is_unlocked() and Achievements.unseen_count() > 0
 		# --- техника ---
 		"station_ready":
-			return StoryState.has_flag("fuel_station_built") and GameState.era != "grandpa" \
-				and _owns_fuel_tool()
+			return FuelRefinery.station_built() and _owns_fuel_tool()
+		"refine_ready":
+			return refine_ready()
 		"tank_empty":
 			var t := GameState.current_tool
 			return FuelTank.uses_fuel(t) and not FuelTank.has_fuel(t)
@@ -191,6 +192,18 @@ static func _owns_fuel_tool() -> bool:
 	return false
 
 
+## Станция стоит, техника на топливе есть, блоков нет нигде — а сырья на блок уже хватает.
+static func refine_ready() -> bool:
+	if not FuelRefinery.station_built() or not _owns_fuel_tool():
+		return false
+	if FuelTank.in_pack() + FuelTank.in_storage() > 0:
+		return false
+	for raw in FuelRefinery.inputs():
+		if FuelRefinery.is_unlocked(String(raw)) and FuelRefinery.max_blocks(String(raw)) > 0:
+			return true
+	return false
+
+
 static func has_food() -> bool:
 	for id in GameState.inventory.keys():
 		if int(GameState.inventory[id]) > 0 and HouseConfig.is_food(String(id)):
@@ -303,7 +316,7 @@ static func screen_open(name: String) -> bool:
 			return es != null and bool(es.call("is_open"))
 		"meta":
 			var m := MetaService.instance
-			return m != null and (m.hub.is_open() or m.popup.is_open())
+			return m != null and (m.hub.is_open() or m.popup.is_open() or (m.tasks != null and m.tasks.is_open()))
 	return false
 
 

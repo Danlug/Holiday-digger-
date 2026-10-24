@@ -161,5 +161,5 @@ func _on_fuel_pressed() -> void:
 	Sfx.play("ui_deny")
 	Haptics.buzz(30)
 	var why := "Бак полон" if FuelTank.room_blocks(tool) <= 0 else "В рюкзаке нет топливных блоков"
-	Tip.set_text(_fuel_btn, FuelTank.tool_name(tool), why, "станция заправки — в огороде")
+	Tip.set_text(_fuel_btn, FuelTank.tool_name(tool), why, "торф в блоки — на станции в огороде")
 	Tip.show_now(_fuel_btn)

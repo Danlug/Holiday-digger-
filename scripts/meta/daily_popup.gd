@@ -313,7 +313,7 @@ func _claim(mult: float) -> void:
 	var tile: Control = _tiles[idx]
 	var origin := tile.global_position + tile.size * 0.5
 	var grand := bool(res["grand"])
-	MetaFx.claim(get_tree(), origin, res["reward"], grand)
+	MetaFx.claim(get_tree(), origin, res["reward"], grand, {}, true)
 	_streak_label.text = str(int(res["streak"]))
 	UiAnim.pulse(_streak_label, 0.5, 0.4)
 	UiAnim.pulse(_hero, 0.25, 0.4)

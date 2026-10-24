@@ -53,6 +53,7 @@ static func eat_now(id: String) -> Dictionary:
 	var stamina_gain: float = minf(HouseConfig.food_stamina_percent(id), 100.0 - GameState.stamina)
 	GameState.set_hunger(GameState.hunger + HouseConfig.food_hunger_percent(id))
 	GameState.set_stamina(GameState.stamina + HouseConfig.food_stamina_percent(id))
+	GameState.emit_event(&"ate", {"id": id, "hunger": hunger_gain, "stamina": stamina_gain})   # задание «поешь N раз»
 	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "reason": ""}
 
 
@@ -102,6 +103,7 @@ static func eat(id: String) -> Dictionary:
 	GameState.remove_item(id, 1)
 	GameState.set_hunger(GameState.hunger + HouseConfig.food_hunger_percent(id))
 	GameState.set_stamina(GameState.stamina + HouseConfig.food_stamina_percent(id))
+	GameState.emit_event(&"ate", {"id": id, "hunger": hunger_gain, "stamina": stamina_gain})   # задание «поешь N раз»
 	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "reason": ""}
 
 

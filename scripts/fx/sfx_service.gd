@@ -44,6 +44,7 @@ var _music_tween: Tween
 var _pending_music: Dictionary = {}
 var _music_streams: Dictionary = {}
 
+var _poll_t: float = 0.0
 var _duck_db: float = 0.0
 var _duck_target: float = 0.0
 var _duck_until_ms: int = 0
@@ -368,6 +369,14 @@ func _apply_music_volume(i: int) -> void:
 
 
 func _process(delta: float) -> void:
+	# Разблокировка звука в вебе не зависит от того, кто «съел» событие ввода: касания и клики внутри игры
+	# забирает HUD раньше нас, и звука не было вовсе. Звук можно включать, как только браузерный
+	# аудиоконтекст уже запущен нажатием на заставке (веб-оболочка) или игрок что-то нажал.
+	if require_gesture and not unlocked:
+		_poll_t -= delta
+		if _poll_t <= 0.0:
+			_poll_t = 0.25
+			_apply_audio_poll(_web_audio_running() or Input.is_anything_pressed())
 	var target := _duck_target
 	if Time.get_ticks_msec() > _duck_until_ms:
 		target = 0.0
@@ -387,6 +396,20 @@ func _input(event: InputEvent) -> void:
 		return
 	if (event is InputEventMouseButton and event.pressed) or (event is InputEventScreenTouch and event.pressed) \
 			or (event is InputEventKey and event.pressed) or (event is InputEventJoypadButton and event.pressed):
+		unlock()
+
+
+## Веб-оболочка (web/shell.src.html) создаёт и будит AudioContext в жесте «Нажмите, чтобы играть»
+## и отдаёт его движку; здесь только спрашиваем, работает ли он.
+func _web_audio_running() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var v = JavaScriptBridge.eval("(window.RaskopkiShell && window.RaskopkiShell.audioStates) ? (window.RaskopkiShell.audioStates().indexOf('running') >= 0) : false")
+	return bool(v)
+
+
+func _apply_audio_poll(allowed: bool) -> void:
+	if allowed:
 		unlock()
 
 

@@ -224,6 +224,15 @@ func _test_sfx_service() -> void:
 	for m in sfx._music:
 		any_playing = any_playing or m.playing
 	check("после жеста отложенная музыка включается", any_playing)
+	# браузерный аудиоконтекст уже запущен нажатием на заставке — игровой ввод для звука не нужен
+	# (касания и клики внутри игры забирает HUD раньше сервиса; из-за этого звука не было совсем)
+	sfx.require_gesture = true
+	sfx.unlocked = false
+	sfx._apply_audio_poll(false)
+	check("опрос без разрешения звук не включает", not sfx.unlocked)
+	sfx._apply_audio_poll(true)
+	check("запущенный аудиоконтекст разблокирует звук без игрового ввода", sfx.unlocked)
+	check("вне веба аудиоконтекст не считается запущенным", not sfx._web_audio_running())
 	sfx.require_gesture = false
 	sfx.stop_music(0.01)
 	_stop_all(sfx)

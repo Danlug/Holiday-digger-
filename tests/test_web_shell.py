@@ -60,6 +60,10 @@ def test_built():
 		check("подстановка Godot " + ph, ph in html)
 	check('ровно один тег <script src="$GODOT_URL"></script> (по нему работает штамп сборки)',
 		html.count('<script src="$GODOT_URL"></script>') == 1)
+	# Таймер «engine init timeout» считает от конца скачивания: от открытия страницы он ронял
+	# игру на 99% на мобильной сети без кэша (iPhone, инкогнито, скачивание дольше 90 с).
+	check("сторож запуска считает от конца скачивания, а не от открытия страницы",
+		"downloadedAt" in html and "performance.now() - t0 > 90000" not in html)
 	return html
 
 

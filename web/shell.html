@@ -416,10 +416,15 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 	}, function (err) {
 		shell.fail('load', err && err.message ? err.message : err);
 	});
-	// Если качалось всё, а движок так и не поднялся — не висеть на 100% вечно.
+	// Если качалось всё, а движок так и не поднялся — не висеть на 100% вечно. Отсчёт — от конца
+	// скачивания, а не от открытия страницы: на мобильной сети без кэша (инкогнито) одно скачивание
+	// идёт дольше 90 с, и прежний таймер ронял игру на 99%, пока движок ещё собирался.
+	var downloadedAt = 0;
 	var watchdog = setInterval(function () {
 		if (shell.phase !== 'loading') { clearInterval(watchdog); return; }
-		if (shown >= 0.98 && !loaded && performance.now() - t0 > 90000) { clearInterval(watchdog); shell.fail('load', 'engine init timeout'); }
+		if (shown < 0.98 || loaded) { return; }
+		if (!downloadedAt) { downloadedAt = performance.now(); $('loadLabel').textContent = 'Подготовка'; return; }
+		if (performance.now() - downloadedAt > 120000) { clearInterval(watchdog); shell.fail('load', 'engine init timeout'); }
 	}, 2000);
 
 	// ---------- жест: звук, полный экран, старт

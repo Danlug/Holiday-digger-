@@ -1465,6 +1465,12 @@ func _reserved_materials() -> Dictionary:
 			var need := int(r["inputs"][id]) - HouseStorage.count(String(id))
 			if need > 0:
 				keep[String(id)] = int(keep.get(String(id), 0)) + need
+				# материал, который не копают, а плавят (бронза из металлолома), — копим сырьё
+				for r2 in ShopCatalog.recipes():
+					if String(r2.get("kind", "")) == "item" and String(r2["output"]["id"]) == String(id):
+						var per := maxi(1, int(r2["output"]["count"]))
+						for in_id in r2["inputs"].keys():
+							keep[String(in_id)] = int(keep.get(String(in_id), 0)) + int(ceil(float(need) / per)) * int(r2["inputs"][in_id])
 		break   # копим на один проект за раз — как человек
 	return keep
 

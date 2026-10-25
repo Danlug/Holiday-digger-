@@ -78,8 +78,15 @@ static func face_index(face: String) -> int:
 
 
 ## Прямоугольник кадра в листе: строка — выражение, столбец — idle/talk/blink.
-static func region(face: String, frame: int) -> Rect2:
-	return Rect2(frame * CELL, face_index(face) * CELL, CELL, CELL)
+## cell — сторона кадра в текселях листа (64; у мальчика по эталону — 128,
+## пиксель рисунка 2×2, см. tools/gen_hero_ref.py).
+static func region(face: String, frame: int, cell: int = CELL) -> Rect2:
+	return Rect2(frame * cell, face_index(face) * cell, cell, cell)
+
+
+## Сторона кадра листа по его ширине (кадров в ряду — FRAMES).
+static func cell_of(tex: Texture2D) -> int:
+	return CELL if tex == null else maxi(1, int(tex.get_width()) / FRAMES.size())
 
 
 static func side(who: String) -> String:

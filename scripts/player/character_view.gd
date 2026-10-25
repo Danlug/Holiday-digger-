@@ -89,7 +89,7 @@ const SHEET_ANIM_DIV := {
 
 ## Листы копки, нарисованные отдельно для копки вниз и для копки вбок.
 ## Ключ — общее имя набора, к нему приписывается "_down" или "_side".
-const DIG_SHEETS := ["idle", "walk", "fall", "fly", "fly_jet",
+const DIG_SHEETS := ["idle", "walk", "walk_turn", "fall", "fly", "fly_jet",
 		"fly_1", "fly_2", "fly_3", "fly_4",
 		"dig_shovel", "dig_pick", "dig_pick_rusty",
 		"dig_drill_down", "dig_drill_side", "dig_rig_down", "dig_rig_side",
@@ -214,14 +214,17 @@ func _ready() -> void:
 	for sheet: String in DIG_SHEETS:
 		var path: String = "res://art/character/" + sheet + ".png"
 		if ResourceLoader.exists(path):
-			_sheets[sheet] = load(path)
+			# Путь, а не текстура: лист грузится при первом показе (_tex_for_sheet).
+			# Листы мальчика ×8 — десятки МБ видеопамяти, а за игру нужны стойка,
+			# ходьба, прыжок и ОДИН инструмент с ОДНИМ полётом.
+			_sheets[sheet] = path
 		if RIG_RECOLOR_SHEETS.has(sheet):
 			for suffix: String in RIG_TIER_SUFFIX:
 				if suffix.is_empty():
 					continue
 				var tiered_path: String = "res://art/character/" + sheet + suffix + ".png"
 				if ResourceLoader.exists(tiered_path):
-					_sheets[sheet + suffix] = load(tiered_path)
+					_sheets[sheet + suffix] = tiered_path
 	_load_rig_exit_sheet()
 	_hp_prev = GameState.hp
 	_connect_signals()
@@ -246,8 +249,16 @@ func _tex_for_sheet(name: String) -> Texture2D:
 	if RIG_RECOLOR_SHEETS.has(name):
 		var suffix := _rig_tier_suffix()
 		if not suffix.is_empty() and _sheets.has(name + suffix):
-			return _sheets[name + suffix]
-	return _sheets.get(name)
+			return _sheet_tex(name + suffix)
+	return _sheet_tex(name)
+
+
+func _sheet_tex(name: String) -> Texture2D:
+	var v: Variant = _sheets.get(name)
+	if v is String:
+		v = load(v)
+		_sheets[name] = v
+	return v as Texture2D
 
 
 ## Общее имя набора копки по текущему инструменту, БЕЗ суффикса направления
@@ -487,7 +498,7 @@ func _rig_move_frame() -> Dictionary:
 # над ногами, а не «плывёт» (ГДД §15.1).
 # ---------------------------------------------------------------------------
 
-## Листы поз и их кадры (tools/gen_hero_anim.py). Нет листа — кадры fall.png.
+## Листы поз и их кадры (tools/gen_hero_ref.py — кукла из эталона). Нет листа — кадры fall.png.
 const JUMP_FRAMES := {"crouch": 0, "launch": 1, "rise": 2, "apex": 3,
 		"fall": 4, "fall_fast": 5, "recover": 6, "apex_b": 7, "rise_lo": 8}
 const FALL_FALLBACK := {"crouch": 0, "launch": 1, "rise": 1, "apex": 2,
@@ -511,26 +522,22 @@ const WALK_REF := 4.2
 ## ближайшем соседе косой край рвётся в лесенку.
 const SMOOTH_FILTER := true
 
-## Чёткость (ветка «hero-art»): линейный фильтр сам по себе мылит рисунок
-## (кадр 144 текселя на экране 448 px уменьшается в 1,5 раза), поэтому поверх
-## него шейдер shaders/pixel_art.gdshader: середина пикселя рисунка чёткая,
+## Чёткость: линейный фильтр сам по себе мылит рисунок, поэтому поверх него
+## шейдер shaders/pixel_art.gdshader: середина пикселя рисунка чёткая,
 ## смешение — только на границе пикселей, наклон и дробный сдвиг остаются
-## гладкими. Листы мальчика перерисованы на сетке 2×2 текселя
-## (tools/gen_hero_art.py, список SHEETS) — для них пиксель рисунка = 2,
-## у авторских листов бурмобиля — 1.
+## гладкими. Листы мальчика по эталону (tools/gen_hero_ref.py, раунд 4) —
+## пиксель рисунка 2 текселя (cell в hero_sheets.json), у бурмобиля — 1.
 const PIXEL_ART_SHADER := preload("res://shaders/pixel_art.gdshader")
-const PIXEL_CELL_2 := ["idle", "idle_x", "walk", "fall", "jump", "hurt", "fly", "fly_jet",
-		"fly_1", "fly_2", "fly_3", "fly_4", "dig_pick", "dig_pick_rusty", "dig_shovel",
-		"dig_drill_down", "dig_drill_side", "sleep"]
-## Кадры этих листов оставлены авторскими (замах с руками над головой: на
-## сетке 2×2 рука сливалась с лицом) — у них пиксель рисунка 1 тексель.
-const PIXEL_CELL_1_FRAMES := {"dig_pick": [0, 1, 2], "dig_pick_rusty": [0, 1, 2]}
 const FOOT_Y := -HH * TILE - 16.0 + float(GROUND_Y) / ART_SCALE
 
 signal footstep(world_pos: Vector2)
 
 var _body: Node2D
 var _ghost: Sprite2D
+## Кадр листа, который сейчас на экране (листы мальчика — в несколько рядов,
+## по region_rect.x номер кадра уже не прочесть; тесты читают это поле).
+var shown_frame: int = 0
+var _cur_scale: float = ART_SCALE
 var _ghost_left: float = 0.0
 var _last_shake: float = 0.0
 var _cur_key: String = ""
@@ -554,6 +561,11 @@ var _kick := HeroAnim.Spring.new(7.0, 0.5)      # толчок корпуса в
 
 var _stride: float = 0.0
 var _walk_active: bool = false
+## Поворот «анфас → профиль» (кадр 3 видео владельца, лист walk_turn): стойка
+## нарисована вполоборота к зрителю, ходьба — в профиль; на старте и на
+## остановке шага на миг показывается промежуточный поворот, а не щелчок.
+const TURN_POSE_S := 0.09
+var _turn_pose_t: float = 0.0
 var _last_idx: int = 0
 
 var _idle_t: float = 0.0
@@ -639,15 +651,17 @@ func _sync_pixel_cell(spr: Sprite2D) -> void:
 	var mat := spr.material as ShaderMaterial
 	if mat == null or spr.texture == null:
 		return
-	var sheet: String = spr.texture.resource_path.get_file().get_basename()
-	var cell: float = 2.0 if PIXEL_CELL_2.has(sheet) else 1.0
-	if PIXEL_CELL_1_FRAMES.has(sheet) and spr.region_rect.size.x > 0.0:
-		var frame := int(round(spr.region_rect.position.x / spr.region_rect.size.x))
-		if (PIXEL_CELL_1_FRAMES[sheet] as Array).has(frame):
-			cell = 1.0
+	var cell: float = float(HeroSheets.info_for(spr.texture).get("cell", 1.0))
 	if float(spr.get_meta("pixel_cell", 0.0)) != cell:
 		spr.set_meta("pixel_cell", cell)
 		mat.set_shader_parameter("cell", cell)
+
+
+## Масштаб спрайта под плотность текущего листа: размер героя в точках один.
+func _set_scale(sc: float) -> void:
+	if sc != _cur_scale:
+		_cur_scale = sc
+		_sprite.scale = Vector2(1.0 / sc, 1.0 / sc)
 
 
 ## Сброс накопленного движения: телепорт, смена сцены, начало сценария в тесте.
@@ -659,6 +673,7 @@ func _reset_motion() -> void:
 	_was_air = false
 	_land_t = 0.0
 	_walk_active = false
+	_turn_pose_t = 0.0
 	_idle_t = 0.0
 	_idle_act = ""
 	_dig_state = ""
@@ -753,11 +768,26 @@ func _on_jumped() -> void:
 # ---------------------------------------------------------------------------
 
 func _frames_in(sheet_name: String) -> int:
-	var geom: Array = SHEET_FRAME.get(sheet_name, [CHAR_W, CHAR_H, GROUND_Y])
 	var tex: Texture2D = _tex_for_sheet(sheet_name)
 	if tex == null:
 		return 1
+	var geom: Array = _geom(sheet_name)
+	if int(geom[5]) > 0:
+		return int(geom[5])
 	return maxi(1, int(round(tex.get_width() / float(geom[0]))))
+
+
+## Геометрия листа: [ширина кадра, высота, линия земли (тексели), текселей на
+## точку, кадров в ряду, кадров всего (-1 — по ширине ленты)]. Листы мальчика
+## по эталону (раунд 4) — из art/character/hero_sheets.json (HeroSheets): 8
+## текселей на точку и несколько рядов; прочие — прежние ленты ART_SCALE 3.
+func _geom(sheet_name: String) -> Array:
+	var inf: Dictionary = HeroSheets.info(sheet_name)
+	if not inf.is_empty():
+		return [int(inf["fw"]), int(inf["fh"]), int(inf["ground"]), HeroSheets.scale_of(inf),
+				int(inf.get("cols", 1)), HeroSheets.frames_of(inf)]
+	var g: Array = SHEET_FRAME.get(sheet_name, [CHAR_W, CHAR_H, GROUND_Y])
+	return [int(g[0]), int(g[1]), int(g[2]), ART_SCALE, 1 << 20, -1]
 
 
 ## Замах — удар — упор — отдача. Фаза цикла привязана к времени копки клетки
@@ -889,7 +919,8 @@ func _spin_down_frame(dt: float) -> Dictionary:
 
 
 func _tick_jet(dt: float, sheet_name: String, f: int) -> void:
-	var on: bool = _fly_on and String(player.thrust) == "jet" and JET_NOZZLE.has(sheet_name)
+	var inf: Dictionary = HeroSheets.info(sheet_name)
+	var on: bool = _fly_on and String(player.thrust) == "jet" and (JET_NOZZLE.has(sheet_name) or inf.has("nozzle"))
 	if _jet == null:
 		if not on:
 			return
@@ -915,9 +946,10 @@ func _tick_jet(dt: float, sheet_name: String, f: int) -> void:
 		add_child(_jet)
 	_jet.emitting = on
 	if on:
-		var n: Vector2 = JET_NOZZLE[sheet_name]
+		# Сопло нарисованного джетпака — в hero_sheets.json (gen_hero_ref.py), иначе прежние числа.
+		var n: Vector2 = Vector2(inf["nozzle"][0], inf["nozzle"][1]) if inf.has("nozzle") else JET_NOZZLE[sheet_name]
 		_jet.position = Vector2(n.x * float(f), FOOT_Y + n.y)
-		var d: Vector2 = JET_DIR[sheet_name]
+		var d: Vector2 = Vector2(inf["jet_dir"][0], inf["jet_dir"][1]) if inf.has("jet_dir") else JET_DIR[sheet_name]
 		_jet.direction = Vector2(d.x * float(f), d.y).normalized()
 
 
@@ -1164,7 +1196,7 @@ func _process(delta: float) -> void:
 		phase_frame = pose2["frame"]
 		mode = pose2["mode"]
 
-	var geom: Array = SHEET_FRAME.get(sheet_name, [CHAR_W, CHAR_H, GROUND_Y])
+	var geom: Array = _geom(sheet_name)
 	var anim_div: float = SHEET_ANIM_DIV.get(sheet_name, ANIM_DIV)
 	var fw: int = geom[0]
 	var fh: int = geom[1]
@@ -1185,12 +1217,16 @@ func _process(delta: float) -> void:
 
 	if tex != null:
 		_sprite.texture = tex
-		var frames: int = maxi(1, int(round(tex.get_width() / float(fw))))
+		var frames: int = _frames_in(sheet_name)
 		var frame: int = phase_frame
 		if frame < 0:
 			frame = 0 if force_static_frame else \
 					(int(floor(player.anim / anim_div)) % frames if frames > 1 else 0)
-		_sprite.region_rect = Rect2(frame * fw, 0, fw, fh)
+		var cols: int = maxi(1, int(geom[4]))
+		frame = clampi(frame, 0, frames - 1)
+		shown_frame = frame
+		_sprite.region_rect = Rect2((frame % cols) * fw, (frame / cols) * fh, fw, fh)
+		_set_scale(float(geom[3]))
 		_sync_pixel_cell(_sprite)
 
 	# Разворот: при смене направления спрайт на миг сужается, на середине
@@ -1328,8 +1364,8 @@ func _apply_pose(dt: float, mode: String, f: int, turn_x: float, sheet_name: Str
 	_sprite.self_modulate = _flash
 	_sprite.modulate.a = alpha
 	_last_shake = _stun_shake()
-	_sprite.position = Vector2(-fw / (2.0 * ART_SCALE) + _last_shake,
-			-46.0 + float(GROUND_Y - int(geom[2])) / ART_SCALE)
+	var sc: float = float(geom[3])
+	_sprite.position = Vector2(-fw / (2.0 * sc) + _last_shake, -float(geom[2]) / sc)
 
 	# Затухание следа смены листа.
 	if _ghost_left > 0.0:
@@ -1349,7 +1385,7 @@ func _pose_rest() -> void:
 	_sprite.modulate.a = 1.0
 	if _sprite.texture != null:
 		var fw: int = int(_sprite.region_rect.size.x)
-		_sprite.position = Vector2(-fw / (2.0 * ART_SCALE) + 0.0, _sprite.position.y)
+		_sprite.position = Vector2(-fw / (2.0 * _cur_scale) + 0.0, _sprite.position.y)
 	_ghost.visible = false
 	_ghost_left = 0.0
 	_cur_key = ""
@@ -1362,6 +1398,7 @@ func _start_ghost() -> void:
 		return
 	_ghost.texture = _sprite.texture
 	_ghost.region_rect = _sprite.region_rect
+	_ghost.scale = _sprite.scale
 	_sync_pixel_cell(_ghost)
 	_ghost.flip_h = _sprite.flip_h
 	_ghost.position = _sprite.position - Vector2(_last_shake, 0.0)
@@ -1383,6 +1420,7 @@ func _ground_pose(dt: float) -> Dictionary:
 			_walk_active = true
 			_idle_t = 0.0
 			_idle_act = ""
+			_turn_pose_t = TURN_POSE_S
 		_stride = HeroAnim.stride_advance(_stride, spd * dt, fpc)
 	elif _walk_active:
 		# Остановка: ставим ногу в проходную позу, а не замираем на размахе.
@@ -1390,8 +1428,12 @@ func _ground_pose(dt: float) -> Dictionary:
 		if need < 0.2 or need > 3.3:
 			_walk_active = false
 			_stride = fposmod(floorf(_stride / 4.0 + 0.5) * 4.0, 16.0)
+			_turn_pose_t = TURN_POSE_S
 		else:
 			_stride = fposmod(_stride + minf(need, 22.0 * dt), 16.0)
+	_turn_pose_t = maxf(0.0, _turn_pose_t - dt)
+	if _turn_pose_t > 0.0 and _sheets.has("walk_turn") and _land_t <= 0.0:
+		return {"sheet_name": "walk_turn", "frame": 1, "mode": "walk" if _walk_active else "idle"}
 	if _walk_active:
 		var idx: int = int(floor(_stride)) % 16
 		if idx != _last_idx and idx % 4 == 1 and spd >= HeroAnim.num("walk.dust_min_speed", 0.7) * WALK_REF \
@@ -1493,6 +1535,7 @@ func _draw_rig_transition() -> void:
 	var fh: int = int(_rig_exit_sheet.get_height())
 	_sprite.texture = _rig_exit_sheet
 	_sprite.region_rect = Rect2(clampi(key - 1, 0, RIG_EXIT_FRAMES - 1) * fw, 0, fw, fh)
+	_set_scale(ART_SCALE)
 	_sync_pixel_cell(_sprite)
 	# Сцена выхода всегда смотрит в одну сторону (та, куда исходно смотрел
 	# художник — герой выходит из машины лицом от тоннеля): разворот по

@@ -52,9 +52,10 @@ func check(label: String, ok: bool) -> void:
 		print("[FAIL] " + label)
 
 
+## Листы мальчика по эталону — в несколько рядов (HeroSheets): номер кадра
+## читаем у самого CharacterView, а не по region_rect.x.
 func _frame() -> int:
-	var fw: float = view._sprite.region_rect.size.x
-	return int(round(view._sprite.region_rect.position.x / fw)) if fw > 0.0 else -1
+	return view.shown_frame
 
 
 func _sheet() -> String:
@@ -216,7 +217,8 @@ func _test_walk_by_distance() -> void:
 	# останавливаемся: доходим до проходной позы и встаём в idle
 	player.vx = 0.0
 	var guard := 0
-	while _sheet() == "walk" and guard < 60:
+	# Между ходьбой (профиль) и стойкой (вполоборота) — миг поворота walk_turn.
+	while (_sheet() == "walk" or _sheet() == "walk_turn") and guard < 60:
 		view._process(dt)
 		guard += 1
 	check("после остановки лист стойки (%d кадров)" % guard, _sheet() == "idle")
@@ -262,50 +264,67 @@ func _test_air_pose() -> void:
 
 
 ## Кадры всех листов стоят на одной оси с головой (допуск по ширине тела) и не пустые.
+## Геометрия листов мальчика — HeroSheets (раунд 4: 8 текселей на точку, ряды);
+## допуск — в логических точках (прежние 5,5 текселя при ×3 ≈ 1,8 точки).
 func _test_art_anchor() -> void:
-	var ref := _head_x("res://art/character/idle.png", 0)
-	check("есть эталон головы idle", ref > 0.0)
+	var ref := _head_x("idle", 0)
+	check("есть эталон головы idle", ref > -900.0)
 	for sheet in ["walk", "jump", "hurt", "idle_x"]:
 		var path := "res://art/character/%s.png" % sheet
 		if not ResourceLoader.exists(path):
 			continue
+		var inf: Dictionary = HeroSheets.info(sheet)
+		if inf.is_empty():
+			continue
 		var img: Image = (load(path) as Texture2D).get_image()
-		var n: int = img.get_width() / 144
-		check("%s: ширина листа кратна кадру (%d кадров)" % [sheet, n], img.get_width() % 144 == 0 and img.get_height() == 144)
+		var n: int = HeroSheets.frames_of(inf)
+		var cols: int = int(inf["cols"])
+		var rows: int = int(ceil(float(n) / float(cols)))
+		check("%s: лист вмещает %d кадров" % [sheet, n],
+				img.get_width() == cols * int(inf["fw"]) and img.get_height() == rows * int(inf["fh"]))
 		var worst := 0.0
 		var empty := 0
 		for i in n:
-			var hx := _head_x(path, i)
-			if hx < 0.0:
+			var hx := _head_x(sheet, i)
+			if hx < -900.0:
 				empty += 1
 				continue
 			worst = maxf(worst, absf(hx - ref))
 		check("%s: пустых кадров нет" % sheet, empty == 0)
-		var tol := 13.0 if sheet == "hurt" else 5.5
-		check("%s: голова не уходит с оси (макс. %.1f px из %.1f допустимых)" % [sheet, worst, tol], worst <= tol)
+		var tol := 4.4 if sheet == "hurt" else 1.85
+		check("%s: голова не уходит с оси (макс. %.2f из %.2f точки)" % [sheet, worst, tol], worst <= tol)
 
 
-func _head_x(path: String, frame: int) -> float:
-	var img: Image = (load(path) as Texture2D).get_image()
-	var x0 := frame * 144
+## Центр головы кадра относительно оси кадра, в логических точках (-1000 — пусто).
+func _head_x(sheet: String, frame: int) -> float:
+	var inf: Dictionary = HeroSheets.info(sheet)
+	if inf.is_empty():
+		return -1000.0
+	var img: Image = (load("res://art/character/%s.png" % sheet) as Texture2D).get_image()
+	var r: Rect2 = HeroSheets.region(inf, frame)
+	var x0 := int(r.position.x)
+	var y0 := int(r.position.y)
+	var fw := int(r.size.x)
+	var fh := int(r.size.y)
+	var sc: float = HeroSheets.scale_of(inf)
 	var top := -1
-	for y in 144:
-		for x in 144:
-			if img.get_pixel(x0 + x, y).a > 0.5:
+	for y in fh:
+		for x in fw:
+			if img.get_pixel(x0 + x, y0 + y).a > 0.5:
 				top = y
 				break
 		if top >= 0:
 			break
 	if top < 0:
-		return -1.0
+		return -1000.0
 	var sum := 0.0
 	var cnt := 0
-	for y in range(top, mini(top + 16, 144)):
-		for x in 144:
-			if img.get_pixel(x0 + x, y).a > 0.5:
+	for y in range(top, mini(top + int(16.0 / 3.0 * sc), fh)):
+		for x in fw:
+			if img.get_pixel(x0 + x, y0 + y).a > 0.5:
 				sum += float(x)
 				cnt += 1
-	return sum / float(cnt) if cnt > 0 else -1.0
+	return (sum / float(cnt) - fw * 0.5) / sc if cnt > 0 else -1000.0
 
 
 ## Слой движения не должен отнимать кадр: средняя цена _process по состояниям.

@@ -283,6 +283,9 @@ func _build_gauges(parent: Control) -> void:
 	_hp_bar = _make_gauge(bars, Color8(0xD9, 0x4F, 0x4A), "hp", "hp")
 	_hunger_bar = _make_gauge(bars, Color8(0xE8, 0x7E, 0x6E), "hunger", "hunger")
 	_stamina_bar = _make_gauge(bars, Color8(0xE8, 0xC5, 0x47), "stamina", "stamina")
+	# Значки «слабее/медленнее/шатает» на конце полосок (раунд 5, ГДД §7; scripts/survival/).
+	SurvivalBadge.attach(_hunger_bar, "hunger", self)
+	SurvivalBadge.attach(_stamina_bar, "stamina", self)
 
 	_build_quest_button(box)
 	_anchors["tasks"] = DailyTasksButton.mount(box).button   # ежедневные задания (ветка daily-tasks, scripts/meta/); до онбординга скрыта
@@ -1461,7 +1464,7 @@ func _sync_gauge(bar: HudBar, frac: float, title: String, value: float, instant:
 	var iv := int(round(value))
 	if int(bar.get_meta(&"_iv", -1)) != iv:
 		bar.set_meta(&"_iv", iv)
-		Tip.bind(bar, title, "%d%%" % iv)
+		Tip.bind(bar, title, "%d%%" % iv + SurvivalBadge.tip_suffix(bar))
 
 
 func _sync_hp(hp: float, max_hp: float, instant: bool = false) -> void:

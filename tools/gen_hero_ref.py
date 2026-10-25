@@ -327,7 +327,7 @@ MARGIN = 70   # поле вокруг эталона под инструмент
 
 
 def pose_frame(pose, w_u=48, h_u=48, ground_u=46, closed=False, back=None, mid=None, front=None,
-               after=None, feet_on_ground=True):
+               after=None, feet_on_ground=True, align_head=False):
     """Поза куклы в кадре: подошва (по самому мальчику, без инструмента) — на
     линии земли, ось эталона — на оси кадра. after(img, joints) — поверх
     готового рисунка (комья, пыль: у них свой контур)."""
@@ -342,7 +342,10 @@ def pose_frame(pose, w_u=48, h_u=48, ground_u=46, closed=False, back=None, mid=N
         after(img, joints)
     f = Frame(w_u, h_u, ground_u)
     LAST["bottom"] = bottom if feet_on_ground else bbox(img)[3]
-    place_feet(f, img, REF_AXIS + MARGIN, bottom=LAST["bottom"])
+    # Позы в воздухе и «ой» сводятся по голове (как ходьба): наклон корпуса
+    # не должен уводить голову с оси, её и так водит слой движения.
+    axis = head_x(boy) - REF_HEAD_DX if align_head else REF_AXIS + MARGIN
+    place_feet(f, img, axis, bottom=LAST["bottom"])
     return f
 
 
@@ -372,7 +375,7 @@ JUMP_ORDER = ["crouch", "launch", "rise", "apex", "fall", "fall_fast", "recover"
 
 
 def frames_jump():
-    return [pose_frame(hp.Pose(**JUMP_POSES[k])) for k in JUMP_ORDER]
+    return [pose_frame(hp.Pose(**JUMP_POSES[k]), align_head=True) for k in JUMP_ORDER]
 
 
 def frames_fall():
@@ -382,13 +385,13 @@ def frames_fall():
         dict(arm_n=(-110, -130), arm_f=(130, 152), leg_n=(-18, -4), leg_f=(10, 16)),
         dict(arm_n=(-150, -160), arm_f=(115, 135), leg_n=(-12, 8), leg_f=(16, 2)),
     ]
-    return [pose_frame(hp.Pose(head_tilt=-4, **p)) for p in poses]
+    return [pose_frame(hp.Pose(head_tilt=-4, **p), align_head=True) for p in poses]
 
 
 def frames_hurt():
     flinch = hp.Pose(arm_n=(-45, -30), arm_f=(50, 70), lean=-9, head_tilt=-8, leg_n=(-8, 4), leg_f=(10, 2))
     ko = hp.Pose(arm_n=(-22, -12), arm_f=(28, 16), lean=-14, head_tilt=-16, leg_n=(-12, 10), leg_f=(14, -4))
-    return [pose_frame(flinch, closed=True), pose_frame(ko, closed=True)]
+    return [pose_frame(flinch, closed=True, align_head=True), pose_frame(ko, closed=True, align_head=True)]
 
 
 def frames_sleep():
@@ -914,7 +917,29 @@ def layout(n, fw):
     return cols, rows
 
 
+def trim(frames):
+    """Пустое поле кадра — прочь (память видеокарты): по ширине симметрично
+    вокруг оси (ось остаётся серединой кадра), сверху — до самого высокого
+    пикселя ленты; низ (линия земли и запас под ней) не трогаем. Размеры —
+    в целых логических точках."""
+    f0 = frames[0]
+    a = np.zeros((f0.h, f0.w), bool)
+    for f in frames:
+        a |= f.img[..., 3] > 0
+    ys, xs = np.nonzero(a)
+    half = max(f0.axis - xs.min(), xs.max() + 1 - f0.axis) + 1
+    half = int(math.ceil(half / (PX / 2.0)) * (PX // 2))
+    half = int(min(half, f0.axis))
+    top = int(max(0, ys.min() - 1))
+    top -= top % PX
+    for f in frames:
+        f.img = f.img[top:, f.axis - half:f.axis + half]
+        f.w, f.h, f.ground = 2 * half, f.h - top, f.ground - top
+    return frames
+
+
 def write_sheet(rel, frames, meta):
+    frames = trim(frames)
     f0 = frames[0]
     fw, fh = f0.w * CELL, f0.h * CELL
     cols, rows = layout(len(frames), fw)

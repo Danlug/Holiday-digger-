@@ -172,9 +172,11 @@ func _test_view_contract() -> void:
 	if inf.is_empty():
 		return
 	var sc: float = HeroSheets.scale_of(inf)
-	check("кадр стойки — 48×48 логических точек, как раньше",
-			is_equal_approx(float(inf["fw"]) / sc, 48.0) and is_equal_approx(float(inf["fh"]) / sc, 48.0))
-	check("линия земли — 46 точек, как раньше", is_equal_approx(float(inf["ground"]) / sc, 46.0))
+	# Кадр обрезан по рисунку (память видеокарты), но низ кадра прежний: 2 точки
+	# под подошвой — сюжетные актёры ставят на землю низ кадра.
+	check("под подошвой стойки 2 точки, как раньше",
+			is_equal_approx((float(inf["fh"]) - float(inf["ground"])) / sc, 2.0))
+	check("ось героя — середина кадра (ширина чётная)", int(inf["fw"]) % 2 == 0)
 	var img := _img(OUT + "idle.png")
 	var top := -1
 	var bottom := -1

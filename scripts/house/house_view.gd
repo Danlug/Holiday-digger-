@@ -100,6 +100,10 @@ const FOOT_PAD := 2.0
 ## скорости явно).
 const WALK_FPS := 8.0 * (WALK_SPEED_PX_S / 130.0)
 
+## Ширина кадра героя и высота линии земли от верха кадра, в логических точках
+## (у листов по эталону кадр обрезан по рисунку — см. _update_hero_frame).
+var _hero_frame_u := Vector2(48.0, 46.0)
+
 const IDLE_SHEET := "res://art/character/idle.png"
 const WALK_SHEET := "res://art/character/walk.png"
 
@@ -763,8 +767,12 @@ func _update_camera_and_hero() -> void:
 	# Масштаб растёт от левого верхнего угла, поэтому и ширина, и высота, и
 	# отступ подошвы считаются уже увеличенными — иначе герой уедет вправо и
 	# провалится под пол.
-	_hero.position = Vector2(screen_x - HERO_W * HERO_SCALE / 2.0,
-		_floor_y_px - (HERO_H - FOOT_PAD) * HERO_SCALE)
+	# Кадр мальчика по эталону обрезан по рисунку (HeroSheets): ширина и линия
+	# земли — из геометрии листа, ось по-прежнему середина кадра.
+	var hw: float = _hero_frame_u.x
+	var feet: float = _hero_frame_u.y
+	_hero.position = Vector2(screen_x - hw * HERO_SCALE / 2.0,
+		_floor_y_px - feet * HERO_SCALE)
 	_hero.flip_h = _facing < 0
 	_position_npc()
 	_update_door_props(cam_x)
@@ -780,7 +788,7 @@ func _update_hero_frame() -> void:
 	# рядов (HeroSheets); кадр тот же 48×48 точек с линией земли 46.
 	var inf: Dictionary = HeroSheets.info_for(sheet)
 	var sc: float = HeroSheets.scale_of(inf)
-	var frame_w := int(HERO_W * sc)
+	var frame_w := int(inf["fw"]) if not inf.is_empty() else int(HERO_W * sc)
 	var frame_count: int = HeroSheets.frames_of(inf) if not inf.is_empty() \
 			else maxi(1, int(sheet.get_width()) / frame_w)
 	var idx := 0
@@ -795,8 +803,11 @@ func _update_hero_frame() -> void:
 	atlas.region = HeroSheets.region(inf, idx) if not inf.is_empty() \
 			else Rect2(idx * frame_w, 0, frame_w, int(HERO_H * sc))
 	_hero.texture = atlas
-	_hero.size = Vector2(HERO_W * sc, HERO_H * sc)
+	var fw: float = float(inf["fw"]) if not inf.is_empty() else HERO_W * sc
+	var fh: float = float(inf["fh"]) if not inf.is_empty() else HERO_H * sc
+	_hero.size = Vector2(fw, fh)
 	_hero.scale = Vector2(HERO_SCALE / sc, HERO_SCALE / sc)
+	_hero_frame_u = Vector2(fw / sc, float(inf["ground"]) / sc if not inf.is_empty() else HERO_H - FOOT_PAD)
 	HeroSheets.crisp(_hero, inf)
 
 

@@ -214,14 +214,17 @@ func _ready() -> void:
 	for sheet: String in DIG_SHEETS:
 		var path: String = "res://art/character/" + sheet + ".png"
 		if ResourceLoader.exists(path):
-			_sheets[sheet] = load(path)
+			# Путь, а не текстура: лист грузится при первом показе (_tex_for_sheet).
+			# Листы мальчика ×8 — десятки МБ видеопамяти, а за игру нужны стойка,
+			# ходьба, прыжок и ОДИН инструмент с ОДНИМ полётом.
+			_sheets[sheet] = path
 		if RIG_RECOLOR_SHEETS.has(sheet):
 			for suffix: String in RIG_TIER_SUFFIX:
 				if suffix.is_empty():
 					continue
 				var tiered_path: String = "res://art/character/" + sheet + suffix + ".png"
 				if ResourceLoader.exists(tiered_path):
-					_sheets[sheet + suffix] = load(tiered_path)
+					_sheets[sheet + suffix] = tiered_path
 	_load_rig_exit_sheet()
 	_hp_prev = GameState.hp
 	_connect_signals()
@@ -246,8 +249,16 @@ func _tex_for_sheet(name: String) -> Texture2D:
 	if RIG_RECOLOR_SHEETS.has(name):
 		var suffix := _rig_tier_suffix()
 		if not suffix.is_empty() and _sheets.has(name + suffix):
-			return _sheets[name + suffix]
-	return _sheets.get(name)
+			return _sheet_tex(name + suffix)
+	return _sheet_tex(name)
+
+
+func _sheet_tex(name: String) -> Texture2D:
+	var v: Variant = _sheets.get(name)
+	if v is String:
+		v = load(v)
+		_sheets[name] = v
+	return v as Texture2D
 
 
 ## Общее имя набора копки по текущему инструменту, БЕЗ суффикса направления

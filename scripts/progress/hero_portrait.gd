@@ -74,10 +74,14 @@ func _set_frame(f: int) -> void:
 func _place_hero() -> void:
 	if _hero == null:
 		return
-	var w := FRAME_U * UNIT
+	# Кадр мальчика по эталону обрезан по рисунку: размеры и линия земли — из геометрии листа.
+	var sc: float = HeroSheets.scale_of(_inf)
+	var w: float = (float(_inf["fw"]) / sc if not _inf.is_empty() else FRAME_U) * UNIT
+	var h: float = (float(_inf["fh"]) / sc if not _inf.is_empty() else FRAME_U) * UNIT
+	var feet_u: float = float(_inf["ground"]) / sc if not _inf.is_empty() else FEET_U
 	var feet_y := size.y - 8.0
-	_hero.position = Vector2((size.x - w) * 0.5, feet_y - FEET_U * UNIT)
-	_hero.size = Vector2(w, w)
+	_hero.position = Vector2((size.x - w) * 0.5, feet_y - feet_u * UNIT)
+	_hero.size = Vector2(w, h)
 
 
 func _draw() -> void:

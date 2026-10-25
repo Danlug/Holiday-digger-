@@ -18,7 +18,8 @@
 #
 # Характеры: cautious (осторожный), greedy (жадный), hasty (торопливый). Вместо характера можно
 # стратегию-цель: deep | achiever | tycoon | collector | fighter (у каждой свой характер по умолчанию;
-# GOAL=deep вместе с характером — стратегия поверх характера). FAST=1 — без онбординга.
+# GOAL=deep вместе с характером — стратегия поверх характера). FAST=1 — без онбординга;
+# FAST=1 DEPTH=1700 — старт сразу на глубине (полости-фигуры и стражи с 1500, раунд 5).
 # Ночной прогон пяти стратегий — tools/bot_night.sh.
 # Результат: build/bot/<метка>/ — telemetry.json, log.txt, summary.txt (и shots/ при SHOTS=1);
 # для «all» — ещё общий build/bot/<метка>/ALL.txt. Код возврата 0 — без находок P0.
@@ -71,6 +72,7 @@ run_one() {
 	[ -n "${RESUME:-}" ] && args+=(--resume)
 	[ -n "${INPUT:-}" ] && args+=(--input="$INPUT")
 	[ "${FAST:-0}" = 1 ] && args+=(--skip-onboarding)
+	[ -n "${DEPTH:-}" ] && args+=(--depth="$DEPTH")   # старт сразу на глубине (полости и стражи, раунд 5)
 	[ -n "${FLUSH:-}" ] && args+=(--flush="$FLUSH")
 	[ -n "${CP:-}" ] && args+=(--checkpoint="$CP")
 	[ "${DIE_LIFT:-0}" = 1 ] && args+=(--die-lift-pack="${DIE_LIFT_PACK:-400}")
@@ -85,7 +87,7 @@ run_one() {
 	python3 tools/bot_report.py "$out" >/dev/null 2>&1 || echo "bot_report.py упал на $out" >"$out/summary.txt"
 }
 export -f run_one
-export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL CP DIE_LIFT DIE_LIFT_PACK
+export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL CP DIE_LIFT DIE_LIFT_PACK DEPTH
 
 if [ "$SEED" = all ]; then
 	jobs=()

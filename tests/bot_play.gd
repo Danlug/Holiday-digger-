@@ -79,6 +79,7 @@ var goal_name := ""               # пусто — без стратегии (к
 var G: Dictionary = {}
 var _char_given := false
 var _skip_onb := false
+var _start_depth := 0             # FAST-старт сразу на глубине (DEPTH=… в tools/bot_play.sh): полости и стражи с 1500 (раунд 5)
 var _cp_sec := 0.0                # сейв-«снимок» каждые N игровых секунд (для снимков рендером утром)
 var _next_cp := 0.0
 var _flush_sec := 600.0           # телеметрия на диск каждые N игровых секунд (ночной прогон не теряет итог)
@@ -181,6 +182,8 @@ func _ready() -> void:
 			goal_name = a.substr(7)
 		elif a == "--skip-onboarding":
 			_skip_onb = true
+		elif a.begins_with("--depth="):
+			_start_depth = int(a.substr(8))
 		elif a.begins_with("--checkpoint="):
 			_cp_sec = float(a.substr(13)) * 60.0
 		elif a.begins_with("--flush="):
@@ -288,6 +291,8 @@ func _run() -> void:
 		T.meta["resumed_from"] = {"max_depth": GameState.max_depth_reached, "coins": GameState.coins, "tool": GameState.current_tool}
 	elif _skip_onb:
 		_fast_start()
+		if _start_depth > 0:
+			_deep_start(_start_depth)
 		await _frames_n(3)
 		T.mark("onboarding_done", _sim)
 	else:
@@ -1072,6 +1077,49 @@ func _fast_start() -> void:
 		world.unlock_pre_autodig_garden()
 	player.teleport_home()
 	_activity = "free"
+
+
+## Старт на глубине (раунд 5, полости и стражи с 1500): шахта от поверхности (иначе
+## боту не подняться продавать — первый прогон встал «ascent_stuck») до ближайшей
+## полости, герой — на её полу: запечатанную полость бот-серпантин обходит стороной,
+## а стражи наружу не выходят, так что бой проверяется только изнутри.
+func _deep_start(depth: int) -> void:
+	var col := 16
+	var top := depth
+	var hero_cell := Vector2i(col, depth)
+	var caves := Caves.caves_between(world, depth, depth + 400)
+	if not caves.is_empty():
+		var c: Dictionary = caves[0]
+		col = int(c.cx)
+		top = int(c.cy)   # до центрального ряда: у сердца верх по центру — выемка, и шахта до y0 с воздухом не сходилась
+		hero_cell = Caves.chest_cell(c)
+		var bd := 1 << 30
+		for f: Vector2i in Caves.floor_cells(c):
+			if Caves.run_width(c, f) < 3:
+				continue
+			var d := absi(f.x - int(c.cx)) * 2 + absi(f.y - int(c.cy))
+			if d < bd:
+				bd = d
+				hero_cell = f
+	# шахта и через торфяной пласт (450–455): игрок прокопал бы его по пути вниз, а бот
+	# на подъёме не копает — второй прогон встал под пластом на 48 минут
+	for y in range(6, top + 1):
+		world.diffs[y * WorldGen.WIDTH + col] = true
+	if caves.is_empty():
+		for x in range(col - 1, col + 2):
+			for y in range(top - 1, top + 1):
+				world.diffs[y * WorldGen.WIDTH + x] = true
+	world.mark_changed()
+	player.x = float(hero_cell.x) + 0.5
+	player.y = float(hero_cell.y) + 0.6
+	player.vx = 0.0
+	player.vy = 0.0
+	player.on_ground = true
+	GameState.house_is_indoors = false
+	GameState.max_depth_reached = maxi(GameState.max_depth_reached, depth)
+	if main != null and main.fog != null:
+		main.fog.reveal_around(player.x, player.y, 6, 6)
+	T.event(_sim, "deep_start", "старт на глубине %d" % depth)
 
 
 func _abort() -> void:

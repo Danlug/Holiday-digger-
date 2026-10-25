@@ -336,7 +336,7 @@ func _respawn_after_death(rode: bool) -> void:
 	# после поездки карточка и так открыта
 	if not Feel.card_pending and not rode:
 		var fee := Healing.last_death_fee   # «скорая забрала» (раунд 4, healing)
-		hud.toast("Ты погиб. Минералы потеряны%s. Уцелел бы только чёрный ящик." % (
+		hud.toast("Ты погиб. Минералы потеряны%s." % (
 			(", скорая забрала %d монет" % fee) if fee > 0 else ""), 4.2)
 
 

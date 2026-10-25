@@ -128,7 +128,7 @@ func _update(dt: float) -> void:
 	_place_marks(door_screen_pos(), get_viewport().get_visible_rect().size)
 
 
-## Дверь в координатах экрана (вьюпорта): низ проёма, по центру клетки.
+## Клетка двери в координатах экрана (вьюпорта): середина по x, её верх по y.
 static func door_screen_pos() -> Vector2:
 	var hs := HouseSystem.instance
 	if hs == null or not is_instance_valid(hs) or not hs.is_inside_tree():

@@ -312,6 +312,11 @@ static func recipe_offers() -> Array:
 			o["extra"] = reason
 			if reason != "Не хватает материалов":
 				o["corner"] = "cross"
+		# Переработка (ползунок в карточке): на плитке — на сколько штук хватает.
+		if o["state"] == "ready" and ShopService.is_batch(rid):
+			var most := ShopService.max_craft(rid)
+			o["pill"] = {"pips": pips, "text": "×" + ShopArt.compact(most), "color": COL_GOOD}
+			o["extra"] = "Хватит на %s" % ShopArt.full(most)
 		out.append(o)
 	_flag_new(out)
 	return out

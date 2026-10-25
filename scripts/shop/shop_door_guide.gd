@@ -18,6 +18,10 @@ const SECONDS := 20.0
 const REOPEN_SECONDS := 30.0
 const TILE := 32.0
 const EDGE := 6.0
+## Стрелка-указатель золотая, как «новинки» и цены: на светлом камне дома и на
+## небе кремовая стрелка терялась.
+const ARROW_TINT := Color(1.0, 0.84, 0.3)
+const EDGE_SIZE := Vector2(54, 30)
 
 var tab: String = ""
 var _left: float = 0.0
@@ -41,21 +45,25 @@ func _ready() -> void:
 
 	_down = Control.new()
 	_down.name = "Down"
-	_down.size = Vector2(24, 24)
+	_down.size = Vector2(32, 32)
 	_down.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var a := ShopArt.rect(ShopArt.tex("glyph_arrow"), Vector2.ZERO, Vector2(24, 24))
-	a.pivot_offset = Vector2(12, 12)
+	var a := ShopArt.rect(ShopArt.tex("glyph_arrow"), Vector2.ZERO, Vector2(32, 32))
+	a.pivot_offset = Vector2(16, 16)
 	a.rotation = PI * 0.5
+	a.modulate = ARROW_TINT
 	_down.add_child(a)
 	_root.add_child(_down)
 
-	_edge = Control.new()
+	# У края — табличка: дверь и стрелка на тёмной подложке, читается на любом фоне.
+	_edge = Panel.new()
 	_edge.name = "Edge"
-	_edge.size = Vector2(40, 24)
+	_edge.size = EDGE_SIZE
 	_edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_edge.add_theme_stylebox_override("panel", ProgressUiKit.popup_box(ShopArt.COL_GOLD, Color(0.071, 0.055, 0.043, 0.92), 0))
 	_edge_arrow = ShopArt.rect(ShopArt.tex("glyph_arrow"), Vector2.ZERO, Vector2(24, 24))
+	_edge_arrow.modulate = ARROW_TINT
 	_edge.add_child(_edge_arrow)
-	_edge.add_child(ShopArt.rect(ShopArt.tex("glyph_door"), Vector2(0, 4), Vector2(16, 16)))
+	_edge.add_child(ShopArt.rect(ShopArt.tex("glyph_door"), Vector2.ZERO, Vector2(16, 16)))
 	_root.add_child(_edge)
 	_hide_marks()
 	set_process(false)
@@ -132,26 +140,28 @@ static func door_screen_pos() -> Vector2:
 ## Где рисовать: дверь в кадре — стрелка вниз над ней; за краем — стрелка у
 ## края в её сторону. Возвращает "down" / "left" / "right" (для теста).
 func _place_marks(door: Vector2, view: Vector2) -> String:
-	var bob := 0.0 if Settings.reduce_motion else absf(sin(_t * 6.0)) * 5.0
+	var bob := 0.0 if Settings.reduce_motion else absf(sin(_t * 6.0)) * 6.0
 	if door.x >= EDGE + 8.0 and door.x <= view.x - EDGE - 8.0:
 		_edge.visible = false
 		_down.visible = true
-		# Над проёмом двери, с запасом на козырёк: сам проём — клетка над порогом.
-		_down.position = Vector2(door.x - 12.0, door.y - TILE * 1.5 - 26.0 - bob)
+		# Над проёмом двери (он выше героя на полторы клетки), остриё вниз.
+		_down.position = Vector2(door.x - 16.0, door.y - TILE * 1.5 - 30.0 - bob)
 		return "down"
 	_down.visible = false
 	_edge.visible = true
 	var left := door.x < EDGE + 8.0
-	var y := clampf(door.y - TILE * 0.5 - 12.0, 120.0, view.y - 120.0)
+	var y := clampf(door.y - TILE * 0.5 - EDGE_SIZE.y * 0.5, 120.0, view.y - 120.0)
+	var nudge := bob * 0.5
+	var door_icon: Control = _edge.get_child(1)
 	_edge_arrow.flip_h = left
 	if left:
-		_edge_arrow.position = Vector2(-bob * 0.6, 0)
-		_edge.get_child(1).position = Vector2(24, 4)
+		_edge_arrow.position = Vector2(3.0 - nudge, 3)
+		door_icon.position = Vector2(EDGE_SIZE.x - 22.0, 7)
 		_edge.position = Vector2(EDGE, y)
 	else:
-		_edge_arrow.position = Vector2(16 + bob * 0.6, 0)
-		_edge.get_child(1).position = Vector2(0, 4)
-		_edge.position = Vector2(view.x - EDGE - 40.0, y)
+		_edge_arrow.position = Vector2(EDGE_SIZE.x - 27.0 + nudge, 3)
+		door_icon.position = Vector2(6, 7)
+		_edge.position = Vector2(view.x - EDGE - EDGE_SIZE.x, y)
 	return "left" if left else "right"
 
 

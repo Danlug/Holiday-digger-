@@ -660,6 +660,8 @@ func _set_tab(tab: String, animate: bool) -> void:
 	_scroll.scroll_vertical = 0
 	_render()
 	_move_marker(animate)
+	if animate and _door_strip.visible:
+		_door_strip.remind()   # перешёл на вкладку с плитками «у двери» — полоса кивает
 	if animate and not ShopFx.reduced():
 		var dir := 1.0 if NAV_TABS.find(tab) >= old_index else -1.0
 		_scroll.modulate.a = 0.0
@@ -979,7 +981,7 @@ func _remind_door(tile: ShopTile) -> void:
 		ShopFx.pop(tile, 0.08, 0.2)
 		tile.hop_corner()
 		ShopFx.coins(_root, ShopArt.tex("glyph_door"), tile.corner_center(), _door_strip.door_center(), 1,
-			func(_i: int) -> void: _door_strip.remind(), 16.0)
+			func(_i: int) -> void: _door_strip.remind(), 24.0)
 	else:
 		_door_strip.remind()
 

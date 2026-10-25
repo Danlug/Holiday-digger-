@@ -102,6 +102,13 @@ func open(report_data: Dictionary) -> void:
 	_update_ride()
 	if not _riding:
 		_start_auto_close()
+	else:
+		# музыка после смерти молчит до респавна (JuiceDirector): поездка в минуту-две
+		# в тишине выглядела бы зависанием — тихая тема огорода, когда отзвучит «die»
+		var t := get_tree().create_timer(2.6)
+		t.timeout.connect(func() -> void:
+			if _riding and visible and Sfx.current_music() == "":
+				Sfx.music("mus_surface"))
 
 
 func _start_auto_close() -> void:

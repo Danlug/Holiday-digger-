@@ -1781,14 +1781,16 @@ func _workbench() -> void:
 				var need := clampi(int(_reserved_or_need(out_id)) if out_id == "bronze" else 6, 1, 40)
 				var have0 := GameState.get_item_count(out_id) + HouseStorage.count(out_id)
 				var ss = load("res://scripts/shop/shop_service.gd")
-				var rq: Dictionary = ss.call("craft", rid, need)
+				if _has_static(ss, "max_craft"):
+					need = mini(need, int(ss.call("max_craft", rid)))   # верх ползунка: пачка проходит целиком или никак
+				var rq: Dictionary = ss.call("craft", rid, need) if need >= 1 else {}
 				var got := GameState.get_item_count(out_id) + HouseStorage.count(out_id) - have0
 				if bool(rq.get("ok", false)):
-					n = got
+					n = need
 					T.mark("craft_qty_used", _sim)
 					var per := maxi(1, int(r["output"]["count"]))
-					if got != need * per and got > 0 and got % per == 0 and got / per > need:
-						T.finding("P1", "craft_qty", "заказано %d × «%s», пришло %d" % [need, rid, got], _sim, {}, rid)
+					if got != need * per and got > 0:
+						T.finding("P1", "craft_qty", "заказано %d × «%s», пришло %d (ждали %d)" % [need, rid, got, need * per], _sim, {}, rid)
 					elif got <= 0:
 						T.finding("P1", "craft_qty", "крафт %d × «%s» сказал «готово», а предметов не прибавилось" % [need, rid], _sim, {}, rid)
 			while want and ShopService.can_craft(rid) and n < 40:

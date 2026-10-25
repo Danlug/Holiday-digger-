@@ -62,9 +62,9 @@ func _test_closed_discrepancies() -> void:
 		is_equal_approx(Balance.get_tool_speed_multiplier("drill_rig"),
 			2.0 * Balance.get_tool_speed_multiplier("hand_drill") * Balance.get_drill_rig_tier_multiplier(0)))
 
-	# 2. Стан от лопаты — секунда, а не минута (ГДД §5).
-	var stun: float = float(Balance.unwrap(Balance.balance.get("digging", {}).get("shovel_stun_on_stone_or_gold_seconds", -1)))
-	check("стан от лопаты в данных — 1 секунда", is_equal_approx(stun, 1.0), "в данных: %s" % stun)
+	# 2. Стана от лопаты нет вовсе (буз-эффект убран — решение владельца, раунд 4).
+	check("стана от лопаты в данных нет",
+		not (Balance.balance.get("digging", {}) as Dictionary).has("shovel_stun_on_stone_or_gold_seconds"))
 
 	# 3. Бронза 1:1 — и в balance.json, и в minerals.json, и в рецепте мастерской.
 	check("balance.json: 1 металлолом = 1 бронза",
@@ -92,8 +92,7 @@ func _test_closed_discrepancies() -> void:
 		"в данных: %d" % Balance.get_artifact_find_coins("antiquity_1"))
 
 
-## Настоящий удар лопатой по золоту после мастерской: герой оглушён примерно на секунду,
-## а не на запасные 60 из кода.
+## Настоящий удар лопатой по золоту после мастерской: стана нет (буз-эффект убран, раунд 4).
 func _test_stun_duration() -> void:
 	var world := WorldGen.new(20260101)
 	var player = preload("res://scripts/player/player.gd").new()
@@ -116,9 +115,7 @@ func _test_stun_duration() -> void:
 	player.stun_until_msec = 0.0
 	for _i in range(4):
 		player.physics_tick(1.0 / 60.0)
-	var left_ms: float = player.stun_until_msec - float(Time.get_ticks_msec())
-	check("лопата о золото оглушает примерно на секунду", left_ms > 300.0 and left_ms <= 1100.0,
-		"осталось %.0f мс" % left_ms)
+	check("лопата о золото не оглушает (буз-эффект убран)", player.stun_until_msec <= float(Time.get_ticks_msec()))
 	GameState.story_seen = saved_seen
 	GameState.current_tool = saved_tool
 	player.queue_free()

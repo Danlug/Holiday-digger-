@@ -1783,7 +1783,7 @@ func _on_fell(damage: float, _speed: float) -> void:
 
 
 func _on_dig_blocked(tile_type: int) -> void:
-	# «Инструмент звенит о породу, стан от вибрации»: кирка, порода, «Звон!».
+	# Лопата не берёт породу, а кирки ещё нет: инструмент, порода, «Звон!» (стана нет — буз-эффект убран).
 	var mineral_id := MineralMap.mineral_id_for(tile_type)
 	var parts: Array = []
 	var tool_path := _tool_icon_path(GameState.current_tool)

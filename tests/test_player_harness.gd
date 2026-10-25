@@ -423,9 +423,23 @@ func _test_shovel_cannot_dig_stone() -> void:
 	player.digging = null
 	player.stun_until_msec = 0.0
 
+	var saved_tools: Array = GameState.owned_tools.duplicate()
+	GameState.owned_tools = ["shovel"]
 	_tick(3)
 	check("лопата не берёт камень — копка не началась", player.digging == null)
-	check("лопата о камень — герой оглушён (стан)", player.stun_until_msec > Time.get_ticks_msec())
+	check("лопата о камень — без стана (буз-эффект убран)", player.stun_until_msec <= Time.get_ticks_msec())
+
+	# Кирка в собственности — лопата сама уступает ей место, и камень копается.
+	GameState.owned_tools = ["shovel", "rusty_pickaxe"]
+	GameState.current_tool = "shovel"
+	player.digging = null
+	_tick(3)
+	check("лопата о камень при кирке в собственности — герой сам берёт кирку",
+		GameState.current_tool == "rusty_pickaxe" and player.digging != null)
+	player.digging = null
+	player.hold_dx = 0
+	GameState.owned_tools = saved_tools
+	GameState.current_tool = "shovel"
 
 
 ## Обучающее золото не оглушает. Автокопка оставляет пять самородков торчать
@@ -457,16 +471,24 @@ func _test_tutorial_gold_does_not_stun() -> void:
 	player.digging = null
 	player.stun_until_msec = 0.0
 
+	var saved_tools: Array = GameState.owned_tools.duplicate()
+	GameState.owned_tools = ["shovel"]
 	_tick(3)
 	check("лопата не берёт сценарное золото", player.digging == null)
 	check("до мастерской золото не оглушает", player.stun_until_msec <= Time.get_ticks_msec())
 
-	# После мастерской правило общее: лопата о золото — стан.
+	# После мастерской кирка в собственности: лопата о золото — герой сам берёт кирку
+	# (раньше здесь был стан с тряской — владелец принял его за зависание игры).
 	GameState.story_seen.append("workshop")
+	GameState.owned_tools = ["shovel", "rusty_pickaxe"]
 	player.stun_until_msec = 0.0
 	player.digging = null
 	_tick(3)
-	check("после мастерской лопата о золото оглушает", player.stun_until_msec > Time.get_ticks_msec())
+	check("после мастерской лопата о золото — без стана", player.stun_until_msec <= Time.get_ticks_msec())
+	check("после мастерской лопата о золото — копает кирка", GameState.current_tool == "rusty_pickaxe" and player.digging != null)
+	player.digging = null
+	GameState.owned_tools = saved_tools
+	GameState.current_tool = "shovel"
 	GameState.story_seen.erase("workshop")
 	player.hold_down = false
 	player.stun_until_msec = 0.0

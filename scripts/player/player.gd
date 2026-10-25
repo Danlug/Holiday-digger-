@@ -13,7 +13,7 @@ signal fell(damage: float, impact_speed: float)
 signal dig_started(x: int, y: int, tile_type: int)
 signal dig_cancelled
 signal dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_loot: bool, coins: int)
-signal dig_blocked(tile_type: int)  # инструмент не берёт эту породу — стан
+signal dig_blocked(tile_type: int)  # инструмент не берёт эту породу (без стана: буз-эффект убран)
 ## Копать нельзя не из-за инструмента, а потому что так решил сюжет
 ## (обучение: сперва золото, потом фундамент). Текст даёт сюжет, не игрок.
 signal dig_refused_by_story(reason: String)
@@ -401,6 +401,28 @@ func has_rig_fuel() -> bool:
 ## собственности»). "Лучший" — по множителю скорости копки из balance.json,
 ## а не по фиксированному списку: список кирок и так живёт в данных, и
 ## дублировать его порядок здесь — плодить второй источник правды.
+## Берёт ли лопата эту клетку: порода по силам, не фундамент и не глубже её предела.
+func _shovel_takes(type: int, ty: int) -> bool:
+	var max_depth := Balance.get_tool_max_depth("shovel")
+	return TileTypes.can_dig_with_shovel(type) and type != TileTypes.Type.FOUNDATION \
+			and (max_depth < 0 or ty <= max_depth)
+
+
+## Лучшая кирка, которая у героя на руках ("" — нет). Бур не берём: он тратит топливо.
+## owned_tools, а не owns_tool: ржавая кирка бесплатна и «своя» с первой секунды, но в руки
+## она попадает только в мастерской (HouseSystem.take_starting_pickaxe).
+func _best_owned_pickaxe() -> String:
+	var best := ""
+	var best_mult := -1.0
+	for tool_id in Balance.get_tools_in_line("pickaxe"):
+		if GameState.owned_tools.has(String(tool_id)):
+			var mult := Balance.get_tool_speed_multiplier(String(tool_id))
+			if mult > best_mult:
+				best_mult = mult
+				best = String(tool_id)
+	return best
+
+
 func _best_owned_dig_tool() -> String:
 	var best := "shovel"
 	var best_mult := -1.0
@@ -1151,6 +1173,14 @@ func _start_dig(tx: int, ty: int) -> void:
 		dig_refused_by_lava.emit(Heat.lava_cell_cost_hp())
 		return
 
+	# Лопата не берёт клетку (камень, золото, фундамент, глубже своего предела), а кирка уже
+	# есть — герой сам берёт лучшую кирку. Стана за удар лопатой больше нет: буз-эффект убран
+	# (решение владельца, раунд 4: «ненужная механика»).
+	if GameState.current_tool == "shovel" and not _shovel_takes(type, ty):
+		var pick := _best_owned_pickaxe()
+		if not pick.is_empty():
+			GameState.set_current_tool(pick)
+
 	if GameState.current_tool == "shovel":
 		var shovel_max_depth := Balance.get_tool_max_depth("shovel")
 		if type == TileTypes.Type.FOUNDATION:
@@ -1166,20 +1196,12 @@ func _start_dig(tx: int, ty: int) -> void:
 			return
 
 	if not _can_dig(type):
-		# Обучающее золото — исключение из стана. Автокопка оставляет пять
-		# самородков на четвёртом уровне торчать посреди расчищенной земли, и
-		# первое, что делает игрок, — бьёт по ним лопатой. Стан приходит
-		# РАНЬШЕ, чем игра успела сказать, что такое золото и зачем нужна
-		# кирка: тряска без объяснения. Пока сцена мастерской не сыграла,
-		# вместо стана объясняем словами.
-		if type == TileTypes.Type.GOLD_ORE and not StoryState.is_seen("workshop"):
-			digging = null
-			dig_refused_by_story.emit("gold_needs_pickaxe")
-			return
-		stun_until_msec = Time.get_ticks_msec() + float(Balance.unwrap(
-			Balance.balance.get("digging", {}).get("shovel_stun_on_stone_or_gold_seconds", 1.0))) * 1000.0
 		digging = null
-		dig_blocked.emit(type)
+		# До сцены мастерской игра ещё не объяснила, чем копают золото, — объясняем словами.
+		if type == TileTypes.Type.GOLD_ORE and not StoryState.is_seen("workshop"):
+			dig_refused_by_story.emit("gold_needs_pickaxe")
+		else:
+			dig_blocked.emit(type)
 		return
 
 	var mineral_id := MineralMap.mineral_id_for(type)

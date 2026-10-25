@@ -962,6 +962,9 @@ def annotate(rows, m):
 def _family_value(m, rows):
 	if len(rows) == 1:
 		return rows[0]["value_text"]
+	keys = [r["key_ru"] for r in rows]
+	if len(rows) <= 4 and len(set(keys)) == len(keys):
+		return "; ".join("%s %s" % (r["key_ru"], r["value_text"]) for r in rows)
 	nums = [r["value"] for r in rows if isinstance(r["value"], (int, float)) and not isinstance(r["value"], bool)]
 	if len(nums) == len(rows):
 		return "%s, от %s до %s" % (n_numbers(len(rows)), fnum(min(nums)), fnum(max(nums)))

@@ -59,10 +59,6 @@ static func _serialize() -> Dictionary:
 			"dollars": gs.dollars,
 		},
 		"inventory": gs.inventory,
-		"black_box": {
-			"tier": gs.black_box_tier,
-			"contents": gs.black_box,
-		},
 		"tool": {
 			"current_tool": gs.current_tool,
 			# Припаркованная машина — объект мира, переживает перезапуск:
@@ -174,10 +170,8 @@ static func _apply(data: Dictionary) -> void:
 	gs.dollars = int(currency.get("dollars", gs.dollars))
 
 	gs.inventory = data.get("inventory", {})
-
-	var black_box: Dictionary = data.get("black_box", {})
-	gs.black_box_tier = String(black_box.get("tier", gs.black_box_tier))
-	gs.black_box = black_box.get("contents", {})
+	# Блок ящика-страховки из старых сейвов не читаем: механика убрана (решение владельца,
+	# раунд 5), положить в ящик было нельзя — он всегда пуст; следующее сохранение блок не пишет.
 
 	var tool: Dictionary = data.get("tool", {})
 	gs.current_tool = String(tool.get("current_tool", gs.current_tool))
@@ -418,16 +412,16 @@ static func load_game() -> bool:
 # ---------------------------------------------------------------------------
 
 ## Блоки-словари корня сейва. ext и world свободной формы — их содержимое не трогаем.
-const _SAN_BLOCKS: Array[String] = ["survival", "progression", "currency", "black_box", "tool", "depth",
+const _SAN_BLOCKS: Array[String] = ["survival", "progression", "currency", "tool", "depth",
 	"artifacts", "time", "ads", "world", "events", "house", "economy", "ext"]
 const _SAN_FREE_BLOCKS: Array[String] = ["ext", "world"]
 ## Листья-строки; любая другая строка там, где ждут число или bool, ломает int()/bool().
-const _SAN_STRING_KEYS: Array[String] = ["current_tool", "tier", "last_reset_utc_date", "room", "current_gear"]
+const _SAN_STRING_KEYS: Array[String] = ["current_tool", "last_reset_utc_date", "room", "current_gear"]
 ## Листья, где контейнер — норма; в любом другом месте словарь или массив вместо числа ломает float()/int().
-const _SAN_CONTAINER_KEYS: Array[String] = ["skill_stages", "contents", "daily_counts", "food_at_door", "storage",
+const _SAN_CONTAINER_KEYS: Array[String] = ["skill_stages", "daily_counts", "food_at_door", "storage",
 	"collected", "completed_branches", "owned_tools", "owned_gear", "craft_invested"]
 ## Словари «ключ → число» (inventory — в корне; остальные — [блок, ключ]).
-const _SAN_COUNT_DICTS: Array = [["", "inventory"], ["progression", "skill_stages"], ["black_box", "contents"],
+const _SAN_COUNT_DICTS: Array = [["", "inventory"], ["progression", "skill_stages"],
 	["ads", "daily_counts"], ["house", "food_at_door"], ["house", "storage"]]
 ## Массивы строк / чисел.
 const _SAN_ARRAYS: Array = [["artifacts", "collected", TYPE_STRING], ["artifacts", "completed_branches", TYPE_FLOAT],

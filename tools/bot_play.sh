@@ -13,6 +13,8 @@
 #   TRACE=5 tools/bot_play.sh ...           # строка состояния в лог каждые 5 игровых секунд
 #   RESUME=build/bot/<метка>/s7_greedy SHOTS=1 tools/bot_play.sh 7 10 greedy
 #                                          # продолжить с сейва прошлого прогона (снимки глубины)
+#   DIE_LIFT=1 tools/bot_play.sh 7 60 deep  # эксперимент «смерть вместо подъёма» (раунд 5): пора наверх,
+#                                          # а рюкзак дешевле DIE_LIFT_PACK (400) — умирает; детектор death_lift
 #
 # Характеры: cautious (осторожный), greedy (жадный), hasty (торопливый). Вместо характера можно
 # стратегию-цель: deep | achiever | tycoon | collector | fighter (у каждой свой характер по умолчанию;
@@ -71,6 +73,7 @@ run_one() {
 	[ "${FAST:-0}" = 1 ] && args+=(--skip-onboarding)
 	[ -n "${FLUSH:-}" ] && args+=(--flush="$FLUSH")
 	[ -n "${CP:-}" ] && args+=(--checkpoint="$CP")
+	[ "${DIE_LIFT:-0}" = 1 ] && args+=(--die-lift-pack="${DIE_LIFT_PACK:-400}")
 	case "$char" in deep|achiever|tycoon|collector|fighter)
 		args=("${args[@]/--char=$char/--goal=$char}") ;; esac
 	[ -n "${GOAL:-}" ] && args+=(--goal="$GOAL")
@@ -82,7 +85,7 @@ run_one() {
 	python3 tools/bot_report.py "$out" >/dev/null 2>&1 || echo "bot_report.py упал на $out" >"$out/summary.txt"
 }
 export -f run_one
-export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL CP
+export GODOT SHOTS WALL TRACE SESSION RESUME INPUT FAST FLUSH GOAL CP DIE_LIFT DIE_LIFT_PACK
 
 if [ "$SEED" = all ]; then
 	jobs=()

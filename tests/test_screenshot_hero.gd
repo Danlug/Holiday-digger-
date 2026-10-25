@@ -7,7 +7,7 @@ extends Node
 ##       res://tests/test_screenshot_hero.tscn --rendering-driver opengl3 \
 ##       --resolution 448x960 -- /каталог [снимок ...]
 ##
-## Снимки: hero records skills skills_armed skills_deep museum museum_bottom
+## Снимки: hero records skills skills_armed skills_deep skills_lock museum museum_bottom
 ## museum_tip museum_empty first_find card_find card_branch.
 ## Состояние выставляется только в памяти — на диск (user://) тест не пишет.
 
@@ -52,7 +52,7 @@ func _ready() -> void:
 		await _frames(8)
 		await _shot("records")
 
-	if _want("skills") or _want("skills_armed") or _want("skills_deep"):
+	if _want("skills") or _want("skills_armed") or _want("skills_deep") or _want("skills_lock"):
 		_screen.open_tab("progress")
 		await _frames(6)
 		if _want("skills"):
@@ -74,6 +74,25 @@ func _ready() -> void:
 				(c as ScrollContainer).scroll_vertical = 400
 			await _frames(4)
 			await _shot("skills_deep")
+		if _want("skills_lock"):
+			# «Удача — множитель» без ступени шанса: замок со значком предка и подсказка-причина.
+			for c in _screen._panels["progress"].find_children("*", "ScrollContainer", true, false):
+				(c as ScrollContainer).scroll_vertical = 0
+			GameState.skill_stages.erase("luck_multiplier")
+			GameState.skill_stages.erase("luck_chance")
+			GameState.skill_points_changed.emit(GameState.skill_points_available)
+			await _frames(4)
+			var tree: SkillTree = _screen._panels["progress"].tree
+			for c in tree.get_children():
+				if c is SkillNode and c.state == SkillNode.State.BLOCKED:
+					c.pressed.emit()
+			await _frames(12)
+			await _shot("skills_lock")
+			Tip.hide_all()
+			GameState.skill_stages["luck_chance"] = 1
+			GameState.skill_points_changed.emit(GameState.skill_points_available)
+			await _frames(6)
+			await _shot("skills_unlocked")
 
 	if _want("museum") or _want("museum_bottom") or _want("museum_tip"):
 		_screen.open_tab("museum")

@@ -1418,9 +1418,11 @@ func _connect_game_state() -> void:
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
 	GameState.leveled_up.connect(func(lvl, pts):
 		_sync_xp()
+		# Значки — как на экране навыков: уровень (искра опыта) и очки навыков (звезда);
+		# очков за уровень с раунда 4 бывает 1–5, число видно сразу (ГДД §11).
 		toast_parts([
-			{"icon": "star"}, {"text": str(lvl), "color": TOAST_COLORS["rare"]},
-			{"icon": "plus"}, {"text": "+%d" % pts, "color": Color8(0xB4, 0xE0, 0x9C)},
+			{"icon_tex": HeroIcons.get_icon("ui_xp")}, {"text": str(lvl), "color": TOAST_COLORS["rare"]},
+			{"icon_tex": HeroIcons.get_icon("ui_star")}, {"text": "+%d" % pts, "color": Color8(0xB4, 0xE0, 0x9C)},
 		], 2.6, "rare"))
 	GameState.survival_warning.connect(_on_survival_warning)
 	GameState.respawned.connect(func(): _sync_all())

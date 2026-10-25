@@ -8,11 +8,13 @@ extends Button
 ##   DONE        — куплена: заливка цветом ветки, иконка ветки;
 ##   NEXT_READY  — следующая и очков хватает: золотая пульсирующая рамка и цена;
 ##   NEXT_POOR   — следующая, но очков не хватает: тусклая рамка, цена красным;
-##   LOCKED      — дальше следующей: замок.
+##   LOCKED      — дальше следующей: замок;
+##   BLOCKED     — следующая, но не открыта ветка-предок (requires): замок и
+##                 в углу значок ветки, которую надо качнуть (need_branch).
 ## В «взведённом» состоянии (armed) вместо цены — галочка: второе нажатие по ней
 ## подтверждает покупку.
 
-enum State { DONE, NEXT_READY, NEXT_POOR, LOCKED }
+enum State { DONE, NEXT_READY, NEXT_POOR, LOCKED, BLOCKED }
 
 const SIZE := 22.0
 
@@ -24,6 +26,7 @@ var armed: bool = false
 var pulse: float = 0.0      # 0..1, пишет дерево
 var flash: float = 0.0      # вспышка после покупки, твин спадает до нуля
 var branch_color: Color = Color.WHITE
+var need_branch: String = ""  # для BLOCKED: какую ветку качнуть сначала
 
 var _sb := StyleBoxFlat.new()
 
@@ -45,6 +48,14 @@ func _init() -> void:
 func _squash(target: float) -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "scale", Vector2(target, target), 0.06)
+
+
+## Сторона узла задаёт дерево по ширине колонки (веток может стать больше).
+func set_side(side: float) -> void:
+	custom_minimum_size = Vector2(side, side)
+	size = Vector2(side, side)
+	pivot_offset = size * 0.5
+	queue_redraw()
 
 
 func setup(branch_id_: String, stage_: int, color: Color) -> void:
@@ -106,6 +117,11 @@ func _draw() -> void:
 			_sb.border_color = ProgressUiKit.BORDER.lightened(0.15)
 			number = str(cost)
 			number_color = HeroUi.POOR
+		State.BLOCKED:
+			_sb.bg_color = Color(0.08, 0.06, 0.05)
+			_sb.border_color = HeroUi.branch_color(need_branch).darkened(0.25)
+			icon = HeroIcons.get_icon("ui_lock")
+			icon_mod = Color(1, 1, 1, 0.8)
 		_:
 			_sb.bg_color = Color(0.06, 0.05, 0.04)
 			_sb.border_color = ProgressUiKit.BORDER.darkened(0.2)
@@ -121,6 +137,13 @@ func _draw() -> void:
 	if icon != null:
 		var isz := Vector2(16, 16)
 		draw_texture_rect(icon, Rect2((size - isz) * 0.5, isz), false, icon_mod)
+	if state == State.BLOCKED:
+		# значок ветки-предка в углу: «сначала вот это»
+		var need := HeroIcons.skill_icon(need_branch)
+		if need != null:
+			var b := Rect2(size - Vector2(9, 9), Vector2(11, 11))
+			draw_rect(b.grow(0.5), Color(0.06, 0.05, 0.04))
+			draw_texture_rect(need, b, false)
 	if number != "":
 		var font := ThemeDB.fallback_font
 		var fs := 10

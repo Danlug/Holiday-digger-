@@ -81,6 +81,9 @@ func _test_spend_point_applies_effect() -> void:
 	check("HP куплено", GameState.spend_skill_point("hp"))
 	check_near("максимум HP вырос на 20", GameState.get_max_hp(), hp_before + 20.0)
 
+	# Множитель открывается после ступени шанса (решение владельца, раунд 4).
+	check("без шанса множитель не покупается", not GameState.spend_skill_point("luck_multiplier"))
+	check("удача-шанс куплена", GameState.spend_skill_point("luck_chance"))
 	check("удача-множитель куплена", GameState.spend_skill_point("luck_multiplier"))
 	check_near("множитель удачи стал ×2", Balance.get_luck_multiplier(GameState.get_skill_stage("luck_multiplier")), 2.0)
 
@@ -116,6 +119,7 @@ func _test_point_is_spent_only_once() -> void:
 	# Ветка на максимуме больше ничего не берёт, даже когда очков вагон.
 	GameState.skill_points_available = 10000
 	var stages := int(Balance.get_upgrade_branch("luck_multiplier").get("stages", 0))
+	GameState.spend_skill_point("luck_chance")  # предок множителя
 	for i in range(stages):
 		GameState.spend_skill_point("luck_multiplier")
 	var points_at_max: int = GameState.skill_points_available

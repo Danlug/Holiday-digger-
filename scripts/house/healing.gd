@@ -9,8 +9,9 @@ extends RefCounted
 ##    hp_percent_full_night, голодный — меньше («в здоровом теле здоровый дух»);
 ##  * еда лечит по питательности (доля её процентов сытости);
 ##  * аптечка — предмет рюкзака, «применить» лечит заметную часть сразу;
-##  * смерть, кроме рюкзака, забирает 200 монет (не в минус).
-## Числа — data/healing.json (proposed, кроме 200 монет владельца).
+##  * смерть, кроме рюкзака, забирает 5% монет, от 50 до 5000 (раунд 5, не в
+##    минус); поездка скорой и полоски после неё — DeathRide.
+## Числа — data/healing.json (proposed, кроме платы владельца).
 
 const DATA_PATH := "res://data/healing.json"
 
@@ -145,15 +146,38 @@ static func use_medkit() -> Dictionary:
 # Смерть: «скорая забрала»
 # ---------------------------------------------------------------------------
 
+## Плата скорой с coins монет при себе (владелец, раунд 5): 5% вниз до целого,
+## не меньше 50 и не больше 5000; меньше 50 монет — сколько есть, в минус не уходим.
+static func death_fee_for(coins: int) -> int:
+	if coins <= 0:
+		return 0
+	var lo := death_fee_min()
+	var fee := clampi(int(floor(float(coins) * death_fee_percent() / 100.0)), lo, maxi(lo, death_fee_max()))
+	return mini(fee, coins)
+
+
+static func death_fee_percent() -> float:
+	return _num("death", "coins_percent", 5.0)
+
+
+static func death_fee_min() -> int:
+	return int(_num("death", "coins_min", 50.0))
+
+
+static func death_fee_max() -> int:
+	return int(_num("death", "coins_max", 5000.0))
+
+
+## Сколько скорая заберёт, если умереть сейчас (подсказки, карточка смерти).
 static func death_fee_coins() -> int:
-	return maxi(0, int(_num("death", "coins_fee", 200.0)))
+	return death_fee_for(GameState.coins)
 
 
-## Списывает плату скорой при несюжетной смерти (зовёт GameState.die()). Не в
-## минус: меньше 200 — сколько есть. Мимо spend_coins: это не покупка, и задание
-## дня «потрать N монет» смерть засчитывать не должна. Возвращает списанное.
+## Списывает плату скорой при несюжетной смерти (зовёт GameState.die()). Мимо
+## spend_coins: это не покупка, и задание дня «потрать N монет» смерть
+## засчитывать не должна. Возвращает списанное.
 static func charge_death_fee() -> int:
-	var fee := mini(maxi(GameState.coins, 0), death_fee_coins())
+	var fee := death_fee_for(GameState.coins)
 	if fee > 0:
 		GameState.coins -= fee
 		GameState.coins_changed.emit(GameState.coins)

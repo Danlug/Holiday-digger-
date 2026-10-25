@@ -7,7 +7,8 @@ extends Node
 ##  * инструмент: бур и бурмобиль дробят экран лёгкой дрожью, пока идёт копка;
 ##  * камера: наезд на тяжёлом ударе и на жёстком приземлении;
 ##  * глубина: вехи каждые 10 / 100 / 1000 клеток (опыт за них давали молча);
-##  * смерть: карточка «что потеряно, что уцелело» после респавна.
+##  * смерть: карточка «что потеряно, что уцелело» — с поездкой скорой сразу (отсчёт до
+##    приезда), без неё — после респавна.
 ## Пары к JuiceDirector («Звук и сок»): тот отвечает за звук и частицы, этот — за
 ## вес событий. Подписки на сигналы, чужой код не правится.
 
@@ -139,6 +140,8 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			_punch(0.02)
 		&"ambulance":
 			_fee = int(data.get("coins", 0))
+		&"ambulance_ride":
+			_on_ride(data)
 
 
 ## Находка, добытая киркой: значок летит в рюкзак; дорогая — «момент».
@@ -269,7 +272,27 @@ func _near_lava() -> bool:
 	return false
 
 
+## «Скорая везёт» (раунд 5, death-cost): карточка открывается сразу и ведёт
+## отсчёт поездки, респавн — по приезде. Поездка, продолженная после перезапуска
+## игры, приходит без отчёта: потерь уже не перечесть, показываем саму поездку.
+func _on_ride(data: Dictionary) -> void:
+	var rep := _pending
+	_pending = {}
+	if rep.is_empty():
+		rep = DeathCard.build_report({}, int(data.get("depth", 0)), "", 0)
+	rep["ride_s"] = float(data.get("seconds", 0.0))
+	stats["cards"] += 1
+	Feel.card_pending = true
+	var t := get_tree().create_timer(0.7 if not bool(data.get("resumed", false)) else 0.05)
+	t.timeout.connect(func() -> void:
+		Feel.card_pending = false
+		if is_instance_valid(card) and card.is_inside_tree():
+			card.open(rep))
+
+
 func _on_respawned() -> void:
+	if card != null and card.is_open():
+		card.ride_arrived()   # приехали: карточка уже открыта поездкой
 	if _pending.is_empty():
 		return
 	var rep := _pending

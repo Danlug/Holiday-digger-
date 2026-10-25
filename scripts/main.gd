@@ -321,7 +321,9 @@ func _handle_death() -> void:
 	GameState.respawn()
 	# respawn() выше уже решил, покажет ли режиссёр «ощущения» карточку потерь (значки и числа вместо этой фразы)
 	if not Feel.card_pending:
-		hud.toast("Ты погиб. Минералы потеряны. В игре уцелел бы только чёрный ящик.", 4.2)
+		var fee := Healing.last_death_fee   # «скорая забрала» (раунд 4, healing)
+		hud.toast("Ты погиб. Минералы потеряны%s. Уцелел бы только чёрный ящик." % (
+			(", скорая забрала %d монет" % fee) if fee > 0 else ""), 4.2)
 
 
 func _on_collapse_tick() -> void:

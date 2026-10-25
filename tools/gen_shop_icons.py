@@ -719,6 +719,108 @@ def gen_full_restore_pill():
     cv.save("item_full_restore_pill")
 
 
+def _plus_with_ink(cv, cx, cy, half, stroke, fill, ink):
+    """Плюс на чётной сетке: штрих stroke пикселей, длина 2*half, тёмный контур по 8 соседям."""
+    a, b = cx - stroke // 2, cx + (stroke + 1) // 2      # [a, b) по ширине штриха
+    cross = {(x, y) for x in range(cx - half, cx + half) for y in range(cy - stroke // 2, cy + (stroke + 1) // 2)}
+    cross |= {(x, y) for y in range(cy - half, cy + half) for x in range(a, b)}
+    for (x, y) in cross:
+        for ox in (-1, 0, 1):
+            for oy in (-1, 0, 1):
+                if (x + ox, y + oy) not in cross:
+                    cv.px(x + ox, y + oy, ink)
+    for (x, y) in cross:
+        cv.px(x, y, fill)
+    return cross
+
+
+def gen_medkit_icon():
+    """Аптечка (раунд 4, healing): красный чемоданчик с ручкой и белым крестом — родня таблетке
+    (тот же красный в пяти ступенях, тот же белый плюс с тёмным контуром и глянцевый блик), но
+    силуэт другой: коробка, а не капсула, — в слоте рюкзака их не спутать. Свет сверху-слева:
+    крышка светлее, правый торец и низ темнее, по кромке крышки — шов-защёлка."""
+    red = [rgba(h) for h in ("#FF8A9A", "#EC4A63", "#C9213D", "#A31A35", "#7A1230")]
+    ink = rgba("#4A0A1A")
+    metal, metal_l, metal_d = rgba("#B4C0D2"), rgba("#F5F8FB"), rgba("#5C6478")
+    cv = Cv()
+    x0, x1, y0, y1 = 3, 28, 10, 28            # корпус включительно
+    # ручка: дуга-скоба над крышкой
+    cv.rect(11, 4, 20, 5, metal_d)
+    cv.rect(10, 5, 11, 10, metal_d)
+    cv.rect(20, 5, 21, 10, metal_d)
+    cv.rect(12, 4, 19, 4, metal)
+    cv.px(12, 4, metal_l)
+    cv.px(13, 4, metal_l)
+    cv.rect(10, 6, 10, 9, metal)
+    # корпус: тело, светлая крышка, тёмный торец справа и низ
+    cv.rect(x0, y0, x1, y1, red[2])
+    cv.rect(x0, y0, x1, y0 + 4, red[1])            # крышка
+    cv.rect(x0 + 1, y0, x1 - 2, y0, red[0])          # верхняя кромка крышки на свету
+    cv.rect(x0, y0 + 5, x1, y0 + 5, red[4])        # шов крышки
+    cv.rect(x1 - 2, y0 + 1, x1, y1, red[3])        # правый торец в тени
+    cv.rect(x0, y1 - 1, x1, y1, red[4])            # низ
+    cv.rect(x0, y0 + 1, x0, y1 - 2, red[1])        # левая грань на свету
+    # защёлки на шве
+    for zx in (7, 22):
+        cv.rect(zx, y0 + 4, zx + 2, y0 + 6, metal_d)
+        cv.px(zx, y0 + 4, metal_l)
+        cv.px(zx + 1, y0 + 4, metal)
+    # глянцевый блик на крышке
+    cv.rect(x0 + 2, y0 + 1, x0 + 7, y0 + 1, red[0])
+    cv.px(x0 + 2, y0 + 2, WHITE)
+    cv.px(x0 + 3, y0 + 2, red[0])
+    # крест: белый, штрих 4 пикселя, длина 12, центр на узле чётной сетки
+    _plus_with_ink(cv, 16, 20, 6, 4, WHITE, ink)
+    # тень на кресте снизу-справа — чтобы он не выглядел наклейкой
+    for (x, y) in ((18, 23), (19, 23), (17, 25), (17, 24), (21, 21), (20, 21)):
+        if cv.get(x, y) == WHITE:
+            cv.px(x, y, rgba("#DDE4EE"))
+    cv.outline()
+    cv.save("item_medkit")
+
+
+def gen_ambulance_icon():
+    """Значок «скорая» для карточки смерти (раунд 4, healing: «скорая забрала» 200 монет): белый
+    фургон боком, красная полоса и красный крест, синяя мигалка, тёмные колёса. Показывается в
+    16x16 рядом с «−200», поэтому силуэт крупный, а деталей мало: кабина справа со стеклом,
+    крест — плюс 6x6 на борту."""
+    body = [rgba(h) for h in ("#FFFFFF", "#F5F8FB", "#DDE4EE", "#B4C0D2", "#8896AE")]
+    red, red_d = rgba("#EC4A63"), rgba("#A31A35")
+    glass, glass_l = rgba("#5C9BD8"), rgba("#B8E0FF")
+    tire, hub = rgba("#241A22"), rgba("#8896AE")
+    cv = Cv()
+    # кузов-фургон (слева) и кабина со скосом (справа)
+    cv.rect(2, 9, 21, 24, body[1])
+    cv.poly([(21, 12), (25, 12), (29, 17), (29, 24), (21, 24)], body[1])
+    cv.rect(2, 9, 20, 9, body[0])                  # крыша на свету
+    cv.rect(2, 10, 2, 23, body[0])
+    cv.rect(2, 22, 29, 24, body[3])                # низ в тени
+    cv.rect(2, 24, 29, 24, body[4])
+    cv.rect(21, 10, 21, 21, body[2])               # стык кузова и кабины
+    # стекло кабины с бликом
+    cv.poly([(23, 14), (25, 14), (27, 17), (23, 17)], glass)
+    cv.px(23, 14, glass_l)
+    cv.px(24, 14, glass_l)
+    # красная полоса по борту
+    cv.rect(2, 19, 29, 20, red)
+    cv.rect(2, 21, 29, 21, red_d)
+    # крест на борту
+    _plus_with_ink(cv, 11, 14, 4, 2, red, red_d)
+    # мигалка на крыше
+    cv.rect(9, 6, 13, 8, rgba("#2E5C9C"))
+    cv.rect(10, 6, 12, 7, rgba("#5C9BD8"))
+    cv.px(10, 6, glass_l)
+    # фара
+    cv.rect(28, 19, 29, 20, rgba("#FFE066"))
+    # колёса
+    for wx in (8, 24):
+        cv.ell(wx, 25, 3, 3, tire)
+        cv.px(wx, 25, hub)
+        cv.px(wx - 1, 24, hub)
+    cv.outline()
+    cv.save("glyph_ambulance")
+
+
 def gen_energy_bar_icon():
     """Энергетический батончик: фиолетовая обёртка с золотыми гофрированными
     краями и крупной молнией поверх. Молния выступает за обёртку и обведена
@@ -846,6 +948,10 @@ def gen_food():
 
     # таблетка полного восстановления: капсула 💊 с плюсом (рисует gen_full_restore_pill)
     gen_full_restore_pill()
+
+    # аптечка и «скорая» карточки смерти (раунд 4, healing)
+    gen_medkit_icon()
+    gen_ambulance_icon()
 
     # часы-телепорт: ремешок, золотой корпус, синий циферблат со стрелками
     cv = Cv()

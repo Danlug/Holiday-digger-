@@ -59,9 +59,25 @@ const ACTIONS := [
 	{"field": "dynamite", "label": "Динамит"},
 ]
 
+## Флаг запуска (`godot ... -- --no-debug-panel`): спрятать кнопку и в отладке.
+const NO_PANEL_FLAG := "--no-debug-panel"
+
 var _trigger: Button
 var _panel: PanelContainer
 var _buttons: Dictionary = {}   # field:String -> Button
+
+
+## Есть ли кнопка «Тест» в этой сборке (владелец, раунд 4: «можешь убрать
+## кнопку „Тест“»). Только отладочная сборка — редактор, debug-экспорт,
+## headless-тесты; в release-экспорте (веб-релиз, магазины) панели нет вовсе:
+## она даёт бесплатные монеты и бессмертие. Флаг NO_PANEL_FLAG прячет её и в
+## отладке — для снимков бота без кнопки поверх породы (docs/PLAYTEST.md, P3.6).
+static func allowed() -> bool:
+	return allowed_for(OS.is_debug_build(), OS.get_cmdline_user_args())
+
+
+static func allowed_for(debug_build: bool, user_args: PackedStringArray) -> bool:
+	return debug_build and not user_args.has(NO_PANEL_FLAG)
 
 
 func _ready() -> void:

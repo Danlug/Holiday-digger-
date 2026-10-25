@@ -22,7 +22,7 @@ const KNOWN_BEATS := ["card", "narr", "say", "show", "hide", "prop", "clear",
 	"house_enter", "house_sleep", "house_npc_show", "house_npc_walk",
 	# Сюжет после старта: звук, музыка и вспышка/вибро из сцены (ГДД раздел 2).
 	"sfx", "music", "fx"]
-const KNOWN_EFFECTS := ["flag", "tool", "coins", "dollars", "xp", "artifact",
+const KNOWN_EFFECTS := ["flag", "tool", "gear", "coins", "dollars", "xp", "artifact",
 	"sleep", "stamina", "hunger", "teleport_home", "enter_house", "toast", "hook", "sfx"]
 ## Сцены, без которых сюжет из ГДД разделов 2 и 9 не собирается.
 const REQUIRED_SCENES := ["intro_grandpa", "intro_boy", "autodig_start",

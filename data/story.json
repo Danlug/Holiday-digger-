@@ -1273,6 +1273,10 @@
 				{
 					"do": "flag",
 					"id": "backpack_owned"
+				},
+				{
+					"do": "gear",
+					"id": "backpack"
 				}
 			]
 		},

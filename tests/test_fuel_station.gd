@@ -260,14 +260,15 @@ func _test_screen() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Сюжет: станция появляется не позже бура
+# Сюжет: станция появляется вместе с буром — не раньше и не позже
 # ---------------------------------------------------------------------------
 
+## Решение владельца (data/story.json, сцена fuel_station): заправка появляется
+## ПОСЛЕ того, как у героя завёлся ручной бур. Раньше сцена смотрела «рецепт
+## открыт на сотой метке» и играла без бура (docs/PLAYTEST.md, P1.4); тупика
+## «бур есть, станции нет» тоже быть не должно — страховка station_built().
 func _test_story_chain() -> void:
 	var drill_depth := ShopCatalog.unlock_depth("hand_drill")
-	var station_depth: int = load("res://scripts/player/player.gd").JET_DEPTH
-	check("сцена заправки зовётся не глубже, чем открывается рецепт бура (%d <= %d)" % [station_depth, drill_depth],
-		station_depth <= drill_depth)
 	check("торф перегоняется с самого начала — к буру сырьё уже есть", FuelRefinery.unlock_depth("peat") <= drill_depth)
 
 	for f in ["user://save.json", "user://save.json.bak", "user://records.json"]:
@@ -278,13 +279,14 @@ func _test_story_chain() -> void:
 	GameState.story_flags = {}
 	GameState.story_seen = []
 	GameState.story_queue = []
+	# Сцены арки на сотой метке (звонок у могилы, «Глубина 100») — не про заправку, не мешаем ими.
 	for id in ["intro_grandpa", "intro_boy", "autodig_start", "autodig_done", "dud_treasure",
-			"workshop", "death", "backpack", "robert", "sleep_lesson_1", "sleep_lesson_2"]:
+			"workshop", "death", "backpack", "robert", "sleep_lesson_1", "sleep_lesson_2", "grave_call", "depth_100"]:
 		StoryState.mark_seen(id)
 	for f in ["intro_seen", "bars_introduced", "gold_taken", "foundation_broken", "gold_sold", "food_ordered"]:
 		StoryState.set_flag(f)
 	GameState.world_seed = 4242
-	GameState.max_depth_reached = drill_depth - 1
+	GameState.max_depth_reached = drill_depth
 	var main: Node2D = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames(8)
@@ -293,9 +295,25 @@ func _test_story_chain() -> void:
 	if director == null:
 		main.free()
 		return
-	check("до сотой метки сцены заправки нет", not StoryState.is_seen("fuel_station") and not GameState.story_queue.has("fuel_station"))
-	check("и рецепт бура ещё закрыт", not ShopService.is_recipe_unlocked("hand_drill"))
-	GameState.max_depth_reached = drill_depth
+	await _frames(20)
+	check("сотая метка: рецепт бура открыт", ShopService.is_recipe_unlocked("hand_drill"))
+	check("сотая метка без бура: сцены заправки нет",
+		not StoryState.is_seen("fuel_station") and not GameState.story_queue.has("fuel_station"))
+	check("сотая метка без бура: станции нет", not FuelRefinery.station_built())
+
+	# Бур собирают в мастерской: пока окно открыто, сцена не встаёт поверх него.
+	var shop := ShopUI.instance
+	if shop != null:
+		shop.open()
+		await _frames(2)
+	GameState.grant_tool("hand_drill")
+	check("бур собран — станция стоит сразу (страховка от «бур есть, топлива нет»)", FuelRefinery.station_built())
+	if shop != null:
+		await _frames(10)
+		check("пока мастерская открыта, сцена заправки ждёт",
+			not StoryState.is_seen("fuel_station") and not GameState.story_queue.has("fuel_station")
+			and not (director.cutscene != null and director.cutscene.is_playing and director.cutscene.scene_id == "fuel_station"))
+		shop.close()
 	var played := false
 	for _i in range(60):
 		await _frames(1)
@@ -304,8 +322,6 @@ func _test_story_chain() -> void:
 			director.cutscene.skip()
 		if StoryState.is_seen("fuel_station"):
 			break
-	check("на сотой метке сыграла сцена заправки", played and StoryState.is_seen("fuel_station"))
+	check("бур есть — сыграла сцена заправки", played and StoryState.is_seen("fuel_station"))
 	check("станция стоит (флаг сцены)", StoryState.has_flag("fuel_station_built") and FuelRefinery.station_built())
-	check("рецепт бура открылся на той же глубине — бур без станции не получить",
-		ShopService.is_recipe_unlocked("hand_drill"))
 	main.free()

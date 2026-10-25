@@ -102,3 +102,14 @@ func _test_detects_problems(audit) -> void:
 			caught = true
 	Balance.balance["tools"]["hand_drill"]["cost"] = saved
 	check("аудит: рецепт с несуществующим материалом даёт ошибку", caught)
+	# подмена данных: техника с баком, которая станцию не ставит, — тупик «бур есть, топлива нет»
+	var station_tools: Array = TechData.fuel()["tools"]
+	station_tools.erase("drill_rig")
+	var probe2 = Audit.new()
+	probe2._check_station_covers_tanks()
+	station_tools.append("drill_rig")
+	var station_caught := false
+	for f in probe2.findings:
+		station_caught = station_caught or (f["level"] == "error" and String(f["where"]).contains("drill_rig"))
+	probe2.free()
+	check("аудит: техника с баком без станции даёт ошибку", station_caught)

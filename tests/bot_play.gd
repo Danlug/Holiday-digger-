@@ -397,6 +397,7 @@ func _step() -> void:
 	_check_tunneling()
 	_auto_story()
 	_dismiss_modals()
+	bot.resync()
 	_detectors()
 	if GameState.coins > _coins_seen:
 		_earned += GameState.coins - _coins_seen

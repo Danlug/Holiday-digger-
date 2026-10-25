@@ -49,6 +49,12 @@ func is_down(k: Key) -> bool:
 	return _down.has(k)
 
 
+## Раз в кадр: восстановить ввод, если игра его «отпустила» сама. Клавиши держатся и так;
+## «палец» (bot_stick.gd) ставится заново.
+func resync() -> void:
+	pass
+
+
 func _send_key(k: Key, pressed: bool) -> void:
 	var ev := InputEventKey.new()
 	ev.keycode = k

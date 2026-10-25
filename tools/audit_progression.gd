@@ -87,7 +87,7 @@ func run() -> void:
 	ladders.clear()
 	_world = WorldGen.new(SEEDS[0])
 	var steps: Array = [_build_density_profile, _index_drops, _check_minerals_consistency, _measure_real_generation,
-		_check_requirements, _check_combat_data, _check_ladders, _check_meta, _check_fuel_selfsufficiency, _check_heat, _check_lava_passable]
+		_check_requirements, _check_combat_data, _check_ladders, _check_meta, _check_fuel_selfsufficiency, _check_station_covers_tanks, _check_heat, _check_lava_passable]
 	for step: Callable in steps:
 		var t0 := Time.get_ticks_msec()
 		step.call()
@@ -685,6 +685,15 @@ func _check_fuel_selfsufficiency() -> void:
 		add("error", "топливо", "перегонка торфа открывается позже ручного бура")
 	if work_depth("peat", 1) < 0:
 		add("error", "топливо", "торфа в мире нет")
+
+
+## Сцена заправки ждёт, пока бур в собственности, а станция стоит сразу по тому же списку
+## техники (FuelRefinery.station_built): техника с баком вне списка — «бур есть, топлива нет».
+func _check_station_covers_tanks() -> void:
+	var station_tools: Array = TechData.fuel().get("tools", [])
+	for tool_id in (TechData.fuel().get("tanks", {}) as Dictionary).keys():
+		if not station_tools.has(tool_id):
+			add("error", "топливо " + String(tool_id), "техника с баком не ставит станцию: перегнать торф будет негде")
 
 
 func _check_heat() -> void:

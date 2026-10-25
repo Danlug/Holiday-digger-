@@ -89,13 +89,20 @@ static func max_blocks(raw: String) -> int:
 
 ## Станция стоит: после сцены заправки (флаг сюжета) — или раз у героя уже есть
 ## техника на топливе. Вторая половина — страховка от тупика «бур есть, станции
-## нет» для сейвов, где сцена почему-то не сыграла (в обычной игре сцена идёт на
-## той же сотой метке, что открывает рецепт бура, — см. тест test_softlock).
+## нет»: сцену зовёт тот же признак owns_fuel_tool() (решение владельца: заправка
+## появляется после того, как завёлся бур), но играет она не сразу — ждёт, пока
+## закроют мастерскую, а сейв мог сняться и раньше.
 static func station_built() -> bool:
 	if GameState.era == "grandpa":
 		return false
 	if StoryState.has_flag("fuel_station_built"):
 		return true
+	return owns_fuel_tool()
+
+
+## У героя есть техника на топливе (ручной бур или бурмобиль) — именно в
+## собственности, а не «рецепт открыт по глубине».
+static func owns_fuel_tool() -> bool:
 	for tool_id in (TechData.fuel().get("tools", []) as Array):
 		if GameState.owns_tool(String(tool_id)):
 			return true

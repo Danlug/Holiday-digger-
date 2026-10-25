@@ -88,6 +88,7 @@ var _metric_t := 0.0
 var _earned := 0
 var _coins_seen := 0
 var _coins_frame := 0
+var _ach_frame: Array = []   # достижения на прошлом кадре: награда за смерть приходит раньше нашего обработчика
 var _no_brake := false             # намеренная смерть (достижение «умри»): не тормозить тягой
 var _die_tries := 0
 var _death_entry: Dictionary = {}
@@ -382,6 +383,8 @@ func _step() -> void:
 	var cpu_ms := float(now_us - _last_us - bot_us) / 1000.0
 	T.bot_ms += float(bot_us) / 1000.0
 	_coins_frame = GameState.coins
+	if MetaState.sub("ach").size() != _ach_frame.size():
+		_ach_frame = MetaState.sub("ach").keys().duplicate()
 	_last_us = now_us
 	_burn_us_frame = 0
 	_frames += 1
@@ -746,7 +749,7 @@ func _on_died() -> void:
 	var d := {"t": snappedf(_sim, 0.1), "cause": cause, "depth": _depth(), "activity": _activity,
 		"lost_items": _pack_before_death.duplicate(), "lost_value": value, "scripted": not StoryState.is_seen("death"),
 		"coins_before": _coins_frame, "deliberate": _no_brake,
-		"ach_before": MetaState.sub("ach").keys().duplicate()}
+		"ach_before": _ach_frame.duplicate()}
 	_no_brake = false
 	_death_entry = d
 	T.deaths.append(d)

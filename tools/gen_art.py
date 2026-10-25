@@ -187,7 +187,6 @@ ALIAS = {
     "coin": "gold_base", "coin_light": "gold_light",
     "dollar": "emerald_base", "dollar_light": "emerald_light",
     "stamina": "gold_light", "stamina_dark": "copper_base",
-    "blackbox_body": "coal_base", "blackbox_light": "ruby_light",
     "roof": "ruby_base", "roof_dark": "shirt_shadow",
     "wall": "parchment", "wall_dark": "parchment_border",
     "hatch": "lead_base", "hatch_light": "lead_light",
@@ -247,7 +246,7 @@ def write_palette_doc():
         "тон уже есть в палитре — это держит общий мир визуально цельным. "
         "Например: дерево инструментов = тона земли, сталь инструментов = "
         "тон свинца, сердце HP = тон рубина, монета = тон золота, доллар = "
-        "тон изумруда, кузов чёрного ящика = тон угля.\n\n"
+        "тон изумруда.\n\n"
     )
     lines.append("```")
     for k, v in ALIAS.items():
@@ -1235,16 +1234,6 @@ def draw_icon_backpack():
     save(img, "ui/icon_backpack.png")
 
 
-def draw_icon_blackbox():
-    img = item_canvas()
-    rect(img, 6, 10, 26, 24, C("blackbox_body"))
-    rect(img, 6, 10, 26, 13, shade(C("blackbox_body"), 1.4))
-    ellipse(img, 22, 12, 1, 1, C("blackbox_light"))
-    rect(img, 13, 15, 19, 19, C("stone_light"))
-    blend_px(img, 16, 17, C("blackbox_body"))
-    save(img, "ui/icon_blackbox.png")
-
-
 def draw_icon_depth():
     img = item_canvas()
     line(img, [(16, 5), (16, 23)], C("stone_light"), 2)
@@ -1289,7 +1278,6 @@ def gen_ui():
     draw_icon_dollar()
     draw_icon_inventory()
     draw_icon_backpack()
-    draw_icon_blackbox()
     draw_icon_depth()
     draw_panel_9slice()
     draw_slot_frame()
@@ -1487,7 +1475,7 @@ def gen_preview():
         ("hp", "ui/icon_hp.png"), ("hunger", "ui/icon_hunger.png"),
         ("stamina", "ui/icon_stamina.png"), ("coin", "ui/icon_coin.png"),
         ("dollar", "ui/icon_dollar.png"), ("inventory", "ui/icon_inventory.png"),
-        ("blackbox", "ui/icon_blackbox.png"), ("depth", "ui/icon_depth.png"),
+        ("depth", "ui/icon_depth.png"),
         ("panel_9slice", "ui/panel_9slice.png"), ("slot_frame", "ui/slot_frame.png"),
     ]
 

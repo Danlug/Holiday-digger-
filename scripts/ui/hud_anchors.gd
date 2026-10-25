@@ -21,3 +21,15 @@ static func get_anchor(id: String) -> Vector2:
 	if hud == null or not hud.has_method("anchor_of"):
 		return FALLBACK
 	return hud.call("anchor_of", id)
+
+
+## Прямоугольник элемента HUD (те же единицы, что get_anchor). Нужен тем, кто
+## встаёт в линию с элементом (шкала азарта под полосками). Нет HUD — пустой Rect2.
+static func get_rect(id: String) -> Rect2:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return Rect2()
+	var hud := tree.get_first_node_in_group("hud")
+	if hud == null or not hud.has_method("anchor_rect"):
+		return Rect2()
+	return hud.call("anchor_rect", id)

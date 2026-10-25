@@ -203,6 +203,14 @@ func anchor_of(id: String) -> Vector2:
 	return node.get_global_rect().get_center()
 
 
+## Прямоугольник якоря (HudAnchors.get_rect): шкала азарта встаёт в линию с полосками.
+func anchor_rect(id: String) -> Rect2:
+	var node: Control = _anchors.get(id, null)
+	if node == null or not is_instance_valid(node):
+		return Rect2()
+	return node.get_global_rect()
+
+
 func set_player(p: Node) -> void:
 	player = p
 	player.fell.connect(_on_fell)

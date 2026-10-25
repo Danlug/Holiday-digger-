@@ -250,6 +250,27 @@
    "pv": 0.03,
    "voices": 1
   },
+  "greed_end": {
+   "cd": 600,
+   "db": 0.0,
+   "files": [
+    "sfx/greed_end.wav"
+   ],
+   "prio": 2,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "greed_start": {
+   "cd": 600,
+   "db": 0.0,
+   "duck": 3.0,
+   "files": [
+    "sfx/greed_start.wav"
+   ],
+   "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  },
   "heal": {
    "cd": 200,
    "db": 0.0,

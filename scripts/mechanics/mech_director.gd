@@ -2,11 +2,13 @@ class_name MechDirector
 extends Node
 ## Режиссёр механик раунда 3. Слушает шину (`dug`), считает серию, мастерство и
 ## тайники, выдаёт награду через GameState (вес рюкзака проверяет add_item) и
-## включает отклик через фасады Sfx / Fx / Haptics. Правил копки не меняет:
-## копку, опыт и добычу клетки делает Player, здесь — только надбавки сверху.
+## включает отклик через фасады Sfx / Fx / Haptics. Копку, опыт и добычу клетки
+## делает Player, здесь — надбавки сверху; единственное, что режиссёр меняет в
+## герое, — множитель жадности (Player.greed_mult) на время режима.
 ##
 ## Узлы: ChestLayer (сундуки в мире, в ViewRoot сразу над тайлами), StreakMeter
-## (шкала азарта под полосками HUD), JournalScreen (журнал, пункт меню «•••»).
+## (шкала азарта под полосками HUD), GreedBadge (значок «×7» над героем, поверх
+## мира), JournalScreen (журнал, пункт меню «•••»).
 
 signal chest_opened(cell: Vector2i, tier: String, items: Dictionary)
 signal fever_started
@@ -23,6 +25,7 @@ var view_root: Node = null
 var streak := StreakLogic.new()
 var chest_layer: ChestLayer = null
 var meter: StreakMeter = null
+var badge: GreedBadge = null
 var journal: JournalScreen = null
 
 ## Броски двойной добычи (мастерство) — свой генератор от сида мира: тест крутит
@@ -36,6 +39,8 @@ var _band_cache: Dictionary = {}
 var _loot_tick: float = 0.0
 var _full_warned: Dictionary = {}
 var _connected := false
+var _greed_was := false
+var _last_pos := Vector2.INF   # где герой был в прошлом кадре (клетки): туман по пути жадности
 
 
 func _ready() -> void:
@@ -65,6 +70,10 @@ func _build() -> void:
 		var wv := view_root.get_node_or_null("WorldView")
 		if wv != null:
 			view_root.move_child(chest_layer, wv.get_index() + 1)
+		badge = GreedBadge.new()
+		badge.name = "GreedBadge"
+		badge.director = self
+		view_root.add_child(badge)
 	var meter_layer := CanvasLayer.new()
 	meter_layer.name = "StreakLayer"
 	meter_layer.layer = 2   # рядом с HUD и значками техники, ниже шторок и экранов
@@ -83,7 +92,7 @@ func _register_menu() -> void:
 	MenuRegistry.add("journal", {
 		"icon": Mechanics.tex("journal"),
 		"title": "Журнал добытчика",
-		"body": "Мастерство руд: звёзды за добычу дают опыт и шанс двойной добычи. Найденные тайники и лихорадки.",
+		"body": "Мастерство руд: звёзды за добычу дают опыт и шанс двойной добычи. Найденные тайники и сколько раз была жадность.",
 		"order": 40,
 		"visible": func() -> bool: return MechData.gate_open(),
 		"badge": func() -> int: return MechState.unseen_count() if MechData.gate_open() else 0,
@@ -120,17 +129,22 @@ func _exit_tree() -> void:
 # ---------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
-	step(delta)
+	# тот же шаг, что у физики героя (main.gd: не больше 0.033): на медленном
+	# телефоне жадность длится столько же игровых секунд, сколько герой бежит
+	step(minf(delta, 0.033))
 
 
 ## Шаг логики (тесты зовут его сами с фиксированным dt).
 func step(dt: float) -> void:
 	if player == null or not is_instance_valid(player):
 		return
+	streak.set_stage(GreedRules.stage())
 	var digging: bool = player.get("digging") != null
 	if streak.tick(dt, digging, _streak_allowed()):
 		if meter != null:
 			meter.on_break()
+	_sync_greed()
+	_reveal_path()
 	_loot_tick -= dt
 	if _loot_tick <= 0.0:
 		_loot_tick = 0.25
@@ -149,6 +163,7 @@ func _on_died() -> void:
 	streak.reset()
 	if meter != null:
 		meter.on_break()
+	_sync_greed()
 
 
 # ---------------------------------------------------------------------------
@@ -180,8 +195,7 @@ func on_dug(data: Dictionary) -> void:
 			Fx.burst("spark", pos, 0.9, COL_GOLD)
 	if bool(r["started"]):
 		_on_fever_started()
-	if bool(r["ended"]):
-		_on_fever_ended()
+		_sync_greed()
 	if meter != null:
 		meter.on_dug(bool(r["fever_cell"]))
 	var ch := chest_at(cell)
@@ -234,25 +248,60 @@ func _to_screen(world_pos: Vector2) -> Vector2:
 	return HudAnchors.FALLBACK
 
 
-# --- лихорадка ---------------------------------------------------------------
+# --- жадность (бывшая лихорадка) ---------------------------------------------
+
+## Герой узнаёт о жадности здесь и только здесь: начало (клетка-порог), конец по
+## часам, сброс серии (пауза, дом, смерть, сцена) — всё сходится в одном месте.
+func _sync_greed() -> void:
+	var on := streak.in_greed()
+	if player != null and is_instance_valid(player) and "greed_mult" in player:
+		player.greed_mult = GreedRules.speed_mult() if on else 1.0
+	if _greed_was and not on:
+		_on_fever_ended()
+	_greed_was = on
+
+
+## В жадности герой проходит за кадр до семи шагов, а main.gd открывает туман
+## только вокруг конечной точки — досвечиваем путь, чтобы за спиной не оставались
+## тёмные клетки шахты.
+func _reveal_path() -> void:
+	var pos := Vector2(float(player.x), float(player.y))
+	var from := _last_pos
+	_last_pos = pos
+	if fog == null or from == Vector2.INF or not streak.in_greed():
+		return
+	var dist := from.distance_to(pos)
+	if dist <= 0.9 or dist > 40.0:
+		return   # шаг меньше клетки main.gd покрыл сам; дальше 40 — телепорт, а не бег
+	var n := int(ceil(dist / 0.9))
+	var tr := GameState.get_vision_terrain_radius()
+	var rr := GameState.get_vision_resource_radius()
+	for i in range(1, n):
+		var p := from.lerp(pos, float(i) / float(n))
+		fog.reveal_around(p.x, p.y, tr, rr)
+
 
 func _on_fever_started() -> void:
 	stats["fevers"] += 1
 	MechState.bump_stat("fevers", 1)
-	Sfx.play("reward")
-	Haptics.buzz(70)
-	Fx.flash(Color(1.0, 0.85, 0.3, 0.22), 0.25)
+	Sfx.play("greed_start")
+	Sfx.play("reward", 1.15, -6.0)
+	Haptics.buzz(90)
+	Fx.flash(Color(1.0, 0.85, 0.3, 0.24), 0.25)
 	if player != null:
 		var head := Vector2(float(player.x) * 32.0, float(player.y) * 32.0 - 12.0)
 		Fx.burst("levelup", head, 1.0)
-		Fx.float_icon(head + Vector2(0, -14), Mechanics.tex("fever"), "×2", COL_GOLD)
-	Feel.punch(0.02)
-	GameState.emit_event(&"fever_started", {"cells": streak.fever_cells})
+		Fx.burst("spark", head + Vector2(0, 8), 1.2, COL_GOLD)
+	Feel.punch(0.03)
+	GameState.emit_event(&"fever_started", {"seconds": streak.greed_s, "stage": streak.stage})
 	fever_started.emit()
 
 
 func _on_fever_ended() -> void:
-	Sfx.play("pickup", 0.8, -4.0)
+	Sfx.play("greed_end")
+	Haptics.tap()
+	if player != null and is_instance_valid(player):
+		Fx.burst("poof", Vector2(float(player.x) * 32.0, float(player.y) * 32.0 - 20.0), 0.8)
 	GameState.emit_event(&"fever_ended", {})
 	fever_ended.emit()
 

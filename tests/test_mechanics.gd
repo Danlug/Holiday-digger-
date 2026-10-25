@@ -19,6 +19,7 @@ class StubPlayer:
 	var y: float = 30.5
 	var digging = null
 	var frozen: bool = false
+	var greed_mult: float = 1.0
 	func cell_x() -> int:
 		return int(floor(x))
 	func cell_y() -> int:
@@ -208,22 +209,19 @@ func _test_streak() -> void:
 	var s := StreakLogic.new()
 	var started := 0
 	var at := s.fever_at
-	var cells := s.fever_cells
-	check("лихорадка из данных: %d клеток подряд → %d двойных" % [at, cells], at == 60 and cells == 5)
+	check("жадность из данных: %d клеток подряд → %.0f с" % [at, s.greed_s], at == 60 and is_equal_approx(s.greed_s, 3.0))
 	for i in range(at - 1):
 		started += int(s.on_dug(40)["started"])
-	check("%d клеток — ещё не лихорадка" % (at - 1), started == 0 and s.count == at - 1 and not s.in_fever())
+	check("%d клеток — ещё не жадность" % (at - 1), started == 0 and s.count == at - 1 and not s.in_greed())
 	var r := s.on_dug(40)
-	check("%d-я клетка запускает лихорадку" % at, bool(r["started"]) and s.in_fever() and s.fever_left == cells)
+	check("%d-я клетка запускает жадность" % at, bool(r["started"]) and s.in_greed() and is_equal_approx(s.greed_left, 3.0))
 	check("сама клетка-порог не двойная", not bool(r["fever_cell"]))
-	var fever_cells := 0
-	var ended := false
-	for i in range(cells):
-		var q := s.on_dug(40)
-		fever_cells += int(q["fever_cell"])
-		ended = ended or bool(q["ended"])
-	check("ровно %d клеток в лихорадке" % cells, fever_cells == cells and ended and not s.in_fever())
-	check("после лихорадки серия с нуля", s.count == 0)
+	check("клетка в жадности — двойная и серию не копит", bool(s.on_dug(40)["fever_cell"]) and s.count == 0)
+	check("пауза в жадности её не рвёт (идёт по часам)", not s.tick(2.9, false, true) and s.in_greed())
+	s.tick(0.2, true, true)
+	check("через 3 с жадность кончилась, серия с нуля", not s.in_greed() and s.count == 0)
+	check("после жадности клетка обычная", not bool(s.on_dug(40)["fever_cell"]) and s.count == 1)
+	s.reset()
 	# пауза
 	for i in range(10):
 		s.on_dug(40)
@@ -234,7 +232,7 @@ func _test_streak() -> void:
 	check("пауза дольше 2.5 с — серия сгорает", s.tick(2.6, false, true) and s.count == 0)
 	for i in range(at + 2):
 		s.on_dug(40)
-	check("лихорадка сгорает на паузе тоже", s.in_fever() and s.tick(3.0, false, true) and not s.in_fever())
+	check("подъём наверх или дом рвут и жадность", s.in_greed() and s.tick(0.01, false, false) and not s.in_greed())
 	for i in range(5):
 		s.on_dug(40)
 	check("подъём наверх или дом (allowed=false) — сброс", s.tick(0.01, false, false) and s.count == 0)
@@ -363,20 +361,21 @@ func _test_director() -> void:
 	d.step(0.3)
 	check("рядом и есть место — остаток в рюкзаке", MechState.chest_left(cell2).is_empty() and not GameState.inventory.is_empty())
 
-	# лихорадка: fever_at клеток подряд, потом руда — двойная
+	# жадность: fever_at клеток подряд, потом руда — двойная, герой ×7
 	GameState.inventory.clear()
 	d.streak.reset()
 	for i in range(d.streak.fever_at):
 		_dug(Vector2i(i % 32, 60), "", false)
-	check("%d клеток подряд — лихорадка" % d.streak.fever_at, d.streak.in_fever() and int(d.stats["fevers"]) == 1)
+	check("%d клеток подряд — жадность" % d.streak.fever_at, d.streak.in_greed() and int(d.stats["fevers"]) == 1)
+	check("герой узнал о жадности сразу", is_equal_approx(p.greed_mult, 7.0))
 	GameState.add_item("silver", 1)   # копка кладёт свою штуку сама (Player), режиссёр — сверху
 	_dug(Vector2i(5, 61), "silver", true)
-	check("руда в лихорадке — вторая штука сверху", GameState.get_item_count("silver") == 2)
+	check("руда в жадности — вторая штука сверху", GameState.get_item_count("silver") == 2)
 	check("счётчик добычи сверху в сейве", MechState.stat("bonus_items") >= 1 and MechState.stat("fevers") == 1)
-	# пауза рвёт лихорадку
+	# жадность идёт по часам: 3 с — и всё
 	p.digging = null
-	d.step(3.0)
-	check("пауза 3 с без копки — лихорадка сгорела", not d.streak.in_fever())
+	d.step(3.1)
+	check("через 3 с жадность кончилась", not d.streak.in_greed() and is_equal_approx(p.greed_mult, 1.0))
 	# дом рвёт серию
 	for i in range(10):
 		_dug(Vector2i(6, 62), "", false)

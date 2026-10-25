@@ -104,9 +104,11 @@ func step(p, vw: float, vh: float, sky_height: int, dt: float) -> Vector2:
 		# чтобы смещение не зависело от частоты кадров
 		var tx := maxf(Feel.num("camera.follow_tau_x_s", 0.10), 0.001)
 		var ty := maxf(Feel.num("camera.follow_tau_y_s", 0.07), 0.001)
+		# жадность (scripts/mechanics/): герой проходит за кадр greed_mult шагов — и поправка во столько же раз
+		var gm: float = maxf(1.0, float(p.greed_mult)) if p is Object and "greed_mult" in p else 1.0
 		ff = Vector2(
-			clampf(float(p.vx) * dt / maxf(exp(dt / tx) - 1.0, 1.0e-6), -3.0, 3.0),
-			clampf(float(p.vy) * dt / maxf(exp(dt / ty) - 1.0, 1.0e-6), -3.0, 3.0))
+			clampf(float(p.vx) * gm * dt / maxf(exp(dt / tx) - 1.0, 1.0e-6), -3.0, 3.0),
+			clampf(float(p.vy) * gm * dt / maxf(exp(dt / ty) - 1.0, 1.0e-6), -3.0, 3.0))
 	var target := classic(float(p.x) + _lead_x + ff.x, float(p.y) + _lead_y + ff.y, vw, vh, sky_height)
 
 	if rigid or not _has or pos.distance_to(target) > Feel.num("camera.snap_cells", 6.0):

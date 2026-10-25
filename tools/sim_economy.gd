@@ -24,9 +24,13 @@ extends Node
 ##   --artifacts=1|0   1 (по умолчанию): находки артефактов платят монетами и опытом, как в игре
 ##                     (позиции — из ArtifactSpawn по сиду мира); 0 — чистая добыча руды
 ##   --json=путь       сохранить результат (потом сверять до/после правок баланса)
-##   --mech=1|0        1: механики раунда 3 (ГДД §20.1, scripts/mechanics/): тайники, лихорадка азарта,
-##                     двойная добыча мастерства — той же логикой, что в игре (ChestLogic, StreakLogic,
-##                     MasteryLogic). По умолчанию 0 — прежние числа §18 не меняются.
+##   --mech=1|0        1: механики раунда 3 (ГДД §20.1, scripts/mechanics/): тайники, жадность азарта
+##                     (копка с первого удара и руда вдвое, пока идёт таймер), двойная добыча мастерства —
+##                     той же логикой, что в игре (ChestLogic, StreakLogic, GreedRules, MasteryLogic).
+##                     Ветка «Жадность» качается, если её id есть в --skills. По умолчанию 0 — прежние
+##                     числа §18 не меняются.
+##   --fever_extra=N   сколько штук сверху даёт рудная клетка в жадности (по умолчанию streak.fever_extra
+##                     из data/mechanics.json; 0 — жадность без удвоения, только темп)
 ##
 ## Модель (всё, что она НЕ учитывает, перечислено — числа это ориентир, не истина):
 ##  * герой копает колонку x=17 (ствол тоннеля Роберта) вниз от первого уровня под
@@ -50,7 +54,7 @@ const UPKEEP_COST_S := 30.0
 const SIDE_TURN_S := 0.4            # тап в сторону
 
 var _opt := {"seeds": 6, "policy": "shaft", "hours": 48.0, "skills": "dig_speed,strength,vision",
-	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": "", "mech": "0"}
+	"bank": "iron", "fill": 0.9, "smart": "1", "artifacts": "1", "json": "", "mech": "0", "fever_extra": ""}
 
 
 func _ready() -> void:
@@ -87,7 +91,7 @@ func _simulate(seed_value: int) -> Dictionary:
 		var mrng := RandomNumberGenerator.new()
 		mrng.seed = seed_value * 31 + 7
 		s["mech"] = {"streak": StreakLogic.new(), "n": {}, "stars": {}, "opened": {}, "bands": {}, "rng": mrng,
-			"val": {"chest": 0, "fever": 0, "mastery": 0}, "chests": 0, "fevers": 0}
+			"val": {"chest": 0, "fever": 0, "mastery": 0}, "chests": 0, "fevers": 0, "greed_cells": 0}
 	# Ступени, которые покупает добытчик, — по стоимости, кирки строго по порядку.
 	var ladder: Array = _build_ladder()
 	var needs: Dictionary = _drill_needs()
@@ -190,7 +194,17 @@ func _dig_cell(s: Dictionary, world: WorldGen, x: int, y: int, in_shaft: bool) -
 	var tile := world.get_tile(x, y)
 	if tile == TileTypes.Type.EMPTY:
 		return
-	s["t"] += _cell_seconds(s, tile, y)
+	var sec := _cell_seconds(s, tile, y)
+	if s.has("mech"):
+		# жадность (ГДД §20.1): клетка — с первого удара; таймер идёт временем копки
+		# (ход ×7 по прокопанному здесь не учтён — оценка снизу)
+		var st: StreakLogic = s["mech"]["streak"]
+		st.set_stage(int(s["stages"].get("greed", 0)))
+		if st.in_greed():
+			sec = minf(sec, GreedRules.dig_seconds(String(s["tool"])))
+			s["mech"]["greed_cells"] += 1
+		st.tick(sec, true, true)
+	s["t"] += sec
 	s["cells"] += 1
 	var mid := MineralMap.mineral_id_for(tile)
 	var price := Balance.get_mineral_price(mid) if not mid.is_empty() else 0
@@ -273,8 +287,10 @@ func _mech_dug(s: Dictionary, world: WorldGen, x: int, y: int, mid: String, loot
 	if bool(r["started"]):
 		m["fevers"] += 1
 	if bool(r["fever_cell"]) and loot and mid != "":
-		s["items"][mid] = int(s["items"].get(mid, 0)) + 1
-		m["val"]["fever"] += price
+		var extra := int(_opt["fever_extra"]) if String(_opt["fever_extra"]) != "" \
+			else int(MechData.num("streak", "fever_extra", 1))
+		s["items"][mid] = int(s["items"].get(mid, 0)) + extra
+		m["val"]["fever"] += price * extra
 	var ch := _mech_chest(s, world, y)
 	if not ch.is_empty() and ch["cell"] == Vector2i(x, y) and not m["opened"].has(ch["cell"]):
 		_mech_open(s, world, ch)
@@ -497,14 +513,17 @@ func _report(results: Array) -> void:
 		var v := {"chest": 0.0, "fever": 0.0, "mastery": 0.0}
 		var chests := 0.0
 		var fevers := 0.0
+		var greed_cells := 0.0
 		for r in results:
 			for k in v.keys():
 				v[k] += float(r["mech"]["val"][k])
 			chests += float(r["mech"]["chests"])
 			fevers += float(r["mech"]["fevers"])
+			greed_cells += float(r["mech"].get("greed_cells", 0))
 		var n := float(results.size())
-		print("механики: сундуков %.1f, лихорадок %.1f за прогон; добыча сверху (по прайсу): сундуки %.0f, лихорадка %.0f, мастерство %.0f — %.1f%% проданного" % [
-			chests / n, fevers / n, v["chest"] / n, v["fever"] / n, v["mastery"] / n,
+		print("механики: сундуков %.1f, жадностей %.1f за прогон (клеток в жадности %.0f, %.1f на раз); добыча сверху (по прайсу): сундуки %.0f, жадность %.0f, мастерство %.0f — %.1f%% проданного" % [
+			chests / n, fevers / n, greed_cells / n, greed_cells / maxf(1.0, fevers),
+			v["chest"] / n, v["fever"] / n, v["mastery"] / n,
 			(v["chest"] + v["fever"] + v["mastery"]) / maxf(1.0, sold) * 100.0])
 	var r0: Dictionary = results[0]
 	print("конец первого сида: глубина %d, монеты %d, на верстаке %s, прокачка %s, уровень %d, время %s" % [

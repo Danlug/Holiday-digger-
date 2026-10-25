@@ -481,6 +481,36 @@ def _reward(rng, v):
     return reverb_tail(mix(1.2, parts), SR, rt60=0.5, wet=0.16)
 
 
+@sfx("greed_start", peak=0.85, pv=0.0, prio=3, voices=1, cd=600, duck=3.0)
+def _greed_start(rng, v):
+    # Жадность (scripts/mechanics/): «вжух» вверх и быстрая лесенка — разгон ×7.
+    dur = 0.8
+    n = int(0.45 * SR)
+    whoosh = fft_filter(rng.standard_normal(n), SR, lo=900, hi=7000)
+    whoosh = whoosh / (np.max(np.abs(whoosh)) + 1e-9)
+    rise = np.linspace(0.0, 1.0, n) ** 2.2
+    whoosh *= rise * np.minimum(1.0, (n - np.arange(n)) / (0.04 * SR))
+    parts = [(0.0, whoosh, 0.35)]
+    for i, m in enumerate([67, 71, 74, 79, 83, 86]):
+        parts.append((0.18 + i * 0.035, chip("sqr", float(mtof(m)), 0.12, 0.05, duty=0.25, lp=6000), 0.38))
+    parts.append((0.42, bell(float(mtof(91)), 0.4, 0.2, GLASS), 0.35))
+    parts.append((0.42, chip("tri", float(mtof(79)), 0.35, 0.18, lp=5000), 0.3))
+    return reverb_tail(mix(dur, parts), SR, rt60=0.35, wet=0.14)
+
+
+@sfx("greed_end", peak=0.6, pv=0.0, prio=2, voices=1, cd=600)
+def _greed_end(rng, v):
+    # Конец жадности: три ноты вниз и выдох — «отпустило», без тревоги.
+    parts = []
+    for i, m in enumerate([79, 74, 67]):
+        parts.append((i * 0.07, chip("tri", float(mtof(m)), 0.16, 0.08, lp=4000), 0.45))
+    n = int(0.3 * SR)
+    puff = fft_filter(rng.standard_normal(n), SR, lo=300, hi=2500)
+    puff = puff / (np.max(np.abs(puff)) + 1e-9) * np.exp(-np.arange(n) / (0.09 * SR))
+    parts.append((0.12, puff, 0.18))
+    return reverb_tail(mix(0.55, parts), SR, rt60=0.3, wet=0.12)
+
+
 # --------------------------------------------------------------------------
 # Мир
 # --------------------------------------------------------------------------

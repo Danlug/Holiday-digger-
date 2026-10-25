@@ -216,8 +216,82 @@ def md_table(dirs):
     print("\n".join(out))
 
 
+GOAL_RU = {"deep": "глубже", "achiever": "достижения", "tycoon": "деньги", "collector": "коллекция", "fighter": "бой"}
+
+
+def night(base):
+    """Сводка ночного прогона (tools/bot_night.sh): таблица по стратегиям и находки без повторов."""
+    runs = []
+    for g in sorted(os.listdir(base)):
+        gdir = os.path.join(base, g)
+        if not os.path.isdir(gdir):
+            continue
+        for d in sorted(os.listdir(gdir)):
+            rd = os.path.join(gdir, d)
+            if not (d.startswith("s") and os.path.isdir(rd)) or d.startswith("shots"):
+                continue
+            if os.path.exists(os.path.join(rd, "telemetry.json")) and not os.path.exists(os.path.join(rd, "summary.txt")):
+                summarize(rd)
+            p = os.path.join(rd, "telemetry.json")
+            if os.path.exists(p):
+                runs.append((g, rd, json.load(open(p, encoding="utf-8"))))
+    L = ["# Ночной прогон ботов-стратегий", "", "Каталог: `%s`" % base, ""]
+    L.append("| Стратегия | Характер, сид | Игровых часов (суток) | Метрика цели | Глубина | Заработано | Уровень | "
+             "Достижений | Артефактов | Тайников | Звёзд мастерства | Монстров | Смертей | Кирка / ранец | Бур / бурмобиль / скважина | P0 | Цель стояла |")
+    L.append("|" + "---|" * 17)
+    for g, rd, t in runs:
+        m = t.get("meta", {})
+        es = m.get("end_state", {})
+        ms = t.get("milestones", {})
+        ec = t.get("event_counts", {})
+        f = t.get("findings", [])
+        p0 = sum(1 for x in f if x.get("sev") == "P0")
+        stall = sum(int(x.get("count", 1)) for x in f if x.get("kind") == "goal_stall")
+        deaths = sum(1 for x in t.get("deaths", []) if not x.get("scripted"))
+        tools = "/".join("да" if ("craft:%s" % k) in ms else "—" for k in ("hand_drill", "drill_rig", "well"))
+        sim_h = float(m.get("sim_seconds", 0)) / 3600
+        L.append("| %s (%s)%s | %s, %s | %.1f (%.1f) | %s | %s | %s | %s | %s | %s | %s | %s | %s | %d | %s / %s | %s | %d | %d |" % (
+            g, GOAL_RU.get(g, g), " — оборван" if m.get("partial") else "", m.get("character"), m.get("seed"), sim_h,
+            float(m.get("game_days", sim_h * 8 / 24)), m.get("goal_metric", "—"), es.get("max_depth"),
+            m.get("coins_earned_total", "—"), es.get("level"), m.get("achievements_done", "—"), es.get("artifacts"),
+            ec.get("chest_opened", 0), ec.get("mastery_star", 0), m.get("monsters", 0), deaths, es.get("tool"),
+            es.get("gear") or "—", tools, p0, stall))
+    # находки без повторов: тип + текст без чисел
+    agg = {}
+    for g, rd, t in runs:
+        for x in t.get("findings", []):
+            k = (x.get("sev"), x.get("kind"), re.sub(r"\d+([.,]\d+)?", "#", str(x.get("text")))[:140])
+            a = agg.setdefault(k, {"runs": set(), "count": 0, "example": x.get("text"), "where": rd, "t": x.get("t", 0)})
+            a["runs"].add(g)
+            a["count"] += int(x.get("count", 1))
+        for kind in ("script_error", "crash", "parse_error"):
+            for row in t.get("log", {}).get(kind, []):
+                k = ("P0" if kind == "crash" else "P1", "log_" + kind, re.sub(r"\d+", "#", row["line"])[:140])
+                a = agg.setdefault(k, {"runs": set(), "count": 0, "example": row["line"][:300], "where": rd, "t": 0})
+                a["runs"].add(g)
+                a["count"] += int(row.get("count", 1))
+    order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+    L += ["", "## Находки (без повторов; стратегии и сколько раз)", ""]
+    for k in sorted(agg, key=lambda k: (order.get(k[0], 9), -len(agg[k]["runs"]), -agg[k]["count"])):
+        a = agg[k]
+        L.append("- **[%s] %s**: %s — %s, ×%d (первый раз: `%s`, %s)" % (
+            k[0], k[1], a["example"], ", ".join(sorted(a["runs"])), a["count"], os.path.relpath(a["where"], base), mmss(a["t"])))
+    shots = []
+    for g, rd, t in runs:
+        for root, _dirs, files in os.walk(rd):
+            if os.path.basename(root) == "shots":
+                shots += [os.path.relpath(os.path.join(root, f), base) for f in sorted(files) if f.endswith(".png")]
+    if shots:
+        L += ["", "## Снимки (настоящий рендер с копий сейва)", ""] + ["- `%s`" % s for s in shots[:120]]
+    text = "\n".join(L) + "\n"
+    open(os.path.join(base, "NIGHT.md"), "w", encoding="utf-8").write(text)
+    print(text)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) >= 3 and sys.argv[1] == "--md":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--night":
+        night(sys.argv[2])
+    elif len(sys.argv) >= 3 and sys.argv[1] == "--md":
         md_table(sys.argv[2:])
     elif len(sys.argv) >= 3 and sys.argv[1] == "--merge":
         merge(sys.argv[2])

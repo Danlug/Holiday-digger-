@@ -5,9 +5,10 @@ extends CanvasLayer
 ## игрок получал тост «Ты погиб. Минералы потеряны…» на три секунды и не мог
 ## ни пересчитать потерю, ни понять, что осталось при нём.
 ##
-## Правила смерти ГДД §7 не тронуты: теряются все минералы рюкзака, кроме
-## чёрного ящика; деньги, уровень, прокачка, карта, артефакты и рекорды целы.
-## Карточка эти правила только показывает.
+## Правила смерти ГДД §7: теряется весь рюкзак, кроме чёрного ящика, и с
+## раунда 4 — 200 монет «скорой» (не в минус, scripts/house/healing.gd);
+## уровень, прокачка, карта, артефакты и рекорды целы. Карточка эти правила
+## только показывает.
 
 signal closed
 
@@ -21,8 +22,9 @@ var _auto_close: Tween = null
 
 
 ## Отчёт о смерти — чистые данные, их проверяет тест, а не картинка.
-## lost: словарь «предмет → штук», потерянный из рюкзака.
-static func build_report(lost: Dictionary, death_depth: int, cause: String) -> Dictionary:
+## lost: словарь «предмет → штук», потерянный из рюкзака; fee — сколько монет
+## забрала скорая (событие ambulance перед died).
+static func build_report(lost: Dictionary, death_depth: int, cause: String, fee: int = 0) -> Dictionary:
 	var rows: Array = []
 	var total := 0
 	for id in lost.keys():
@@ -47,6 +49,7 @@ static func build_report(lost: Dictionary, death_depth: int, cause: String) -> D
 		"depth": death_depth,
 		"max_depth": GameState.max_depth_reached,
 		"cause": cause,
+		"fee": maxi(fee, 0),
 	}
 
 
@@ -56,7 +59,7 @@ static func worth_showing(report: Dictionary) -> bool:
 	if not StoryState.has_flag("gold_sold"):
 		return false
 	return not (report["lost"] as Array).is_empty() or not (report["box"] as Array).is_empty() \
-			or int(report["depth"]) > 0
+			or int(report["depth"]) > 0 or int(report.get("fee", 0)) > 0
 
 
 func _ready() -> void:
@@ -159,7 +162,7 @@ func _build_header() -> Control:
 	h.add_theme_constant_override("separation", 6)
 	var skull := MetaUiKit.icon_rect(MetaUiKit.tex("skull"), 28)
 	h.add_child(skull)
-	Tip.bind(skull, "Смерть", "Минералы из рюкзака потеряны. Деньги, уровень, прокачка и всё, что в чёрном ящике, остались.")
+	Tip.bind(skull, "Смерть", "Рюкзак потерян, скорая забрала до %d монет. Уровень, прокачка и всё, что в чёрном ящике, остались." % Healing.death_fee_coins())
 	var depth := MetaUiKit.chip(UiIcons.tex("depth"), str(int(_report["depth"])), MetaUiKit.BLUE, 14, 12)
 	Tip.bind(depth, "Глубина смерти", "На какой глубине ты погиб.", str(int(_report["depth"])))
 	h.add_child(depth)
@@ -221,6 +224,7 @@ func _build_lost() -> Control:
 	var value_chip := MetaUiKit.chip(MetaUiKit.tex("coin"), "−" + MetaUiKit.compact(int(_report["lost_value"])),
 			MetaUiKit.RED.lightened(0.45), 13, 11)
 	head.add_child(value_chip)
+	head.add_child(_build_fee())
 	v.add_child(head)
 	if lost.is_empty():
 		var ok := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 20)
@@ -248,6 +252,27 @@ func _build_lost() -> Control:
 		Tip.bind(more, "Ещё потеряно", "Остальные стопки не поместились в строку.", "+%d" % (lost.size() - shown))
 		row.add_child(more)
 	return v
+
+
+## «Скорая забрала»: значок фургона и −200 монет (раунд 4, healing). Пусто,
+## если монет не было вовсе — минуса не бывает.
+func _build_fee() -> Control:
+	var fee := int(_report.get("fee", 0))
+	var h := HBoxContainer.new()
+	h.name = "Fee"
+	h.add_theme_constant_override("separation", 3)
+	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL | Control.SIZE_SHRINK_END
+	h.alignment = BoxContainer.ALIGNMENT_END
+	h.mouse_filter = Control.MOUSE_FILTER_PASS
+	h.visible = fee > 0
+	if fee <= 0:
+		return h
+	h.add_child(MetaUiKit.icon_rect(ShopArt.tex("glyph_ambulance"), 18))
+	h.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), "−" + MetaUiKit.compact(fee), MetaUiKit.RED.lightened(0.45), 13, 11))
+	var full := Healing.death_fee_coins()
+	Tip.bind(h, "Скорая забрала", ("За вызов — %d монет." % full) if fee >= full \
+			else "За вызов берут %d монет — забрали сколько было." % full, "−%d" % fee)
+	return h
 
 
 func _build_kept() -> Control:

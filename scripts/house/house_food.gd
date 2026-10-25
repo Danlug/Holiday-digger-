@@ -53,8 +53,9 @@ static func eat_now(id: String) -> Dictionary:
 	var stamina_gain: float = minf(HouseConfig.food_stamina_percent(id), 100.0 - GameState.stamina)
 	GameState.set_hunger(GameState.hunger + HouseConfig.food_hunger_percent(id))
 	GameState.set_stamina(GameState.stamina + HouseConfig.food_stamina_percent(id))
-	GameState.emit_event(&"ate", {"id": id, "hunger": hunger_gain, "stamina": stamina_gain})   # задание «поешь N раз»
-	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "reason": ""}
+	var hp_gain := Healing.heal_percent(Healing.food_hp_percent(id))   # еда лечит по питательности (раунд 4)
+	GameState.emit_event(&"ate", {"id": id, "hunger": hunger_gain, "stamina": stamina_gain, "hp": hp_gain})   # задание «поешь N раз»
+	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "hp": hp_gain, "reason": ""}
 
 
 ## Доставка приехала: порция ложится у входной двери.
@@ -91,9 +92,13 @@ static func take_from_door() -> int:
 	return taken
 
 
-## Съесть порцию из рюкзака. Возвращает {ok, hunger, stamina, reason}:
-## сколько процентов реально восстановлено (полоски упираются в 100%).
+## Съесть порцию из рюкзака. Возвращает {ok, hunger, stamina, hp, reason}:
+## сколько реально восстановлено (полоски упираются в 100%; hp — в единицах HP).
+## Аптечка «применяется» той же кнопкой рюкзака (раунд 4, ГДД §7) — но это не
+## еда: сытость не трогает и «поешь N раз» не засчитывает.
 static func eat(id: String) -> Dictionary:
+	if Healing.is_medkit(id):
+		return Healing.use_medkit()
 	if GameState.get_item_count(id) <= 0:
 		return {"ok": false, "hunger": 0.0, "stamina": 0.0, "reason": "В рюкзаке этого нет."}
 	if not HouseConfig.is_food(id):
@@ -103,8 +108,9 @@ static func eat(id: String) -> Dictionary:
 	GameState.remove_item(id, 1)
 	GameState.set_hunger(GameState.hunger + HouseConfig.food_hunger_percent(id))
 	GameState.set_stamina(GameState.stamina + HouseConfig.food_stamina_percent(id))
-	GameState.emit_event(&"ate", {"id": id, "hunger": hunger_gain, "stamina": stamina_gain})   # задание «поешь N раз»
-	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "reason": ""}
+	var hp_gain := Healing.heal_percent(Healing.food_hp_percent(id))   # еда лечит по питательности (раунд 4)
+	GameState.emit_event(&"ate", {"id": id, "hunger": hunger_gain, "stamina": stamina_gain, "hp": hp_gain})   # задание «поешь N раз»
+	return {"ok": true, "hunger": hunger_gain, "stamina": stamina_gain, "hp": hp_gain, "reason": ""}
 
 
 ## Вся еда, которая сейчас лежит в рюкзаке: [{id, name, count}, ...].

@@ -37,12 +37,29 @@ static func hunger_cost(hours: float) -> float:
 	return rate * 100.0 * real_seconds * HouseConfig.sleep_hunger_factor()
 
 
-## Можно ли сейчас лечь. Возвращает {ok, hours, hunger_cost, stamina_gain, reason}.
-## Отказ — только по голоду: лечь голодным нельзя, потому что сон прокручивает
+## Можно ли сейчас лечь. Возвращает {ok, hours, hunger_cost, stamina_gain,
+## hp_gain, reason}; hp_gain — сколько процентов HP вернёт сон (раунд 4, ГДД §7
+## «Лечение»: сон лечит по часам и сытости). hp_percent < 0 — взять у героя.
+## Отказ — по голоду: лечь голодным нельзя, потому что сон прокручивает
 ## игровые часы, голод за них уходит в ноль и герой не просыпается вовсе
 ## (полоска на нуле сразу начинает жечь HP).
-static func plan(stamina_percent: float, hunger_percent: float) -> Dictionary:
-	var hours := hours_needed(stamina_percent)
+static func plan(stamina_percent: float, hunger_percent: float, hp_percent: float = -1.0) -> Dictionary:
+	if hp_percent < 0.0:
+		hp_percent = 100.0 * GameState.hp / maxf(1.0, GameState.get_max_hp())
+	var hp_deficit := maxf(0.0, 100.0 - hp_percent)
+	var tired := 100.0 - stamina_percent >= HouseConfig.sleep_min_deficit_percent()
+	var hurt := hp_deficit >= Healing.sleep_min_hp_deficit_percent()
+	var hours := hours_needed(stamina_percent) if tired else 0.0
+	# Раненый спит дольше — сколько нужно для HP, но не дольше полной ночи и не
+	# дольше, чем позволяет сытость: иначе раненый, но бодрый не уснул бы вовсе,
+	# а усталый с полупустым желудком получал бы отказ там, где раньше спал.
+	if hurt:
+		var hp_hours := clampf(Healing.sleep_hours_for_hp(hp_deficit),
+			Balance.get_min_sleep_game_hours(), Healing.full_night_hours())
+		if hp_hours > hours:
+			var per_hour_cost := hunger_cost(1.0)
+			var affordable := hunger_percent / per_hour_cost if per_hour_cost > 0.0 else hp_hours
+			hours = maxf(hours, maxf(minf(hp_hours, affordable), Balance.get_min_sleep_game_hours()))
 	var cost := hunger_cost(hours)
 	var gain: float = minf(100.0 - stamina_percent,
 		Balance.get_sleep_restore_percent_per_game_hour() * hours)
@@ -51,12 +68,14 @@ static func plan(stamina_percent: float, hunger_percent: float) -> Dictionary:
 		"hours": hours,
 		"hunger_cost": cost,
 		"stamina_gain": gain,
+		"hp_gain": minf(hp_deficit, Healing.sleep_hp_percent(hours, hunger_percent, cost)),
 		"reason": "",
 	}
 	# Минимальный сон по ГДД — 2 игровых часа, и они отдают 25% бодрости.
 	# Лечь с почти полной полоской значит сжечь лишнее и всё равно заплатить
-	# сытостью за эти два часа, то есть отдать еду ни за что.
-	if 100.0 - stamina_percent < HouseConfig.sleep_min_deficit_percent():
+	# сытостью за эти два часа, то есть отдать еду ни за что — если только не
+	# ранен: тогда сон лечит.
+	if not tired and not hurt:
 		result["ok"] = false
 		result["reason"] = "Спать пока незачем: бодрость почти полная, а сытость за сон спишется."
 		return result
@@ -80,7 +99,14 @@ static func sleep_now(force: bool = false) -> Dictionary:
 		# полоской бодрости, HP уже течёт, и списать за урок ещё и голод —
 		# значит добить того, кого только что взялись учить.
 		result["hunger_cost"] = 0.0
+	var hunger_before := GameState.hunger
 	GameState.sleep(float(result["hours"]))
 	GameState.set_hunger(GameState.hunger - float(result["hunger_cost"]))
+	# Сон лечит (раунд 4): по часам и средней сытости за сон, см. Healing.
+	var healed := Healing.heal_percent(Healing.sleep_hp_percent(float(result["hours"]),
+		hunger_before, float(result["hunger_cost"])))
+	result["hp"] = healed
+	if healed > 0.0:
+		GameState.emit_event(&"healed", {"source": "sleep", "hp": healed})
 	result["ok"] = true
 	return result

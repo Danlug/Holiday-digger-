@@ -745,7 +745,8 @@ func _on_died() -> void:
 		value += Balance.get_mineral_price(String(id)) * int(_pack_before_death[id])
 	var d := {"t": snappedf(_sim, 0.1), "cause": cause, "depth": _depth(), "activity": _activity,
 		"lost_items": _pack_before_death.duplicate(), "lost_value": value, "scripted": not StoryState.is_seen("death"),
-		"coins_before": _coins_frame, "deliberate": _no_brake}
+		"coins_before": _coins_frame, "deliberate": _no_brake,
+		"ach_before": MetaState.sub("ach").keys().duplicate()}
 	_no_brake = false
 	_death_entry = d
 	T.deaths.append(d)
@@ -769,7 +770,14 @@ func _on_respawned() -> void:
 		return
 	var t := get_tree().create_timer(1.0, true, false, false)
 	t.timeout.connect(func() -> void:
-		var lost := int(d.get("coins_before", 0)) - GameState.coins
+		# Смерть сама открывает достижения («Двоечник пришёл к бабушке» +100): их монеты не цена смерти.
+		var bonus := 0
+		var before_ach: Array = d.get("ach_before", [])
+		for a in MetaData.achievements():
+			var aid := String(a.get("id", ""))
+			if MetaState.sub("ach").has(aid) and not before_ach.has(aid):
+				bonus += int((a.get("reward", {}) as Dictionary).get("coins", 0))
+		var lost := int(d.get("coins_before", 0)) - GameState.coins + bonus
 		d["coins_lost"] = lost
 		var expect := mini(200, int(d.get("coins_before", 0)))
 		if lost != expect:

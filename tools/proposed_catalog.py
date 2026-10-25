@@ -1064,7 +1064,7 @@ FAMILIES = [
 	F("min.scrap", "mining", 4, "Металлолом — единственный источник бронзы",
 		["minerals.json:minerals[scrap].depth_max", "minerals.json:minerals[scrap].density", "minerals.json:minerals[scrap].drill_seconds"],
 		"Металлолом: {key}", "", "сборка ручного бура (100 бронзы) и скважины (20)", lambda m, r: eff_scrap_depth(m, r) if r["segs"][-1] == "depth_max" else (eff_drill(m, r) if r["segs"][-1] == "drill_seconds" else None),
-		rec=("оставить", "без лома до 500 бур на части миров не собирался (ГДД §18)")),
+		rec=("оставить", "без лома до 500 бур на части миров не собирался (ГДД §18)"), vtext=lambda m, r: v_density(m, r) if r["segs"][-1] == "density" else None),
 	F("min.earth", "mining", 3, "Время копки земли", "minerals.json:minerals[earth].drill_seconds",
 		"Земля: секунд на клетку", "с", "темп первых минут и всей «пустой» породы", eff_drill, rec=("оставить", "база, от которой выведены остальные секунды")),
 	F("min.formations", "mining", 3, "Особые образования: каверны, провалы, гроты, руины, жилы", "world_layers.json:formations.**",

@@ -808,7 +808,8 @@ KEY_RU = {
 	"ttl": "подсказка висит, с", "lost_after": "снять, если цель пропала, с", "frac": "доля", "pct": "процент", "max": "максимум",
 	"projects": "проекты по порядку", "auto_track": "трекер сам берёт проект", "max_alpha": "плотность ночи",
 	"radius_min_cells": "радиус факела", "radius_extra_cells": "прибавка радиуса", "inner_cells": "яркое ядро", "warm_k": "тёплый оттенок",
-	"flicker": "мерцание", "up_px": "высота дымки", "down_px": "глубина дымки",
+	"flicker": "мерцание", "up_px": "высота дымки", "down_px": "глубина дымки", "density": "плотность",
+	"tool_required": "чем копается",
 }
 # Списки, номер элемента в которых — «ступень» (а не просто №).
 STEP_LISTS = {"levels", "upgrade_cost", "road", "bonuses", "per_level_tiers", "slots", "upgrade_tiers", "suit_tiers", "cycle"}

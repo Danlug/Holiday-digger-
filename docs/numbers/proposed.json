@@ -539,7 +539,7 @@
     "minerals.json:minerals[scrap].drill_seconds"
    ],
    "count": 3,
-   "value_text": "до глубины 500; density type flat, percent_min 1, percent_max 3; секунд на клетку 4",
+   "value_text": "до глубины 500; плотность 1–3% ровно; секунд на клетку 4",
    "affects": "сборка ручного бура (100 бронзы) и скважины (20)",
    "reviewed": true,
    "effect": "Металлолом: до глубины — на весь мир до 500 — около 199 металлолома (бур просит 100 бронзы = 100 лома, скважина — ещё 20)",
@@ -3850,13 +3850,13 @@
    "path": "minerals[scrap].density",
    "theme": "mining",
    "family": "min.scrap",
-   "title": "Металлолом: плотность не задана в GDD",
+   "title": "Металлолом: плотность",
    "value": {
     "type": "flat",
     "percent_min": 1,
     "percent_max": 3
    },
-   "value_text": "type flat, percent_min 1, percent_max 3",
+   "value_text": "1–3% ровно",
    "unit": "",
    "note": "плотность не задана в GDD; невысокая, чтобы не конкурировать с железом",
    "affects": "сборка ручного бура (100 бронзы) и скважины (20)",

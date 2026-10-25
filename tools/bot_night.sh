@@ -4,7 +4,7 @@
 #   tools/bot_night.sh <часов> [стратегии…]          # по умолчанию все пять
 #   tools/bot_night.sh 8
 #   tools/bot_night.sh 2 deep fighter
-#   JOBS=5 SHOTS=1 SHOT_POINTS=2 SESSION=60 OUT=/каталог tools/bot_night.sh 8
+#   JOBS=5 SHOTS=1 SHOT_POINTS=2 SESSION=60 SEED_OFFSET=1000 OUT=/каталог tools/bot_night.sh 8
 #
 # Стратегии (tests/bot_play.gd → GOALS): deep — как можно глубже; achiever — открыть больше
 # достижений; tycoon — максимум денег; collector — музей, артефакты, тайники, мастерство;
@@ -48,7 +48,7 @@ fi
 
 echo "[bot_night] $(date -u +%H:%M) старт: ${STRATS[*]} на $HOURS ч, каталог $BASE"
 for g in "${STRATS[@]}"; do
-	seed="${SEEDS[$g]:-7}"
+	seed=$(( ${SEEDS[$g]:-7} + ${SEED_OFFSET:-0} ))   # SEED_OFFSET — другие миры для повторной волны
 	(
 		OUT="$BASE/$g" WALL="$WALL" SESSION="$SESSION" SHOTS=0 FLUSH=10 CP="$CP" \
 			tools/bot_play.sh "$seed" 99999 "$g" >/dev/null 2>&1

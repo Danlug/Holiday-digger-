@@ -680,6 +680,8 @@ var ext: Dictionary = {}
 ##   picked         {item: String, count: int} — предмет лёг в рюкзак
 ##   sold           {coins: int, count: int}   — сделка в мастерской
 ##   bought         {id: String, currency: String} — покупка в магазине
+##   crafted        {recipe: String, item: String, count: int, to_pack: int, to_storage: int}
+##                  — верстак (ShopService.craft); у переработки count — вся пачка с ползунка
 ##   fuel_used / refueled {amount: float}      — топливо бура
 ##   fuel_refined   {raw: String, used: int, blocks: int, to_pack: int, to_storage: int}
 ##                  — перегонка на станции заправки (торф/уголь -> топливные блоки)

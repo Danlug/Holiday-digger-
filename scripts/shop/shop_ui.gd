@@ -93,6 +93,8 @@ var _card_offer: Dictionary = {}
 var _card_ok: Button = null
 var _card_panel: Control = null   # плашка карточки: над ней встаёт описание по тапу
 var _info_pulse: Tween = null     # пульсация «i», пока игрок не научился тапать
+var _craft_qty: CraftQtyBox = null   # ползунок «сколько» в карточке переработки (_craft_qty_*)
+var _craft_qty_ok: Label = null      # «×N» на зелёной кнопке карточки переработки
 
 var _notice_panel: Panel
 var _notice_label: Label
@@ -1018,6 +1020,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 
 	if is_recipe:
 		col.add_child(_make_inputs_grid(offer))
+		_craft_qty_mount(col, offer)
 	else:
 		col.add_child(_make_price_row(offer))
 
@@ -1045,6 +1048,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	_card_ok.pressed.connect(_confirm_card)
 	Tip.bind(_card_ok, String(offer["title"]), String(offer["body"]), String(offer["extra"]))
 	btns.add_child(_card_ok)
+	_craft_qty_sync()
 	ProjectsScreen.decorate_card(panel, offer)   # ветка guidance: кнопка «цепочка» → экран «Проекты»
 
 	if ShopFx.reduced():
@@ -1230,7 +1234,7 @@ func _confirm_card() -> void:
 		_teleport_home()
 	_render()
 	var t: ShopTile = _tiles.get(String(offer["key"]))
-	if t != null:
+	if t != null and not result.has("craft_fx"):
 		_after_snap(t, ShopArt.COL_GOLD if String(offer["kind"]) != "recipe" else ShopArt.COL_GOOD)
 
 
@@ -1245,7 +1249,7 @@ func _perform(offer: Dictionary) -> Dictionary:
 		"drill":
 			return ShopService.buy_drill_upgrade()
 		"recipe":
-			return ShopService.craft(ref)
+			return _craft_qty_perform(ref)
 		"food":
 			return HouseSystem.order_food(ref)
 		"good":
@@ -1272,6 +1276,141 @@ func _invest(offer: Dictionary) -> void:
 	if t != null:
 		ShopFx.pop(t, 0.16, 0.26)
 		t.pressed.emit()
+
+
+# ---------------------------------------------------------------------------
+# Сколько сделать: переработка пачкой (раунд 4, «craft-qty»)
+#
+# Слово владельца: «когда плавишь металлолом… тупо делать по одному — надо
+# ползунок». Всё про ползунок живёт в этих функциях и в CraftQtyBox; карточка
+# зовёт их тремя строками (_open_card, _perform, _confirm_card).
+# ---------------------------------------------------------------------------
+
+## Под материалами рецепта — ползунок, если рецепт повторяемый и хоть одна
+## штука уже по карману. Нечего делать — ползунка нет: красные «есть/нужно»
+## выше и так говорят, чего не хватает.
+func _craft_qty_mount(col: Control, offer: Dictionary) -> void:
+	_craft_qty = null
+	_craft_qty_ok = null
+	var rid := String(offer["ref"])
+	if not ShopService.is_batch(rid) or String(offer["state"]) != "ready" or ShopService.max_craft(rid) < 1:
+		return
+	_craft_qty = CraftQtyBox.new()
+	_craft_qty.setup(rid, _card_panel)
+	_craft_qty.changed.connect(func(_n: int) -> void: _craft_qty_sync())
+	col.add_child(_craft_qty)
+
+
+## «×N» на зелёной кнопке: молоток уходит влево, рядом число пачки.
+func _craft_qty_sync() -> void:
+	if _craft_qty == null or _card_ok == null:
+		return
+	var glyph := _card_ok.get_node_or_null("Glyph") as Control
+	if _craft_qty_ok == null:
+		_craft_qty_ok = ShopArt.label("", 13, Color.WHITE, INK, 3)
+		_craft_qty_ok.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_craft_qty_ok.position = Vector2(_card_ok.size.x * 0.5 - 2.0, 0)
+		_craft_qty_ok.size = Vector2(_card_ok.size.x * 0.5, _card_ok.size.y - 2.0)
+		_card_ok.add_child(_craft_qty_ok)
+		if glyph != null:
+			glyph.position.x = _card_ok.size.x * 0.5 - glyph.size.x - 4.0
+	_craft_qty_ok.text = "×" + ShopArt.compact(_craft_qty.amount())
+
+
+## Крафт с числом с ползунка. Точки полёта снимаются ДО закрытия карточки:
+## сырьё полетит в верстак (плитку рецепта) от своих значков в строке итога.
+func _craft_qty_perform(ref: String) -> Dictionary:
+	if _craft_qty == null:
+		return ShopService.craft(ref)
+	var from: Dictionary = {}
+	for id in _craft_qty.input_icons.keys():
+		var ic := _craft_qty.input_icons[id] as Control
+		if is_instance_valid(ic):
+			from[id] = ic.get_global_rect().get_center()
+	var at := _card_panel.get_global_rect().get_center() if _card_panel != null else _root.size * 0.5
+	var res := ShopService.craft(ref, _craft_qty.amount())
+	if bool(res.get("ok", false)):
+		res["craft_fx"] = true
+		_craft_qty_celebrate(ref, res, from, at)
+	return res
+
+
+## Сок пачки: сырьё летит в верстак, удар (вспышка, искры, звук, вибро),
+## результат выпрыгивает из плитки с «+N». Ждём кадр: карточка уже закрыта,
+## а сетку только что пересобрали — координаты плитки готовы после раскладки.
+func _craft_qty_celebrate(ref: String, res: Dictionary, from: Dictionary, fallback: Vector2) -> void:
+	await get_tree().process_frame
+	var tile := _craft_qty_tile(ref)
+	if tile == null:
+		Sfx.play("pickup")
+		return
+	var origin := _root.get_global_rect().position
+	var to := tile.get_global_rect().get_center() - origin
+	var used: Dictionary = res.get("used", {})
+	var flights: Array = []
+	for id in used.keys():
+		flights.append([String(id), mini(int(used[id]), 6)])
+	# Счётчик долетевших — в массиве: лямбда захватывает локальные по значению.
+	var left := [0]
+	for f in flights:
+		left[0] += int(f[1])
+	if int(left[0]) <= 0 or ShopFx.reduced():
+		_craft_qty_hit(ref, int(res.get("count", 0)))
+		return
+	for f in flights:
+		var id := String(f[0])
+		var start: Vector2 = from.get(id, fallback)
+		ShopFx.coins(_root, ShopArt.item_icon(id), start - origin, to, int(f[1]),
+			func(_i: int) -> void:
+				left[0] -= 1
+				Sfx.play("ui_tap", 0.8 + 0.05 * float(left[0]))
+				if int(left[0]) == 0:
+					_craft_qty_hit(ref, int(res.get("count", 0))), 14.0)
+
+
+## Плитка рецепта в сетке, если она ещё жива (витрину могли пересобрать или закрыть).
+func _craft_qty_tile(ref: String) -> ShopTile:
+	var t = _tiles.get("recipe:" + ref)
+	if t == null or not is_instance_valid(t) or not (t as Node).is_inside_tree():
+		return null
+	return t
+
+
+## Удар по верстаку и вылет результата с числом. Плитку ищем заново, а не
+## держим в лямбде полёта: пока сырьё летит, витрину могут закрыть.
+func _craft_qty_hit(ref: String, made: int) -> void:
+	Sfx.play("dig_hard")
+	Haptics.thud()
+	var tile := _craft_qty_tile(ref)
+	if tile == null or not is_open():
+		return
+	_after_snap(tile, ShopArt.COL_GOOD)
+	if ShopFx.reduced() or made <= 0:
+		Sfx.play("pickup")
+		return
+	var r := ShopCatalog.recipe(ref)
+	var icon := ShopArt.item_icon(String(r.get("output", {}).get("id", ref)))
+	# Вылет вешается на саму плитку: витрину пересоберут или закроют — уйдёт вместе с ней.
+	var c := tile.size * 0.5
+	var ic := ShopArt.rect(icon, c - Vector2(12, 12), Vector2(24, 24))
+	ic.z_index = 110
+	ic.pivot_offset = Vector2(12, 12)
+	ic.scale = Vector2(0.4, 0.4)
+	tile.add_child(ic)
+	var lbl := ShopArt.label("+" + ShopArt.compact(made), 16, ShopArt.COL_GOOD, INK, 4)
+	lbl.z_index = 111
+	lbl.position = c + Vector2(4, -14)
+	tile.add_child(lbl)
+	var tw := tile.create_tween().set_parallel(true)
+	tw.tween_property(ic, "scale", Vector2(1.25, 1.25), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ic, "position:y", ic.position.y - 30.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "position:y", lbl.position.y - 34.0, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ic, "modulate:a", 0.0, 0.3).set_delay(0.55)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.3).set_delay(0.75)
+	tw.chain().tween_callback(func() -> void:
+		ic.queue_free()
+		lbl.queue_free())
+	Sfx.play("pickup")
 
 
 ## Часы-телепорт: единственный товар, который трогает не GameState, а героя.

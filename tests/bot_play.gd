@@ -1079,27 +1079,39 @@ func _fast_start() -> void:
 	_activity = "free"
 
 
-## Старт на глубине (раунд 5, полости и стражи с 1500): шахта от поверхности до
-## кармана (иначе боту не подняться продавать — первый прогон встал «ascent_stuck»),
-## карман над ближайшей полостью по её центру: копая вниз, бот входит к стражам.
+## Старт на глубине (раунд 5, полости и стражи с 1500): шахта от поверхности (иначе
+## боту не подняться продавать — первый прогон встал «ascent_stuck») до ближайшей
+## полости, герой — на её полу: запечатанную полость бот-серпантин обходит стороной,
+## а стражи наружу не выходят, так что бой проверяется только изнутри.
 func _deep_start(depth: int) -> void:
 	var col := 16
 	var top := depth
+	var hero_cell := Vector2i(col, depth)
 	var caves := Caves.caves_between(world, depth, depth + 400)
 	if not caves.is_empty():
 		var c: Dictionary = caves[0]
 		col = int(c.cx)
-		top = int(c.y0) - 4
+		top = int(c.cy)   # до центрального ряда: у сердца верх по центру — выемка, и шахта до y0 с воздухом не сходилась
+		hero_cell = Caves.chest_cell(c)
+		var bd := 1 << 30
+		for f: Vector2i in Caves.floor_cells(c):
+			if Caves.run_width(c, f) < 3:
+				continue
+			var d := absi(f.x - int(c.cx)) * 2 + absi(f.y - int(c.cy))
+			if d < bd:
+				bd = d
+				hero_cell = f
 	# шахта и через торфяной пласт (450–455): игрок прокопал бы его по пути вниз, а бот
 	# на подъёме не копает — второй прогон встал под пластом на 48 минут
 	for y in range(6, top + 1):
 		world.diffs[y * WorldGen.WIDTH + col] = true
-	for x in range(col - 1, col + 2):
-		for y in range(top - 1, top + 1):
-			world.diffs[y * WorldGen.WIDTH + x] = true
+	if caves.is_empty():
+		for x in range(col - 1, col + 2):
+			for y in range(top - 1, top + 1):
+				world.diffs[y * WorldGen.WIDTH + x] = true
 	world.mark_changed()
-	player.x = float(col) + 0.5
-	player.y = float(top) + 0.6
+	player.x = float(hero_cell.x) + 0.5
+	player.y = float(hero_cell.y) + 0.6
 	player.vx = 0.0
 	player.vy = 0.0
 	player.on_ground = true

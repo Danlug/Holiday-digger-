@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_tiles_by_place()
 	_test_onboarding_door_order()
 	_test_ui_flow()
+	_test_garden_reminder()
 	_test_hud_hints()
 	MetaClock.override_unix = -1
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -493,15 +494,22 @@ func _test_tiles_by_place() -> void:
 	check("без роликов плитки за доллары по-прежнему открыты", premium_empty.filter(func(o): \
 		return String(o["currency"]) == "dollars" and String(o["kind"]) == "good").all(func(o): return _plain(o)))
 
-	# На огороде и в доме вне двери: замок, причина, без счётчика.
+	check("под землёй без роликов — замок, а не дверь", locked_food.all(func(o): return not o.has("at_door")))
+
+	# На огороде и в доме вне двери (раунд 5): вместо замка значок двери, причина,
+	# без счётчика «N/3» и без ролика. Было: замок — владелец попросил, чтобы
+	# огород напоминал «покупать у входной двери».
 	for place in ["garden", "house"]:
 		_fresh()
 		_place(place)
 		var food := _locked(_offers("food"))
-		check("%s: еда заперта замком, без счётчика" % place, not food.is_empty() and food.all(func(o): \
-				return String(o["corner"]) == "lock" and String(o["state"]) == "away" and String(o.get("count_text", "")) == ""))
+		check("%s: еда «у двери» — значок двери, без счётчика и ролика" % place, not food.is_empty() and food.all(func(o): \
+				return String(o["corner"]) == "door" and bool(o.get("at_door", false)) and String(o["state"]) == "away" \
+				and String(o.get("count_text", "")) == "" and not o.has("needs_ad") and String(o.get("corner_tl", "")) == ""))
+		check("%s: и снаряжение «у двери»" % place, _locked(_offers("picks")).all(func(o): return String(o["corner"]) == "door"))
 		var reason := String(food[0]["lock_reason"])
 		check("%s: причина — про входную дверь" % place, reason.contains("двер"))
+		check("%s: про ролик ни слова" % place, not reason.contains("ролик"))
 		check("%s: в подсказке та же причина" % place, String(food[0]["extra"]) == reason)
 		check("%s: ад-бейджей нет" % place, _badged(_offers("picks")).is_empty())
 		# «3/3» у ролика-награды «+1 $» — его собственный лимит, не покупка: его не проверяем.
@@ -602,12 +610,16 @@ func _test_ui_flow() -> void:
 		GameState.dollars == dollars_before - int(pill.offer["price"]) and ShopRemote.used_today() == ShopRemote.limit())
 	ui.close()
 
-	# Огород: витрина открывается, плитки заперты, плашка объясняет.
+	# Огород: витрина открывается, плитки «у двери», внизу полоса-напоминание
+	# (раунд 5; раньше — плашка с текстом сверху, она закрывала первый ряд).
 	_place("garden")
 	ui._notice_panel.visible = false
 	ui.open(ShopUI.TAB_FOOD)
 	check("на огороде витрина открывается", ui.is_open())
-	check("плашка сразу называет причину", ui._notice_panel.visible and ui._notice_label.text.contains("двер"))
+	check("полоса «у входной двери» видна сразу", ui._door_strip.visible and ui._door_strip._label.text.contains("двер"))
+	check("плашки с текстом сверху нет", not ui._notice_panel.visible)
+	check("на огороде есть кнопка «к двери»", ui._door_strip.go_btn.visible)
+	check("список не уходит под полосу", is_equal_approx(ui._scroll.offset_bottom, -(ShopUI.NAV_H + ShopDoorStrip.H)))
 	ui.close()
 	ui._notice_panel.visible = false
 	ui.open(ShopUI.SCREEN_PREMIUM)
@@ -615,6 +627,7 @@ func _test_ui_flow() -> void:
 	var exch: ShopTile = ui._tiles["exchange:1"]
 	check("обмен долларов на огороде доступен", String(exch.offer["state"]) == "available")
 	check("на огороде во вкладке за доллары плашки «к двери» нет (раунд 4)", not ui._notice_panel.visible)
+	check("и полосы «у двери» нет", not ui._door_strip.visible)
 	var watch: ShopTile = ui._tiles["good:dollars:teleport_watch"]
 	check("часы на огороде без замка", String(watch.offer["state"]) == "available" and not watch._corner_tr.visible)
 	ui.close()
@@ -625,6 +638,7 @@ func _test_ui_flow() -> void:
 	ui.open(ShopUI.TAB_FOOD)
 	check("у двери плашки нет", not ui._notice_panel.visible)
 	check("у двери плитки без замков", not ui._tiles.values().any(func(t): return t.offer.has("lock_reason")))
+	check("у двери полосы «к двери» нет", not ui._door_strip.visible)
 	ui.close()
 
 	# Новые сутки: открытая витрина обновляет бейджи сама.
@@ -636,6 +650,111 @@ func _test_ui_flow() -> void:
 	GameState.daily_reset.emit()
 	var after: ShopTile = ui._tiles["tool:platinum_pickaxe"]
 	check("после daily_reset плитка снова 3/3", String(after.offer.get("count_text", "")) == "3/3")
+	ui.close()
+	ui.queue_free()
+
+
+## Раунд 5, слова владельца: «В огороде покупки напоминают, что покупать надо у
+## входной двери». Тап по монетной плитке на огороде: карточки нет, ролик и
+## деньги не тронуты, полоса внизу вспыхивает; «к двери» закрывает витрину и
+## ведёт стрелкой (не телепорт); в прихожей витрина открывается сама.
+func _test_garden_reminder() -> void:
+	_fresh()
+	GameState.max_depth_reached = 100
+	var ui = load("res://scenes/shop.tscn").instantiate()
+	add_child(ui)
+	_place("garden")
+	ui.open(ShopUI.TAB_FOOD)
+	var tile: ShopTile = ui._tiles["food:food_bar"]
+	check("огород: плитка еды с дверью в углу", tile._corner_tr.visible and tile._corner_tr.texture == ShopArt.tex("glyph_door"))
+	check("огород: без «N/3» и значка ролика", not tile._count.visible and not tile._corner_tl.visible)
+	ui._notice_panel.visible = false
+	var coins := GameState.coins
+	ui._on_tile_pressed(tile.offer, tile)
+	check("тап по плитке «у двери» карточку не открывает", ui._card == null)
+	check("плашки с текстом сверху нет — отвечает полоса", not ui._notice_panel.visible and ui._door_strip.visible)
+	check("ролики и деньги не тронуты", ShopRemote.left_today() == ShopRemote.limit() and GameState.coins == coins)
+	var gear: ShopTile = ui._tiles.get("good:coins:energy_drink", null)
+	if gear == null:
+		for t in ui._tiles.values():
+			if String(t.offer.get("kind", "")) == "good" and String(t.offer.get("currency", "")) == "coins":
+				gear = t
+				break
+	check("допинги за монеты тоже «у двери»", gear != null and bool(gear.offer.get("at_door", false)))
+	# «Купить» с карточки (если бы она открылась) тоже отвечает дверью, а не отказом.
+	ui._card_offer = tile.offer
+	ui._card = Control.new()
+	ui._root.add_child(ui._card)
+	ui._confirm_card()
+	check("кнопка «купить» на огороде: напоминание, карточка закрыта", ui._card == null and not ui._notice_panel.visible)
+	check("и ничего не куплено", GameState.coins == coins and HouseFood.food_at_door_count() == 0)
+	ui.close()
+
+	# «К двери»: витрина закрывается, стрелка запоминает вкладку.
+	ui.open(ShopUI.TAB_PICKS)
+	check("на вкладке снаряжения полоса тоже есть", ui._door_strip.visible)
+	ui._go_to_door()
+	check("«к двери» закрыл витрину", not ui.is_open())
+	check("стрелка к двери запущена и помнит вкладку", ui._door_guide.is_active() and ui._door_guide.tab == ShopUI.TAB_PICKS)
+	check("это не телепорт: герой не в доме", not GameState.house_is_indoors)
+	ui.open(ShopUI.TAB_FOOD)
+	check("витрину открыли снова — стрелка погасла", not ui._door_guide.is_active())
+	ui.close()
+
+	# Куда смотрит стрелка: дверь в кадре — вниз над ней, за краем — к краю.
+	var g: ShopDoorGuide = ui._door_guide
+	var view := Vector2(224, 480)
+	check("дверь в кадре — стрелка вниз", g._place_marks(Vector2(120, 300), view) == "down" and g._down.visible and not g._edge.visible)
+	check("дверь правее кадра — стрелка у правого края", g._place_marks(Vector2(400, 300), view) == "right" \
+		and g._edge.visible and g._edge.position.x > 150.0 and not g._edge_arrow.flip_h)
+	check("дверь левее кадра — у левого края", g._place_marks(Vector2(-90, 300), view) == "left" \
+		and g._edge.position.x < 20.0 and g._edge_arrow.flip_h)
+	check("стрелка у края не уходит под шапку HUD", g._place_marks(Vector2(-90, -400), view) == "left" and g._edge.position.y >= 120.0)
+	g.stop()
+
+	# Без мира (нет дома) стрелка гаснет сама, а не висит.
+	g.start(ShopUI.TAB_FOOD)
+	g._update(0.0)
+	check("без дома стрелка гаснет на первом шаге", not g.is_active() and not g._down.visible and not g._edge.visible)
+
+	# Дошёл и зашёл в прихожую — витрина открылась сама на той вкладке.
+	g.tab = ShopUI.TAB_PICKS
+	g._reopen_left = ShopDoorGuide.REOPEN_SECONDS
+	g._reopen_wait = 0.4
+	g._update(0.1)
+	check("пока на огороде — ждёт", g.is_reopen_pending() and not ui.is_open())
+	_place("door")
+	g._update(0.1)
+	check("в прихожей не сразу — дом ещё открывается", not ui.is_open())
+	g._update(0.5)
+	check("в прихожей витрина открылась сама на вкладке снаряжения", ui.is_open() and ui._tab == ShopUI.TAB_PICKS)
+	check("у двери плитки без двери и замка", not ui._tiles.values().any(func(t): return t.offer.has("lock_reason")))
+	ui.close()
+	_place("garden")
+	g._reopen_left = ShopDoorGuide.REOPEN_SECONDS
+	_place("underground")
+	g._update(0.1)
+	check("ушёл в шахту — витрину не открываем", not g.is_reopen_pending() and not ui.is_open())
+	_place("house")
+	g._reopen_left = ShopDoorGuide.REOPEN_SECONDS
+	g._update(0.1)
+	check("зашёл не в прихожую — тоже нет", not g.is_reopen_pending() and not ui.is_open())
+
+	# В комнате дома полоса без кнопки «к двери»: в прихожую ведут двери интерьера.
+	_place("house")
+	ui.open(ShopUI.TAB_FOOD)
+	check("в комнате дома полоса есть, кнопки «к двери» нет", ui._door_strip.visible and not ui._door_strip.go_btn.visible)
+	ui.close()
+	# В шахте — как было: замок, без полосы.
+	_place("underground")
+	for i in ShopRemote.limit():
+		ShopRemote.watch_ad()
+	ui.open(ShopUI.TAB_FOOD)
+	var under: ShopTile = ui._tiles["food:food_bar"]
+	check("шахта без роликов: замок, без полосы «к двери»", under._corner_tr.texture == ShopArt.tex("glyph_lock") and not ui._door_strip.visible)
+	ui._notice_panel.visible = false
+	ui._on_tile_pressed(under.offer, under)
+	check("шахта: тап по замку по-прежнему говорит причину плашкой", ui._notice_panel.visible and ui._notice_label.text.contains("Ролик"))
 	ui.close()
 	ui.queue_free()
 

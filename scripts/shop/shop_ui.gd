@@ -100,6 +100,10 @@ var _notice_panel: Panel
 var _notice_label: Label
 var _notice_timer: Timer
 
+## «За монеты — у входной двери» (раунд 5): полоса над вкладками и стрелка «к двери».
+var _door_strip: ShopDoorStrip
+var _door_guide: ShopDoorGuide
+
 var _player: Node = null
 var _hud: Node = null
 var _was_frozen: bool = false
@@ -141,6 +145,8 @@ func _ready() -> void:
 	layer = 20  # выше HUD: шторка обязана перекрывать джойстик и нижнюю полосу
 	_build()
 	_root.visible = false
+	_door_guide = ShopDoorGuide.new()
+	add_child(_door_guide)
 	GameState.tool_purchase_required.connect(_on_tool_purchase_required)
 	GameState.coins_changed.connect(func(_c): _sync_wallet(true))
 	GameState.dollars_changed.connect(func(_d): _sync_wallet(true))
@@ -165,6 +171,7 @@ func open(tab: String = TAB_FOOD) -> void:
 	# раз не замораживает: иначе «как было» запомнилось бы уже замороженным.
 	if not is_open():
 		_freeze_world(true)
+	_door_guide.stop()
 	ShopItems.seed_seen()
 	_selected.clear()
 	# По умолчанию отмечено всё: типовой сценарий — поднялся с полным рюкзаком
@@ -185,19 +192,16 @@ func open(tab: String = TAB_FOOD) -> void:
 	_announce_place(tab)
 
 
-## Витрину открыли вне двери и не под землёй (меню или «Магазин» на огороде):
-## плитки заперты, и сразу говорим почему. Под землёй не нужно — там плитки с
-## бейджем роликов, а отказ при пустом лимите объясняет сама плитка. Вкладке
-## без запертых местом плиток (за доллары всё покупается где угодно) объяснять
-## нечего.
+## Витрину открыли на огороде или в комнате дома (меню, «Магазин»): на вкладке
+## с плитками «у двери» полоса-напоминание сразу вспыхивает (раунд 5; раньше —
+## плашка с текстом сверху). Под землёй не нужно — там плитки с бейджем
+## роликов, а отказ при пустом лимите объясняет сама плитка. Вкладке без плиток
+## «у двери» (за доллары всё покупается где угодно) объяснять нечего.
 func _announce_place(tab: String) -> void:
 	if tab == SCREEN_EQUIP or tab == TAB_SELL:
 		return
-	var gate := ShopService.can_buy({"kind": "good"})
-	if bool(gate["ok"]) or String(gate["place"]) == ShopService.PLACE_UNDERGROUND:
-		return
-	if _tiles.values().any(func(t: ShopTile) -> bool: return t.offer.has("lock_reason")):
-		notice(String(gate["reason"]), 3.2)
+	if _door_strip.visible:
+		_door_strip.remind()
 
 
 func close() -> void:
@@ -284,6 +288,7 @@ func _build() -> void:
 	_build_scroll()
 	_build_header()
 	_build_action_bar()
+	_build_door_strip()
 	_build_nav()
 	_build_notice()
 
@@ -751,6 +756,7 @@ func _render() -> void:
 		_list.add_child(_make_empty_state())
 	_update_badges()
 	_update_action_bar()
+	_sync_door_strip()
 
 
 func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
@@ -840,6 +846,9 @@ func _on_tile_pressed(offer: Dictionary, tile: ShopTile) -> void:
 					Sfx.play("ui_tap")
 					ShopFx.pop(tile, 0.08, 0.18)
 				"locked", "away":
+					if bool(offer.get("at_door", false)):
+						_remind_door(tile)
+						return
 					Sfx.play("ui_deny")
 					Haptics.tap()
 					tile.deny()
@@ -922,6 +931,70 @@ func _after_snap(tile: ShopTile, color: Color) -> void:
 	var rect := tile.get_global_rect()
 	ShopFx.sparkles(_root, rect.get_center(), color, 14, 32.0)
 	ShopFx.flash(_root, rect, Color(1, 1, 1, 0.55), 0.22)
+
+
+# ---------------------------------------------------------------------------
+# «За монеты — у входной двери» (раунд 5, слова владельца: «В огороде покупки
+# напоминают, что покупать надо у входной двери»)
+# ---------------------------------------------------------------------------
+
+func _build_door_strip() -> void:
+	_door_strip = ShopDoorStrip.new().setup(_make_btn("green", "", Vector2(56, 32)))
+	_door_strip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_door_strip.offset_top = -(NAV_H + ShopDoorStrip.H)
+	_door_strip.offset_bottom = -NAV_H
+	_door_strip.visible = false
+	_door_strip.go_btn.pressed.connect(_go_to_door)
+	_root.add_child(_door_strip)
+
+
+## Полоса видна, пока на вкладке есть плитки «у двери»; список над ней короче.
+func _sync_door_strip() -> void:
+	var want := _tab != TAB_SELL and _tab != SCREEN_EQUIP \
+		and _tiles.values().any(func(t: ShopTile) -> bool: return bool(t.offer.get("at_door", false)))
+	_door_strip.visible = want
+	if not want:
+		return
+	_scroll.offset_bottom = -(NAV_H + ShopDoorStrip.H)
+	_door_strip.configure(ShopService.purchase_place(), _door_dir())
+
+
+## Где дверь от героя: -1 левее, +1 правее (стрелка на кнопке «к двери»).
+func _door_dir() -> int:
+	if _player == null or not is_instance_valid(_player):
+		return 1
+	var door_x := float(HouseConfig.door_cell().x) + 0.5
+	return -1 if door_x < float(_player.get("x")) else 1
+
+
+## Тап по плитке «у двери»: не «нельзя», а «вот где». Плитка мягко щёлкает,
+## её дверь подпрыгивает и летит в полосу внизу, полоса вспыхивает, стрелка
+## «кивает» к двери. Ни ролика, ни «N/3», ни плашки с текстом сверху.
+func _remind_door(tile: ShopTile) -> void:
+	Sfx.play("ui_tap")
+	Haptics.tap()
+	if not _door_strip.visible:
+		_sync_door_strip()
+	if tile != null and is_instance_valid(tile):
+		ShopFx.pop(tile, 0.08, 0.2)
+		tile.hop_corner()
+		ShopFx.coins(_root, ShopArt.tex("glyph_door"), tile.corner_center(), _door_strip.door_center(), 1,
+			func(_i: int) -> void: _door_strip.remind(), 16.0)
+	else:
+		_door_strip.remind()
+
+
+## «К двери»: витрина закрывается, над миром стрелка к входной двери. Сам
+## герой идёт пешком — это не телепорт; зайдёт в дом — витрина откроется
+## в прихожей на этой же вкладке (ShopDoorGuide).
+func _go_to_door() -> void:
+	if Tip.swallowed():
+		return
+	var tab := _tab
+	Sfx.play("ui_tap")
+	Haptics.tap()
+	close()
+	_door_guide.start(tab)
 
 
 # ---------------------------------------------------------------------------
@@ -1218,6 +1291,10 @@ func _confirm_card() -> void:
 		return
 	var offer := _card_offer
 	var result := _perform(offer)
+	if not bool(result.get("ok", false)) and ShopService.is_door_reminder(ShopService.can_buy(offer)):
+		_close_card(true)
+		_remind_door(_tiles.get(String(offer["key"])))
+		return
 	if not bool(result.get("ok", false)):
 		Sfx.play("ui_deny")
 		Haptics.tap()

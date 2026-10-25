@@ -49,7 +49,7 @@ static func speed_mult() -> float:
 
 ## «С первого удара»: клетка разбивается в тот миг, когда кирка впервые бьёт по
 ## породе — через полпериода удара инструмента (так стоят звук и кадр удара:
-## JuiceDirector, HeroAnim.dig_target_phase). Кирка — 0.19 с, бурмобиль — 0.06 с.
+## JuiceDirector). Кирка — 0.19 с, бурмобиль — 0.06 с.
 static func dig_seconds(tool_id: String) -> float:
 	var hits := maxf(1.0, MechData.num("greed", "dig_hits", 1.0))
 	return Feel.hit_period(tool_id) * (hits - 0.5)

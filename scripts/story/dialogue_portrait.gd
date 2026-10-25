@@ -215,6 +215,5 @@ func _draw() -> void:
 	draw_circle(Vector2(SIZE_PX * 0.5, 26.0), 27.0, Color(_accent.r, _accent.g, _accent.b, 0.16))
 	draw_circle(Vector2(SIZE_PX * 0.5, 26.0), 19.0, Color(_accent.r, _accent.g, _accent.b, 0.14))
 	if _sheet != null:
-		draw_texture_rect_region(_sheet, Rect2(PAD, PAD, ART, ART),
-				DialogueCast.region(face, _frame, DialogueCast.cell_of(_sheet)))
+		draw_texture_rect_region(_sheet, Rect2(PAD, PAD, ART, ART), DialogueCast.region(face, _frame))
 	draw_style_box(_edge, r)

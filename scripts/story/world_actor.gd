@@ -42,11 +42,6 @@ var _sprite: Sprite2D
 var _frames: int = 1
 var _frame_w: float = CHAR_FRAME
 var _frame_h: float = CHAR_FRAME
-## Листы мальчика по эталону (раунд 4) — 8 текселей на точку и ряды кадров:
-## их геометрия из HeroSheets; {} — прежний лист ×3 в одну ленту.
-var _inf: Dictionary = {}
-var _scale: float = ART_SCALE
-var _ground_u: float = GROUND_Y / ART_SCALE
 
 func _ready() -> void:
 	_sprite = Sprite2D.new()
@@ -113,18 +108,6 @@ func set_pose(p_pose: String, p_flip: bool = false) -> bool:
 	var tex_w: int = int(round(tex.get_width()))
 	_frames = 1
 	_frame_w = float(tex_w)
-	_inf = HeroSheets.info("%s/%s" % [_dir, p_pose])
-	_set_density(_inf)
-	if not _inf.is_empty():
-		_frames = HeroSheets.frames_of(_inf)
-		_frame_w = float(_inf["fw"])
-		_frame_h = float(_inf["fh"])
-		_sprite.texture = tex
-		_sprite.region_rect = HeroSheets.region(_inf, 0)
-		pose = p_pose
-		flip = p_flip
-		_sprite.flip_h = flip
-		return true
 	if tex_h == int(CHAR_FRAME):
 		if tex_w % int(CHAR_FRAME) == 0:
 			_frames = maxi(1, tex_w / int(CHAR_FRAME))
@@ -148,20 +131,8 @@ func _process(_dt: float) -> void:
 	# Центр по ширине — по РЕАЛЬНОЙ ширине текущего кадра (_frame_w), не по
 	# фиксированному CHAR_FRAME: у широких кадров копки (см. WIDE_DIG_FRAME_W
 	# выше) иначе персонаж сидел бы смещённым от клетки на разницу ширин.
-	_sprite.position = Vector2(-_frame_w / (2.0 * _scale), -HH * TILE - 16.0 + 46.0 - _ground_u)
+	_sprite.position = Vector2(-_frame_w / (2.0 * ART_SCALE), -HH * TILE - 16.0)
 	if _frames <= 1 or _sprite.texture == null:
 		return
 	var idx: int = int(anim / ANIM_DIV) % _frames
-	if not _inf.is_empty():
-		_sprite.region_rect = HeroSheets.region(_inf, idx)
-		return
 	_sprite.region_rect = Rect2(idx * _frame_w, 0, _frame_w, _frame_h)
-
-
-## Плотность листа: масштаб спрайта (размер в точках тот же) и шейдер чёткости
-## у листов мальчика (как у героя в шахте — CharacterView).
-func _set_density(inf: Dictionary) -> void:
-	_scale = HeroSheets.scale_of(inf)
-	_ground_u = float(inf["ground"]) / _scale if not inf.is_empty() else GROUND_Y / ART_SCALE
-	_sprite.scale = Vector2(1.0 / _scale, 1.0 / _scale)
-	HeroSheets.crisp(_sprite, inf)

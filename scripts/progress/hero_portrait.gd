@@ -10,21 +10,15 @@ extends Control
 ## листов; портрету нужна одна статичная стойка, и ему незачем знать о мире.
 
 const SHEET := "res://art/character/idle.png"
-## Кадр 48×48 логических точек, линия земли 46 (как в шахте); на карточке
-## он ×3·0,82 — тот же размер, что был при листах ×3.
-const FRAME_U := 48.0
-const FEET_U := 46.0
-const UNIT := 3.0 * 0.82
+const FRAME := 144
+const FEET_Y := 138.0          # линия земли внутри кадра
+const SPRITE_SCALE := 0.82
 const BREATH_SECONDS := 0.5
 
 var _tex: Texture2D = null
-var _inf: Dictionary = {}
 var _frames: int = 1
 var _frame: int = 0
 var _t: float = 0.0
-## Герой — отдельный узел с шейдером чёткости (лист ×8 на карточке
-## уменьшается/растягивается в нецелое число раз).
-var _hero: TextureRect = null
 
 
 func _init() -> void:
@@ -35,18 +29,7 @@ func _init() -> void:
 func _ready() -> void:
 	if ResourceLoader.exists(SHEET):
 		_tex = load(SHEET)
-		_inf = HeroSheets.info_for(_tex)
-		_frames = HeroSheets.frames_of(_inf) if not _inf.is_empty() \
-				else maxi(int(_tex.get_width() / (FRAME_U * HeroSheets.LEGACY_SCALE)), 1)
-		_hero = TextureRect.new()
-		_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_hero.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		_hero.stretch_mode = TextureRect.STRETCH_SCALE
-		HeroSheets.crisp(_hero, _inf)
-		add_child(_hero)
-		_set_frame(0)
-		resized.connect(_place_hero)
-		_place_hero()
+		_frames = maxi(int(_tex.get_width() / FRAME), 1)
 	visibility_changed.connect(func() -> void: set_process(is_visible_in_tree()))
 	# Движок включает _process при READY, даже если скрыт с самого начала: сигнал видимости до первого показа молчит.
 	set_process(is_visible_in_tree())
@@ -56,32 +39,8 @@ func _process(delta: float) -> void:
 	_t += delta
 	var f := int(_t / BREATH_SECONDS) % _frames
 	if f != _frame:
-		_set_frame(f)
-
-
-func _set_frame(f: int) -> void:
-	_frame = f
-	if _hero == null:
-		return
-	var atlas := AtlasTexture.new()
-	atlas.atlas = _tex
-	var sc: float = HeroSheets.scale_of(_inf)
-	atlas.region = HeroSheets.region(_inf, f) if not _inf.is_empty() \
-			else Rect2(f * FRAME_U * sc, 0.0, FRAME_U * sc, FRAME_U * sc)
-	_hero.texture = atlas
-
-
-func _place_hero() -> void:
-	if _hero == null:
-		return
-	# Кадр мальчика по эталону обрезан по рисунку: размеры и линия земли — из геометрии листа.
-	var sc: float = HeroSheets.scale_of(_inf)
-	var w: float = (float(_inf["fw"]) / sc if not _inf.is_empty() else FRAME_U) * UNIT
-	var h: float = (float(_inf["fh"]) / sc if not _inf.is_empty() else FRAME_U) * UNIT
-	var feet_u: float = float(_inf["ground"]) / sc if not _inf.is_empty() else FEET_U
-	var feet_y := size.y - 8.0
-	_hero.position = Vector2((size.x - w) * 0.5, feet_y - feet_u * UNIT)
-	_hero.size = Vector2(w, h)
+		_frame = f
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -98,3 +57,9 @@ func _draw() -> void:
 	draw_set_transform(Vector2(size.x * 0.5, feet_y), 0.0, Vector2(1.0, 0.28))
 	draw_circle(Vector2.ZERO, 22.0, Color(0, 0, 0, 0.45))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	if _tex == null:
+		return
+	var w := float(FRAME) * SPRITE_SCALE
+	var dest := Rect2(Vector2((size.x - w) * 0.5, feet_y - FEET_Y * SPRITE_SCALE), Vector2(w, w))
+	draw_texture_rect_region(_tex, dest, Rect2(float(_frame * FRAME), 0.0, float(FRAME), float(FRAME)))

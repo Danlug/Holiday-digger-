@@ -802,10 +802,6 @@ def build(sheet_path=None):
 						px[x, y] = PAL["K"] + (255,)
 						break
 		big = img.resize((32, 32), Image.NEAREST)
-		if name == "hero":
-			# Значок героя — голова мальчика по эталону владельца (tools/gen_hero_ref.py, раунд 4).
-			imgs[name] = big
-			continue
 		big.save(os.path.join(OUT, name + ".png"))
 		imgs[name] = big
 	if errors:

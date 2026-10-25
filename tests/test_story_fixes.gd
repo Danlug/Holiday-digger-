@@ -139,7 +139,8 @@ func _run_intro(mode: String, skip_at: Callable = Callable(), skip_delay: int = 
 	var m := await _spawn_main()
 	var d: StoryDirector = m.find_child("StoryDirector", true, false)
 	var cs := d.cutscene
-	var res := {"snap": {}, "in_rock": 0, "rock_at": "", "pit_ok": false, "pit_detail": "", "skipped_at": ""}
+	var res := {"snap": {}, "in_rock": 0, "rock_at": "", "pit_ok": false, "pit_detail": "", "skipped_at": "",
+		"card_over_dig": 0}
 	var on_finished := func(id: String) -> void:
 		if id == "intro_grandpa":
 			res.snap = _snapshot(m, d)
@@ -161,6 +162,8 @@ func _run_intro(mode: String, skip_at: Callable = Callable(), skip_delay: int = 
 				if res.rock_at.is_empty():
 					res.rock_at = "(%d;%d) на кадре %d" % [body.x, body.y, cs._index - 1]
 		var beat := _current_beat(cs)
+		if beat.get("t") == "world_dig" and cs._item_card.visible:
+			res.card_over_dig += 1
 		# Дно ямы: дед в «ловушке» стоит в своей шахте x=15 на глубине 6, вся шахта открыта.
 		if not pit_checked and String(beat.get("text", "")) == "intro_grandpa.s_trapped" and a != null:
 			pit_checked = true
@@ -220,6 +223,8 @@ func _test_intro_grandpa() -> void:
 		snap.clock < 1.0 and is_equal_approx(snap.scale, 1.0), "часы %.2f, темп %.2f" % [snap.clock, snap.scale])
 	check("досмотрено: дед ни разу не стоял в целой породе", ref.in_rock == 0, ref.rock_at)
 	check("досмотрено: дно ямы — шахта x=15 до глубины 6, дед в ней", ref.pit_ok, ref.pit_detail)
+	check("досмотрено: карточка самородка не закрывает копку шахты", ref.card_over_dig == 0,
+		"кадров под карточкой: %d" % ref.card_over_dig)
 
 	var tap := await _run_intro("tap")
 	check("пролистано тапами: дед ни разу не стоял в целой породе", tap.in_rock == 0,

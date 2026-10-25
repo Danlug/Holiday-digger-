@@ -655,6 +655,10 @@ func _input(event: InputEvent) -> void:
 
 func _advance() -> void:
 	_world_finish_pending()
+	# Карточка находки — окно «тапни и дальше»: по тапу она уходит. Иначе она
+	# висела бы посреди экрана всю следующую копку — и как дед проходит
+	# фундамент, видно не было: карточка исчезала, а он уже под плитой.
+	_item_card.hide_item()
 	while _index < _beats.size():
 		var beat: Dictionary = _beats[_index]
 		_index += 1

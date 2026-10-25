@@ -208,8 +208,9 @@ func get_max_hp() -> float:
 	return float(Balance.get_max_hp(get_skill_stage("hp")))
 
 
-## Смерть: теряется весь рюкзак (см. GDD раздел 7)
-## и 200 монет «скорой» (решение владельца, раунд 4; не в минус — Healing).
+## Смерть: теряется весь рюкзак (см. GDD раздел 7) и плата «скорой»: 5% монет,
+## от 50 до 5000 (владелец, раунд 5; не в минус — Healing). Поездку скорой и
+## полоски после неё ведёт DeathRide из main.gd.
 func die() -> void:
 	if not is_alive:
 		return
@@ -217,6 +218,7 @@ func die() -> void:
 	inventory.clear()
 	inventory_changed.emit()
 	Healing.charge_death_fee()
+	DeathRide.on_died()
 	died.emit()
 
 
@@ -687,7 +689,9 @@ var ext: Dictionary = {}
 ##   ate            {id: String, hunger: float, stamina: float, hp: float} — герой поел (рюкзак или стол дома,
 ##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
 ##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
-##   ambulance      {coins: int} — смерть: «скорая забрала» монеты (до 200, не в минус), перед сигналом died
+##   ambulance      {coins: int} — смерть: «скорая забрала» монеты (5%, от 50 до 5000, не в минус), перед сигналом died
+##   ambulance_ride {seconds: float, depth: int, resumed?: bool} — скорая везёт героя наверх (DeathRide), герой мёртв до приезда
+##   ambulance_arrived {seconds: float, depth: int, hp: float} — приехали: респавн с половиной HP (DeathRide.respawn)
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)

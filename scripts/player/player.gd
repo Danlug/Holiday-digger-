@@ -153,6 +153,7 @@ const HOME_X := float(WorldGen.HOUSE_X_MAX + 1) + 0.5   # 15.5
 
 const LUCK_COLOR := Color8(0xFF, 0xD8, 0x4A)
 var _luck_rng: RandomNumberGenerator = null
+var _stagger_t: float = 0.0   # часы «шатания» без сил (SurvivalRules.stagger_factor)
 
 var x: float = HOME_X
 var y: float = 0.5
@@ -951,7 +952,7 @@ func _jump(coyote: bool = false) -> void:
 		return
 	if _solid_at(x, y - HH - 0.1):
 		return
-	vy = -JUMP_V
+	vy = -JUMP_V * SurvivalRules.jump_velocity_factor()   # уставший прыгает ниже (ГДД §7)
 	on_ground = false
 	_coyote_left = 0.0
 	_jump_buffer_left = 0.0
@@ -1013,10 +1014,12 @@ func _apply_intent(dt: float) -> void:
 		vx = 0.0
 		return
 
-	# Обессиленный герой медленнее во всём (ГДД раздел 7). Множитель берётся
-	# из GameState, а не считается здесь, чтобы штраф нельзя было забыть
-	# применить в одном из трёх мест — ходьбе, копке или полёте.
-	var speed: float = WALK * (1.0 if on_ground else AIR_CTRL) * GameState.get_speed_multiplier()
+	# Обессиленный герой медленнее во всём (ГДД раздел 7). С раунда 5 ходьбу
+	# режут уже 25% и 10% бодрости, а без сил героя ещё и шатает
+	# (SurvivalRules, data/survival.json).
+	_stagger_t += dt
+	var speed: float = WALK * (1.0 if on_ground else AIR_CTRL) * SurvivalRules.move_factor() \
+		* SurvivalRules.stagger_factor(_stagger_t)
 	vx = float(hold_dx) * speed
 	if hold_dx != 0:
 		facing = hold_dx
@@ -1219,8 +1222,9 @@ func _start_dig(tx: int, ty: int) -> void:
 		var stage := GameState.get_skill_stage("dig_speed")
 		total = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier() \
 			/ Balance.get_global_dig_speed_multiplier()
-		# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
-		total /= GameState.get_speed_multiplier()
+		# Штраф голода и усталости — делением, потому что здесь время, а не скорость
+		# (ГДД §7: на нуле бодрости −50% владельца, с раунда 5 — и ступени 25%/10%).
+		total /= maxf(SurvivalRules.dig_factor(), 0.05)
 		total = maxf(total, 0.05)
 		if type == TileTypes.Type.LAVA:
 			# Лава — 5 с вне зависимости от инструмента (решение владельца): цена в HP
@@ -1325,7 +1329,11 @@ func _luck_roll(loot: bool) -> int:
 	if _luck_rng == null:
 		_luck_rng = RandomNumberGenerator.new()
 		_luck_rng.randomize()
-	return Balance.luck_find_multiplier(_luck_rng.randf() * 100.0, loot,
+	# Голодному везёт реже (ГДД §7, раунд 5): бросок делится на долю — шанс падает во столько же раз.
+	var hunger_luck := SurvivalRules.luck_factor()
+	if hunger_luck <= 0.0:
+		return 1
+	return Balance.luck_find_multiplier(_luck_rng.randf() * 100.0 / hunger_luck, loot,
 			GameState.get_skill_stage("luck_chance"), GameState.get_skill_stage("luck_multiplier"))
 
 

@@ -2,7 +2,7 @@ extends Node
 ## GameState — автолоад состояния игрока.
 ##
 ## Хранит HP/голод/бодрость, опыт и прокачку, валюты, инвентарь с весом и
-## стаками, чёрный ящик, текущий инструмент, максимальную глубину, собранные
+## стаками, текущий инструмент, максимальную глубину, собранные
 ## артефакты и дневные лимиты рекламы. Формулы берёт из автолоада Balance.
 ##
 ## КРИТИЧНО (см. GDD п.7, 15): дневной сброс лимитов рекламы считается по
@@ -22,7 +22,6 @@ signal skill_points_changed(available: int)
 signal coins_changed(coins: int)
 signal dollars_changed(dollars: int)
 signal inventory_changed
-signal black_box_changed
 signal artifact_collected(artifact_id: String)
 signal branch_completed(branch_num: int)
 signal tool_changed(tool_id: String)
@@ -51,8 +50,6 @@ var dollars: int = 0  # премиум-валюта
 
 # --- Инвентарь ---
 var inventory: Dictionary = {}  # mineral_id:String -> count:int
-var black_box_tier: String = "base"  # base | premium | premium_plus
-var black_box: Dictionary = {}  # mineral_id:String -> count:int
 
 # --- Инструмент и прогресс ---
 var current_tool: String = "shovel"
@@ -214,7 +211,7 @@ func get_max_hp() -> float:
 	return float(Balance.get_max_hp(get_skill_stage("hp")))
 
 
-## Смерть: теряются все минералы, кроме чёрного ящика (см. GDD раздел 7),
+## Смерть: теряется весь рюкзак (см. GDD раздел 7)
 ## и 200 монет «скорой» (решение владельца, раунд 4; не в минус — Healing).
 func die() -> void:
 	if not is_alive:
@@ -254,7 +251,6 @@ func reset_progress() -> void:
 	coins = 0
 	dollars = 0
 	inventory.clear()
-	black_box.clear()
 	current_tool = "shovel"
 	current_gear = ""
 	rig_parked_at = Vector2i(-1, -1)
@@ -280,7 +276,6 @@ func reset_progress() -> void:
 	coins_changed.emit(coins)
 	dollars_changed.emit(dollars)
 	inventory_changed.emit()
-	black_box_changed.emit()
 	tool_changed.emit(current_tool)
 	gear_changed.emit(current_gear)
 	max_depth_changed.emit(max_depth_reached)
@@ -519,49 +514,6 @@ func remove_item(id: String, count: int) -> bool:
 
 func get_item_count(id: String) -> int:
 	return int(inventory.get(id, 0))
-
-
-# --- Чёрный ящик: содержимое гарантированно возвращается при смерти ---
-
-func set_black_box_tier(tier: String) -> void:
-	black_box_tier = tier
-	black_box_changed.emit()
-
-
-func get_black_box_capacity() -> int:
-	return Balance.get_black_box_capacity(black_box_tier)
-
-
-## Кладёт count единиц mineral_id в чёрный ящик. Каждый вид минерала занимает
-## одну ячейку (клетку) ящика; клетки ящика в грузоподъёмность не входят
-## (см. GDD раздел 14). Возвращает реально добавленное количество.
-func add_to_black_box(id: String, count: int) -> int:
-	if count <= 0:
-		return 0
-	var capacity := get_black_box_capacity()
-	var current_count := int(black_box.get(id, 0))
-	if current_count == 0 and black_box.size() >= capacity:
-		return 0
-	var max_stack := Balance.get_mineral_max_stack(id)
-	var to_add: int = min(count, max(0, max_stack - current_count))
-	if to_add <= 0:
-		return 0
-	black_box[id] = current_count + to_add
-	black_box_changed.emit()
-	return to_add
-
-
-func remove_from_black_box(id: String, count: int) -> bool:
-	var current_count := int(black_box.get(id, 0))
-	if count <= 0 or current_count < count:
-		return false
-	var remaining := current_count - count
-	if remaining <= 0:
-		black_box.erase(id)
-	else:
-		black_box[id] = remaining
-	black_box_changed.emit()
-	return true
 
 
 # ---------------------------------------------------------------------------
@@ -828,7 +780,7 @@ var house_tutorial_stage: int = 0
 var house_dopings_shop_unlocked: bool = false
 
 ## Склад в мастерской (ГДД п.14, «Склад в мастерской»): item_id -> количество.
-## Живёт отдельно от инвентаря и от чёрного ящика: при смерти теряется только
+## Живёт отдельно от инвентаря: при смерти теряется только
 ## рюкзак, склад остаётся целиком — он и нужен затем, чтобы копить материалы
 ## на ступень инструмента, которую за одну ходку не принести (железная кирка
 ## — 160 кг при рюкзаке 60). Грузоподъёмность на склад не действует: он стоит

@@ -133,13 +133,11 @@ func _loot() -> void:
 func _death() -> void:
 	# reset_progress() нельзя: он шлёт max_depth_changed(0), и режиссёр сюжета проигрывает интро заново
 	GameState.inventory.clear()
-	GameState.black_box.clear()
 	GameState.add_item("iron_ore", 14)
 	GameState.add_item("silver", 6)
 	GameState.add_item("diamond", 2)
 	GameState.add_item("ruby", 1)
 	GameState.add_item("coal", 9)
-	GameState.add_to_black_box("gold", 7)
 	GameState.coins = 4280
 	GameState.level = 12
 	GameState.max_depth_reached = 640

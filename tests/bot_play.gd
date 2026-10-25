@@ -1659,9 +1659,10 @@ func _home_visit() -> void:
 			_stop = true
 			return
 	_sell()
-	if not _reserved_in_pack().is_empty() or _any_craftable():
+	if not _reserved_in_pack().is_empty() or _any_craftable() or _fuel_raw_in_pack():
 		# склад и верстак — в мастерской (ГДД §14): несём туда то, что копим на проект
 		if await _go_room("workshop"):
+			_stash_fuel_raw()
 			_workbench()
 		await _go_room("hall")
 	else:
@@ -1874,6 +1875,23 @@ func _greed_active() -> bool:
 				if v is bool:
 					return v
 	return false
+
+
+## Торф и уголь для станции — на склад, а не в рюкзак (раунд 5, ветка peat): за пластом 450 торфа
+## ~4 на ряд, и бот, носивший всё сырьё в рюкзаке до визита на станцию (а та — только при баке
+## ниже 60%), забивал рюкзак торфом до порога возврата: 51 кг из 60 — и ходки кончались, не
+## начавшись (сид 7, deep и achiever). Станция перегоняет и со склада (FuelRefinery.held).
+func _fuel_raw_in_pack() -> bool:
+	return _fuel_tool() != "" and (GameState.get_item_count("peat") > 0 or GameState.get_item_count("coal") > 0)
+
+
+func _stash_fuel_raw() -> void:
+	if _fuel_tool() == "":
+		return
+	for raw in ["peat", "coal"]:
+		var n := HouseStorage.put(raw, GameState.get_item_count(raw))
+		if n > 0:
+			T.event(_sim, "stash", "%s ×%d на склад" % [raw, n], false)
 
 
 func _reserved_in_pack() -> Dictionary:

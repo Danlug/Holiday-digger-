@@ -1292,11 +1292,12 @@ func _confirm_card() -> void:
 	if Tip.swallowed() or _card == null:
 		return
 	var offer := _card_offer
-	var result := _perform(offer)
-	if not bool(result.get("ok", false)) and ShopService.is_door_reminder(ShopService.can_buy(offer)):
+	# За монеты не у двери (огород, комната дома) — не отказ, а «вот где».
+	if ShopService.is_door_reminder(ShopService.can_buy(offer)):
 		_close_card(true)
 		_remind_door(_tiles.get(String(offer["key"])))
 		return
+	var result := _perform(offer)
 	if not bool(result.get("ok", false)):
 		Sfx.play("ui_deny")
 		Haptics.tap()

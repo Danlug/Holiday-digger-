@@ -561,7 +561,7 @@ func _dismiss_modals() -> void:
 	if hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open():
 		open.append("more_menu")
 		hud.close_more_menu()
-	if WellReport.is_open():
+	if WellReport.is_open() and is_instance_valid(hud):
 		open.append("well_report")
 		hud.close_well_report()
 	if TechScreen.is_open() and _activity != "tech":
@@ -2203,6 +2203,15 @@ func _session_restart() -> void:
 	for k in snap.keys():
 		if k == "coins" or k == "dollars":
 			if int(after[k]) < int(snap[k]):
+				lost.append("%s %s → %s" % [k, str(snap[k]), str(after[k])])
+		elif k == "items":
+			# словарь сравниваем по содержимому: после загрузки порядок ключей другой, и str() их различал
+			var a: Dictionary = after[k]
+			var b: Dictionary = snap[k]
+			var same := a.size() == b.size()
+			for id in b.keys():
+				same = same and a.has(id) and int(a[id]) == int(b[id])
+			if not same:
 				lost.append("%s %s → %s" % [k, str(snap[k]), str(after[k])])
 		elif str(after[k]) != str(snap[k]):
 			lost.append("%s %s → %s" % [k, str(snap[k]), str(after[k])])

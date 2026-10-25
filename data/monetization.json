@@ -12,7 +12,7 @@
  "_fairness_note": "Ни один товар в dollar_packs/iap_products/cosmetic_catalog не даёт скорость копки, силу, HP, шанс удачи, вместимость рюкзака или доступ к глубине/минералам — эти рычаги (кирки, ранцы, бур, апгрейды) в игре остаются исключительно за монеты, зарабатываемые копкой (см. data/balance.json -> tools/gear/drill_upgrade, ShopCatalog). Донат покупает время, удобство и внешний вид — не силу.",
 
  "dollar_packs": {
-  "_note": "НОВОЕ по сравнению с текущей сборкой: сейчас доллары купить нельзя вообще (см. scripts/shop/shop_ui.gd:_render_premium_screen — 'Доллары в этой сборке нельзя купить: платежей нет'). Это предложение продуктов на будущее, когда появится платёжный SDK. Ставка тем выгоднее, чем крупнее пачка — стандартная практика F2P, но не 'плати больше — копай быстрее': доллары по-прежнему не покупают силу, только то, что перечислено ниже в cosmetic_catalog/convenience_catalog и в iap_products (антиреклама, слот ящика, подписки).",
+  "_note": "НОВОЕ по сравнению с текущей сборкой: сейчас доллары купить нельзя вообще (см. scripts/shop/shop_ui.gd:_render_premium_screen — 'Доллары в этой сборке нельзя купить: платежей нет'). Это предложение продуктов на будущее, когда появится платёжный SDK. Ставка тем выгоднее, чем крупнее пачка — стандартная практика F2P, но не 'плати больше — копай быстрее': доллары по-прежнему не покупают силу, только то, что перечислено ниже в cosmetic_catalog/convenience_catalog и в iap_products (антиреклама, подписки).",
   "items": [
    {
     "product_id": "dollars_pack_s",
@@ -48,7 +48,7 @@
  },
 
  "iap_products": {
-  "_note": "Расширяет и заменяет черновик data/balance.json -> monetization.iap_products (та секция помечена устаревшей и указывает сюда). Отличие от прежнего черновика: у premium_monthly убран 'strength' — грант силы в копке несовместим с заданием владельца 'честно к игрокам'; вместо него — вращающийся набор косметики и storage-конвенience через существующее поле GameState.black_box_tier (см. ниже).",
+  "_note": "Расширяет и заменяет черновик data/balance.json -> monetization.iap_products (та секция помечена устаревшей и указывает сюда). Отличие от прежнего черновика: у premium_monthly убран 'strength' — грант силы в копке несовместим с заданием владельца 'честно к игрокам'; вместо него — вращающийся набор косметики (см. ниже).",
   "items": [
    {
     "id": "remove_ads",
@@ -58,19 +58,11 @@
     "note": "убирает баннеры/интерстишлы, если такие появятся; НЕ убирает добровольные rewarded-ролики за награду (см. ad_placements) — тот же принцип, что в GDD раздел 15"
    },
    {
-    "id": "black_box_plus_1",
-    "name_ru": "Чёрный ящик +1",
-    "price_usd": 2.9,
-    "grants": ["black_box_slot+1"],
-    "note": "ещё одна ячейка в GameState.black_box — сортировка/склад, не грузоподъёмность и не сила (см. data/balance.json -> black_box._note)"
-   },
-   {
     "id": "premium_monthly",
     "name_ru": "Премиум / мес",
     "price_usd": 9.9,
     "grants": [
      "no_ads",
-     {"black_box_tier": "premium", "note": "вместо абстрактного 'inventory_boost' — конкретно: GameState.black_box_tier='premium' (2 ячейки вместо 1, см. data/balance.json -> black_box.tiers) на время подписки"},
      {"cosmetic_bundle_monthly": true, "note": "ЗАМЕНА 'strength' из прежнего черновика balance.json — вместо прибавки к силе/копке (pay-to-win) подписчик получает доступ к одному предмету из cosmetic_catalog в месяц по выбору, бесплатно. Требует утверждения владельца — это предложение агента, не решение"},
      {"premium_currency_onetime": {"value": 50, "proposed": true, "note": "разовая выдача при оформлении — количество не задано в GDD"}}
     ]
@@ -81,7 +73,6 @@
     "price_usd": 14.9,
     "grants": [
      "premium_monthly_benefits",
-     {"black_box_tier": "premium_plus", "note": "GameState.black_box_tier='premium_plus' (3 ячейки) вместо 'premium' — перекрывает, не складывается"},
      {"premium_currency_daily": {"value": 5, "proposed": true, "note": "ежедневная выдача — количество не задано в GDD"}},
      {"cosmetic_bundle_monthly_plus": true, "note": "тот же принцип, что у premium_monthly, но выбор из двух предметов вместо одного — разница уровней в ассортименте косметики, а не в силе"}
     ]

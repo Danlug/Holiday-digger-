@@ -185,12 +185,10 @@ func _s_shop_card() -> void:
 
 func _death_report(coins_before: int) -> Dictionary:
 	GameState.inventory.clear()
-	GameState.black_box.clear()
 	GameState.add_item("iron_ore", 14)
 	GameState.add_item("silver", 6)
 	GameState.add_item("ruby", 1)
 	GameState.add_item("medkit", 1)
-	GameState.add_to_black_box("gold", 7)
 	GameState.max_depth_reached = maxi(GameState.max_depth_reached, 640)
 	GameState.coins = coins_before
 	var fee := mini(coins_before, Healing.death_fee_coins())

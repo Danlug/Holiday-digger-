@@ -114,11 +114,26 @@ static func pick_tier(world_seed: int, band: int, y: int) -> String:
 	return String(tiers[tiers.size() - 1].get("id", "wood"))
 
 
+## Запись ступени: обычные (tiers, их разыгрывает pick_tier) и назначаемые явно
+## (extra_tiers — сундук полости-фигуры, раунд 5).
 static func tier_row(tier: String) -> Dictionary:
 	for t in MechData.section("chests").get("tiers", []):
 		if String(t.get("id", "")) == tier:
 			return t
+	for t in MechData.section("chests").get("extra_tiers", []):
+		if String(t.get("id", "")) == tier:
+			return t
 	return {}
+
+
+## Ценность ступени в «клетках» на глубине y: value_cells плюс value_per_1000 за
+## каждую 1000 ниже y_min ступени (у тайников нуль — их ценность не зависит от глубины).
+static func tier_value_cells(row: Dictionary, y: int) -> float:
+	var base := float(MechData.value(row.get("value_cells", 20), 20))
+	var per := float(MechData.value(row.get("value_per_1000", 0), 0))
+	if per <= 0.0:
+		return base
+	return base + per * maxf(0.0, float(y - int(row.get("y_min", 0)))) / 1000.0
 
 
 ## Добыча сундука: {tier, items: {id: n}, xp: int}. Детерминирована от сида и
@@ -137,7 +152,7 @@ static func roll_loot(world: WorldGen, world_seed: int, cell: Vector2i, tier: St
 	var lo := int(limits[0])
 	var hi := int(limits[limits.size() - 1])
 	var spread := MechData.num("chests", "value_spread", 0.25)
-	var target := float(MechData.value(row.get("value_cells", 20), 20)) * cell_value(world, cell.y) \
+	var target := tier_value_cells(row, cell.y) * cell_value(world, cell.y) \
 		* rng.randf_range(1.0 - spread, 1.0 + spread)
 	if not pool.is_empty():
 		var total := 0.0

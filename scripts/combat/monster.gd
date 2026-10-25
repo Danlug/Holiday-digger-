@@ -8,10 +8,16 @@ extends RefCounted
 ##   flyer    — летун: висит рядом, замах, пике по прямой, отход;
 ##   jumper   — прыгун: приседает (замах) и прыгает, в полёте не отменить;
 ##   ambusher — засадник: замурован в породе, просыпается рядом, дальше ползун;
-##   swarm    — стая: мелкие летуны кружат и жалят по таймеру.
+##   swarm    — стая: мелкие летуны кружат и жалят по таймеру;
+##   shooter  — стрелок (раунд 5): держит дистанцию, раздувается (замах) и
+##              плюёт снарядом по дуге — событие "shoot", снаряд ведёт Projectile.
 ## Удар всегда предваряется замахом (windup) — это и телеграф, и окно для
 ## уклонения. tick() возвращает события, а не трогает героя сам: так поведение
 ## проверяется в тестах без окна и без GameState.
+##
+## Поводок (раунд 5, стражи полостей): у монстра с home/leash есть дом — он не
+## замечает героя дальше aggro от дома и, уйдя дальше leash, возвращается
+## (состояние "return"), не глядя на героя. Без поводка поведение прежнее.
 
 const GRAVITY := 16.0
 const V_TERM := 20.0
@@ -46,6 +52,12 @@ var depth: int = 0
 var emerge_pos: Vector2 = Vector2.ZERO
 var anim_t: float = 0.0
 var rng := RandomNumberGenerator.new()
+## Поводок стража полости: дом, радиус поводка и агро (0 — поводка нет).
+var home: Vector2 = Vector2.INF
+var leash: float = 0.0
+var aggro: float = 0.0
+var cave_id: String = ""
+var guard_index: int = -1
 
 var _hit_done: bool = false
 var _phase: float = 0.0
@@ -93,11 +105,11 @@ func anim_name() -> String:
 			return "die"
 		"dormant":
 			return "dormant"
-		"windup", "strike":
+		"windup", "strike", "shoot":
 			return "attack"
 		"dash", "leap":
 			return "attack"
-		"patrol", "chase":
+		"patrol", "chase", "return":
 			return "move" if absf(vx) > 0.05 or behavior == "flyer" or behavior == "swarm" else "idle"
 		_:
 			return "idle"
@@ -197,6 +209,24 @@ func tick(dt: float, hero: Dictionary, solid: Callable) -> Array:
 		return ev
 
 	var hero_ok := bool(hero.get("alive", true))
+	if leashed():
+		# вне агро героя будто нет; ушёл за поводок — домой, не глядя на героя
+		if hero_ok and not hero_in_aggro(hero):
+			hero_ok = false
+		var far := Vector2(x, y).distance_to(home)
+		if state == "return":
+			if far <= leash * 0.5:
+				state = "patrol"
+				t = 0.0
+			else:
+				_ai_return(dt, solid)
+				return ev
+		elif far > leash and (state == "patrol" or state == "chase"):
+			state = "return"
+			t = 0.0
+			telegraph = false
+			_ai_return(dt, solid)
+			return ev
 	match behavior:
 		"crawler":
 			_ai_crawler(dt, hero, hero_ok, solid, ev)
@@ -211,7 +241,55 @@ func tick(dt: float, hero: Dictionary, solid: Callable) -> Array:
 			_ai_jumper(dt, hero, hero_ok, solid, ev)
 		"swarm":
 			_ai_swarm(dt, hero, hero_ok, solid, ev)
+		"shooter":
+			_ai_shooter(dt, hero, hero_ok, solid, ev)
 	return ev
+
+
+func leashed() -> bool:
+	return leash > 0.0 and home != Vector2.INF
+
+
+func hero_in_aggro(hero: Dictionary) -> bool:
+	if not leashed():
+		return true
+	return Vector2(float(hero["x"]), float(hero["y"])).distance_to(home) <= aggro
+
+
+## Домой: летун — по прямой, ходячие и прыгуны — по полу (через ступеньку прыжком).
+func _ai_return(dt: float, solid: Callable) -> void:
+	var to := home - Vector2(x, y)
+	if is_flying():
+		var v := to.limit_length(speed_cfg("chase_speed"))
+		vx = v.x
+		vy = v.y
+		facing = 1 if vx >= 0.0 else -1
+		_move(dt, solid)
+		return
+	_apply_gravity(dt)
+	_dir = 1 if to.x >= 0.0 else -1
+	facing = _dir
+	if behavior == "jumper":
+		if on_ground:
+			if t > 0.5:
+				t = 0.0
+				vx = float(_dir) * 2.5
+				vy = -4.5
+				on_ground = false
+			else:
+				vx = 0.0
+	else:
+		vx = float(_dir) * speed_cfg("chase_speed") * 0.8
+	_move(dt, solid)
+	_hop_if_blocked()
+
+
+## Ступенька на пути (пол полости не ровный): ходячий страж перепрыгивает одну клетку.
+func _hop_if_blocked() -> void:
+	if _blocked_x and on_ground and bool(def.get("can_hop", false)):
+		vy = -6.4
+		on_ground = false
+		vx = float(facing) * speed_cfg("chase_speed") * 0.8
 
 
 # ---------------------------------------------------------------------------
@@ -297,8 +375,75 @@ func _ai_crawler(dt: float, hero: Dictionary, hero_ok: bool, solid: Callable, ev
 						_dir = -_dir
 						facing = _dir
 						vx = float(_dir) * speed_cfg("speed")
+					elif wall_ahead and bool(def.get("can_hop", false)):
+						pass   # ступенька: упрёмся и перепрыгнем (см. _hop_if_blocked)
 					else:
 						vx = 0.0
+	_move(dt, solid)
+	if state == "chase":
+		_hop_if_blocked()
+
+
+## Стрелок: держит дистанцию (отходит, если герой ближе keep_dist), по кулдауну
+## замахивается и выпускает снаряд в текущее место героя — навесом вблизи,
+## настильно издали. Пока не видит героя — медленно бродит, как ползун.
+func _ai_shooter(dt: float, hero: Dictionary, hero_ok: bool, solid: Callable, ev: Array) -> void:
+	_apply_gravity(dt)
+	var d := _dist_to(hero)
+	var sight := float(def.get("sight", 7.0))
+	var seen := hero_ok and d.length() <= sight
+	match state:
+		"windup":
+			vx = 0.0
+			telegraph = true
+			facing = 1 if d.x >= 0.0 else -1
+			if t >= attack_cfg("windup", 0.6):
+				telegraph = false
+				var spec: Dictionary = def.get("projectile", {})
+				var mx := x + float(facing) * hw * 0.6
+				var my := y - hh * 0.3
+				var aim := Projectile.aim(float(hero["x"]) - mx, float(hero["y"]) - my,
+					float(spec.get("speed", 7.0)), float(spec.get("gravity", 0.0)), d.length() < 4.5)
+				ev.append({"type": "shoot", "x": mx, "y": my, "vx": aim.x, "vy": aim.y, "spec": spec,
+					"damage": damage, "kind": kind})
+				cd = attack_cfg("cooldown", 2.4)
+				state = "recover"
+				t = 0.0
+		"recover":
+			vx = 0.0
+			if t >= attack_cfg("recover", 0.5):
+				state = "chase"
+				t = 0.0
+		_:
+			if seen:
+				state = "chase"
+				facing = 1 if d.x >= 0.0 else -1
+				var keep := attack_cfg("keep_dist", 2.5)
+				if absf(d.x) < keep and on_ground:
+					# слишком близко: пятится, пока есть куда
+					var back := -facing
+					var wall := _solid_at(solid, x + float(back) * (hw + 0.1), y)
+					var floor_ok := _solid_at(solid, x + float(back) * (hw + 0.12), y + hh + 0.1)
+					vx = float(back) * speed_cfg("chase_speed") if not wall and floor_ok else 0.0
+				else:
+					vx = 0.0
+				if cd <= 0.0 and t > 0.3 and d.length() >= attack_cfg("min_range", 1.5):
+					state = "windup"
+					t = 0.0
+					vx = 0.0
+					telegraph = true
+					ev.append({"type": "windup"})
+			else:
+				state = "patrol"
+				vx = float(_dir) * speed_cfg("speed")
+				facing = _dir
+				if on_ground:
+					var wall_ahead := _solid_at(solid, x + float(_dir) * (hw + 0.1), y)
+					var floor_ahead := _solid_at(solid, x + float(_dir) * (hw + 0.12), y + hh + 0.1)
+					if wall_ahead or not floor_ahead:
+						_dir = -_dir
+						facing = _dir
+						vx = float(_dir) * speed_cfg("speed")
 	_move(dt, solid)
 
 

@@ -93,6 +93,8 @@ var _form_cfg: Dictionary = {}
 var _form_slot_h: int = 36
 var _form_min_y: int = 1 << 30
 var _slot_cache: Dictionary = {}
+# ---- полости-фигуры с 1500 (caves.gd, раунд 5): кэш слотов, тот же приём ----
+var _cave_cache: Dictionary = {}
 # ---- кэш клеток: get_tile зовут на каждую клетку экрана каждый кадр ----
 # Плоский массив 32 x (глубина+64) байт, 255 = ещё не считали. Сбрасывается при
 # смене сида/событий — сама генерация остаётся чистой функцией. Один массив, а не
@@ -773,6 +775,7 @@ func _cache_reset() -> void:
 		_cells.resize(n)
 	_cells.fill(255)
 	_slot_cache.clear()
+	_cave_cache.clear()
 
 
 ## Поставить предикат защиты клеток (см. protect_cell) и сбросить кэш.
@@ -784,9 +787,10 @@ func set_protect_cell(c: Callable) -> void:
 ## База (слои, руды, камень) + особые образования поверх.
 func _generate_layered(x: int, y: int, salt: int) -> int:
 	var base := _generate_base(x, y, salt)
-	if y < _form_min_y:
-		return base
-	return Formations.apply(self, x, y, salt, base)
+	if y >= _form_min_y:
+		base = Formations.apply(self, x, y, salt, base)
+	# полости-фигуры с сундуком и стражами (раунд 5): поверх образований, геометрия только от сида
+	return Caves.apply(self, x, y, base)
 
 
 func _generate_base(x: int, y: int, salt: int) -> int:

@@ -1,0 +1,615 @@
+{
+ "music": {
+  "mus_boss": {
+   "bpm": 132,
+   "db": -3.0,
+   "file": "music/mus_boss.ogg"
+  },
+  "mus_deep": {
+   "bpm": 50,
+   "db": -1.0,
+   "file": "music/mus_deep.ogg"
+  },
+  "mus_menu": {
+   "alias": "mus_shop"
+  },
+  "mus_mine_1": {
+   "bpm": 78,
+   "db": -2.0,
+   "file": "music/mus_mine_1.ogg"
+  },
+  "mus_mine_2": {
+   "bpm": 66,
+   "db": -2.0,
+   "file": "music/mus_mine_2.ogg"
+  },
+  "mus_shop": {
+   "bpm": 108,
+   "db": -3.0,
+   "file": "music/mus_shop.ogg"
+  },
+  "mus_story": {
+   "bpm": 72,
+   "db": -2.0,
+   "file": "music/mus_story.ogg"
+  },
+  "mus_surface": {
+   "bpm": 92,
+   "db": -2.0,
+   "file": "music/mus_surface.ogg"
+  }
+ },
+ "sfx": {
+  "artifact": {
+   "cd": 800,
+   "db": 0.0,
+   "duck": 8.0,
+   "files": [
+    "sfx/artifact.wav"
+   ],
+   "prio": 4,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "boss_roar": {
+   "cd": 1500,
+   "db": 0.0,
+   "duck": 8.0,
+   "files": [
+    "sfx/boss_roar.wav"
+   ],
+   "prio": 4,
+   "pv": 0.03,
+   "voices": 1
+  },
+  "coin": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/coin_1.wav",
+    "sfx/coin_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.07,
+   "voices": 3
+  },
+  "coins_big": {
+   "cd": 150,
+   "db": 0.0,
+   "duck": 3.0,
+   "files": [
+    "sfx/coins_big.wav"
+   ],
+   "prio": 2,
+   "pv": 0.02,
+   "voices": 2
+  },
+  "collapse": {
+   "cd": 800,
+   "db": 0.0,
+   "files": [
+    "sfx/collapse_1.wav",
+    "sfx/collapse_2.wav"
+   ],
+   "prio": 3,
+   "pv": 0.04,
+   "voices": 1
+  },
+  "die": {
+   "cd": 500,
+   "db": 0.0,
+   "duck": 8.0,
+   "files": [
+    "sfx/die.wav"
+   ],
+   "prio": 4,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "dig_dirt": {
+   "cd": 35,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_dirt_1.wav",
+    "sfx/dig_dirt_2.wav",
+    "sfx/dig_dirt_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.09,
+   "voices": 3
+  },
+  "dig_gold": {
+   "cd": 50,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_gold_1.wav",
+    "sfx/dig_gold_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.05,
+   "voices": 2
+  },
+  "dig_hard": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_hard_1.wav",
+    "sfx/dig_hard_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "dig_ore": {
+   "cd": 35,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_ore_1.wav",
+    "sfx/dig_ore_2.wav",
+    "sfx/dig_ore_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 3
+  },
+  "dig_stone": {
+   "cd": 35,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_stone_1.wav",
+    "sfx/dig_stone_2.wav",
+    "sfx/dig_stone_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 3
+  },
+  "door": {
+   "cd": 200,
+   "db": 0.0,
+   "files": [
+    "sfx/door_1.wav",
+    "sfx/door_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.05,
+   "voices": 1
+  },
+  "drink": {
+   "cd": 150,
+   "db": 0.0,
+   "files": [
+    "sfx/drink.wav"
+   ],
+   "prio": 1,
+   "pv": 0.05,
+   "voices": 1
+  },
+  "eat": {
+   "cd": 150,
+   "db": 0.0,
+   "files": [
+    "sfx/eat_1.wav",
+    "sfx/eat_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.06,
+   "voices": 1
+  },
+  "enemy_die": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/enemy_die_1.wav",
+    "sfx/enemy_die_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "explosion": {
+   "cd": 300,
+   "db": 0.0,
+   "duck": 6.0,
+   "files": [
+    "sfx/explosion_1.wav",
+    "sfx/explosion_2.wav"
+   ],
+   "prio": 4,
+   "pv": 0.05,
+   "voices": 1
+  },
+  "fly_loop": {
+   "cd": 0,
+   "db": 0.0,
+   "files": [
+    "sfx/fly_loop.wav"
+   ],
+   "loop": true,
+   "prio": 0,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "fly_start": {
+   "cd": 200,
+   "db": 0.0,
+   "files": [
+    "sfx/fly_start.wav"
+   ],
+   "prio": 1,
+   "pv": 0.03,
+   "voices": 1
+  },
+  "fly_stop": {
+   "cd": 200,
+   "db": 0.0,
+   "files": [
+    "sfx/fly_stop.wav"
+   ],
+   "prio": 1,
+   "pv": 0.03,
+   "voices": 1
+  },
+  "greed_end": {
+   "cd": 600,
+   "db": 0.0,
+   "files": [
+    "sfx/greed_end.wav"
+   ],
+   "prio": 2,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "greed_start": {
+   "cd": 600,
+   "db": 0.0,
+   "duck": 3.0,
+   "files": [
+    "sfx/greed_start.wav"
+   ],
+   "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "heal": {
+   "cd": 200,
+   "db": 0.0,
+   "files": [
+    "sfx/heal.wav"
+   ],
+   "prio": 2,
+   "pv": 0.02,
+   "voices": 1
+  },
+  "hit_enemy": {
+   "cd": 50,
+   "db": 0.0,
+   "files": [
+    "sfx/hit_enemy_1.wav",
+    "sfx/hit_enemy_2.wav",
+    "sfx/hit_enemy_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "hurt": {
+   "cd": 120,
+   "db": 0.0,
+   "files": [
+    "sfx/hurt_1.wav",
+    "sfx/hurt_2.wav"
+   ],
+   "prio": 3,
+   "pv": 0.07,
+   "voices": 1
+  },
+  "hurt_armor": {
+   "cd": 70,
+   "db": 0.0,
+   "files": [
+    "sfx/hurt_armor_1.wav",
+    "sfx/hurt_armor_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "jump": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/jump.wav"
+   ],
+   "prio": 1,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "land": {
+   "cd": 90,
+   "db": 0.0,
+   "files": [
+    "sfx/land_1.wav",
+    "sfx/land_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.1,
+   "voices": 2
+  },
+  "lava_hiss": {
+   "cd": 600,
+   "db": -2.0,
+   "files": [
+    "sfx/lava_hiss.wav"
+   ],
+   "prio": 1,
+   "pv": 0.05,
+   "voices": 1
+  },
+  "levelup": {
+   "cd": 800,
+   "db": 0.0,
+   "duck": 6.0,
+   "files": [
+    "sfx/levelup.wav"
+   ],
+   "prio": 4,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "phone": {
+   "cd": 600,
+   "db": 0.0,
+   "files": [
+    "sfx/phone.wav"
+   ],
+   "prio": 2,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "pickup": {
+   "cd": 40,
+   "db": 0.0,
+   "files": [
+    "sfx/pickup_1.wav",
+    "sfx/pickup_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.07,
+   "voices": 3
+  },
+  "pickup_rare": {
+   "cd": 100,
+   "db": 0.0,
+   "files": [
+    "sfx/pickup_rare.wav"
+   ],
+   "prio": 2,
+   "pv": 0.02,
+   "voices": 2
+  },
+  "quake": {
+   "cd": 1500,
+   "db": 0.0,
+   "duck": 6.0,
+   "files": [
+    "sfx/quake.wav"
+   ],
+   "prio": 4,
+   "pv": 0.03,
+   "voices": 1
+  },
+  "quest_done": {
+   "cd": 500,
+   "db": 0.0,
+   "duck": 4.0,
+   "files": [
+    "sfx/quest_done.wav"
+   ],
+   "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "respawn": {
+   "cd": 400,
+   "db": 0.0,
+   "files": [
+    "sfx/respawn.wav"
+   ],
+   "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "reward": {
+   "cd": 400,
+   "db": 0.0,
+   "duck": 4.0,
+   "files": [
+    "sfx/reward.wav"
+   ],
+   "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "sell": {
+   "cd": 120,
+   "db": 0.0,
+   "files": [
+    "sfx/sell.wav"
+   ],
+   "prio": 2,
+   "pv": 0.02,
+   "voices": 2
+  },
+  "skill_buy": {
+   "cd": 150,
+   "db": 0.0,
+   "files": [
+    "sfx/skill_buy.wav"
+   ],
+   "prio": 2,
+   "pv": 0.02,
+   "voices": 1
+  },
+  "step": {
+   "cd": 120,
+   "db": 0.0,
+   "files": [
+    "sfx/step_1.wav",
+    "sfx/step_2.wav",
+    "sfx/step_3.wav",
+    "sfx/step_4.wav"
+   ],
+   "prio": 0,
+   "pv": 0.1,
+   "voices": 2
+  },
+  "step_grass": {
+   "cd": 120,
+   "db": 0.0,
+   "files": [
+    "sfx/step_grass_1.wav",
+    "sfx/step_grass_2.wav",
+    "sfx/step_grass_3.wav"
+   ],
+   "prio": 0,
+   "pv": 0.1,
+   "voices": 2
+  },
+  "step_stone": {
+   "cd": 120,
+   "db": 0.0,
+   "files": [
+    "sfx/step_stone_1.wav",
+    "sfx/step_stone_2.wav",
+    "sfx/step_stone_3.wav"
+   ],
+   "prio": 0,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "swing": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/swing_1.wav",
+    "sfx/swing_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "thud": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/thud.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "tile_break": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/tile_break_1.wav",
+    "sfx/tile_break_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "ui_buy": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_buy.wav"
+   ],
+   "prio": 2,
+   "pv": 0.02,
+   "voices": 2
+  },
+  "ui_close": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_close.wav"
+   ],
+   "prio": 1,
+   "pv": 0.03,
+   "voices": 2
+  },
+  "ui_deny": {
+   "cd": 100,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_deny.wav"
+   ],
+   "prio": 1,
+   "pv": 0.02,
+   "voices": 2
+  },
+  "ui_open": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_open.wav"
+   ],
+   "prio": 1,
+   "pv": 0.03,
+   "voices": 2
+  },
+  "ui_slider": {
+   "cd": 35,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_slider.wav"
+   ],
+   "prio": 1,
+   "pv": 0.12,
+   "voices": 1
+  },
+  "ui_tab": {
+   "cd": 30,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_tab.wav"
+   ],
+   "prio": 1,
+   "pv": 0.05,
+   "voices": 2
+  },
+  "ui_tap": {
+   "cd": 25,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_tap.wav"
+   ],
+   "prio": 1,
+   "pv": 0.04,
+   "voices": 2
+  },
+  "ui_toggle": {
+   "cd": 40,
+   "db": 0.0,
+   "files": [
+    "sfx/ui_toggle.wav"
+   ],
+   "prio": 1,
+   "pv": 0.03,
+   "voices": 2
+  },
+  "warn_low": {
+   "cd": 600,
+   "db": 0.0,
+   "files": [
+    "sfx/warn_low.wav"
+   ],
+   "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  }
+ },
+ "version": 1
+}

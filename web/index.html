@@ -1,0 +1,1293 @@
+<meta charset="utf-8">
+<title>Раскопки на каникулах</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --soil:#16120E;
+  --edge:#3E3125;
+  --bone:#EADDC6;
+  --muted:#9D8B73;
+  --gold:#E0A93B;
+  --rust:#B85A52;
+  --moss:#8FA35C;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--soil);
+  color:var(--bone);
+  font-family:"Manrope",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+#app{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  max-width:520px;
+  margin:0 auto;
+  padding-inline:10px;
+  padding-block:8px;
+  gap:8px;
+}
+
+#stage{
+  flex:1 1 auto;
+  min-height:0;
+  position:relative;
+  border:1px solid var(--edge);
+  background:#0B0907;
+  overflow:hidden;
+}
+#screen{display:block;width:100%;height:100%;image-rendering:pixelated}
+
+.gauges{
+  position:absolute;
+  top:8px; left:8px;
+  display:flex;flex-direction:column;gap:4px;
+  pointer-events:none;
+}
+.gauge{display:flex;align-items:center;gap:5px}
+.gauge .ico{width:13px;height:13px;image-rendering:pixelated;flex:0 0 auto}
+.track{
+  width:72px;height:8px;
+  background:#0B0907C0;
+  border:1px solid #00000090;
+  box-shadow:0 0 0 1px #FFFFFF14;
+  overflow:hidden;
+}
+.fill{height:100%;width:100%;transition:width .25s linear}
+.fill.hp{background:var(--rust)}
+.fill.food{background:#C4706A}
+.fill.rest{background:#6E93A8}
+
+.purse{
+  position:absolute;
+  top:8px;right:8px;
+  display:flex;flex-direction:column;align-items:flex-end;gap:3px;
+  pointer-events:none;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12px;font-variant-numeric:tabular-nums;
+  text-shadow:0 1px 2px #000A;
+}
+.purse .row{display:flex;align-items:center;gap:5px}
+.purse img{width:14px;height:14px;image-rendering:pixelated;flex:0 0 auto}
+.purse .coins{color:var(--gold);font-weight:600}
+.purse .dollars{color:#7FB86B;font-weight:600}
+.purse .xp{color:#9FC0E0;font-weight:600}
+.purse .xp-u{color:#9FC0E0;font-size:10px;width:14px;text-align:center}
+.purse .load{color:var(--moss)}
+.purse .load.over{color:var(--rust)}
+
+.depth{
+  position:absolute;
+  right:0;
+  transform:translateY(-50%);
+  display:none;align-items:center;gap:5px;
+  padding:3px 7px 3px 9px;
+  background:#120E0BD8;
+  border:1px solid var(--edge);border-right:none;
+  pointer-events:none;
+}
+.depth.on{display:flex}
+.depth .n{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+}
+.depth .u{
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:9px;color:var(--muted);letter-spacing:.06em;
+}
+
+#toast{
+  position:absolute;
+  /* поднят над джойстиком: тот теперь лежит поверх экрана слева внизу */
+  left:8px;right:8px;bottom:140px;
+  background:#120E0BEE;
+  border:1px solid var(--edge);border-left:3px solid var(--gold);
+  padding:8px 10px;font-size:13px;line-height:1.35;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .25s,transform .25s;
+  pointer-events:none;
+}
+#toast.show{opacity:1;transform:none}
+#toast b{color:var(--gold);font-weight:800}
+
+.strip{flex:0 0 auto;display:flex;align-items:stretch;gap:6px;height:34px}
+.tool{
+  display:flex;align-items:center;gap:5px;min-width:0;flex:1;
+  padding-inline:2px;
+}
+.tool img{width:18px;height:18px;image-rendering:pixelated;flex:0 0 auto}
+.tool span{
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.gear{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.gear img{width:17px;height:17px;image-rendering:pixelated;opacity:.22;transition:opacity .3s}
+.chip{
+  display:flex;align-items:center;gap:5px;
+  font-family:"Pixelify Sans","Manrope",sans-serif;font-size:11px;
+  color:var(--muted);background:none;
+  border:1px solid var(--edge);padding-inline:9px;cursor:pointer;white-space:nowrap;
+}
+.chip.inv{color:var(--bone);border-color:var(--muted)}
+.chip.inv img{width:15px;height:15px;image-rendering:pixelated}
+
+/* Джойстик лежит поверх игрового экрана, а не отдельной панелью под ним:
+   так экрану достаётся вся высота, а большой палец остаётся там же, где
+   держит телефон. */
+#stick{
+  position:absolute;right:12px;bottom:12px;   /* справа: под большой палец правой руки */
+  width:118px;height:118px;
+  border-radius:50%;
+  background:radial-gradient(circle at 50% 50%, #241C15C0 0%, #1A140FA8 70%, transparent 71%);
+  border:1px solid #6A563FA0;
+  touch-action:none;
+}
+#stick::before,#stick::after{content:"";position:absolute;background:#6A563F60}
+#stick::before{left:12%;right:12%;top:calc(50% - 1px);height:1px}
+#stick::after{top:12%;bottom:12%;left:calc(50% - 1px);width:1px}
+#knob{
+  position:absolute;width:46px;height:46px;left:36px;top:36px;
+  border-radius:50%;
+  background:#3A2C20;border:2px solid var(--muted);
+  box-shadow:0 2px 0 #0007;
+  transition:transform .05s linear, border-color .12s;
+}
+#knob.live{border-color:var(--gold)}
+#stick .up{
+  position:absolute;top:7px;left:50%;transform:translateX(-50%);
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+  font-size:9px;color:var(--moss);letter-spacing:.06em;pointer-events:none;
+  white-space:nowrap;
+}
+.holdhint{
+  position:absolute;left:10px;right:10px;bottom:12px;
+  text-align:center;font-size:11px;color:var(--muted);line-height:1.45;
+  text-shadow:0 1px 3px #000;pointer-events:none;
+}
+.holdhint[hidden]{display:none}
+
+/* лист инвентаря */
+.sheet{
+  position:absolute;inset:0;
+  background:#120E0BF2;
+  display:flex;flex-direction:column;
+  font-size:13px;
+}
+.sheet[hidden]{display:none}
+.sheet-head{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 10px;border-bottom:1px solid var(--edge);
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+}
+.sheet-load{margin-left:auto;color:var(--moss);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.sheet-x{
+  background:none;border:1px solid var(--edge);color:var(--muted);
+  font:inherit;font-size:12px;line-height:1;padding:4px 7px;cursor:pointer;
+}
+.sheet-body{flex:1;overflow-y:auto;padding:6px 10px}
+.sheet-row{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 0;border-bottom:1px solid #FFFFFF10;
+}
+.sheet-row img{width:20px;height:20px;image-rendering:pixelated;flex:0 0 auto}
+.sheet-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-row .ct{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--bone)}
+.sheet-row .pr{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--gold);width:64px;text-align:right}
+.sheet-empty{color:var(--muted);padding:14px 0;text-align:center;line-height:1.5}
+.sheet-foot{
+  padding:9px 10px;border-top:1px solid var(--edge);
+  font-family:"Pixelify Sans","Manrope",sans-serif;
+}
+.sheet-foot b{color:var(--gold)}
+.sheet-row .drop-btn{
+  flex:0 0 auto;background:none;border:1px solid var(--edge);color:var(--muted);
+  font:inherit;font-size:11px;line-height:1;padding:4px 7px;cursor:pointer;
+}
+.sheet-row .drop-btn:active{border-color:var(--rust);color:var(--rust)}
+
+/* окно «сколько выкинуть» */
+.drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#0B0907CC;padding:16px}
+.drop[hidden]{display:none}
+.drop-box{
+  width:100%;max-width:280px;background:#1A140F;
+  border:1px solid var(--edge);padding:12px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.drop-title{font-family:"Pixelify Sans","Manrope",sans-serif;font-size:13px}
+.drop-range{width:100%;accent-color:var(--rust)}
+.drop-count{display:flex;align-items:baseline;justify-content:center;gap:6px}
+.drop-num{
+  width:82px;background:#0B0907;border:1px solid var(--muted);color:var(--bone);
+  font-family:"IBM Plex Mono",monospace;font-size:22px;font-variant-numeric:tabular-nums;
+  text-align:center;padding:4px 2px;
+}
+.drop-num:focus{outline:none;border-color:var(--gold)}
+.drop-of{color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:13px}
+.drop-btns{display:flex;gap:8px}
+.drop-btns .chip{flex:1;justify-content:center;padding-block:7px}
+.drop-ok{color:var(--rust);border-color:var(--rust)}
+.chip[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
+.chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="app">
+  <div id="stage">
+    <canvas id="screen"></canvas>
+    <div class="gauges">
+      <div class="gauge"><img class="ico" id="i-hp" alt=""><div class="track"><div class="fill hp" id="b-hp"></div></div></div>
+      <div class="gauge"><img class="ico" id="i-food" alt=""><div class="track"><div class="fill food" id="b-food"></div></div></div>
+      <div class="gauge"><img class="ico" id="i-rest" alt=""><div class="track"><div class="fill rest" id="b-rest"></div></div></div>
+    </div>
+    <div class="purse">
+      <div class="row"><span class="coins" id="v-coins">0</span><img id="i-coin" alt="монеты"></div>
+      <div class="row"><span class="dollars" id="v-dollars">0</span><img id="i-dollar" alt="доллары"></div>
+      <div class="row"><span class="xp" id="v-xp">0</span><span class="xp-u">XP</span></div>
+      <div class="row"><span class="load" id="v-load">0 / 60 кг</span><img id="i-inv" alt="инвентарь"></div>
+    </div>
+    <div class="depth" id="depth"><span class="n" id="v-depth">0</span><span class="u">кл</span></div>
+    <div id="toast"></div>
+    <div id="stick"><div class="up">ВВЕРХ — ПРЫЖОК</div><div id="knob"></div></div>
+    <div class="holdhint" id="holdhint" hidden>Зажми экран в нужную сторону — герой пойдёт туда и будет копать.<br>Отпустил — остановился.</div>
+    <div class="sheet" id="inv" hidden>
+      <div class="sheet-head">
+        <span>Инвентарь</span>
+        <span class="sheet-load" id="inv-load"></span>
+        <button class="sheet-x" id="inv-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="sheet-body" id="inv-list"></div>
+      <div class="sheet-foot">К продаже: <b id="inv-total">0</b> монет</div>
+      <div class="drop" id="drop" hidden>
+        <div class="drop-box">
+          <div class="drop-title" id="drop-title"></div>
+          <input class="drop-range" id="drop-range" type="range" min="1" max="1" value="1">
+          <div class="drop-count">
+            <!-- type=number + inputmode=numeric: на телефоне открывается
+                 цифровая клавиатура, а не полная -->
+            <input class="drop-num" id="drop-num" type="number" inputmode="numeric"
+                   pattern="[0-9]*" min="1" step="1" value="1" aria-label="Сколько выкинуть">
+            <span class="drop-of" id="drop-of"></span>
+          </div>
+          <div class="drop-btns">
+            <button class="chip" id="drop-cancel" type="button">Отмена</button>
+            <button class="chip drop-ok" id="drop-ok" type="button">Выкинуть</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <button class="chip inv" id="inv-open" type="button"><img id="i-invbtn" alt="">Инвентарь</button>
+    <span class="tool"><img id="tool-icon" alt=""><span id="tool-name">Лопата</span></span>
+    <span class="gear">
+      <img id="g-pack" alt="Ранец" title="Ранец с пропеллерами — глубина 10">
+      <img id="g-jet" alt="Джетпак" title="Джетпак — глубина 100">
+    </span>
+    <button class="chip" id="mode" type="button" aria-pressed="true">Джойстик</button>
+    <button class="chip" id="reset" type="button">↺</button>
+  </div>
+</div>
+
+<script>
+const TILE = 32, VIEW_W = 7;
+const CHAR_W = 48, CHAR_H = 48;   // кадр персонажа шире клетки — см. draw()
+const GROUND_Y = 46;              // линия земли внутри кадра: подошва стоит здесь
+// Листы с кадром не 48×48: имя -> [ширина, высота, линия земли]. Бурмобиль по
+// ГДД п.5 занимает две клетки в ширину (64 px) и в кадр 48 не влезает, а
+// ужимать его нельзя — вместе с машиной ужимается герой в кабине. Лишняя
+// высота уходит ВНИЗ, под линию земли: бур, копающий вниз, входит в клетку
+// под машиной.
+const SHEET_FRAME = { dig_rig_down: [80, 56, 50], dig_rig_side: [80, 56, 50] };
+const cv = document.getElementById('screen');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const el = {
+  coins: document.getElementById('v-coins'),
+  load: document.getElementById('v-load'),
+  dollars: document.getElementById('v-dollars'),
+  xp: document.getElementById('v-xp'),
+  depthBox: document.getElementById('depth'),
+  depthN: document.getElementById('v-depth'),
+  hp: document.getElementById('b-hp'),
+  food: document.getElementById('b-food'),
+  rest: document.getElementById('b-rest'),
+  toolIcon: document.getElementById('tool-icon'),
+  toolName: document.getElementById('tool-name'),
+  toast: document.getElementById('toast'),
+  stage: document.getElementById('stage'),
+  stick: document.getElementById('stick'),
+  knob: document.getElementById('knob'),
+  hint: document.getElementById('holdhint'),
+  mode: document.getElementById('mode'),
+  invBtn: document.getElementById('inv-open'),
+  invSheet: document.getElementById('inv'),
+  invList: document.getElementById('inv-list'),
+  invLoad: document.getElementById('inv-load'),
+  invTotal: document.getElementById('inv-total'),
+  drop: document.getElementById('drop'),
+  dropTitle: document.getElementById('drop-title'),
+  dropRange: document.getElementById('drop-range'),
+  dropNum: document.getElementById('drop-num'),
+  dropOf: document.getElementById('drop-of'),
+  gPack: document.getElementById('g-pack'),
+  gJet: document.getElementById('g-jet'),
+};
+
+let W = null, sprites = {}, charSprites = {};
+let viewH = 15;
+
+/* ── физика ──
+   Подобрано так, чтобы прыжок поднимал ровно на 2 клетки (потолок по ГДД,
+   пока нет ранца) и чтобы полёт занимал около секунды: раньше персонаж
+   проваливался по клетке за кадр, и ни повернуть, ни разглядеть это было
+   невозможно. */
+const G = 16;          // клеток/с²
+const JUMP_V = 8.1;    // с учётом зависания даёт ровно 2.2 клетки подъёма
+const APEX_V = 2.0;    // |vy| ниже этого порога — зона зависания
+const APEX_G = 0.45;   // насколько слабее тяготение в этой зоне
+const WALK = 4.2;      // клеток/с по земле
+const AIR_CTRL = 0.82; // насколько слушается руля в воздухе
+// Предел скорости падения. Достигается примерно с 16 клетки, поэтому
+// короткие падения он не трогает — их задаёт только G. Занижать нельзя:
+// урон считается от скорости удара, и низкий потолок обрезал бы его.
+const V_TERM = 32;
+const HW = 0.38, HH = 0.46;
+
+// Снаряжение открывается по глубине (ГДД раздел 5)
+const PROP_DEPTH = 10, JET_DEPTH = 100, DRILL_DEPTH = 100, RIG_DEPTH = 1000;
+const PROP_SPEED = 2.5, PROP_RAMP = 3;
+const JUMP_TO_FLY_MS = 300;   // пауза между прыжком и включением тяги
+const JET_SPEED = 20, JET_RAMP = 5;
+// Пока герой ещё падает, тяга работает тормозом и гасит скорость намного
+// резче, чем потом разгоняет вверх. Без этого подъёмная сила ранца
+// (2/3 ≈ 0.7 кл/с²) не могла перебить тяготение в 16 кл/с²: нажатие вверх
+// в падении выглядело так, будто ранец вообще не включился.
+const THRUST_BRAKE = 26;
+// Отпустил тягу на подъёме — инерция гасится в разы резче, чем тянет
+// тяготение. Иначе джетпак на 20 кл/с уносит вверх ещё на десяток клеток
+// после того, как палец уже снят.
+const COAST_DECEL = G * 6;
+
+// Урон считается от СКОРОСТИ удара, а не от высоты: спуск на пропеллере
+// с семи клеток — это не падение с семи клеток, хотя высота та же.
+// Коэффициенты выведены из опорных точек ГДД так, что свободное падение
+// даёт ровно прежние числа: 5 клеток = 5 HP, 20 клеток = 100 HP.
+const FALL_POW = 2.16 * 2;
+const FALL_K = 0.154 / Math.pow(2 * G, 2.16);
+const SAFE_SPEED = Math.sqrt(2 * G * 5);   // скорость, набираемая за 5 клеток
+const DRILL_MULT = 0.45;   // ручной бур заметно быстрее кирки
+const RIG_MULT = 0.33;     // буровая машина: tools.drill_rig.speed_multiplier = 3.0
+// Физические углы тайлов слегка «скруглены»: если персонаж цепляется за угол
+// меньше чем на столько, его обводит мимо, а не останавливает. Визуально
+// тайлы не меняются — это только коллизии.
+const CORNER = 5 / 32;
+
+const MAX_KG = 60;
+const DEMO_SPEED = 4;
+const STUN_MS = 1000;   // символический стан: секунда и тряска, см. ГДД п.5
+
+const S = {
+  x: 20.5, y: 0.5,
+  vx: 0, vy: 0,
+  onGround: false,
+  tool: 'shovel',
+  coins: 0, dollars: 0, loadKg: 0, xp: 0,
+  hp: 100, food: 100, rest: 100,
+  maxDepth: 0,
+  digging: null,
+  stunUntil: 0,
+  hold: { dx: 0, up: false, down: false },
+  target: null,
+  mode: 'stick',
+  dirZone: null,         // 'side' | 'up' | 'down' — залипание вектора управления
+  touch: null,           // удержание пальца на экране в режиме без джойстика
+  flyArmAt: 0,           // раньше этого момента тяга не включается — сначала прыжок
+  reliefR: 2, resR: 1,
+  facing: 1,
+  anim: 0,
+  seenFoundation: false,
+  gear: { backpack: false, jetpack: false, drill: false, rig: false },
+  thrust: null,
+  coasting: false,
+  bag: new Map(),        // имя тайла -> количество; только добыча, земля и камень не в счёт
+  fogRelief: new Set(),
+  fogRes: new Set(),
+  lastCell: '',
+};
+
+const cellX = () => Math.floor(S.x);
+const cellY = () => Math.floor(S.y);
+
+function key(x, y){ return y * W.width + x; }
+function tileAt(x, y){
+  if (y <= 0) return 'EMPTY';
+  if (x < 0 || x >= W.width || y > W.depth) return 'BEDROCK';
+  return W.tile_names[W.grid[(y - 1) * W.width + x]];
+}
+function setTile(x, y, name){
+  if (y <= 0 || y > W.depth) return;
+  W.grid[(y - 1) * W.width + x] = W.tile_names.indexOf(name);
+}
+const NOT_LOOT = new Set(['DIRT', 'STONE', 'FOUNDATION', 'STAIRCASE', 'EMPTY']);
+const LOOT = { has: n => !NOT_LOOT.has(n) };
+
+function meta(name){ return W.meta[name] || { name, price: 0, weight: 0, secs: 4 }; }
+function solid(name){ return name !== 'EMPTY' && name !== 'BEDROCK'; }
+function solidPt(wx, wy){ return solid(tileAt(Math.floor(wx), Math.floor(wy))); }
+function canDig(name){
+  if (name === 'STAIRCASE' || name === 'BEDROCK') return false;
+  const p = W.tile_props[String(W.tile_names.indexOf(name))];
+  if (!p) return false;
+  return S.tool === 'shovel' ? p.shovel : (p.pickaxe || p.shovel);
+}
+function toast(html, ms = 2600){
+  el.toast.innerHTML = html;
+  el.toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.toast.classList.remove('show'), ms);
+}
+
+// Доля площади клетки, накрытая кругом обзора. Считается пробами по сетке:
+// точная формула пересечения круга и квадрата тут не нужна, а 16 проб дают
+// погрешность заметно меньше половины клетки — порога раскрытия.
+function coverage(cx, cy, radius){
+  const N = 4, r2 = radius * radius;
+  let inside = 0;
+  for (let i = 0; i < N; i++){
+    const sy = cy + (i + 0.5) / N - S.y;
+    for (let j = 0; j < N; j++){
+      const sx = cx + (j + 0.5) / N - S.x;
+      if (sx * sx + sy * sy <= r2) inside++;
+    }
+  }
+  return inside / (N * N);
+}
+
+// Клетка раскрывается, когда круг накрывает её не меньше чем наполовину.
+// По расстоянию между центрами диагональные клетки отсекались, хотя круг
+// заметно на них заходил — и в них было видно пустоту там, где рельеф
+// нарисован.
+function reveal(){
+  const rRelief = S.reliefR + 0.5, rRes = S.resR + 0.5;
+  const span = Math.ceil(rRelief);
+  const cx = cellX(), cy = cellY();
+  for (let dy = -span; dy <= span; dy++)
+    for (let dx = -span; dx <= span; dx++){
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || x >= W.width || y < 0) continue;
+      if (coverage(x, y, rRelief) < 0.5) continue;
+      S.fogRelief.add(key(x, y));
+      if (coverage(x, y, rRes) >= 0.5) S.fogRes.add(key(x, y));
+    }
+}
+
+/* ── столкновения ── */
+function moveX(dt){
+  if (S.vx === 0) return;
+  S.x += S.vx * dt;
+  const top = S.y - HH + 0.02, bot = S.y + HH - 0.02;
+  const probe = S.vx > 0 ? S.x + HW : S.x - HW;
+  const hitT = solidPt(probe, top), hitB = solidPt(probe, bot);
+  let slipped = false;
+
+  if (hitT && !hitB){
+    const over = (Math.floor(top) + 1) - top;
+    if (over <= CORNER){ S.y += over + 0.002; slipped = true; }
+  } else if (hitB && !hitT){
+    const over = bot - Math.floor(bot);
+    if (over <= CORNER){ S.y -= over + 0.002; slipped = true; }
+  }
+
+  if (!slipped && (hitT || hitB)){
+    S.x = S.vx > 0 ? Math.floor(probe) - HW - 0.001 : Math.floor(probe) + 1 + HW + 0.001;
+    S.vx = 0;
+  }
+  S.x = Math.min(Math.max(S.x, HW), W.width - HW);
+}
+
+
+// Возле вершины прыжка и в момент смены знака скорости тяготение
+// ослабляется: скорость набирается и гасится по параболе, и без этой паузы
+// верхняя точка проскакивается мгновенно. Тем же местом потом гасится
+// падение при включении пропеллеров.
+function gravityNow(){
+  return Math.abs(S.vy) < APEX_V ? G * APEX_G : G;
+}
+
+// Разгон ранца падает с грузом (ГДД: 3 / 0.85^(груз/20) секунд),
+// потолок скорости при этом не меняется.
+function propRamp(){ return PROP_RAMP / Math.pow(0.85, S.loadKg / 20); }
+
+function moveY(dt){
+  if (S.thrust){
+    const jet = S.thrust === 'jet';
+    const maxUp = jet ? JET_SPEED : PROP_SPEED;
+    const ramp = jet ? JET_RAMP : propRamp();
+    const accel = S.vy > 0 ? THRUST_BRAKE : maxUp / ramp;
+    S.vy = Math.max(S.vy - accel * dt, -maxUp);
+  } else {
+    const g = (S.coasting && S.vy < 0) ? COAST_DECEL : gravityNow();
+    S.vy = Math.min(S.vy + g * dt, V_TERM);
+  }
+  S.y += S.vy * dt;
+  const left = S.x - HW + 0.02, right = S.x + HW - 0.02;
+  S.onGround = false;
+
+  if (S.vy > 0){
+    const b = S.y + HH;
+    const hitL = solidPt(left, b), hitR = solidPt(right, b);
+    if (hitL || hitR){
+      S.y = Math.floor(b) - HH - 0.001;
+      land();
+      S.vy = 0;
+      S.onGround = true;
+    }
+  } else if (S.vy < 0){
+    const tp = S.y - HH;
+    const hitL = solidPt(left, tp), hitR = solidPt(right, tp);
+    let slipped = false;
+    // задет один угол потолка — обводим мимо, если зацеп мелкий
+    if (hitL && !hitR){
+      const over = (Math.floor(left) + 1) - left;
+      if (over <= CORNER){ S.x += over + 0.002; slipped = true; }
+    } else if (hitR && !hitL){
+      const over = right - Math.floor(right);
+      if (over <= CORNER){ S.x -= over + 0.002; slipped = true; }
+    }
+    if (!slipped && (hitL || hitR)){
+      S.y = Math.floor(tp) + 1 + HH + 0.001;
+      S.vy = 0;
+    }
+  }
+
+  if (!S.onGround){
+    const b = S.y + HH + 0.02;
+    S.onGround = S.vy === 0 && (solidPt(left, b) || solidPt(right, b));
+  }
+}
+
+
+function land(){
+  const v = S.vy;
+  if (v <= SAFE_SPEED) return;
+  const dmg = Math.round(FALL_K * Math.pow(v, FALL_POW));
+  if (dmg < 1) return;
+  S.hp = Math.max(0, S.hp - dmg);
+  toast(`Удар на скорости <b>${v.toFixed(1)}</b> кл/с — минус <b>${dmg}</b> HP`);
+  if (S.hp === 0) die();
+}
+
+function updateFlight(){
+  const was = S.thrust;
+  let want = null;
+  if (S.hold.up && !S.onGround && !S.digging)
+    want = S.gear.jetpack ? 'jet' : (S.gear.backpack ? 'prop' : null);
+
+  // Тяга включается не раньше, чем через JUMP_TO_FLY_MS после толчка И
+  // только когда прыжок перешёл в падение (vy >= 0). Иначе прыжок с земли
+  // мгновенно превращался во взлёт, и подпрыгнуть было нечем.
+  if (want && !was && (performance.now() < S.flyArmAt || S.vy < 0)) want = null;
+  S.thrust = want;
+
+  if (was && !S.thrust && S.vy < 0) S.coasting = true;
+  if (S.thrust || S.vy >= 0 || S.onGround) S.coasting = false;
+}
+
+function checkUnlocks(){
+  // По текущей клетке открывать нельзя: достаточно на кадр подпрыгнуть или
+  // соскользнуть выше порога, и момент теряется. Считаем по самой глубокой
+  // точке, где герой вообще побывал.
+  S.maxDepth = Math.max(S.maxDepth, cellY());
+  const d = S.maxDepth;
+  if (d >= PROP_DEPTH && !S.gear.backpack){
+    S.gear.backpack = true;
+    syncGear();
+    toast('Глубина 10. Пригодился <b>ранец с пропеллерами</b> — держи стик вверх в воздухе: сначала погасит падение, потом поднимет.', 5200);
+  }
+  if (d >= JET_DEPTH && !S.gear.jetpack){
+    S.gear.jetpack = true;
+    S.gear.drill = true;
+    S.tool = 'drill';
+    el.toolIcon.src = 'art/items/hand_drill.png';
+    el.toolName.textContent = 'Ручной бур';
+    syncGear();
+    toast('Глубина 100. Собраны <b>джетпак</b> и <b>ручной бур</b> — летишь без остановки и буришь вдвое быстрее.', 5200);
+  }
+  // Буровая машина — ступень ИНСТРУМЕНТА, а не транспорт: меняются вид и
+  // скорость копки, посадки в кабину и топлива в демо нет (см. отчёт).
+  if (d >= RIG_DEPTH && !S.gear.rig){
+    S.gear.rig = true;
+    S.tool = 'rig';
+    el.toolIcon.src = 'art/items/hand_drill.png';
+    el.toolName.textContent = 'Буровая машина';
+    toast('Глубина 1000. Собрана <b>буровая машина</b> — копает втрое быстрее кирки.', 5200);
+  }
+}
+
+function syncGear(){
+  el.gPack.style.opacity = S.gear.backpack ? '1' : '.22';
+  el.gJet.style.opacity = S.gear.jetpack ? '1' : '.22';
+}
+
+function jump(){
+  if (!S.onGround || S.digging) return;
+  if (performance.now() < S.stunUntil) return;
+  if (solidPt(S.x, S.y - HH - 0.1)){ toast('Над головой порода — не подпрыгнуть.'); return; }
+  S.vy = -JUMP_V;
+  S.onGround = false;
+  // Прыжок и взлёт больше не сливаются в одно движение: пока прыжок не
+  // выдохся, ранец молчит. Отсчёт идёт от толчка.
+  S.flyArmAt = performance.now() + JUMP_TO_FLY_MS;
+}
+
+// Верхний слой земли зарастает: иначе игрок, погибший под своей же шахтой,
+// возрождается прямо над дырой и падает насмерть снова и снова.
+function restoreTopSoil(){
+  for (let x = 0; x < W.width; x++) W.grid[x] = W.pristine[x];
+}
+
+function die(){
+  const lost = S.loadKg;
+  restoreTopSoil();
+  S.loadKg = 0;
+  S.bag.clear();
+  closeInv();
+  S.hp = S.food = S.rest = 100;
+  S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
+  S.digging = null;
+  toast(`Ты погиб. Минералы потеряны (<b>${lost.toFixed(1)}</b> кг). В игре уцелел бы только чёрный ящик.`, 4200);
+}
+
+/* ── копка ── */
+function startDig(x, y){
+  const name = tileAt(x, y);
+  if (!solid(name)) return;
+  if (S.digging && S.digging.x === x && S.digging.y === y) return;
+
+  if (name === 'STAIRCASE'){ toast('Ступени не копаются — это путь наверх, пока нет ранца.'); return; }
+  if (S.tool === 'shovel' && name === 'FOUNDATION'){
+    if (!S.seenFoundation){
+      S.seenFoundation = true;
+      toast('Лопата упёрлась в старый фундамент. Нужно что-то покрепче — <b>в мастерскую!</b>', 3800);
+      setTimeout(givePickaxe, 1400);
+    }
+    return;
+  }
+  if (S.tool === 'shovel' && y > 4){ toast('Лопатой глубже четвёртой клетки не достать.'); return; }
+  if (!canDig(name)){
+    S.stunUntil = performance.now() + STUN_MS;
+    S.digging = null;
+    toast(`Лопата звенит о <b>${meta(name).name.toLowerCase()}</b>. Буз-эффект — руки трясутся.`);
+    return;
+  }
+  const mult = S.tool === 'rig' ? RIG_MULT : S.tool === 'drill' ? DRILL_MULT : 1;
+  S.digging = { x, y, t: 0, total: meta(name).secs * mult / DEMO_SPEED, name };
+}
+
+function finishDig(){
+  const d = S.digging;
+  S.digging = null;
+  const m = meta(d.name);
+  setTile(d.x, d.y, 'EMPTY');
+  S.fogRes.add(key(d.x, d.y));
+  // Монеты за копку НЕ капают: сырьё превращается в деньги только при
+  // продаже. Иначе шахта оплачивает себя сама, и подъём на поверхность с
+  // грузом перестаёт быть решением игрока. Опыт при этом идёт сразу.
+  // Земля, камень и фундамент — не добыча: в рюкзак не ложатся и не стоят ничего.
+  // Опыт идёт за САМ ТРУД и не зависит от того, влезла ли добыча в рюкзак:
+  // клетка выкопана, спина заболела. Иначе с полным рюкзаком игрок копает
+  // впустую и прокачка молча останавливается ровно тогда, когда игрок
+  // работает больше всего.
+  S.xp += LOOT.has(d.name) ? Math.max(1, Math.round(m.price / 5)) : 1;
+
+  // Земля, камень и фундамент — не добыча: в рюкзак не ложатся и не стоят
+  // ничего. Монеты за копку не капают вовсе, сырьё продаётся (см. ГДД §15).
+  if (LOOT.has(d.name)){
+    if (S.loadKg + m.weight > MAX_KG){
+      toast(`Рюкзак полон — <b>${m.name.toLowerCase()}</b> пришлось оставить. Выкинь лишнее в инвентаре.`);
+    } else {
+      S.loadKg += m.weight;
+      S.bag.set(d.name, (S.bag.get(d.name) || 0) + 1);
+      if (!el.invSheet.hidden) renderInv();
+      if (m.price >= 100) toast(`<b>${m.name}!</b> — в рюкзак, ${m.price} монет при продаже`);
+    }
+  }
+  if (d.y > S.maxDepth){
+    S.maxDepth = d.y;
+    if (d.y === 80) toast('Алмаз замурован в камне. Дедова кирка трескается — <b>−25% скорости</b>.', 4000);
+  }
+}
+
+function givePickaxe(){
+  S.tool = 'pickaxe';
+  el.toolIcon.src = 'art/items/pickaxe_rusty.png';
+  el.toolName.textContent = 'Ржавая кирка дедушки';
+  toast('В мастерской деда, среди швабр и грабель — <b>кирка</b>. Теперь берётся камень и руда.', 4200);
+}
+
+/* ── намерение игрока ── */
+/* ── магнетизм управления ──
+   Раньше любое отклонение стика вниз читалось как «копать», а вверх — как
+   «прыгать», и шаг вбок превращался в яму под ногами от одного неточного
+   миллиметра. Теперь направление решается по УГЛУ, а не по осям: пока
+   вектор ближе к горизонтали, это всегда шаг. Вверх и вниз включаются
+   только за 45° — то есть намеренным движением, а не дрожью пальца.
+   Пороги разные на вход и на выход (45° / 33°), чтобы на самой границе
+   режим не мигал. */
+const ANG_ON = 45, ANG_OFF = 33;   // градусы от горизонтали
+/* 67.5° — середина между идеальной диагональю (45°) и вертикалью (90°):
+   вектор достаётся тому из шести направлений, к которому он ближе. */
+const ANG_PURE = 67.5;
+const DIAG = 0.70710678;           // ручка на диагонали стоит ровно на 45°
+
+// Возвращает нормированный вектор «залипания» для отрисовки ручки стика.
+function resolveDir(vx, vy, dead){
+  const len = Math.hypot(vx, vy);
+  if (len < dead){
+    S.dirZone = null;
+    S.hold.dx = 0; S.hold.up = false; S.hold.down = false;
+    return null;
+  }
+  const ang = Math.atan2(-vy, Math.abs(vx)) * 180 / Math.PI;   // -90..90
+  const z = S.dirZone;
+  let zone;
+  /* Границы включающие: ровно 45° — это идеальная диагональ ↗, и отдавать
+     её шагу вбок нельзя. «До 45° — шаг, от 45° — вверх». */
+  if (z === 'up') zone = ang >= ANG_OFF ? 'up' : (ang <= -ANG_ON ? 'down' : 'side');
+  else if (z === 'down') zone = ang <= -ANG_OFF ? 'down' : (ang >= ANG_ON ? 'up' : 'side');
+  else zone = ang >= ANG_ON ? 'up' : (ang <= -ANG_ON ? 'down' : 'side');
+  S.dirZone = zone;
+
+  const side = vx === 0 ? 0 : Math.sign(vx);
+  if (zone === 'side'){
+    S.hold.dx = side; S.hold.up = false; S.hold.down = false;
+    return { x: side, y: 0 };
+  }
+  if (zone === 'up'){
+    // ↗ и ↖ — бежать и прыгать одновременно; круче 67.5° — чистое ↑
+    S.hold.dx = ang < ANG_PURE ? side : 0;
+    S.hold.up = true; S.hold.down = false;
+    return S.hold.dx === 0 ? { x: 0, y: -1 }
+                           : { x: S.hold.dx * DIAG, y: -DIAG };
+  }
+  // вниз копаем строго под собой: это всегда осознанное действие
+  S.hold.dx = 0; S.hold.up = false; S.hold.down = true;
+  return { x: 0, y: 1 };
+}
+
+/* Удержание пальца: герой идёт (или копает) в ту сторону, где палец
+   относительно него, и останавливается, как только палец отпущен. */
+function readHoldIntent(){
+  if (!S.touch){ resolveDir(0, 0, 1); return; }
+  const r = cv.getBoundingClientRect();
+  const cam = camera();
+  const wx = cam.x + (S.touch.x - r.left) / r.width * cv.width / TILE;
+  const wy = cam.y + (S.touch.y - r.top) / r.height * cv.height / TILE;
+  resolveDir(wx - S.x, wy - S.y, 0.45);
+}
+
+function applyIntent(dt){
+  // пока открыт инвентарь, герой не бежит и не копает
+  if (!el.invSheet.hidden){ S.hold.dx = 0; S.hold.up = false; S.hold.down = false; }
+  else if (S.mode === 'hold') readHoldIntent();
+
+  if (S.digging){ S.vx = 0; return; }
+
+  const speed = WALK * (S.onGround ? 1 : AIR_CTRL);
+  S.vx = S.hold.dx * speed;
+  if (S.hold.dx) S.facing = S.hold.dx;
+
+  if (S.hold.up && S.onGround) jump();
+  updateFlight();
+
+  if (!S.onGround) return;
+
+  const cx = cellX(), cy = cellY();
+  if (S.hold.dx !== 0){
+    // упёрся в породу на своём уровне — копаем её
+    const ahead = tileAt(cx + S.hold.dx, cy);
+    const edge = S.hold.dx > 0 ? (cx + 1) - (S.x + HW) : (S.x - HW) - cx;
+    if (solid(ahead) && edge < 0.06) startDig(cx + S.hold.dx, cy);
+  } else if (S.hold.down){
+    const below = tileAt(cx, cy + 1);
+    if (solid(below)) startDig(cx, cy + 1);
+  }
+}
+
+/* ── отрисовка ── */
+function camera(){
+  return {
+    x: Math.min(Math.max(S.x - VIEW_W / 2, 0), W.width - VIEW_W),
+    y: Math.max(S.y - viewH / 2, -2),
+  };
+}
+
+// Вариантов земли столько же, сколько в DIRT_FILES у scripts/world/tile_art.gd.
+const DIRT_VARIANTS = 8;
+
+function drawTile(name, sx, sy, resKnown, wx, wy){
+  if (!resKnown){
+    ctx.fillStyle = solid(name) ? '#2C241B' : '#100D0A';
+    ctx.fillRect(sx, sy, TILE, TILE);
+    return;
+  }
+  if (name === 'BEDROCK'){ ctx.fillStyle = '#050403'; ctx.fillRect(sx, sy, TILE, TILE); return; }
+  if (name === 'STAIRCASE'){
+    ctx.fillStyle = '#6B5B45'; ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = '#8A7657'; ctx.fillRect(sx, sy, TILE, 5);
+    return;
+  }
+  let file = W.art[name];
+  if (name === 'DIRT'){
+    // Вариант выбирается по МИРОВЫМ координатам клетки. По экранным он менялся
+    // на каждый пиксель прокрутки, и земля рябила, будто тайлы вращаются.
+    const h = ((wx * 73856093) ^ (wy * 19349663)) >>> 0;
+    file = 'dirt_' + (1 + h % DIRT_VARIANTS);
+  }
+  const img = sprites[file];
+  if (img && img.complete && img.naturalWidth) ctx.drawImage(img, sx, sy);
+  else { ctx.fillStyle = solid(name) ? '#4A3A2A' : '#0F0C09'; ctx.fillRect(sx, sy, TILE, TILE); }
+}
+
+function draw(){
+  const cam = camera();
+  const ox = Math.round((cam.x - Math.floor(cam.x)) * TILE);
+  const oy = Math.round((cam.y - Math.floor(cam.y)) * TILE);
+  const bx = Math.floor(cam.x), by = Math.floor(cam.y);
+
+  ctx.fillStyle = '#0B0907';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  for (let r = -1; r <= viewH + 1; r++){
+    const y = by + r, sy = r * TILE - oy;
+    for (let c = -1; c <= VIEW_W + 1; c++){
+      const x = bx + c, sx = c * TILE - ox;
+      if (y < 0){ ctx.fillStyle = '#1D2A33'; ctx.fillRect(sx, sy, TILE, TILE); continue; }
+      if (y === 0){
+        ctx.fillStyle = '#3E5A2E'; ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = '#4E6E38'; ctx.fillRect(sx, sy, TILE, 6);
+        continue;
+      }
+      const k = key(x, y);
+      if (!S.fogRelief.has(k)){ ctx.fillStyle = '#080605'; ctx.fillRect(sx, sy, TILE, TILE); continue; }
+      drawTile(tileAt(x, y), sx, sy, S.fogRes.has(k), x, y);
+    }
+  }
+
+  const pcx = (S.x - cam.x) * TILE;
+  const pcy = (S.y - cam.y) * TILE;
+
+  ctx.save();
+  ctx.globalAlpha = 0.16; ctx.strokeStyle = '#EADDC6'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(pcx, pcy, (S.reliefR + 0.5) * TILE, 0, 7); ctx.stroke();
+  ctx.globalAlpha = 0.3; ctx.strokeStyle = '#E0A93B';
+  ctx.beginPath(); ctx.arc(pcx, pcy, (S.resR + 0.5) * TILE, 0, 7); ctx.stroke();
+  ctx.restore();
+
+  if (S.digging){
+    const dx = (S.digging.x - cam.x) * TILE, dy = (S.digging.y - cam.y) * TILE;
+    ctx.fillStyle = '#00000070'; ctx.fillRect(dx, dy, TILE, TILE);
+    ctx.fillStyle = '#E0A93B';
+    ctx.fillRect(dx + 3, dy + TILE - 6, (TILE - 6) * (S.digging.t / S.digging.total), 3);
+  }
+
+  // Для каждого инструмента своя нарисованная анимация: лопата, дедова
+  // ржавая кирка и стальная кирка машут по-разному. У бура и бурмобиля своя
+  // анимация ещё и на каждое НАПРАВЛЕНИЕ: копка вниз и копка вбок нарисованы
+  // отдельно. Направление берём из самой копаемой клетки — она либо прямо под
+  // героем, либо сбоку. У кирки и лопаты набор один на оба направления.
+  const digBase = S.tool === 'shovel' ? 'dig_shovel'
+                : S.tool === 'pickaxe' ? 'dig_pick_rusty'
+                : S.tool === 'rig' ? 'dig_rig'
+                : S.tool === 'drill' ? 'dig_drill' : 'dig_pick';
+  const digDir = S.digging && S.digging.y === cellY() + 1 ? '_down' : '_side';
+  const digSheet = charSprites[digBase + digDir] ? digBase + digDir : digBase;
+  const sheet = S.digging ? digSheet
+              : (!S.onGround
+                  // ранец и джетпак выглядят по-разному — видно, на чём висишь
+                  ? (S.thrust === 'jet' ? 'fly_jet' : S.thrust ? 'fly' : 'fall')
+                  : (S.vx !== 0 ? 'walk' : 'idle'));
+  const img = charSprites[sheet];
+  // Кадр персонажа шире клетки: при 32 px замах киркой и винты ранца не
+  // помещались, и спрайт приходилось ужимать — герой худел, стоило ему
+  // начать копать. Тело по-прежнему ~20 px, вокруг просто есть поле.
+  // Размер кадра и линия земли — свои у каждого листа (см. SHEET_FRAME).
+  // Линия земли листа обязана лечь туда же, куда ложится подошва у кадра
+  // 48×48, иначе высокий кадр повиснет над землёй.
+  const [FW, FH, FG] = SHEET_FRAME[sheet] || [CHAR_W, CHAR_H, GROUND_Y];
+  // Стан показывается тряской, а не простоем: секунда без движения выглядит
+  // как зависшая игра, и игрок начинает давить на экран. Три пикселя
+  // вправо-влево на 14 Гц читаются как «отдало в руки» и не двигают клетку —
+  // только рисунок героя (то же делает character_view.gd в движке).
+  const stunLeft = S.stunUntil - performance.now();
+  const shake = stunLeft > 0 ? Math.sign(Math.sin(stunLeft / 1000 * Math.PI * 2 * 14)) * 3 : 0;
+  const dx0 = Math.round(pcx - FW / 2) + shake;
+  const dy0 = Math.round(pcy - HH * TILE - 16 + (GROUND_Y - FG));
+  if (img && img.complete && img.naturalWidth){
+    const frames = Math.max(1, Math.round(img.naturalWidth / FW));
+    const f = frames > 1 ? Math.floor(S.anim / 7) % frames : 0;
+    ctx.save();
+    // при отражении сдвиг зависит от ширины кадра, а она теперь разная
+    if (S.facing < 0){ ctx.translate(dx0 * 2 + FW, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(img, f * FW, 0, FW, FH, dx0, dy0, FW, FH);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#C9553F'; ctx.fillRect(dx0 + 8, dy0 + 18, 16, 26);
+  }
+
+
+  placeDepth(cam);
+}
+
+function placeDepth(cam){
+  const d = cellY();
+  if (d <= 0){ el.depthBox.classList.remove('on'); return; }
+  el.depthBox.classList.add('on');
+  el.depthN.textContent = d;
+  const scale = el.stage.clientHeight / cv.height;
+  el.depthBox.style.top = (((S.y - cam.y) * TILE) * scale) + 'px';
+}
+
+function syncHud(){
+  el.coins.textContent = S.coins.toLocaleString('ru-RU');
+  el.dollars.textContent = S.dollars;
+  el.xp.textContent = S.xp;
+  el.load.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG} кг`;
+  el.load.classList.toggle('over', S.loadKg > MAX_KG * 0.85);
+  el.hp.style.width = S.hp + '%';
+  el.food.style.width = S.food + '%';
+  el.rest.style.width = S.rest + '%';
+}
+
+/* ── цикл ── */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+
+  if (now < S.stunUntil){ S.vx = 0; }
+  else applyIntent(dt);
+
+  moveX(dt);
+  moveY(dt);
+  reveal();
+  checkUnlocks();
+
+  // Счётчик кадров идёт ВСЕГДА. Пока он тикал только при копке и ходьбе,
+  // покой, падение и полёт стояли на первом кадре и выглядели статикой.
+  S.anim += 2;
+  if (S.digging){
+    S.digging.t += dt;
+    if (S.digging.t >= S.digging.total) finishDig();
+  }
+
+  const drain = (S.digging ? 3 : 1) * dt * 0.35;
+  S.food = Math.max(0, S.food - drain);
+  S.rest = Math.max(0, S.rest - drain * 0.8);
+  if (S.food === 0 || S.rest === 0){
+    S.hp = Math.max(0, S.hp - dt * 4);
+    if (S.hp === 0) die();
+  }
+
+  draw();
+  syncHud();
+  requestAnimationFrame(loop);
+}
+
+/* ── джойстик ── */
+let stickId = null;
+const DEAD = 0.26;   // мёртвая зона по радиусу; направление решает угол
+function stickVec(ev){
+  const r = el.stick.getBoundingClientRect();
+  let vx = (ev.clientX - r.left - r.width / 2) / (r.width / 2);
+  let vy = (ev.clientY - r.top - r.height / 2) / (r.height / 2);
+  const len = Math.hypot(vx, vy);
+  if (len > 1){ vx /= len; vy /= len; }
+  return { vx, vy };
+}
+function applyStick(v){
+  const snap = resolveDir(v.vx, v.vy, DEAD);
+  // Ручка притягивается к распознанному направлению, а не идёт за пальцем:
+  // так сразу видно, что игра поняла — шаг, прыжок или копка.
+  if (snap){
+    el.knob.style.transform = `translate(${snap.x * 34}px, ${snap.y * 34}px)`;
+    el.knob.classList.add('live');
+  } else {
+    el.knob.style.transform = '';
+    el.knob.classList.remove('live');
+  }
+  cancelWrongDig();
+}
+
+// Копка отменяется, если игрок увёл управление с той клетки, которую копал.
+function cancelWrongDig(){
+  if (!S.digging) return;
+  const wrongSide = S.hold.dx && S.digging.x !== cellX() + S.hold.dx;
+  const leftDown = !S.hold.down && S.digging.y === cellY() + 1;
+  if (wrongSide || (leftDown && S.hold.dx)) S.digging = null;
+}
+
+function releaseStick(){
+  stickId = null;
+  S.dirZone = null;
+  S.hold.dx = 0; S.hold.up = false; S.hold.down = false;
+  el.knob.style.transform = '';
+  el.knob.classList.remove('live');
+}
+el.stick.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  stickId = e.pointerId;
+  el.stick.setPointerCapture(e.pointerId);
+  applyStick(stickVec(e));
+});
+el.stick.addEventListener('pointermove', e => {
+  if (e.pointerId === stickId) applyStick(stickVec(e));
+});
+for (const t of ['pointerup','pointercancel','lostpointercapture'])
+  el.stick.addEventListener(t, e => { if (e.pointerId === stickId) releaseStick(); });
+
+/* ── инвентарь ──
+   Отдельной кнопки «копать» нет: герой сам вгрызается в породу, когда
+   упирается в неё джойстиком (см. applyIntent). Нижняя полоса свелась к
+   одной строке, и освободившееся место занял инвентарь. */
+function renderInv(){
+  const rows = [...S.bag.entries()].filter(([, n]) => n > 0);
+  // дороже — выше: игрок смотрит в рюкзак, чтобы понять, что он унёс
+  rows.sort((a, b) => meta(b[0]).price * b[1] - meta(a[0]).price * a[1]);
+
+  el.invLoad.textContent = `${S.loadKg.toFixed(1)} / ${MAX_KG} кг`;
+  el.invLoad.style.color = S.loadKg > MAX_KG * 0.85 ? 'var(--rust)' : '';
+
+  if (!rows.length){
+    el.invList.innerHTML = '<div class="sheet-empty">Рюкзак пуст.<br>Земля и камень в него не кладутся — только руда и находки.</div>';
+    el.invTotal.textContent = '0';
+    return;
+  }
+
+  let total = 0;
+  const html = [];
+  for (const [name, n] of rows){
+    const m = meta(name);
+    const sum = m.price * n;
+    total += sum;
+    const file = W.art[name];
+    const icon = file ? `<img src="art/tiles/${file}.png" alt="">` : '<img alt="">';
+    html.push(
+      `<div class="sheet-row">${icon}` +
+      `<span class="nm">${m.name}</span>` +
+      `<span class="ct">×${n}</span>` +
+      `<span class="pr">${sum.toLocaleString('ru-RU')}</span>` +
+      `<button class="drop-btn" type="button" data-drop="${name}">Выкинуть</button></div>`
+    );
+  }
+  el.invList.innerHTML = html.join('');
+  el.invTotal.textContent = total.toLocaleString('ru-RU');
+}
+
+/* ── выбросить часть стопки ──
+   Рюкзак наполняется быстрее, чем игрок доходит до поверхности, и без
+   возможности что-то выкинуть он вынужден бросать НОВУЮ находку вместо
+   старого хлама. Количество выбирается ползунком, а число рядом можно
+   тапнуть и ввести с клавиатуры: ползунком не попасть точно в «оставить 3». */
+let dropName = null;
+
+function clampDrop(v){
+  const max = S.bag.get(dropName) || 1;
+  v = Math.round(Number(v) || 1);
+  return Math.min(max, Math.max(1, v));
+}
+
+function syncDrop(v){
+  const n = clampDrop(v);
+  el.dropRange.value = n;
+  if (document.activeElement !== el.dropNum) el.dropNum.value = n;
+  const m = meta(dropName);
+  document.getElementById('drop-ok').textContent = `Выкинуть ${n}`;
+  el.dropOf.textContent = `из ${S.bag.get(dropName) || 0} · −${(m.weight * n).toFixed(1)} кг`;
+}
+
+function openDrop(name){
+  if (!S.bag.has(name)) return;
+  dropName = name;
+  const max = S.bag.get(name);
+  el.dropTitle.textContent = meta(name).name;
+  el.dropRange.min = 1;
+  el.dropRange.max = max;
+  el.dropNum.max = max;
+  // по умолчанию вся стопка: выкидывают, чтобы освободить место, а не
+  // чтобы расстаться с одной штукой
+  syncDrop(max);
+  el.drop.hidden = false;
+}
+
+function closeDrop(){ el.drop.hidden = true; dropName = null; }
+
+function applyDrop(){
+  if (!dropName) return;
+  const n = clampDrop(el.dropNum.value);
+  const m = meta(dropName);
+  const left = (S.bag.get(dropName) || 0) - n;
+  if (left > 0) S.bag.set(dropName, left); else S.bag.delete(dropName);
+  S.loadKg = Math.max(0, S.loadKg - m.weight * n);
+  toast(`Выкинуто: <b>${m.name.toLowerCase()}</b> ×${n}`);
+  closeDrop();
+  renderInv();
+}
+
+el.invList.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-drop]');
+  if (b) openDrop(b.dataset.drop);
+});
+el.dropRange.addEventListener('input', () => syncDrop(el.dropRange.value));
+el.dropNum.addEventListener('input', () => {
+  // во время набора не переписываем поле под курсором, только ползунок
+  const n = clampDrop(el.dropNum.value);
+  el.dropRange.value = n;
+  syncDrop(n);
+});
+el.dropNum.addEventListener('blur', () => syncDrop(el.dropNum.value));
+document.getElementById('drop-ok').addEventListener('click', applyDrop);
+document.getElementById('drop-cancel').addEventListener('click', closeDrop);
+
+function openInv(){
+  releaseStick();          // иначе джойстик останется «зажатым» под шторкой
+  S.touch = null;
+  S.digging = null;
+  renderInv();
+  el.invSheet.hidden = false;
+  el.invBtn.setAttribute('aria-pressed', 'true');
+}
+function closeInv(){
+  closeDrop();
+  el.invSheet.hidden = true;
+  el.invBtn.setAttribute('aria-pressed', 'false');
+}
+el.invBtn.addEventListener('click', () => el.invSheet.hidden ? openInv() : closeInv());
+document.getElementById('inv-close').addEventListener('click', closeInv);
+
+/* ── клавиатура для проверки с компьютера ── */
+const K = {};
+addEventListener('keydown', e => {
+  if (['Space','ArrowUp','KeyW','ArrowLeft','KeyA','ArrowRight','KeyD','ArrowDown','KeyS'].includes(e.code)) e.preventDefault();
+  K[e.code] = true; syncKeys();
+});
+addEventListener('keyup', e => { K[e.code] = false; syncKeys(); });
+function syncKeys(){
+  if (!el.invSheet.hidden) return;
+  const l = K.ArrowLeft || K.KeyA, r = K.ArrowRight || K.KeyD;
+  S.hold.dx = (r ? 1 : 0) - (l ? 1 : 0);
+  S.hold.up = !!(K.ArrowUp || K.KeyW || K.Space);
+  S.hold.down = !!(K.ArrowDown || K.KeyS) && S.hold.dx === 0;
+  cancelWrongDig();
+}
+
+/* ── режим управления ── */
+function setMode(m){
+  S.mode = m;
+  releaseStick();
+  S.touch = null;
+  const stick = m === 'stick';
+  el.mode.textContent = stick ? 'Джойстик' : 'Удержание';
+  el.mode.setAttribute('aria-pressed', String(stick));
+  el.stick.style.display = stick ? '' : 'none';
+  el.hint.hidden = stick;
+}
+el.mode.addEventListener('click', () => setMode(S.mode === 'stick' ? 'hold' : 'stick'));
+
+/* ── удержание пальца на экране ──
+   Не «тап по клетке с автопоходом», а именно удержание: пока палец на
+   экране, герой идёт или копает в его сторону; отпустил — встал. */
+let touchId = null;
+cv.addEventListener('pointerdown', ev => {
+  if (S.mode !== 'hold' || !el.invSheet.hidden) return;
+  ev.preventDefault();
+  touchId = ev.pointerId;
+  cv.setPointerCapture(ev.pointerId);
+  S.touch = { x: ev.clientX, y: ev.clientY };
+});
+cv.addEventListener('pointermove', ev => {
+  if (ev.pointerId === touchId) S.touch = { x: ev.clientX, y: ev.clientY };
+});
+for (const t of ['pointerup','pointercancel','lostpointercapture'])
+  cv.addEventListener(t, ev => {
+    if (ev.pointerId !== touchId) return;
+    touchId = null;
+    S.touch = null;
+    S.dirZone = null;
+    S.digging = null;
+  });
+
+document.getElementById('reset').addEventListener('click', () => {
+  S.x = 20.5; S.y = 0.5; S.vx = S.vy = 0;
+  S.coins = 0; S.loadKg = 0; S.xp = 0;
+  S.bag.clear(); closeInv();
+  S.hp = S.food = S.rest = 100;
+  S.tool = 'shovel'; S.seenFoundation = false; S.maxDepth = 0;
+  S.gear.backpack = S.gear.jetpack = S.gear.drill = S.gear.rig = false;
+  S.thrust = null; S.coasting = false;
+  syncGear();
+  S.fogRelief.clear(); S.fogRes.clear(); S.lastCell = '';
+  S.digging = null;
+  if (W) W.grid.set(W.pristine);
+  el.toolIcon.src = 'art/items/shovel.png';
+  el.toolName.textContent = 'Лопата';
+  reveal();
+  toast('Бабка улетела в Таиланд. Огород твой.');
+});
+
+function resize(){
+  viewH = Math.max(9, Math.min(19, Math.round(el.stage.clientHeight / (el.stage.clientWidth / VIEW_W))));
+  cv.width = VIEW_W * TILE;
+  cv.height = viewH * TILE;
+  ctx.imageSmoothingEnabled = false;
+}
+addEventListener('resize', resize);
+
+const loadImg = src => { const i = new Image(); i.src = src; return i; };
+
+fetch('world_dump.json').then(r => r.json()).then(data => {
+  W = data;
+  W.grid = Int16Array.from(W.grid);
+  W.pristine = Int16Array.from(W.grid);
+  for (const name of Object.keys(W.art)){
+    const f = W.art[name];
+    if (f) sprites[f] = loadImg(`art/tiles/${f}.png`);
+  }
+  for (let i = 1; i <= DIRT_VARIANTS; i++) sprites['dirt_' + i] = loadImg(`art/tiles/dirt_${i}.png`);
+  for (const a of ['idle','walk','fall','fly','fly_jet','dig_shovel','dig_pick','dig_pick_rusty',
+                   'dig_drill_down','dig_drill_side','dig_rig_down','dig_rig_side'])
+    charSprites[a] = loadImg(`art/character/${a}.png`);
+  el.toolIcon.src = 'art/items/shovel.png';
+  el.gPack.src = 'art/items/backpack_propeller.png';
+  el.gJet.src = 'art/items/jetpack.png';
+  syncGear();
+  document.getElementById('i-coin').src = 'art/ui/icon_coin.png';
+  document.getElementById('i-dollar').src = 'art/ui/icon_dollar.png';
+  document.getElementById('i-inv').src = 'art/ui/icon_inventory.png';
+  document.getElementById('i-invbtn').src = 'art/ui/icon_inventory.png';
+  document.getElementById('i-hp').src = 'art/ui/icon_hp.png';
+  document.getElementById('i-food').src = 'art/ui/icon_hunger.png';
+  document.getElementById('i-rest').src = 'art/ui/icon_stamina.png';
+
+  resize();
+  setMode('stick');
+  reveal();
+  syncHud();
+  toast('Бабка улетела в Таиланд. Огород твой — <b>копай</b>.', 3600);
+  requestAnimationFrame(loop);
+});
+</script>

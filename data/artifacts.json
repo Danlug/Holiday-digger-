@@ -1,0 +1,1121 @@
+{
+  "version": 1,
+  "_source": "docs/GDD.md раздел 10 (+ раздел 9 для скриптового исключения, раздел 11 для диапазона XP)",
+  "_legend": "поле {value, proposed:true, note} = число/список не задано в GDD и предложено геймдизайнеру на утверждение",
+  "_texts": {
+    "proposed": true,
+    "note": "Названия взяты из ГДД раздел 10 как есть; описания (desc_*), подсказки для ненайденных (hint_*) и английские версии (*_en) написаны ПРЕДЛОЖЕНИЕМ — ждут утверждения владельца. Ключи (id) стабильны: тексты можно менять без правки кода.",
+    "fields": {
+      "name_ru / name_en": "название предмета (показывается только в подсказке Tip найденного)",
+      "desc_ru / desc_en": "короткое описание с юмором, одна-две фразы (Tip найденного)",
+      "hint_ru / hint_en": "намёк для ненайденного — без названия (Tip силуэта)"
+    },
+    "fallback": "если поле *_en пусто, берётся русское (ArtifactText)"
+  },
+  "branches": [
+    {
+      "branch": 1,
+      "id": "antiquity",
+      "name_ru": "Античность",
+      "name_en": "Antiquity",
+      "depth_range": [
+        15,
+        100
+      ],
+      "equip_slot_from_item_5": "shield",
+      "completion_reward": {
+        "coins": {
+          "value": 500,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD (раздел 10 упоминает её существование, но не число); растёт с номером ветки"
+        },
+        "premium_currency": {
+          "value": 2,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD"
+        }
+      }
+    },
+    {
+      "branch": 2,
+      "id": "mysticism",
+      "name_ru": "Мистика и алхимия",
+      "name_en": "Mysticism & Alchemy",
+      "depth_range": [
+        60,
+        250
+      ],
+      "equip_slot_from_item_5": "chestplate",
+      "completion_reward": {
+        "coins": {
+          "value": 1500,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD (раздел 10 упоминает её существование, но не число); растёт с номером ветки"
+        },
+        "premium_currency": {
+          "value": 4,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD"
+        }
+      }
+    },
+    {
+      "branch": 3,
+      "id": "occult",
+      "name_ru": "Оккульт",
+      "name_en": "Occult",
+      "depth_range": [
+        150,
+        500
+      ],
+      "equip_slot_from_item_5": "amulet",
+      "completion_reward": {
+        "coins": {
+          "value": 4000,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD (раздел 10 упоминает её существование, но не число); растёт с номером ветки"
+        },
+        "premium_currency": {
+          "value": 8,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD"
+        }
+      }
+    },
+    {
+      "branch": 4,
+      "id": "forgotten_civilizations",
+      "name_ru": "Забытые цивилизации",
+      "name_en": "Forgotten Civilizations",
+      "depth_range": [
+        400,
+        1500
+      ],
+      "equip_slot_from_item_5": "helmet",
+      "completion_reward": {
+        "coins": {
+          "value": 10000,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD (раздел 10 упоминает её существование, но не число); растёт с номером ветки"
+        },
+        "premium_currency": {
+          "value": 15,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD"
+        }
+      }
+    },
+    {
+      "branch": 5,
+      "id": "legends",
+      "name_ru": "Легенды",
+      "name_en": "Legends",
+      "depth_range": [
+        800,
+        4000
+      ],
+      "equip_slot_from_item_5": "glove",
+      "completion_reward": {
+        "coins": {
+          "value": 30000,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD (раздел 10 упоминает её существование, но не число); растёт с номером ветки"
+        },
+        "premium_currency": {
+          "value": 40,
+          "proposed": true,
+          "note": "награда за закрытие ветки не задана в GDD"
+        }
+      }
+    }
+  ],
+  "ultimate_set": {
+    "pieces": [
+      "shield",
+      "chestplate",
+      "amulet",
+      "helmet",
+      "glove"
+    ],
+    "note": "5-е предметы всех веток образуют комплект против монстров глубже 4000 (см. GDD п.10); НЕ повторяет Перчатку Бесконечности Marvel — архетип оригинальный",
+    "glove_sockets": [
+      "hellstone",
+      "dark_matter",
+      "universum",
+      "angelstone",
+      "divine_heart"
+    ],
+    "name_ru": "Ультимативный сет",
+    "name_en": "Ultimate Set",
+    "piece_names": {
+      "helmet": {
+        "ru": "шлем",
+        "en": "helmet"
+      },
+      "chestplate": {
+        "ru": "нагрудник",
+        "en": "chestplate"
+      },
+      "shield": {
+        "ru": "щит",
+        "en": "shield"
+      },
+      "amulet": {
+        "ru": "амулет",
+        "en": "amulet"
+      },
+      "glove": {
+        "ru": "перчатка",
+        "en": "glove"
+      }
+    }
+  },
+  "spawn": {
+    "_note": "тюнинг слоя спавна артефактов в мире (scripts/museum/artifact_spawn.gd). Позиции детерминированы от сида мира и в сейв не пишутся: сид один и тот же — клетки те же. Порода в клетке не меняется, артефакт выдаётся при её раскопке.",
+    "expected_cells_dug_per_find_by_branch": {
+      "1": {
+        "value": 120,
+        "proposed": true,
+        "note": "сколько клеток внутри полосы глубин ветки игрок в среднем выкапывает до находки; в GDD задана только качественная редкость ('чем старее эпоха, тем реже')"
+      },
+      "2": {
+        "value": 200,
+        "proposed": true,
+        "note": "см. ветку 1"
+      },
+      "3": {
+        "value": 350,
+        "proposed": true,
+        "note": "см. ветку 1"
+      },
+      "4": {
+        "value": 600,
+        "proposed": true,
+        "note": "см. ветку 1"
+      },
+      "5": {
+        "value": 1000,
+        "proposed": true,
+        "note": "см. ветку 1"
+      }
+    },
+    "min_candidate_cells": {
+      "value": 4,
+      "proposed": true,
+      "note": "нижний предел числа клеток-кандидатов на один артефакт: при одной-двух клетках находка превращается в лотерею на 0.1%"
+    },
+    "max_candidate_cells": {
+      "value": 24,
+      "proposed": true,
+      "note": "верхний предел: иначе у веток 4-5 с полосой в сотни рядов кандидатов становится столько, что легендарный артефакт попадается случайно"
+    },
+    "single_row_is_guaranteed": {
+      "value": true,
+      "proposed": true,
+      "note": "артефакт, у которого depth_min == depth_max (Никчёмный клад на 15), лежит во ВСЕХ клетках своего ряда: по GDD п.9 это скриптовая находка онбординга, её нельзя пропустить"
+    }
+  },
+  "artifacts": [
+    {
+      "id": "antiquity_1",
+      "branch": 1,
+      "branch_id": "antiquity",
+      "branch_name_ru": "Античность",
+      "slot": 1,
+      "name_ru": "Никчёмный клад",
+      "name_en": "Worthless Hoard",
+      "desc_ru": "Мешочек мелочи, который кто-то тысячу лет прятал. Видимо, от налоговой.",
+      "desc_en": "A pouch of loose change somebody hid for a thousand years. Probably from the tax office.",
+      "hint_ru": "Совсем неглубоко. Дед проходил мимо.",
+      "hint_en": "Barely below the surface. Grandpa walked right past it.",
+      "depth_min": 15,
+      "depth_max": 15,
+      "note": "скриптовая находка в онбординге (см. GDD п.9); формально считается веткой 1 слотом 1",
+      "find_bonus": {
+        "xp": {
+          "value": 500,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 50,
+          "proposed": false,
+          "note": "ГДД п.9: никчёмный клад даёт 50 монет (и 5 премиума — их выдаёт сцена dud_treasure). Общая формула 1.5×XP давала 750 и расходилась со сценой."
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "antiquity_2",
+      "branch": 1,
+      "branch_id": "antiquity",
+      "branch_name_ru": "Античность",
+      "slot": 2,
+      "name_ru": "Религиозный свиток",
+      "name_en": "Religious Scroll",
+      "desc_ru": "Написано что-то очень важное. Либо молитва, либо рецепт солёных огурцов — бабка бы разобрала.",
+      "desc_en": "Something very important is written here. A prayer, or a pickle recipe. Grandma could tell.",
+      "hint_ru": "Скатано в трубочку и давно ждёт читателя.",
+      "hint_en": "Rolled up tight, waiting ages for a reader.",
+      "depth_min": {
+        "value": 32,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 49,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 688,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 1032,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "antiquity_3",
+      "branch": 1,
+      "branch_id": "antiquity",
+      "branch_name_ru": "Античность",
+      "slot": 3,
+      "name_ru": "Золотая инкрустированная чаша",
+      "name_en": "Gilded Inlaid Chalice",
+      "desc_ru": "Из неё пили цари. Бабка бы в такую варенье переложила.",
+      "desc_en": "Kings drank from it. Grandma would pour jam into it.",
+      "hint_ru": "Блестит даже в темноте, если присмотреться.",
+      "hint_en": "Gleams even in the dark, if you look closely.",
+      "depth_min": {
+        "value": 49,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 66,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 875,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 1312,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "antiquity_4",
+      "branch": 1,
+      "branch_id": "antiquity",
+      "branch_name_ru": "Античность",
+      "slot": 4,
+      "name_ru": "Сокровища Эльдорадо",
+      "name_en": "Treasures of El Dorado",
+      "desc_ru": "Все искали в джунглях, а оно лежало под грядкой с кабачками. Классика.",
+      "desc_en": "Everyone searched the jungle. It was under the zucchini bed all along. Classic.",
+      "hint_ru": "Сияет, как мечта конкистадора.",
+      "hint_en": "Shines like a conquistador's daydream.",
+      "depth_min": {
+        "value": 66,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 83,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 1062,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 1593,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "antiquity_5",
+      "branch": 1,
+      "branch_id": "antiquity",
+      "branch_name_ru": "Античность",
+      "slot": 5,
+      "name_ru": "Золотой щит спартанского полководца",
+      "name_en": "Golden Shield of the Spartan General",
+      "desc_ru": "Тяжёлый, золотой, с вмятиной от чьего-то «давайте ещё раз». Держит удар.",
+      "desc_en": "Heavy, golden, dented by someone's “let's go again.” Takes a hit.",
+      "hint_ru": "Тот, кто его держал, не отступал ни на шаг.",
+      "hint_en": "Whoever carried it never took a step back.",
+      "depth_min": {
+        "value": 83,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 100,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 1250,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 1875,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": true,
+      "equip_slot": "shield"
+    },
+    {
+      "id": "mysticism_1",
+      "branch": 2,
+      "branch_id": "mysticism",
+      "branch_name_ru": "Мистика и алхимия",
+      "slot": 1,
+      "name_ru": "Алхимический тигель",
+      "name_en": "Alchemist's Crucible",
+      "desc_ru": "Золото из свинца так и не сварилось, зато вышел отличный суп.",
+      "desc_en": "Never turned lead into gold, but the soup came out great.",
+      "hint_ru": "Закопчённый, пахнет серой и немного борщом.",
+      "hint_en": "Sooty. Smells of sulphur and slightly of borscht.",
+      "depth_min": {
+        "value": 60,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 98,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 1438,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 2157,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "mysticism_2",
+      "branch": 2,
+      "branch_id": "mysticism",
+      "branch_name_ru": "Мистика и алхимия",
+      "slot": 2,
+      "name_ru": "Компас, указывающий не на север",
+      "name_en": "Compass That Doesn't Point North",
+      "desc_ru": "Стрелка упрямо показывает на бабкин холодильник. Спорить бесполезно.",
+      "desc_en": "The needle stubbornly points at Grandma's fridge. Arguing is useless.",
+      "hint_ru": "Стрелка вертится, но куда-то всё же тянет.",
+      "hint_en": "The needle spins, yet something pulls it.",
+      "depth_min": {
+        "value": 98,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 136,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 1625,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 2438,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "mysticism_3",
+      "branch": 2,
+      "branch_id": "mysticism",
+      "branch_name_ru": "Мистика и алхимия",
+      "slot": 3,
+      "name_ru": "Незавершённый философский камень",
+      "name_en": "Unfinished Philosopher's Stone",
+      "desc_ru": "Алхимик не дожил до конца рецепта. Говорят, не хватило щепотки соли.",
+      "desc_en": "The alchemist never finished the recipe. They say it needed a pinch of salt.",
+      "hint_ru": "На ощупь тёплый, как булочка.",
+      "hint_en": "Warm to the touch, like a fresh bun.",
+      "depth_min": {
+        "value": 136,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 174,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 1812,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 2718,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "mysticism_4",
+      "branch": 2,
+      "branch_id": "mysticism",
+      "branch_name_ru": "Мистика и алхимия",
+      "slot": 4,
+      "name_ru": "Реликварий с нетленной рукой",
+      "name_en": "Reliquary with the Incorruptible Hand",
+      "desc_ru": "Рука нетленная, а вот маникюр не сохранился.",
+      "desc_en": "The hand is incorruptible. The manicure, sadly, is not.",
+      "hint_ru": "В шкатулке что-то лежит. Что-то с пальцами.",
+      "hint_en": "Something is in the box. Something with fingers.",
+      "depth_min": {
+        "value": 174,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 212,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 2000,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 3000,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "mysticism_5",
+      "branch": 2,
+      "branch_id": "mysticism",
+      "branch_name_ru": "Мистика и алхимия",
+      "slot": 5,
+      "name_ru": "Зерцало",
+      "name_en": "The Looking-Glass",
+      "desc_ru": "Показывает не тебя, а того, кем станешь к концу лета: загорелого и в мозолях.",
+      "desc_en": "Shows not you, but who you'll be by summer's end: tanned and calloused.",
+      "hint_ru": "В нём что-то отражается, но точно не ты.",
+      "hint_en": "Something is reflected in it, but it's not you.",
+      "depth_min": {
+        "value": 212,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 250,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 2188,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 3282,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": true,
+      "equip_slot": "chestplate"
+    },
+    {
+      "id": "occult_1",
+      "branch": 3,
+      "branch_id": "occult",
+      "branch_name_ru": "Оккульт",
+      "slot": 1,
+      "name_ru": "Гадальные кости из чёрного дерева",
+      "name_en": "Ebony Divination Bones",
+      "desc_ru": "Выпали две шестёрки. К добру? К двойной смене на грядках.",
+      "desc_en": "Double six. Good luck? A double shift in the garden.",
+      "hint_ru": "Стучат сами, когда рядом никого нет.",
+      "hint_en": "They rattle by themselves when nobody's near.",
+      "depth_min": {
+        "value": 150,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 220,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 2375,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 3562,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "occult_2",
+      "branch": 3,
+      "branch_id": "occult",
+      "branch_name_ru": "Оккульт",
+      "slot": 2,
+      "name_ru": "Гримуар в человеческом переплёте",
+      "name_en": "Grimoire in Human Binding",
+      "desc_ru": "Переплёт жуткий, а внутри — рецепты. Варенье из крыжовника, по четвергам.",
+      "desc_en": "The binding is creepy, the contents are recipes. Gooseberry jam, Thursdays only.",
+      "hint_ru": "Страницы шуршат, хотя ветра нет.",
+      "hint_en": "The pages rustle, though there's no wind.",
+      "depth_min": {
+        "value": 220,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 290,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 2562,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 3843,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "occult_3",
+      "branch": 3,
+      "branch_id": "occult",
+      "branch_name_ru": "Оккульт",
+      "slot": 3,
+      "name_ru": "Печать призывателя",
+      "name_en": "Summoner's Seal",
+      "desc_ru": "Призвать успели только соседа — одолжить дрель.",
+      "desc_en": "It only ever summoned the neighbour, asking to borrow a drill.",
+      "hint_ru": "Круг на камне, затёртый по краям.",
+      "hint_en": "A circle on stone, worn at the edges.",
+      "depth_min": {
+        "value": 290,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 360,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 2750,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 4125,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "occult_4",
+      "branch": 3,
+      "branch_id": "occult",
+      "branch_name_ru": "Оккульт",
+      "slot": 4,
+      "name_ru": "Кинжал ритуала затмения",
+      "name_en": "Eclipse Ritual Dagger",
+      "desc_ru": "Идеально режет колбасу. И затмения. Главное — не перепутать.",
+      "desc_en": "Slices sausage perfectly. And eclipses. Just don't mix them up.",
+      "hint_ru": "Лезвие тёмное, но блестит, как днём.",
+      "hint_en": "A dark blade that gleams like noon.",
+      "depth_min": {
+        "value": 360,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 430,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 2938,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 4407,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "occult_5",
+      "branch": 3,
+      "branch_id": "occult",
+      "branch_name_ru": "Оккульт",
+      "slot": 5,
+      "name_ru": "Сердце идола, которое ещё бьётся",
+      "name_en": "Idol's Heart, Still Beating",
+      "desc_ru": "Тук-тук-тук. Ровно, как у молодого. Врачи бы обзавидовались.",
+      "desc_en": "Thump-thump-thump. Steady as a youngster's. Doctors would be jealous.",
+      "hint_ru": "Где-то внизу стучит. Ритмично.",
+      "hint_en": "Something thumps down below. Rhythmically.",
+      "depth_min": {
+        "value": 430,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 500,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 3125,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 4688,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": true,
+      "equip_slot": "amulet"
+    },
+    {
+      "id": "forgotten_civilizations_1",
+      "branch": 4,
+      "branch_id": "forgotten_civilizations",
+      "branch_name_ru": "Забытые цивилизации",
+      "slot": 1,
+      "name_ru": "Табличка с непереводимым письмом",
+      "name_en": "Tablet of Untranslatable Script",
+      "desc_ru": "Двадцать лингвистов сдались. Внук прочёл: «не копай». Копает дальше.",
+      "desc_en": "Twenty linguists gave up. Grandson read: “don't dig.” Keeps digging.",
+      "hint_ru": "Каменная плитка вся в закорючках.",
+      "hint_en": "A stone slab covered in squiggles.",
+      "depth_min": {
+        "value": 400,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 620,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 3312,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 4968,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "forgotten_civilizations_2",
+      "branch": 4,
+      "branch_id": "forgotten_civilizations",
+      "branch_name_ru": "Забытые цивилизации",
+      "slot": 2,
+      "name_ru": "Механизм на 118 шестерён",
+      "name_en": "118-Gear Mechanism",
+      "desc_ru": "Что он делает — неизвестно. Но все 118 шестерён крутятся. Дед бы оценил.",
+      "desc_en": "What it does is unknown, but all 118 gears turn. Grandpa would approve.",
+      "hint_ru": "Под землёй что-то тикает. Это не будильник.",
+      "hint_en": "Something ticks underground. Not an alarm clock.",
+      "depth_min": {
+        "value": 620,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 840,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 3500,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 5250,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "forgotten_civilizations_3",
+      "branch": 4,
+      "branch_id": "forgotten_civilizations",
+      "branch_name_ru": "Забытые цивилизации",
+      "slot": 3,
+      "name_ru": "Карта звёздного неба, которого нет",
+      "name_en": "Map of a Starry Sky That Doesn't Exist",
+      "desc_ru": "Ни Ковша, ни Медведицы — зато есть Лопата и Грядка. Древние знали толк.",
+      "desc_en": "No Big Dipper, no Great Bear, but a Shovel and a Garden Bed. The ancients knew best.",
+      "hint_ru": "Тонкий диск, а на нём — чужие звёзды.",
+      "hint_en": "A thin disc with foreign stars on it.",
+      "depth_min": {
+        "value": 840,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 1060,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 3688,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 5532,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "forgotten_civilizations_4",
+      "branch": 4,
+      "branch_id": "forgotten_civilizations",
+      "branch_name_ru": "Забытые цивилизации",
+      "slot": 4,
+      "name_ru": "Саркофаг не-человека",
+      "name_en": "Sarcophagus of a Non-Human",
+      "desc_ru": "Тот, кто здесь лежал, был заметно выше и точно не из нашей деревни.",
+      "desc_en": "Whoever lay here was much taller, and definitely not from our village.",
+      "hint_ru": "Большой ящик с узором на крышке.",
+      "hint_en": "A big box with a pattern on the lid.",
+      "depth_min": {
+        "value": 1060,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 1280,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 3875,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 5812,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "forgotten_civilizations_5",
+      "branch": 4,
+      "branch_id": "forgotten_civilizations",
+      "branch_name_ru": "Забытые цивилизации",
+      "slot": 5,
+      "name_ru": "Шлем безымянного зодчего",
+      "name_en": "Helm of the Nameless Architect",
+      "desc_ru": "Строил так, что стоит до сих пор. Каску, видимо, носил. Техника безопасности.",
+      "desc_en": "Built things that still stand. Wore a hard hat, clearly. Safety first.",
+      "hint_ru": "Тот, кто строил на века, берёг голову.",
+      "hint_en": "A builder for the ages looked after his head.",
+      "depth_min": {
+        "value": 1280,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "depth_max": {
+        "value": 1500,
+        "proposed": true,
+        "note": "точная глубина внутри ветки не задана в GDD; ветка делится на 5 равных сегментов"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 4062,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 6093,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": true,
+      "equip_slot": "helmet"
+    },
+    {
+      "id": "legends_1",
+      "branch": 5,
+      "branch_id": "legends",
+      "branch_name_ru": "Легенды",
+      "slot": 1,
+      "name_ru": "Клинок, рассёкший гору",
+      "name_en": "Blade That Split the Mountain",
+      "desc_ru": "Рассёк гору одним взмахом. Дедова кирка смотрит на него с завистью.",
+      "desc_en": "Split a mountain in one swing. Grandpa's pickaxe watches with envy.",
+      "hint_ru": "Говорят, раньше здесь была гора.",
+      "hint_en": "They say there used to be a mountain here.",
+      "depth_min": {
+        "value": 800,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "depth_max": {
+        "value": 1560,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 4250,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 6375,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "legends_2",
+      "branch": 5,
+      "branch_id": "legends",
+      "branch_name_ru": "Легенды",
+      "slot": 2,
+      "name_ru": "Молот, который не поднять",
+      "name_en": "Hammer Too Heavy to Lift",
+      "desc_ru": "Тяжёлый, как бабкины аргументы. Поднять нельзя, можно только откопать.",
+      "desc_en": "Heavy as Grandma's arguments. Can't be lifted, only dug up.",
+      "hint_ru": "Земля над ним прогнулась.",
+      "hint_en": "The ground above it has sagged.",
+      "depth_min": {
+        "value": 1560,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "depth_max": {
+        "value": 2320,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 4438,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 6657,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "legends_3",
+      "branch": 5,
+      "branch_id": "legends",
+      "branch_name_ru": "Легенды",
+      "slot": 3,
+      "name_ru": "Плащ, отменяющий тень",
+      "name_en": "Cloak That Cancels the Shadow",
+      "desc_ru": "Накинул — и тени нет: ни твоей, ни забора. Для загара самое то.",
+      "desc_en": "Put it on and the shadows vanish: yours, the fence's. Great for tanning.",
+      "hint_ru": "Свет вокруг ведёт себя странно.",
+      "hint_en": "Light behaves strangely around it.",
+      "depth_min": {
+        "value": 2320,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "depth_max": {
+        "value": 3080,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 4625,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 6938,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "legends_4",
+      "branch": 5,
+      "branch_id": "legends",
+      "branch_name_ru": "Легенды",
+      "slot": 4,
+      "name_ru": "Ключ от всех дверей",
+      "name_en": "Key to All Doors",
+      "desc_ru": "Подходит ко всем замкам, кроме бабкиного сундука с «конфетами». Тот спрятан лучше.",
+      "desc_en": "Opens every lock except Grandma's “candy” chest. She hid that one better.",
+      "hint_ru": "Маленький, а запирает весь мир.",
+      "hint_en": "Small, yet it locks up the whole world.",
+      "depth_min": {
+        "value": 3080,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "depth_max": {
+        "value": 3850,
+        "proposed": true,
+        "note": "предложено: ГДД задаёт для ветки 5 полосу 800–4000 и только последний предмет (3850–4100); первые четыре делят 800–3850 на равные отрезки (раньше они обрывались на 3360, оставляя дыру до 3850)"
+      },
+      "find_bonus": {
+        "xp": {
+          "value": 4812,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 7218,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": false
+    },
+    {
+      "id": "legends_5",
+      "branch": 5,
+      "branch_id": "legends",
+      "branch_name_ru": "Легенды",
+      "slot": 5,
+      "name_ru": "Перчатка Мироздания",
+      "name_en": "Gauntlet of Creation",
+      "desc_ru": "Пять гнёзд пока пусты. Бабка бы связала на вырост — тут то же самое.",
+      "desc_en": "Five sockets, all empty for now. Grandma would knit it a size up. Same idea.",
+      "hint_ru": "Самое дно хранит для неё пять камней.",
+      "hint_en": "The very bottom keeps five stones for it.",
+      "depth_min": 3850,
+      "depth_max": 4100,
+      "find_bonus": {
+        "xp": {
+          "value": 5000,
+          "proposed": true,
+          "note": "конкретное распределение опыта по предметам не задано в GDD; известен только общий диапазон 500-5000 (раздел 11), распределён линейно по всем 25 предметам от редкой/ранней до легендарной/поздней находки"
+        },
+        "coins": {
+          "value": 7500,
+          "proposed": true,
+          "note": "бонус монет за находку не задан в GDD совсем; предложено как 1.5×XP находки"
+        }
+      },
+      "is_ultimate_set_piece": true,
+      "equip_slot": "glove",
+      "sockets": {
+        "value": [
+          "hellstone",
+          "dark_matter",
+          "universum",
+          "angelstone",
+          "divine_heart"
+        ],
+        "proposed": true,
+        "note": "GDD говорит про 5 пустых сокетов под 5 самых глубоких материалов игры (см. п.10), но не называет их явно как список id — сопоставлено с лестницей редкости minerals.json"
+      }
+    }
+  ]
+}

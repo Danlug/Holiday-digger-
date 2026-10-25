@@ -1,0 +1,45 @@
+{
+	"_comment": "Свет мира (ветка world-fx, scripts/world/light_layer.gd). Числа, которых владелец не задавал, — подбор по глазам (proposed). Затемнение глубиной и факел героя — один полноэкранный шейдер; ореолы руд — аддитивные спрайты по видимым клеткам.",
+	"proposed": true,
+	"depth_dark": {
+		"_note": "Доля затемнения за пределами факела по глубине героя (клеток): [глубина, затемнение 0..1]. Между точками плавно. Небесное ядро светлеет: там свой свет.",
+		"stops": [[0, 0.0], [3, 0.0], [80, 0.12], [300, 0.20], [1000, 0.27], [2000, 0.31], [3000, 0.34], [4000, 0.37], [5500, 0.42], [7000, 0.44], [8400, 0.34], [9200, 0.14], [10000, 0.05]]
+	},
+	"torch": {
+		"radius_min_cells": 3.8,
+		"radius_extra_cells": 1.8,
+		"inner_cells": 2.2,
+		"warm_k": 0.13,
+		"flicker": 0.06
+	},
+	"night": {
+		"_note": "Ночь на поверхности: тёмно-синяя дымка у земли, затухает с высотой над ней (px) и с глубиной (px под землёй). Небо рисует SkyView и свою яркость держит само.",
+		"max_alpha": 0.5,
+		"color": "0A1230",
+		"up_px": 240,
+		"down_px": 420
+	},
+	"belts": {
+		"roots": { "dark": "120A06", "torch": "FFB868" },
+		"caves": { "dark": "041210", "torch": "FFC878" },
+		"crystal": { "dark": "0E0620", "torch": "FFC0A0" },
+		"magma_upper": { "dark": "1E0602", "torch": "FF9448" },
+		"ruins": { "dark": "140E04", "torch": "FFC070" },
+		"hell": { "dark": "260202", "torch": "FF7038" },
+		"void": { "dark": "02041C", "torch": "B8C8FF" },
+		"heaven": { "dark": "3A3210", "torch": "FFF0B0" }
+	},
+	"glow": {
+		"_note": "Светящиеся клетки: цвет ореола, радиус в клетках (ореол-текстура 3 клетки при r=1.5), сила 0..1, мерцание, блёстки.",
+		"uranium_ore": { "color": "7DFF40", "r": 1.7, "k": 0.50, "pulse": 0.18, "twinkle": 0 },
+		"geocrystal": { "color": "FF8A2A", "r": 1.8, "k": 0.52, "pulse": 0.14, "twinkle": 1 },
+		"hellstone": { "color": "FF4A18", "r": 1.8, "k": 0.55, "pulse": 0.26, "twinkle": 0 },
+		"divine_heart": { "color": "FF5C8C", "r": 2.0, "k": 0.60, "pulse": 0.20, "twinkle": 1 },
+		"universalium": { "color": "B49CFF", "r": 2.0, "k": 0.55, "pulse": 0.16, "twinkle": 1 },
+		"angel_stone": { "color": "FFE69A", "r": 2.0, "k": 0.55, "pulse": 0.14, "twinkle": 1 },
+		"dark_matter": { "color": "5A48FF", "r": 1.8, "k": 0.46, "pulse": 0.22, "twinkle": 0 },
+		"diamond": { "color": "7DFFFF", "r": 1.3, "k": 0.24, "pulse": 0.10, "twinkle": 1 },
+		"ruby": { "color": "FF4A4A", "r": 1.3, "k": 0.22, "pulse": 0.10, "twinkle": 1 },
+		"emerald": { "color": "50FF88", "r": 1.3, "k": 0.22, "pulse": 0.10, "twinkle": 1 }
+	}
+}

@@ -1,0 +1,41 @@
+{
+	"frame": [
+		128,
+		120
+	],
+	"scale": 3,
+	"foot": 2,
+	"anchor": "feet",
+	"anims": {
+		"idle": {
+			"row": 0,
+			"frames": 4,
+			"fps": 4,
+			"loop": true
+		},
+		"attack": {
+			"row": 1,
+			"frames": 6,
+			"fps": 6,
+			"loop": false
+		},
+		"exposed": {
+			"row": 2,
+			"frames": 4,
+			"fps": 6,
+			"loop": true
+		},
+		"roar": {
+			"row": 3,
+			"frames": 4,
+			"fps": 8,
+			"loop": true
+		},
+		"die": {
+			"row": 4,
+			"frames": 6,
+			"fps": 4,
+			"loop": false
+		}
+	}
+}

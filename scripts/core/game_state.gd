@@ -121,6 +121,9 @@ var _warned: Dictionary = {}
 func _tick_survival(delta: float) -> void:
 	var stamina_rate := Balance.get_bar_depletion_rate_per_second("stamina", is_digging)
 	var hunger_rate := Balance.get_bar_depletion_rate_per_second("hunger", is_digging)
+	# Раунд 5: полоски тают быстрее базы владельца (data/survival.json, ГДД §7).
+	stamina_rate *= SurvivalRules.drain_multiplier("stamina")
+	hunger_rate *= SurvivalRules.drain_multiplier("hunger")
 
 	# Обессиленный ест больше: усталость не убивает сама, но ускоряет голод,
 	# который убивает. Штраф считается по состоянию НА НАЧАЛО кадра, иначе
@@ -150,8 +153,8 @@ func _update_exhausted() -> void:
 	exhausted_changed.emit(now)
 
 
-## Множитель ко всем скоростям героя. Копка, ходьба и полёт спрашивают его
-## сами — так штраф нельзя забыть применить в одном из трёх мест.
+## Штраф владельца за пустую бодрость (−50%). Полёт спрашивает его сам; ходьба
+## и копка с раунда 5 — через SurvivalRules (там он же плюс ступени 25%/10%).
 func get_speed_multiplier() -> float:
 	return Balance.get_exhausted_speed_multiplier() if is_exhausted else 1.0
 

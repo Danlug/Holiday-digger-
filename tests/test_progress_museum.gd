@@ -93,8 +93,9 @@ func _test_spend_point_applies_effect() -> void:
 	add_child(effects)
 	check_near("без прокачки выносливости ничего не возвращается",
 		effects._saved_fraction("stamina", 0), 0.0)
-	check_near("ступень 1 выносливости экономит 13% расхода",
-		effects._saved_fraction("stamina", 1), 1.0 - 1.0 / 1.15, 0.001)
+	# Раунд 5 (ГДД §7): «Выносливость» — +20% до истощения за ступень (было +15%).
+	check_near("ступень 1 выносливости экономит 17% расхода",
+		effects._saved_fraction("stamina", 1), 1.0 - 1.0 / 1.2, 0.001)
 	check_near("ступень 10 голода экономит 80% расхода",
 		effects._saved_fraction("hunger", 10), 0.8, 0.001)
 	effects.queue_free()

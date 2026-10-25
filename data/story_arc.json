@@ -41,7 +41,7 @@
 			"beats": [
 				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
 				{"t": "world_walk", "actor": "boy", "x": 13.0, "camera": true, "sec": 0.6},
-				{"t": "world_prop", "id": "jar", "tex": "res://art/story/grave_jar.png", "x": 14.95, "y": 1.0, "scale": 3.0},
+				{"t": "world_prop", "id": "jar", "tex": "res://art/env/grave_jar.png", "x": 14.6, "y": 0.78, "scale": 1.5},
 				{"t": "sfx", "id": "pickup"},
 				{"t": "narr", "text": "diary_first.n1"},
 				{"t": "narr", "text": "diary_first.n2"},
@@ -282,7 +282,7 @@
 				{"t": "item", "icon": "res://art/story/prop_nugget.png", "name": "item.first_nugget", "text": "ending.item_text"},
 				{"t": "say", "who": "grandma_rich", "text": "ending.g3"},
 				{"t": "world_walk", "actor": "boy", "x": 13.7, "sec": 0.9},
-				{"t": "world_prop", "id": "nugget", "tex": "res://art/story/prop_nugget.png", "x": 14.0, "y": 1.0, "scale": 3.0},
+				{"t": "world_prop", "id": "nugget", "tex": "res://art/story/prop_nugget.png", "x": 14.15, "y": 0.69, "scale": 1.5},
 				{"t": "sfx", "id": "reward"},
 				{"t": "narr", "text": "ending.n6"},
 				{"t": "say", "who": "boy", "text": "ending.s5"},

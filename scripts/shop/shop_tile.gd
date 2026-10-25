@@ -8,13 +8,17 @@ extends Button
 ##   icon: Texture2D, tier: int 0..5, state: String, title/body/extra: String (Tip),
 ##   pill: {icon, text, color, pips}, corner: "check"|"lock"|"cross"|"home"|"gift",
 ##   count_text: String (число в углу значка), selected: bool, new: bool,
-##   sub_icon: Texture2D (мелкая «награда» на значке ролика).
+##   sub_icon: Texture2D (мелкая «награда» на значке ролика),
+##   need_icon: Texture2D — значок проекта «нужно для…» в левом верхнем углу
+##   (ProjectChain.decorate_offer); отмеченная к продаже такая плитка горит
+##   янтарной рамкой — мягкое предупреждение, продаже не мешает.
 ## Состояния state: available, poor (не хватает денег), owned, locked, away,
 ## ready (рецепт можно собрать), active (надето), nosale, off (отключено).
 
 const W := 64.0
 const H := 64.0
 const COL_GREEN := Color8(0x4D, 0xE0, 0x94)
+const COL_NEED := Color8(0xFF, 0x9A, 0x2E)
 
 var offer: Dictionary = {}
 
@@ -30,6 +34,7 @@ var _corner_tr: TextureRect
 var _corner_tl: TextureRect
 var _lock: TextureRect
 var _pulse: Tween
+var _need: NeedBadge
 
 
 func _init() -> void:
@@ -171,6 +176,7 @@ func setup(o: Dictionary) -> void:
 	elif String(o.get("corner_tl", "")) != "":
 		tl = String(o.get("corner_tl"))
 	_set_corner(_corner_tl, tl)
+	_set_need(o)
 
 	_glow.visible = state in ["ready", "active"] or bool(o.get("new", false))
 	if _glow.visible:
@@ -178,6 +184,27 @@ func setup(o: Dictionary) -> void:
 		_start_pulse()
 
 	Tip.bind(self, String(o.get("title", "")), String(o.get("body", "")), String(o.get("extra", "")))
+
+
+## Значок «нужно для…» (ветка guidance): у материала открытого проекта. Если
+## такая плитка отмечена к продаже — янтарная рамка и пульс значка.
+func _set_need(o: Dictionary) -> void:
+	var tex: Texture2D = o.get("need_icon", null)
+	if tex == null:
+		if _need != null:
+			_need.visible = false
+		return
+	if _need == null:
+		_need = NeedBadge.new()
+		add_child(_need)
+	_need.texture = tex
+	_need.position = Vector2(0, 17) if _corner_tl.visible else Vector2(0, 0)
+	_need.visible = true
+	# Продажа «за ролик» из-под земли сдаёт всё разом — там отметок нет, и плитка
+	# предупреждает сразу.
+	_need.warn = bool(o.get("selected", String(o.get("kind", "")) == "sell"))
+	if _need.warn:
+		_rim.modulate = COL_NEED
 
 
 ## Твин нельзя создать, пока узел вне дерева, поэтому плитку, собранную до

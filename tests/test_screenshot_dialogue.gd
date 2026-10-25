@@ -57,6 +57,8 @@ func _ready() -> void:
 	# Настройки читаются при старте main-сцены, поэтому «меньше движения» ставим уже после неё.
 	Settings.reduce_motion = _calm
 	if _en:
+		# Режиссёр при play() сверяет язык с Settings.language — иначе вернёт «ru».
+		Settings.language = "en"
 		StoryText.load_locale("en")
 	for e in StoryData.depth_scenes():
 		StoryState.mark_seen(String(e.id))

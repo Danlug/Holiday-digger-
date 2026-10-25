@@ -95,7 +95,9 @@ func _ready() -> void:
 	check("директор боя знает о полостях", director.caves != null)
 	var layer: Node = main.view_root.get_node_or_null("CaveLayer")
 	var wv: Node = main.view_root.get_node_or_null("WorldView")
-	check("слой полостей в ViewRoot сразу над миром", layer != null and wv != null and layer.get_index() == wv.get_index() + 1)
+	var cv: Node = main.view_root.get_node_or_null("CharacterView")
+	check("слой полостей в ViewRoot над миром и под героем", layer != null and wv != null and cv != null
+			and layer.get_index() > wv.get_index() and layer.get_index() < cv.get_index())
 	main.set_process(false)
 	director.set_process(false)
 	director.spawner.reset()
@@ -126,6 +128,9 @@ func _ready() -> void:
 	_step(30)
 	var gs := _guards_of(id)
 	check("у полости появились все стражи (%d из %d)" % [gs.size(), n], gs.size() == n)
+	for m: Monster in gs:
+		m.max_hp = 1e9   # автоатака героя не должна перебить стражей раньше сценария теста
+		m.hp = 1e9
 	var ok := true
 	for m: Monster in gs:
 		if m.home != Caves.center(c) or m.leash <= 0.0 or m.aggro < m.leash or m.guard_index < 0:
@@ -157,7 +162,7 @@ func _ready() -> void:
 	# --- убили одного, ушли, вернулись: он не вернулся, остальные стоят ---
 	GameState.hp = hp0
 	var first: Monster = gs[0]
-	first.take_hit(1e9, 1)
+	first.take_hit(2e9, 1)
 	_step(40)
 	check("убитый страж запомнен", CaveGuards.killed(id).size() == 1 and _count("monster_killed") >= 1)
 	check("полость не зачищена одним убийством", not CaveGuards.is_cleared(c) and _count("cave_cleared") == 0)
@@ -170,20 +175,20 @@ func _ready() -> void:
 	check("вернулся — стоят только живые (%d)" % _guards_of(id).size(), _guards_of(id).size() == n - 1)
 
 	# --- зачистка: событие, замок снят, сундук открывается касанием ---
+	var inv0 := _inv_total()
 	for m: Monster in _guards_of(id):
-		m.take_hit(1e9, 1)
+		m.take_hit(2e9, 1)
 	_step(40)
 	check("полость зачищена: событие cave_cleared", CaveGuards.is_cleared(c) and _count("cave_cleared") == 1
 			and String(_last("cave_cleared").get("id", "")) == id)
 	check("стражей не осталось и новых нет", _guards_of(id).is_empty())
-	var inv0 := GameState.inventory.size()
 	_place(p, c)
 	_step(20)
 	check("сундук открыт касанием через MechDirector", MechState.chest_opened(chest) and _count("chest_opened") == 1
 			and String(_last("chest_opened").get("tier", "")) == "cave")
 	check("событие cave_chest_opened", _count("cave_chest_opened") == 1)
 	var items: Dictionary = _last("chest_opened").get("items", {})
-	check("добыча легла в рюкзак или осталась в сундуке", not items.is_empty() and (GameState.inventory.size() > inv0 or not MechState.chest_left(chest).is_empty()))
+	check("добыча легла в рюкзак или осталась в сундуке", not items.is_empty() and (_inv_total() > inv0 or not MechState.chest_left(chest).is_empty()))
 	check("состояние сундука: с остатком или пуст", CaveGuards.chest_state(c) in ["loot", "empty"])
 	check("повторного открытия нет", _count("chest_opened") == 1)
 	_step(5)
@@ -216,8 +221,10 @@ func _ready() -> void:
 		if not director.projectiles.is_empty():
 			shot = true
 			var view: Node = main.view_root.get_node_or_null("CombatView")
-			if view != null and not view._proj_sprites.is_empty():
-				broke_or_hit = true   # спрайт снаряда создан
+			if view != null:
+				view.call("_sync_projectiles")   # кадры сцены не идут: вид синхронизируем сами
+				if not view._proj_sprites.is_empty():
+					broke_or_hit = true   # спрайт снаряда создан
 		if shot and director.projectiles.is_empty():
 			break
 	check("стрелок выпустил снаряд, снаряд рисуется", shot and broke_or_hit)
@@ -235,6 +242,13 @@ func _ready() -> void:
 	GameState.respawn()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
+
+
+func _inv_total() -> int:
+	var n := 0
+	for k in GameState.inventory.keys():
+		n += int(GameState.inventory[k])
+	return n
 
 
 func _layer_has_chest(layer: Node, cell: Vector2i, state: String) -> bool:

@@ -307,7 +307,8 @@ static func air_cells(c: Dictionary) -> Array:
 	return out
 
 
-## Клетки пола: воздух, под которым не воздух (кромка или алтарь).
+## Клетки пола: воздух, под которым не воздух (кромка). Клетка сундука (над алтарём)
+## полом не считается — стражи на сундуке не стоят.
 static func floor_cells(c: Dictionary) -> Array:
 	if c.has("floor"):
 		return c["floor"]
@@ -315,6 +316,8 @@ static func floor_cells(c: Dictionary) -> Array:
 	for cell: Vector2i in air_cells(c):
 		var dx := cell.x - int(c.cx)
 		var dy := cell.y - int(c.cy)
+		if dx == 0 and dy == 0:
+			continue
 		var below_air := in_shape(c, dx, dy + 1) and not (dx == 0 and dy + 1 == 1)
 		if not below_air:
 			out.append(cell)

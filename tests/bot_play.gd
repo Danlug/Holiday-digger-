@@ -79,6 +79,7 @@ var goal_name := ""               # пусто — без стратегии (к
 var G: Dictionary = {}
 var _char_given := false
 var _skip_onb := false
+var _start_depth := 0             # FAST-старт сразу на глубине (DEPTH=… в tools/bot_play.sh): полости и стражи с 1500 (раунд 5)
 var _cp_sec := 0.0                # сейв-«снимок» каждые N игровых секунд (для снимков рендером утром)
 var _next_cp := 0.0
 var _flush_sec := 600.0           # телеметрия на диск каждые N игровых секунд (ночной прогон не теряет итог)
@@ -178,6 +179,8 @@ func _ready() -> void:
 			goal_name = a.substr(7)
 		elif a == "--skip-onboarding":
 			_skip_onb = true
+		elif a.begins_with("--depth="):
+			_start_depth = int(a.substr(8))
 		elif a.begins_with("--checkpoint="):
 			_cp_sec = float(a.substr(13)) * 60.0
 		elif a.begins_with("--flush="):
@@ -280,6 +283,8 @@ func _run() -> void:
 		T.meta["resumed_from"] = {"max_depth": GameState.max_depth_reached, "coins": GameState.coins, "tool": GameState.current_tool}
 	elif _skip_onb:
 		_fast_start()
+		if _start_depth > 0:
+			_deep_start(_start_depth)
 		await _frames_n(3)
 		T.mark("onboarding_done", _sim)
 	else:
@@ -1029,6 +1034,25 @@ func _fast_start() -> void:
 		world.unlock_pre_autodig_garden()
 	player.teleport_home()
 	_activity = "free"
+
+
+## Старт на глубине (раунд 5, полости и стражи с 1500): карман в породе, герой в нём,
+## туман открыт, рекорд глубины и несколько ступеней HP — как у игрока, дошедшего сюда.
+func _deep_start(depth: int) -> void:
+	for x in range(15, 19):
+		for y in range(depth - 1, depth + 1):
+			world.diffs[y * WorldGen.WIDTH + x] = true
+	world.mark_changed()
+	player.x = 16.5
+	player.y = float(depth) + 0.6
+	player.vx = 0.0
+	player.vy = 0.0
+	player.on_ground = true
+	GameState.house_is_indoors = false
+	GameState.max_depth_reached = maxi(GameState.max_depth_reached, depth)
+	if main != null and main.fog != null:
+		main.fog.reveal_around(player.x, player.y, 6, 6)
+	T.event(_sim, "deep_start", "старт на глубине %d" % depth)
 
 
 func _abort() -> void:

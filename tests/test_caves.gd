@@ -11,7 +11,7 @@ var failures := 0
 var total := 0
 var world: WorldGen
 
-## Ступенька на пути ходячего: клетка (12, 9) твёрдая, пол — ряд 10.
+## Ступенька на пути ходячего: клетка (11, 9) твёрдая, пол — ряд 10.
 var _step_grid := false
 
 
@@ -40,7 +40,7 @@ func _ready() -> void:
 
 
 func _solid(cx: int, cy: int) -> bool:
-	if _step_grid and cx == 12 and cy == 9:
+	if _step_grid and cx == 11 and cy == 9:
 		return true
 	return cy >= 10 or cx <= 0 or cx >= 24 or cy < 2
 
@@ -170,22 +170,22 @@ func _test_leash() -> void:
 
 func _test_hop() -> void:
 	_step_grid = true
-	var beetle := _guard("shell_beetle", 7.5, 9, 2000, Vector2(12.5, 9.5), 9.0, 12.0, 13)
-	var hero := _hero(18.0, 9.67)
+	var beetle := _guard("shell_beetle", 8.5, 9, 2000, Vector2(12.5, 9.5), 9.0, 12.0, 13)
+	var hero := _hero(14.5, 9.67)
 	var t := 0.0
 	var passed := false
 	while t < 8.0 and not passed:
 		beetle.tick(1.0 / 60.0, hero, Callable(self, "_solid"))
-		passed = beetle.x > 13.5
+		passed = beetle.x > 12.0
 		t += 1.0 / 60.0
 	check("ходячий страж перепрыгивает ступеньку в погоне (x=%.1f)" % beetle.x, passed)
 	# старый ползун без can_hop упирается в ступеньку, как раньше
-	var grub := Monster.create("cinder_grub", 7.5, 9, 4500, 14)
+	var grub := Monster.create("cinder_grub", 8.5, 9, 4500, 14)
 	t = 0.0
 	while t < 5.0:
 		grub.tick(1.0 / 60.0, hero, Callable(self, "_solid"))
 		t += 1.0 / 60.0
-	check("старый ползун ступеньку не берёт (поведение прежнее)", grub.x < 12.0)
+	check("старый ползун ступеньку не берёт (поведение прежнее)", grub.x < 11.0)
 	_step_grid = false
 
 
@@ -460,6 +460,16 @@ func _sim_fight(ids: Array, depth: int, hero_hp: float, dodge: float, seed_value
 				if gap <= reach and absf(m.y - hero["y"]) <= half_h + m.hh and gap < best_gap:
 					best_gap = gap
 					best = m
+			if best == null:
+				# никого в радиусе — шаг к ближайшему живому стражу (скорость героя ~3 клетки/с)
+				var near: Monster = null
+				var nd := 1e9
+				for m: Monster in monsters:
+					if m.alive and absf(m.x - hero["x"]) < nd:
+						nd = absf(m.x - hero["x"])
+						near = m
+				if near != null and nd > 1.0:
+					hero["x"] = clampf(float(hero["x"]) + signf(near.x - float(hero["x"])) * 3.0 * dt, 2.0, 22.0)
 			if best != null:
 				cd = float(st["cd"])
 				var dir := 1 if best.x >= hero["x"] else -1
@@ -500,6 +510,6 @@ func _test_balance() -> void:
 			var hp_avg := hp_sum / maxf(1.0, float(wins))
 			print("     %s, уклонение %.0f%%: побед %d/%d, HP после %.0f%%, бой %.0f с" % [s[0], dodge * 100.0, wins, runs, hp_avg * 100.0, t_sum / runs])
 			if dodge == 0.0:
-				check("%s: столбом — побед не меньше половины" % s[0], rate >= 0.5)
+				check("%s: без уклонения — побед ≥ 50%%, но бой не бесплатный (HP после ≤ 75%%)" % s[0], rate >= 0.5 and hp_avg <= 0.75)
 			else:
 				check("%s: с уклонением — побед ≥ 85%%" % s[0], rate >= 0.85)

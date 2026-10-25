@@ -155,6 +155,10 @@ func take_hit(amount: float, dir: int, knock: float = 3.0) -> float:
 		vx = 0.0
 		return amount
 	var armored := bool(def.get("super_armor", false)) or state == "leap" or state == "dash"
+	# stagger_chance (стражи полостей): панцирный жук от удара шатается не всегда —
+	# иначе кирка 0.7 с сбивала бы каждый его замах, и бой был бы без риска
+	if not armored and rng.randf() >= float(def.get("stagger_chance", 1.0)):
+		armored = true
 	if not armored:
 		stun = 0.25
 		state = "stagger"
@@ -284,6 +288,15 @@ func _ai_return(dt: float, solid: Callable) -> void:
 	_hop_if_blocked()
 
 
+## Есть ли пол перед монстром. Страж полости (can_hop) считает полом и ступеньку
+## на клетку ниже: пол круга или звезды — лесенка, с которой он сходит, а не стоит.
+func _floor_ahead(solid: Callable, dir: int) -> bool:
+	var fx := x + float(dir) * (hw + 0.12)
+	if _solid_at(solid, fx, y + hh + 0.1):
+		return true
+	return bool(def.get("can_hop", false)) and _solid_at(solid, fx, y + hh + 1.1)
+
+
 ## Ступенька на пути (пол полости не ровный): ходячий страж перепрыгивает одну клетку.
 func _hop_if_blocked() -> void:
 	if _blocked_x and on_ground and bool(def.get("can_hop", false)):
@@ -368,7 +381,7 @@ func _ai_crawler(dt: float, hero: Dictionary, hero_ok: bool, solid: Callable, ev
 				facing = _dir
 			if on_ground and state != "windup":
 				var wall_ahead := _solid_at(solid, x + float(_dir) * (hw + 0.1), y)
-				var floor_ahead := _solid_at(solid, x + float(_dir) * (hw + 0.12), y + hh + 0.1)
+				var floor_ahead := _floor_ahead(solid, _dir)
 				var hero_below := d.y > 1.2 and absf(d.x) < 2.0
 				if wall_ahead or (not floor_ahead and not (state == "chase" and hero_below)):
 					if state == "patrol":
@@ -439,8 +452,7 @@ func _ai_shooter(dt: float, hero: Dictionary, hero_ok: bool, solid: Callable, ev
 				facing = _dir
 				if on_ground:
 					var wall_ahead := _solid_at(solid, x + float(_dir) * (hw + 0.1), y)
-					var floor_ahead := _solid_at(solid, x + float(_dir) * (hw + 0.12), y + hh + 0.1)
-					if wall_ahead or not floor_ahead:
+					if wall_ahead or not _floor_ahead(solid, _dir):
 						_dir = -_dir
 						facing = _dir
 						vx = float(_dir) * speed_cfg("speed")

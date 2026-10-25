@@ -1011,11 +1011,12 @@ func _position_hotspot_buttons() -> void:
 	var n := _hotspot_buttons.size()
 	if n == 0:
 		return
-	var hero_center_x: float = _hero.position.x + HERO_W * HERO_SCALE / 2.0
+	var hero_center_x: float = _hero.position.x + _hero_frame_u.x * HERO_SCALE / 2.0
 	# Над макушкой, а не над рамкой кадра: в кадре 48×48 у героя сверху шесть
 	# пустых пикселей, и после увеличения это уже тридцать — пузырь висел бы
 	# заметно выше головы. Кончик хвостика — в паре точек над макушкой.
-	var top_y: float = _hero.position.y + 6.0 * HERO_SCALE - HouseBubble.H - 2.0
+	# (Рост героя 40 точек: макушка — на 40 выше линии земли кадра.)
+	var top_y: float = _hero.position.y + (_hero_frame_u.y - 40.0) * HERO_SCALE - HouseBubble.H - 2.0
 	var gap := 6.0
 	var total := float(n) * HouseBubble.W + gap * float(n - 1)
 	var hi: float = maxf(4.0, _view_w - total - 4.0)
@@ -1230,7 +1231,8 @@ func _update_door_props(cam_x: float) -> void:
 func float_at_hero(text: String, color: Color) -> void:
 	if _hero == null:
 		return
-	var head := _hero.position + Vector2(HERO_W * HERO_SCALE * 0.5 - 10.0, 6.0 * HERO_SCALE - 56.0)
+	var head := _hero.position + Vector2(_hero_frame_u.x * HERO_SCALE * 0.5 - 10.0,
+			(_hero_frame_u.y - 40.0) * HERO_SCALE - 56.0)
 	HouseArt.float_number(_stage, head, text, color)
 
 

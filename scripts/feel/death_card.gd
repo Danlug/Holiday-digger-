@@ -5,7 +5,7 @@ extends CanvasLayer
 ## игрок получал тост «Ты погиб. Минералы потеряны…» на три секунды и не мог
 ## ни пересчитать потерю, ни понять, что осталось при нём.
 ##
-## Правила смерти ГДД §7: теряется весь рюкзак, кроме чёрного ящика, и с
+## Правила смерти ГДД §7: теряется весь рюкзак и с
 ## раунда 4 — 200 монет «скорой» (не в минус, scripts/house/healing.gd);
 ## уровень, прокачка, карта, артефакты и рекорды целы. Карточка эти правила
 ## только показывает.
@@ -35,15 +35,9 @@ static func build_report(lost: Dictionary, death_depth: int, cause: String, fee:
 		rows.append({"id": String(id), "count": n, "value": price * n, "price": price})
 		total += price * n
 	rows.sort_custom(func(a, b): return a["value"] > b["value"] or (a["value"] == b["value"] and String(a["id"]) < String(b["id"])))
-	var box: Array = []
-	for id in GameState.black_box.keys():
-		box.append({"id": String(id), "count": int(GameState.black_box[id])})
-	box.sort_custom(func(a, b): return String(a["id"]) < String(b["id"]))
 	return {
 		"lost": rows,
 		"lost_value": total,
-		"box": box,
-		"box_cap": GameState.get_black_box_capacity(),
 		"coins": GameState.coins,
 		"level": GameState.level,
 		"depth": death_depth,
@@ -54,12 +48,11 @@ static func build_report(lost: Dictionary, death_depth: int, cause: String, fee:
 
 
 ## Нужна ли карточка вообще: только после онбординга (сцена смерти из §9 играет
-## своя) и только если было что показать — потерю или то, что уцелело.
+## своя) и только если было что показать — потерю, плату скорой или глубину.
 static func worth_showing(report: Dictionary) -> bool:
 	if not StoryState.has_flag("gold_sold"):
 		return false
-	return not (report["lost"] as Array).is_empty() or not (report["box"] as Array).is_empty() \
-			or int(report["depth"]) > 0 or int(report.get("fee", 0)) > 0
+	return not (report["lost"] as Array).is_empty() or int(report["depth"]) > 0 or int(report.get("fee", 0)) > 0
 
 
 func _ready() -> void:
@@ -162,7 +155,7 @@ func _build_header() -> Control:
 	h.add_theme_constant_override("separation", 6)
 	var skull := MetaUiKit.icon_rect(MetaUiKit.tex("skull"), 28)
 	h.add_child(skull)
-	Tip.bind(skull, "Смерть", "Рюкзак потерян, скорая забрала до %d монет. Уровень, прокачка и всё, что в чёрном ящике, остались." % Healing.death_fee_coins())
+	Tip.bind(skull, "Смерть", "Рюкзак потерян, скорая забрала до %d монет. Уровень и прокачка остались." % Healing.death_fee_coins())
 	var depth := MetaUiKit.chip(UiIcons.tex("depth"), str(int(_report["depth"])), MetaUiKit.BLUE, 14, 12)
 	Tip.bind(depth, "Глубина смерти", "На какой глубине ты погиб.", str(int(_report["depth"])))
 	h.add_child(depth)
@@ -280,11 +273,9 @@ func _build_kept() -> Control:
 	v.add_theme_constant_override("separation", 4)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 5)
-	var safe := MetaUiKit.icon_rect(UiIcons.tex("blackbox"), 16)
-	safe.mouse_filter = Control.MOUSE_FILTER_PASS
-	Tip.bind(safe, "Чёрный ящик", "Его содержимое при смерти не пропадает.")
-	head.add_child(safe)
-	head.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), MetaUiKit.compact(int(_report["coins"])), MetaUiKit.GOLD_LIGHT, 13, 11))
+	var coins := MetaUiKit.chip(MetaUiKit.tex("coin"), MetaUiKit.compact(int(_report["coins"])), MetaUiKit.GOLD_LIGHT, 13, 11)
+	Tip.bind(coins, "Монеты при тебе", "Всё, что не забрала скорая, осталось.", MetaUiKit.compact(int(_report["coins"])))
+	head.add_child(coins)
 	var lvl := MetaUiKit.chip(MetaUiKit.tex("star"), str(int(_report["level"])), MetaUiKit.BLUE, 13, 11)
 	Tip.bind(lvl, "Уровень и прокачка сохранены", "Опыт, очки навыков и разведанная карта при смерти не теряются.", str(int(_report["level"])))
 	head.add_child(lvl)
@@ -292,22 +283,6 @@ func _build_kept() -> Control:
 	Tip.bind(rec, "Рекорд глубины", "Лучшая глубина за всю игру.", str(int(_report["max_depth"])))
 	head.add_child(rec)
 	v.add_child(head)
-
-	var cap := maxi(1, int(_report["box_cap"]))
-	var items: Array = _report["box"]
-	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", 3)
-	for i in cap:
-		if i < items.size():
-			var e: Dictionary = items[i]
-			slots.add_child(_item_tile(String(e["id"]), int(e["count"]), Balance.get_mineral_price(String(e["id"])), false))
-		else:
-			var empty := PanelContainer.new()
-			empty.custom_minimum_size = Vector2(40, 40)
-			empty.add_theme_stylebox_override("panel", MetaUiKit.box(Color(0, 0, 0, 0.25), MetaUiKit.BORDER, 1, 3))
-			Tip.bind(empty, "Ячейка чёрного ящика пуста", "То, что лежит в ящике, при смерти не пропадает.")
-			slots.add_child(empty)
-	v.add_child(slots)
 	return v
 
 

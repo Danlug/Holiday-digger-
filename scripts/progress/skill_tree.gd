@@ -1,7 +1,11 @@
 class_name SkillTree
 extends Control
-## Дерево прокачки (ГДД раздел 11): восемь веток — восемь колонок-«стволов»,
-## ступени идут вниз, как шахта. Ступени ветки соединены линией; пройденные
+## Дерево прокачки (ГДД раздел 11): ветка — колонка-«ствол», ступени идут
+## вниз, как шахта. Колонки делят ширину поровну (сколько бы веток ни было в
+## data/upgrades.json); ветка с требованием-предком (поле requires) стоит
+## справа от предка, её ступени начинаются ниже нужной ступени предка, и от
+## той к стволу ветки идёт линия-связь. Пока предок не открыт, следующая
+## ступень — замок со значком нужной ветки. Ступени ветки соединены линией; пройденные
 ## подсвечены цветом ветки, следующая пульсирует золотом, остальные закрыты
 ## замком. Покупка — два нажатия: первое «взводит» узел (в нём появляется
 ## галочка и сразу всплывает подсказка с ценой и эффектом), второе по галочке
@@ -22,12 +26,16 @@ const HEAD_Y := 2.0
 const FIRST_NODE_Y := 40.0
 const PITCH := 27.0
 const ARM_SECONDS := 4.0
+## Узел не уже MIN_NODE (цель нажатия) и не шире SkillNode.SIZE; зазор между
+## колонками не меньше COL_GAP, иначе стволы сливаются.
+const MIN_NODE := 18.0
+const COL_GAP := 4.0
 
 ## Писать сейв после покупки (тесты выключают — они не должны трогать user://).
 var save_on_buy: bool = true
 
 var _branches: Array = []
-var _cols: Array = []          # {id, head, nodes, stages}
+var _cols: Array = []          # {id, head, nodes, stages, color, row0, reqs: [{branch, stage, col}]}
 var _armed: SkillNode = null
 var _arm_token: int = 0
 var _time: float = 0.0
@@ -56,11 +64,10 @@ func _on_points_changed(_points: int) -> void:
 # ---------------------------------------------------------------------------
 
 func _build() -> void:
-	var tallest := 0
-	for b: Dictionary in _branches:
+	var rows := 0
+	for b: Dictionary in display_order(_branches):
 		var id := String(b.get("id", ""))
 		var stages := int(b.get("stages", 0))
-		tallest = maxi(tallest, stages)
 		var color := HeroUi.branch_color(id)
 
 		var head := Button.new()
@@ -87,30 +94,104 @@ func _build() -> void:
 			node.pressed.connect(_on_node_pressed.bind(node))
 			add_child(node)
 			nodes.append(node)
-		_cols.append({"id": id, "head": head, "nodes": nodes, "stages": stages, "color": color})
-	custom_minimum_size = Vector2(0, FIRST_NODE_Y + float(tallest) * PITCH + 6.0)
+		# Ступени ветки-потомка начинаются строкой ниже нужной ступени предка.
+		var row0 := 0
+		var reqs: Array = []
+		for r: Dictionary in Balance.get_upgrade_requirements(id):
+			var a := _col_index(r["branch"])
+			if a < 0:
+				continue
+			reqs.append({"branch": r["branch"], "stage": r["stage"], "col": a})
+			row0 = maxi(row0, int(_cols[a]["row0"]) + int(r["stage"]))
+		_cols.append({"id": id, "head": head, "nodes": nodes, "stages": stages, "color": color,
+			"row0": row0, "reqs": reqs})
+		rows = maxi(rows, row0 + stages)
+	custom_minimum_size = Vector2(0, FIRST_NODE_Y + float(rows) * PITCH + 6.0)
 	_layout()
 
 
+## Порядок колонок: как в data/upgrades.json, но ветка с требованием встаёт
+## сразу за своим предком — тогда линия-связь короткая и не пересекает чужие
+## стволы. Ветки без предков (и с неизвестным предком) не двигаются.
+static func display_order(branches: Array) -> Array:
+	var ids: Array = []
+	for b: Dictionary in branches:
+		ids.append(String(b.get("id", "")))
+	var order: Array = []
+	var waiting: Array = []
+	for b: Dictionary in branches:
+		var parent := _parent_of(b)
+		if parent != "" and ids.has(parent):
+			waiting.append(b)
+		else:
+			order.append(b)
+	# Потомок встаёт за предком и его уже вставленными потомками; цепочка — за несколько проходов.
+	var guard := waiting.size() + 1
+	while not waiting.is_empty() and guard > 0:
+		guard -= 1
+		for b: Dictionary in waiting.duplicate():
+			var parent := _parent_of(b)
+			var at := -1
+			for i in range(order.size()):
+				if String(order[i].get("id", "")) == parent:
+					at = i
+			if at < 0:
+				continue
+			while at + 1 < order.size() and _parent_of(order[at + 1]) == parent:
+				at += 1
+			order.insert(at + 1, b)
+			waiting.erase(b)
+	order.append_array(waiting)
+	return order
+
+
+static func _parent_of(b: Dictionary) -> String:
+	var reqs := Balance.get_upgrade_requirements(String(b.get("id", "")))
+	return String(reqs[0]["branch"]) if not reqs.is_empty() else ""
+
+
+func _col_index(branch_id: String) -> int:
+	for i in range(_cols.size()):
+		if _cols[i]["id"] == branch_id:
+			return i
+	return -1
+
+
+func _pitch_x() -> float:
+	return size.x / float(maxi(_cols.size(), 1))
+
+
 func _col_x(i: int) -> float:
-	var n := maxi(_cols.size(), 1)
-	return size.x / float(n) * (float(i) + 0.5)
+	return _pitch_x() * (float(i) + 0.5)
 
 
-func _node_center_y(k: int) -> float:
-	return FIRST_NODE_Y + SkillNode.SIZE * 0.5 + float(k) * PITCH
+## Сторона узла по ширине колонки: 22 при восьми колонках на 216, меньше — если веток больше.
+func _node_side() -> float:
+	return clampf(_pitch_x() - COL_GAP, MIN_NODE, SkillNode.SIZE)
+
+
+func _row_y(col: Dictionary, k: int) -> float:
+	return FIRST_NODE_Y + float(int(col["row0"]) + k) * PITCH
+
+
+func _node_center_y(col: Dictionary, k: int) -> float:
+	return _row_y(col, k) + SkillNode.SIZE * 0.5
 
 
 func _layout() -> void:
+	var side := _node_side()
 	for i in range(_cols.size()):
 		var col: Dictionary = _cols[i]
 		var cx := _col_x(i)
 		var head: Control = col["head"]
-		head.position = Vector2(cx - HEAD * 0.5, HEAD_Y)
+		head.custom_minimum_size = Vector2(side, HEAD)
+		head.size = Vector2(side, HEAD)
+		head.position = Vector2(cx - side * 0.5, HEAD_Y)
 		var nodes: Array = col["nodes"]
 		for k in range(nodes.size()):
-			var node: Control = nodes[k]
-			node.position = Vector2(cx - SkillNode.SIZE * 0.5, FIRST_NODE_Y + float(k) * PITCH)
+			var node: SkillNode = nodes[k]
+			node.set_side(side)
+			node.position = Vector2(cx - side * 0.5, _row_y(col, k) + (SkillNode.SIZE - side) * 0.5)
 	queue_redraw()
 
 
@@ -125,13 +206,20 @@ func refresh() -> void:
 	for col: Dictionary in _cols:
 		var id: String = col["id"]
 		var stage := GameState.get_skill_stage(id)
+		var unmet := GameState.unmet_skill_requirements(id)
 		var nodes: Array = col["nodes"]
 		for k in range(nodes.size()):
 			var node: SkillNode = nodes[k]
 			var number := k + 1
 			var cost := Balance.get_upgrade_stage_cost(id, number)
+			node.need_branch = ""
 			if number <= stage:
 				node.set_state(SkillNode.State.DONE, cost)
+			elif number == stage + 1 and not unmet.is_empty():
+				# Старый сейв мог купить ступени без предка — они остаются (DONE выше),
+				# а дальше ветка ждёт предка, как у всех.
+				node.need_branch = String(unmet[0]["branch"])
+				node.set_state(SkillNode.State.BLOCKED, cost)
 			elif number == stage + 1:
 				node.set_state(SkillNode.State.NEXT_READY if cost >= 0 and points >= cost
 					else SkillNode.State.NEXT_POOR, cost)
@@ -140,7 +228,7 @@ func refresh() -> void:
 			if node == _armed and node.state != SkillNode.State.NEXT_READY:
 				_disarm()
 			_bind_node_tip(node, id, number, stage, cost, points)
-		_bind_head_tip(col, stage)
+		_bind_head_tip(col, stage, unmet)
 		(col["head"] as Control).queue_redraw()
 	queue_redraw()
 
@@ -163,10 +251,24 @@ func _bind_node_tip(node: SkillNode, id: String, number: int, stage: int, cost: 
 			extra = "Цена: %d оч. Не хватает %d" % [cost, cost - points]
 	else:
 		extra = "Сначала открой ступень %d" % (stage + 1)
+	if node.state == SkillNode.State.BLOCKED:
+		extra = "Сначала " + requirements_text(GameState.unmet_skill_requirements(id))
+		if cost >= 0:
+			extra += ". Цена: %d оч." % cost
 	Tip.set_text(node, title, body, extra)
 
 
-func _bind_head_tip(col: Dictionary, stage: int) -> void:
+## «„Удача — шанс“, ступень 1 (сейчас 0)» — по одному на требование.
+static func requirements_text(reqs: Array) -> String:
+	var parts: PackedStringArray = []
+	for r: Dictionary in reqs:
+		var name := String(Balance.get_upgrade_branch(r["branch"]).get("name_ru", r["branch"]))
+		parts.append("«%s», ступень %d (сейчас %d)" % [name, int(r["stage"]),
+			GameState.get_skill_stage(r["branch"])])
+	return ", ".join(parts)
+
+
+func _bind_head_tip(col: Dictionary, stage: int, unmet: Array = []) -> void:
 	var id: String = col["id"]
 	var branch := Balance.get_upgrade_branch(id)
 	var stages: int = col["stages"]
@@ -176,6 +278,8 @@ func _bind_head_tip(col: Dictionary, stage: int) -> void:
 		extra += " — максимум"
 	elif spent > 0:
 		extra += ", вложено %d оч." % spent
+	if not unmet.is_empty():
+		extra += ". Откроется после: " + requirements_text(unmet)
 	Tip.set_text(col["head"], String(branch.get("name_ru", id)), "Сейчас: " + effect_text(branch, stage), extra)
 
 
@@ -204,6 +308,14 @@ func _deny(node: SkillNode) -> void:
 	Haptics.tap()
 	HeroUi.shake(node)
 	Tip.show_now(node)
+	# Закрыто предком — показываем, куда нажать: следующая ступень предка подпрыгивает.
+	if node.state == SkillNode.State.BLOCKED:
+		var a := _col_index(node.need_branch)
+		if a >= 0:
+			var anc: Array = _cols[a]["nodes"]
+			var next := GameState.get_skill_stage(node.need_branch)
+			if next < anc.size():
+				HeroUi.bounce(anc[next], 1.2)
 
 
 func _arm(node: SkillNode) -> void:
@@ -317,8 +429,8 @@ func _start_flash(branch_id: String, stage: int) -> void:
 		var col: Dictionary = _cols[i]
 		if col["id"] != branch_id:
 			continue
-		var y1 := _node_center_y(stage - 1)
-		var y0 := _node_center_y(stage - 2) if stage > 1 else HEAD_Y + HEAD
+		var y1 := _node_center_y(col, stage - 1)
+		var y0 := _node_center_y(col, stage - 2) if stage > 1 else HEAD_Y + HEAD
 		_flash_line = {"x": _col_x(i), "y0": y0, "y1": y1, "t": 0.0, "color": col["color"],
 			"node": (col["nodes"] as Array)[stage - 1]}
 		return
@@ -356,6 +468,8 @@ func _burst(at: Vector2, color: Color) -> void:
 
 
 func _draw() -> void:
+	_draw_links()
+	var half := _node_side() * 0.5
 	for i in range(_cols.size()):
 		var col: Dictionary = _cols[i]
 		var cx := _col_x(i)
@@ -364,9 +478,9 @@ func _draw() -> void:
 		var stages: int = col["stages"]
 		var y_prev := FIRST_NODE_Y - 4.0
 		for k in range(stages):
-			var y := _node_center_y(k)
-			var y_from := y_prev if k == 0 else _node_center_y(k - 1) + SkillNode.SIZE * 0.5
-			var y_to := y - SkillNode.SIZE * 0.5
+			var y := _node_center_y(col, k)
+			var y_from := y_prev if k == 0 else _node_center_y(col, k - 1) + half
+			var y_to := y - half
 			var line_color := Color(0.16, 0.13, 0.1)
 			var width := 3.0
 			if k + 1 <= stage:
@@ -402,6 +516,20 @@ func _draw() -> void:
 		draw_rect(Rect2((s["pos"] as Vector2) - Vector2(1, 1), Vector2(2, 2)), sc)
 
 
+## Линия-связь «предок → потомок»: от нужной ступени предка вбок до ствола
+## потомка. Требование выполнено — линия цвета предка, нет — тёмная.
+func _draw_links() -> void:
+	for i in range(_cols.size()):
+		var col: Dictionary = _cols[i]
+		for r: Dictionary in col["reqs"]:
+			var anc: Dictionary = _cols[int(r["col"])]
+			var met := GameState.get_skill_stage(r["branch"]) >= int(r["stage"])
+			var y := _node_center_y(anc, int(r["stage"]) - 1)
+			var c: Color = anc["color"] if met else Color(0.16, 0.13, 0.1)
+			draw_line(Vector2(_col_x(int(r["col"])), y), Vector2(_col_x(i), y), c, 3.0)
+			draw_circle(Vector2(_col_x(i), y), 3.0, c)
+
+
 func _draw_head(head: Button) -> void:
 	var id: String = head.get_meta("branch_id")
 	var color: Color = head.get_meta("color")
@@ -411,10 +539,15 @@ func _draw_head(head: Button) -> void:
 		if col["id"] == id:
 			stages = col["stages"]
 	var maxed := stages > 0 and stage >= stages
-	var sb := HeroUi.box(color.darkened(0.65), ProgressUiKit.GOLD if maxed else color, 5, 2 if maxed else 1)
+	var blocked := not GameState.unmet_skill_requirements(id).is_empty()
+	var border := ProgressUiKit.GOLD if maxed else (color.darkened(0.45) if blocked else color)
+	var sb := HeroUi.box(color.darkened(0.8 if blocked else 0.65), border, 5, 2 if maxed else 1)
 	head.draw_style_box(sb, Rect2(Vector2.ZERO, head.size))
 	var icon := HeroIcons.skill_icon(id)
 	if icon != null:
-		head.draw_texture_rect(icon, Rect2((head.size - Vector2(16, 16)) * 0.5, Vector2(16, 16)), false)
+		head.draw_texture_rect(icon, Rect2((head.size - Vector2(16, 16)) * 0.5, Vector2(16, 16)), false,
+			Color(1, 1, 1, 0.5) if blocked else Color.WHITE)
+	if blocked:
+		head.draw_texture_rect(HeroIcons.get_icon("ui_lock"), Rect2(Vector2(head.size.x - 8, -3), Vector2(11, 11)), false)
 	if maxed:
 		head.draw_texture_rect(HeroIcons.get_icon("ui_star"), Rect2(Vector2(head.size.x - 9, -4), Vector2(12, 12)), false)

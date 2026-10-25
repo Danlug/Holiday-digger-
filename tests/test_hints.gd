@@ -343,6 +343,22 @@ func _scenarios() -> Dictionary:
 		"gear_new": {
 			"on": func() -> void: GameState.owned_gear.append(gear_id),
 			"off": func() -> void: GameState.owned_gear.clear()},
+		# ветка guidance: открылся рецепт проекта — снимается, когда проект собран
+		"project_hand_drill": {
+			"on": func() -> void:
+				GameState.owned_tools.erase("hand_drill")
+				GameState.max_depth_reached = maxi(GameState.max_depth_reached, int(ProjectChain.def("hand_drill")["unlock_depth"])),
+			"off": func() -> void: GameState.owned_tools.append("hand_drill")},
+		"project_well": {
+			"on": func() -> void:
+				GameState.well_level = 0
+				GameState.max_depth_reached = maxi(GameState.max_depth_reached, int(ProjectChain.def("well")["unlock_depth"])),
+			"off": func() -> void: GameState.well_level = 1},
+		"project_drill_rig": {
+			"on": func() -> void:
+				GameState.owned_tools.erase("drill_rig")
+				GameState.max_depth_reached = maxi(GameState.max_depth_reached, int(ProjectChain.def("drill_rig")["unlock_depth"])),
+			"off": func() -> void: GameState.owned_tools.append("drill_rig")},
 	}
 
 

@@ -5,7 +5,7 @@ extends RefCounted
 ## пункте меню) гаснут, когда игрок откроет вкладку достижений.
 
 ## Предметы, которые подбираются, но «видом добычи» не считаются.
-const NOT_A_KIND := ["energy_bar", "energy_drink", "fuel_block", "bronze", "food_soup", "food_dumplings"]
+const NOT_A_KIND := ["energy_bar", "energy_drink", "fuel_block", "bronze", "food_soup", "food_dumplings", "medkit"]
 
 
 static func is_kind(id: String) -> bool:

@@ -150,6 +150,7 @@ func _check_tech_and_world_targets() -> void:
 func _check_marks() -> void:
 	var d: HintDirector = HintDirector.instance()
 	GameState.max_depth_reached = 150   # пункт «Техника» открывается с глубины 100
+	HintState.mark_entry_opened("projects")   # «Проекты» (ветка guidance) видны всегда — проверяем одну «Технику»
 	await _wait(0.4)
 	d.marks.refresh()
 	await _frames(2)

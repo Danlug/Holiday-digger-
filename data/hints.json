@@ -36,7 +36,7 @@
 	},
 
 	"menu_new": {
-		"entries": ["tech", "meta_rewards", "equipment"],
+		"entries": ["tech", "meta_rewards", "equipment", "projects"],
 		"note": "пункты меню «•••» с красным ярлыком «new», пока игрок не открыл их ни разу; новые подсистемы дописывают свой id сюда."
 	},
 
@@ -240,6 +240,36 @@
 			"done": {"fn": "screen_open", "name": "equipment"},
 			"toast": {"icon": "gear:ui_equip", "text": "надень"},
 			"tip": ["Есть лучше надетого", "В экране «Снаряжение» тапни по предмету, чтобы надеть: броня снижает урон монстров."]
+		},
+		{
+			"id": "project_hand_drill",
+			"prio": 52,
+			"when": {"fn": "project_open", "id": "hand_drill"},
+			"target": ["attached:project_tracker", "menu:projects"],
+			"done": {"fn": "screen_open", "name": "projects"},
+			"toast": {"icon": "items:hand_drill", "text": "цель"},
+			"tip": ["Цель: ручной бур", "Собирается на верстаке из железа, бронзы и серебра. Бронзу плавят из металлолома — не продавай лом! Тап — что уже есть и где копать."],
+			"sfx": "reward"
+		},
+		{
+			"id": "project_well",
+			"prio": 51,
+			"when": {"fn": "project_open", "id": "well"},
+			"target": ["attached:project_tracker", "menu:projects"],
+			"done": {"fn": "screen_open", "name": "projects"},
+			"toast": {"icon": "shop:item_well", "text": "цель"},
+			"tip": ["Цель: буровая скважина", "Копает сама, пока тебя нет. Нужны железо, свинец и бронза из металлолома. Цепочка — в меню, «Проекты»."],
+			"sfx": "reward"
+		},
+		{
+			"id": "project_drill_rig",
+			"prio": 52,
+			"when": {"fn": "project_open", "id": "drill_rig"},
+			"target": ["attached:project_tracker", "menu:projects"],
+			"done": {"fn": "screen_open", "name": "projects"},
+			"toast": {"icon": "items:drill_rig_icon", "text": "цель"},
+			"tip": ["Цель: бурмобиль", "Никель и платина берутся только ручным буром, глубже 500 и 1000 м. Копи их на складе — цепочка в «Проектах»."],
+			"sfx": "reward"
 		},
 		{
 			"id": "gear_new",

@@ -252,6 +252,50 @@ func get_upgrade_total_cost(id: String, up_to_stage: int) -> int:
 	return total
 
 
+## Сколько очков стоит всё дерево целиком (все ветки до максимума).
+func get_upgrade_tree_total_cost() -> int:
+	var total := 0
+	for b in upgrades.get("branches", []):
+		total += get_upgrade_total_cost(String(b.get("id", "")), int(b.get("stages", 0)))
+	return total
+
+
+## Требования-предки ветки (data/upgrades.json, поле requires): любая её ступень
+## покупается, только когда у каждой ветки branch куплено не меньше stage ступеней.
+func get_upgrade_requirements(id: String) -> Array:
+	var out: Array = []
+	for r in get_upgrade_branch(id).get("requires", []):
+		if typeof(r) == TYPE_DICTIONARY and String(r.get("branch", "")) != "":
+			out.append({"branch": String(r["branch"]), "stage": maxi(1, int(_v(r.get("stage", 1))))})
+	return out
+
+
+## Очки навыков за достижение уровня level (ГДД §11): по ступеням per_level_tiers
+## плюс bonus_every_5th_level на каждом пятом. legacy — правило до раунда 4
+## (per_level за любой уровень), по нему доплачиваются старые сейвы.
+func skill_points_for_level(level: int, legacy: bool = false) -> int:
+	if level < 2:
+		return 0
+	var sp: Dictionary = upgrades.get("skill_points", {})
+	var points := int(_v(sp.get("per_level", 1)))
+	if not legacy:
+		for tier in _v(sp.get("per_level_tiers", [])):
+			if level <= int(tier.get("up_to_level", 0)):
+				points = int(tier.get("points", points))
+				break
+	if level % 5 == 0:
+		points += int(_v(sp.get("bonus_every_5th_level", 2)))
+	return points
+
+
+## Сколько очков набирается с 1-го уровня до level включительно.
+func skill_points_total(level: int, legacy: bool = false) -> int:
+	var total := 0
+	for l in range(2, level + 1):
+		total += skill_points_for_level(l, legacy)
+	return total
+
+
 # --- Конкретные формулы эффектов веток (см. GDD раздел 11) ---
 
 ## Время копки клетки с учётом ступени "Скорость копки": time = 3.0 * 0.96^stage.

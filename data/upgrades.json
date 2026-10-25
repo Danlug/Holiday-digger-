@@ -26,11 +26,20 @@
  "skill_points": {
   "per_level": 1,
   "bonus_every_5th_level": 2,
-  "total_by_level_100_approx": 140,
-  "total_points_needed_for_full_maxout_approx": 500,
-  "note": "игрок не может закрыть все ветки — обязан выбирать билд (см. GDD п.11)"
+  "per_level_tiers": {
+   "value": [
+    {"up_to_level": 10, "points": 1},
+    {"up_to_level": 25, "points": 2},
+    {"up_to_level": 100, "points": 3}
+   ],
+   "proposed": true,
+   "note": "Решение владельца (раунд 4): «уровни дают постепенно больше очков». Уровень до up_to_level включительно даёт points очков, каждый 5-й — ещё bonus_every_5th_level. До 10-го уровня — как раньше (per_level), дальше 2 и 3. Таблица и время до уровней — ГДД §11"
+  },
+  "legacy_note": "per_level — правило до раунда 4 (одно очко за любой уровень); по нему считается доплата старым сейвам (GameState.top_up_skill_points)",
+  "total_by_level_100_approx": 304,
+  "total_points_needed_for_full_maxout_approx": 485,
+  "note": "игрок не может закрыть все ветки — обязан выбирать билд (см. GDD п.11); точные суммы считает Balance.skill_points_total / get_upgrade_tree_total_cost"
  },
- "total_points_to_max_all_branches": 540,
  "branches": [
   {
    "id": "vision",
@@ -187,6 +196,13 @@
    "id": "luck_multiplier",
    "name_ru": "Удача — множитель",
    "stages": 3,
+   "requires": [
+    {
+     "branch": "luck_chance",
+     "stage": 1,
+     "note": "решение владельца (раунд 4): множитель не сдвигать, а открывать после ступени «удачливой раскопки»"
+    }
+   ],
    "effect": {
     "type": "table",
     "values": [

@@ -211,13 +211,15 @@ func get_max_hp() -> float:
 	return float(Balance.get_max_hp(get_skill_stage("hp")))
 
 
-## Смерть: теряются все минералы, кроме чёрного ящика (см. GDD раздел 7).
+## Смерть: теряются все минералы, кроме чёрного ящика (см. GDD раздел 7),
+## и 200 монет «скорой» (решение владельца, раунд 4; не в минус — Healing).
 func die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
 	inventory.clear()
 	inventory_changed.emit()
+	Healing.charge_death_fee()
 	died.emit()
 
 
@@ -326,9 +328,10 @@ func _check_level_up() -> void:
 	while level < level_cap and xp >= _xp_needed_for_next_level():
 		xp -= _xp_needed_for_next_level()
 		level += 1
-		var points_awarded := int(Balance.upgrades.get("skill_points", {}).get("per_level", 1))
-		if level % 5 == 0:
-			points_awarded += int(Balance.upgrades.get("skill_points", {}).get("bonus_every_5th_level", 2))
+		# Очки растут с уровнем (ГДД §11, раунд 4); пометка правила — чтобы
+		# top_up_skill_points не доплатил этому сейву второй раз.
+		var points_awarded := Balance.skill_points_for_level(level)
+		ext[SKILL_POINTS_EXT] = SKILL_POINTS_RULE
 		skill_points_available += points_awarded
 		leveled_up.emit(level, points_awarded)
 		skill_points_changed.emit(skill_points_available)
@@ -343,11 +346,41 @@ func get_skill_stage(branch_id: String) -> int:
 	return int(skill_stages.get(branch_id, 0))
 
 
+## Невыполненные требования-предки ветки: [{branch, stage}] (пусто — можно качать).
+func unmet_skill_requirements(branch_id: String) -> Array:
+	var out: Array = []
+	for r: Dictionary in Balance.get_upgrade_requirements(branch_id):
+		if get_skill_stage(r["branch"]) < int(r["stage"]):
+			out.append(r)
+	return out
+
+
+const SKILL_POINTS_EXT := "skill_points_rule"
+const SKILL_POINTS_RULE := 2
+
+## Сейв, набравший уровни по старому правилу (одно очко за уровень), получает
+## разницу с нынешним один раз — иначе ветеран отставал бы от новичка того же
+## уровня. Купленные ступени не трогаем. Зовёт SaveSystem после загрузки.
+func top_up_skill_points() -> int:
+	if int(ext.get(SKILL_POINTS_EXT, 1)) >= SKILL_POINTS_RULE:
+		return 0
+	var diff := maxi(0, Balance.skill_points_total(level) - Balance.skill_points_total(level, true))
+	# До 10-го уровня правила совпадают: пометку не пишем, сейв остаётся как был.
+	if diff > 0:
+		ext[SKILL_POINTS_EXT] = SKILL_POINTS_RULE
+		skill_points_available += diff
+		skill_points_changed.emit(skill_points_available)
+	return diff
+
+
 ## Тратит одно очко прокачки на следующую ступень ветки branch_id.
-## Возвращает false, если очков не хватает или ветка уже на максимуме.
+## Возвращает false, если очков не хватает, ветка уже на максимуме или
+## не открыта ветка-предок (поле requires в upgrades.json).
 func spend_skill_point(branch_id: String) -> bool:
 	var branch := Balance.get_upgrade_branch(branch_id)
 	if branch.is_empty():
+		return false
+	if not unmet_skill_requirements(branch_id).is_empty():
 		return false
 	var max_stages := int(branch.get("stages", 0))
 	var current_stage := get_skill_stage(branch_id)
@@ -699,8 +732,10 @@ var ext: Dictionary = {}
 ##                  штук, у земли и камня (mineral "") — ×mult опыта
 ##   spent          {currency: String, amount: int} — списание в spend_coins/spend_dollars (любая
 ##                  покупка, еда, крафт; «бесплатно» отладки не считается)
-##   ate            {id: String, hunger: float, stamina: float} — герой поел (рюкзак или стол дома,
-##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено
+##   ate            {id: String, hunger: float, stamina: float, hp: float} — герой поел (рюкзак или стол дома,
+##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
+##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
+##   ambulance      {coins: int} — смерть: «скорая забрала» монеты (до 200, не в минус), перед сигналом died
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)

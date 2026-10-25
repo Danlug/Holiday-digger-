@@ -355,14 +355,19 @@ static func food_offers() -> Array:
 		o["icon"] = ShopArt.item_icon(id)
 		o["tier"] = ShopArt.tier_for(i, n)
 		o["title"] = HouseConfig.food_name(id)
+		var hp := Healing.food_hp_percent(id)   # еда лечит по питательности (раунд 4, healing)
 		var parts: Array = ["голод +%d%%" % hunger]
 		if stamina > 0:
 			parts.append("бодрость +%d%%" % stamina)
+		if hp > 0:
+			parts.append("здоровье +%d%%" % hp)
 		parts.append("с собой" if portable else "только дома, съедается сразу")
 		o["body"] = ", ".join(parts)
 		var effects: Array = [{"icon": ShopArt.ui("icon_hunger"), "text": "+%d" % hunger}]
 		if stamina > 0:
 			effects.append({"icon": ShopArt.ui("icon_stamina"), "text": "+%d" % stamina})
+		if hp > 0:
+			effects.append({"icon": ShopArt.ui("icon_hp"), "text": "+%d" % hp})
 		if not portable:
 			effects.append(_eff("glyph_house", ""))
 		o["effects"] = effects
@@ -436,6 +441,9 @@ static func good_effects(g: Dictionary) -> Array:
 				out.append({"icon": ShopArt.ui("icon_stamina"), "text": "+%d" % stamina})
 			if hunger > 0:
 				out.append({"icon": ShopArt.ui("icon_hunger"), "text": "+%d" % hunger})
+			var hp := Healing.food_hp_percent(String(g.get("id", "")))   # еда лечит (раунд 4)
+			if hp > 0:
+				out.append({"icon": ShopArt.ui("icon_hp"), "text": "+%d" % hp})
 		"full_restore":
 			out.append({"icon": ShopArt.ui("icon_hp"), "text": "100"})
 			out.append({"icon": ShopArt.ui("icon_stamina"), "text": "100"})
@@ -445,6 +453,9 @@ static func good_effects(g: Dictionary) -> Array:
 		"grant_item":
 			out.append({"icon": ShopArt.item_icon(String(g.get("item", ""))),
 				"text": "×%d" % maxi(1, int(g.get("count", 1)))})
+			var item_hp := Healing.item_hp_percent(String(g.get("item", "")))   # аптечка (раунд 4)
+			if item_hp > 0:
+				out.append({"icon": ShopArt.ui("icon_hp"), "text": "+%d" % item_hp})
 	return out
 
 
@@ -545,6 +556,7 @@ static func sell_offers(selected: Dictionary, remote: bool) -> Array:
 			"color": ShopArt.COL_GOLD}
 		if not remote:
 			o["selected"] = bool(selected.get(id, false))
+		ProjectChain.decorate_offer(o, id)   # «нужно для бура: 40/100» (ветка guidance)
 		out.append(o)
 	return out
 

@@ -5,10 +5,12 @@ extends CanvasLayer
 ## игрок получал тост «Ты погиб. Минералы потеряны…» на три секунды и не мог
 ## ни пересчитать потерю, ни понять, что осталось при нём.
 ##
-## Правила смерти ГДД §7: теряется весь рюкзак, кроме чёрного ящика, и с
-## раунда 4 — 200 монет «скорой» (не в минус, scripts/house/healing.gd);
-## уровень, прокачка, карта, артефакты и рекорды целы. Карточка эти правила
-## только показывает.
+## Правила смерти ГДД §7: теряется весь рюкзак и плата «скорой» — 5% монет,
+## от 50 до 5000 (раунд 5, не в минус, scripts/house/healing.gd); уровень,
+## прокачка, карта, артефакты и рекорды целы. С раунда 5 скорая ещё и везёт
+## героя наверх (DeathRide): карточка открывается сразу, ведёт отсчёт поездки
+## (полоска с фургоном) и до приезда не закрывается. Карточка эти правила только
+## показывает.
 
 signal closed
 
@@ -19,12 +21,17 @@ var _root: Control = null
 var _card: PanelContainer = null
 var _report: Dictionary = {}
 var _auto_close: Tween = null
+var _riding := false
+var _track: Control = null
+var _ride_label: Label = null
+var _ok: Button = null
 
 
 ## Отчёт о смерти — чистые данные, их проверяет тест, а не картинка.
 ## lost: словарь «предмет → штук», потерянный из рюкзака; fee — сколько монет
-## забрала скорая (событие ambulance перед died).
-static func build_report(lost: Dictionary, death_depth: int, cause: String, fee: int = 0) -> Dictionary:
+## забрала скорая (событие ambulance перед died); ride_s — сколько везёт скорая
+## (событие ambulance_ride, 0 — без поездки).
+static func build_report(lost: Dictionary, death_depth: int, cause: String, fee: int = 0, ride_s: float = 0.0) -> Dictionary:
 	var rows: Array = []
 	var total := 0
 	for id in lost.keys():
@@ -35,36 +42,32 @@ static func build_report(lost: Dictionary, death_depth: int, cause: String, fee:
 		rows.append({"id": String(id), "count": n, "value": price * n, "price": price})
 		total += price * n
 	rows.sort_custom(func(a, b): return a["value"] > b["value"] or (a["value"] == b["value"] and String(a["id"]) < String(b["id"])))
-	var box: Array = []
-	for id in GameState.black_box.keys():
-		box.append({"id": String(id), "count": int(GameState.black_box[id])})
-	box.sort_custom(func(a, b): return String(a["id"]) < String(b["id"]))
 	return {
 		"lost": rows,
 		"lost_value": total,
-		"box": box,
-		"box_cap": GameState.get_black_box_capacity(),
 		"coins": GameState.coins,
 		"level": GameState.level,
 		"depth": death_depth,
 		"max_depth": GameState.max_depth_reached,
 		"cause": cause,
 		"fee": maxi(fee, 0),
+		"ride_s": maxf(ride_s, 0.0),
 	}
 
 
 ## Нужна ли карточка вообще: только после онбординга (сцена смерти из §9 играет
-## своя) и только если было что показать — потерю или то, что уцелело.
+## своя) и только если было что показать — потерю, плату скорой или глубину.
 static func worth_showing(report: Dictionary) -> bool:
 	if not StoryState.has_flag("gold_sold"):
 		return false
-	return not (report["lost"] as Array).is_empty() or not (report["box"] as Array).is_empty() \
-			or int(report["depth"]) > 0 or int(report.get("fee", 0)) > 0
+	return not (report["lost"] as Array).is_empty() or int(report["depth"]) > 0 \
+			or int(report.get("fee", 0)) > 0 or float(report.get("ride_s", 0.0)) > 0.0
 
 
 func _ready() -> void:
 	layer = 93   # выше HUD и шторок, ниже окна дня (94) и катсцен (100)
 	visible = false
+	set_process(false)
 	add_to_group("hint_block")
 
 
@@ -76,21 +79,85 @@ func report() -> Dictionary:
 	return _report
 
 
+## Едет ли ещё скорая (карточка тогда не закрывается).
+func is_riding() -> bool:
+	return _riding
+
+
 func open(report_data: Dictionary) -> void:
 	_report = report_data
+	_riding = float(_report.get("ride_s", 0.0)) > 0.0 and DeathRide.riding()
 	_build()
 	visible = true
+	set_process(_riding)
 	Sfx.play("ui_open", 0.9)
 	if _card != null:
 		UiAnim.appear(_card, 0.88, 0.24)
-	if not UiAnim.reduced():
-		_auto_close = create_tween()
-		_auto_close.tween_interval(Feel.num("death.auto_hide_s", 7.0))
-		_auto_close.tween_callback(close)
+	_update_ride()
+	if not _riding:
+		_start_auto_close()
+	else:
+		# музыка после смерти молчит до респавна (JuiceDirector): поездка в минуту-две
+		# в тишине выглядела бы зависанием — тихая тема огорода, когда отзвучит «die»
+		var t := get_tree().create_timer(2.6)
+		t.timeout.connect(func() -> void:
+			if _riding and visible and Sfx.current_music() == "":
+				Sfx.music("mus_surface"))
+
+
+func _start_auto_close() -> void:
+	if UiAnim.reduced():
+		return
+	if _auto_close != null and _auto_close.is_valid():
+		_auto_close.kill()
+	_auto_close = create_tween()
+	_auto_close.tween_interval(Feel.num("death.auto_hide_s", 7.0))
+	_auto_close.tween_callback(close)
+
+
+## Скорая приехала (респавн): кнопка оживает, дальше — как обычная карточка.
+func ride_arrived() -> void:
+	if not _riding:
+		return
+	_riding = false
+	set_process(false)
+	_update_ride()
+	if _ok != null:
+		_ok.disabled = false
+		_ok.modulate = Color.WHITE
+		UiAnim.pulse(_ok)
+	_start_auto_close()
+
+
+func _process(_delta: float) -> void:
+	if not visible or not _riding:
+		return
+	_update_ride()
+	# респавн мимо FeelDirector (тест, отладка) — тоже приезд
+	if not DeathRide.riding():
+		ride_arrived()
+
+
+func _update_ride() -> void:
+	if _track != null:
+		_track.queue_redraw()
+	if _ride_label != null:
+		_ride_label.text = fmt_seconds(DeathRide.seconds_left()) if _riding else fmt_seconds(float(_report.get("ride_s", 0.0)))
+
+
+static func _pct_text() -> String:
+	var p := Healing.death_fee_percent()
+	return str(int(p)) if is_equal_approx(p, roundf(p)) else str(snappedf(p, 0.1))
+
+
+## «1:05», «0:42»: число без букв, как на таймерах мобильных игр.
+static func fmt_seconds(sec: float) -> String:
+	var s := int(ceil(maxf(sec, 0.0)))
+	return "%d:%02d" % [s / 60, s % 60]
 
 
 func close() -> void:
-	if not visible:
+	if not visible or _riding:
 		return
 	visible = false
 	if _auto_close != null and _auto_close.is_valid():
@@ -152,6 +219,7 @@ func _build() -> void:
 	box.add_theme_constant_override("separation", 7)
 	_card.add_child(box)
 	box.add_child(_build_header())
+	box.add_child(_build_ride())
 	box.add_child(_build_lost())
 	box.add_child(_build_kept())
 	box.add_child(_build_button())
@@ -162,7 +230,8 @@ func _build_header() -> Control:
 	h.add_theme_constant_override("separation", 6)
 	var skull := MetaUiKit.icon_rect(MetaUiKit.tex("skull"), 28)
 	h.add_child(skull)
-	Tip.bind(skull, "Смерть", "Рюкзак потерян, скорая забрала до %d монет. Уровень, прокачка и всё, что в чёрном ящике, остались." % Healing.death_fee_coins())
+	Tip.bind(skull, "Смерть", ("Рюкзак потерян, скорая берёт %s%% монет (от %d до %d) и везёт наверх дольше, чем летел бы сам. "
+			% [_pct_text(), Healing.death_fee_min(), Healing.death_fee_max()]) + "Уровень и прокачка остались.")
 	var depth := MetaUiKit.chip(UiIcons.tex("depth"), str(int(_report["depth"])), MetaUiKit.BLUE, 14, 12)
 	Tip.bind(depth, "Глубина смерти", "На какой глубине ты погиб.", str(int(_report["depth"])))
 	h.add_child(depth)
@@ -269,10 +338,71 @@ func _build_fee() -> Control:
 		return h
 	h.add_child(MetaUiKit.icon_rect(ShopArt.tex("glyph_ambulance"), 18))
 	h.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), "−" + MetaUiKit.compact(fee), MetaUiKit.RED.lightened(0.45), 13, 11))
-	var full := Healing.death_fee_coins()
-	Tip.bind(h, "Скорая забрала", ("За вызов — %d монет." % full) if fee >= full \
-			else "За вызов берут %d монет — забрали сколько было." % full, "−%d" % fee)
+	var lo := Healing.death_fee_min()
+	Tip.bind(h, "Скорая забрала", ("За вызов — %s%% монет при себе, не меньше %d и не больше %d." % [
+			_pct_text(), lo, Healing.death_fee_max()]) if fee >= lo \
+			else "Вызов стоит не меньше %d — забрали сколько было." % lo, "−%d" % fee)
 	return h
+
+
+## «Скорая везёт»: полоска пути от глубины смерти к поверхности, фургон едет по
+## ней, справа — сколько осталось. Пусто, если поездки не было.
+func _build_ride() -> Control:
+	var ride_s := float(_report.get("ride_s", 0.0))
+	var h := HBoxContainer.new()
+	h.name = "Ride"
+	h.add_theme_constant_override("separation", 4)
+	h.mouse_filter = Control.MOUSE_FILTER_PASS
+	h.visible = ride_s > 0.0
+	_track = null
+	_ride_label = null
+	if ride_s <= 0.0:
+		return h
+	_track = Control.new()
+	_track.name = "Track"
+	_track.custom_minimum_size = Vector2(0, 24)
+	_track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_track.draw.connect(_draw_track)
+	h.add_child(_track)
+	var clock := MetaUiKit.icon_rect(MetaUiKit.tex("clock"), 14)
+	h.add_child(clock)
+	_ride_label = MetaUiKit.label(fmt_seconds(ride_s), 12, Color.WHITE)
+	_ride_label.name = "RideLeft"
+	_ride_label.custom_minimum_size = Vector2(30, 0)
+	_ride_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	h.add_child(_ride_label)
+	var depth := int(_report.get("depth", 0))
+	Tip.bind(h, "Скорая везёт наверх", ("Поднимает по стволу с глубины %d — дольше, чем летел бы ты сам: " % depth)
+			+ "умереть, чтобы не лететь, не выйдет. Приедешь домой с половиной здоровья, голод и усталость — как были.",
+			fmt_seconds(ride_s))
+	return h
+
+
+func _draw_track() -> void:
+	if _track == null:
+		return
+	var w := _track.size.x
+	var hgt := _track.size.y
+	var end_w := 12.0
+	var bar := Rect2(2.0, hgt - 8.0, maxf(8.0, w - end_w - 4.0), 5.0)
+	_track.draw_rect(bar.grow(1.0), MetaUiKit.BORDER)
+	_track.draw_rect(bar, MetaUiKit.SLOT)
+	var p := DeathRide.progress() if _riding else 1.0
+	if p > 0.0:
+		_track.draw_rect(Rect2(bar.position, Vector2(bar.size.x * p, bar.size.y)), MetaUiKit.RED.lightened(0.25))
+	# метки «ствола» каждые 25% пути — видно, что это дорога снизу вверх
+	for i in range(1, 4):
+		var x := bar.position.x + bar.size.x * float(i) / 4.0
+		_track.draw_rect(Rect2(x, bar.position.y + 1.0, 1.0, bar.size.y - 2.0), Color(1, 1, 1, 0.25))
+	var up := UiIcons.tex("arrow_up")
+	if up != null:
+		_track.draw_texture_rect(up, Rect2(w - end_w, hgt - 13.0, end_w, end_w), false, MetaUiKit.GREEN.lightened(0.3))
+	var van := ShopArt.tex("glyph_ambulance")
+	if van != null:
+		var vw := 18.0
+		var vx := bar.position.x + (bar.size.x - vw) * p
+		_track.draw_texture_rect(van, Rect2(roundf(vx), 0.0, vw, vw), false)
 
 
 func _build_kept() -> Control:
@@ -280,11 +410,9 @@ func _build_kept() -> Control:
 	v.add_theme_constant_override("separation", 4)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 5)
-	var safe := MetaUiKit.icon_rect(UiIcons.tex("blackbox"), 16)
-	safe.mouse_filter = Control.MOUSE_FILTER_PASS
-	Tip.bind(safe, "Чёрный ящик", "Его содержимое при смерти не пропадает.")
-	head.add_child(safe)
-	head.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), MetaUiKit.compact(int(_report["coins"])), MetaUiKit.GOLD_LIGHT, 13, 11))
+	var coins := MetaUiKit.chip(MetaUiKit.tex("coin"), MetaUiKit.compact(int(_report["coins"])), MetaUiKit.GOLD_LIGHT, 13, 11)
+	Tip.bind(coins, "Монеты при тебе", "Всё, что не забрала скорая, осталось.", MetaUiKit.compact(int(_report["coins"])))
+	head.add_child(coins)
 	var lvl := MetaUiKit.chip(MetaUiKit.tex("star"), str(int(_report["level"])), MetaUiKit.BLUE, 13, 11)
 	Tip.bind(lvl, "Уровень и прокачка сохранены", "Опыт, очки навыков и разведанная карта при смерти не теряются.", str(int(_report["level"])))
 	head.add_child(lvl)
@@ -292,22 +420,6 @@ func _build_kept() -> Control:
 	Tip.bind(rec, "Рекорд глубины", "Лучшая глубина за всю игру.", str(int(_report["max_depth"])))
 	head.add_child(rec)
 	v.add_child(head)
-
-	var cap := maxi(1, int(_report["box_cap"]))
-	var items: Array = _report["box"]
-	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", 3)
-	for i in cap:
-		if i < items.size():
-			var e: Dictionary = items[i]
-			slots.add_child(_item_tile(String(e["id"]), int(e["count"]), Balance.get_mineral_price(String(e["id"])), false))
-		else:
-			var empty := PanelContainer.new()
-			empty.custom_minimum_size = Vector2(40, 40)
-			empty.add_theme_stylebox_override("panel", MetaUiKit.box(Color(0, 0, 0, 0.25), MetaUiKit.BORDER, 1, 3))
-			Tip.bind(empty, "Ячейка чёрного ящика пуста", "То, что лежит в ящике, при смерти не пропадает.")
-			slots.add_child(empty)
-	v.add_child(slots)
 	return v
 
 
@@ -322,7 +434,11 @@ func _build_button() -> Control:
 		if Tip.swallowed():
 			return
 		close())
-	Tip.bind(b, "Понятно", "Закрыть. Ты дома, всё остальное при тебе.")
+	Tip.bind(b, "Понятно", "Закрыть. Ты дома, всё остальное при тебе. Пока едет скорая — подожди.")
+	_ok = b
+	if _riding:
+		b.disabled = true
+		b.modulate = Color(1, 1, 1, 0.45)
 	return b
 
 

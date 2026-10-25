@@ -129,7 +129,7 @@
    "note": "решение владельца: пустая бодрость HP не трогает вовсе, она даёт штраф к скорости и расходу голода (см. exhausted_penalty). Убивает только голод."
   },
   "death": {
-   "loses_all_minerals_except_black_box": true,
+   "loses_whole_backpack": true,
    "respawn_location": "house"
   },
   "hazards": {
@@ -201,9 +201,6 @@
  },
  "food": {
   "delivery_seconds": 5,
-  "vegetable_satiety_percent": 20,
-  "vegetable_max_per_day": 5,
-  "fertilizer_unlocks_vegetables": true,
   "_house_comment": "ниже — данные системы дома (scripts/house): что можно заказать, сколько это стоит и что восстанавливает. Существующие поля выше не менялись. Вес порций лежит в minerals.json (одно место: оттуда его берёт GameState.get_total_weight).",
   "free_orders_per_day": {
    "value": 3,
@@ -554,10 +551,9 @@
    "name_ru": "Торфоперегонка",
    "location": "огород, с разрешения бабки",
    "output": {
-    "fuel_blocks": "торф -> топливные блоки",
-    "fertilizer": "торф -> удобрение"
+    "fuel_blocks": "торф -> топливные блоки"
    },
-   "note": "конверсия торфа в блоки/удобрение количественно не задана в GDD; см. fuel_consumption ниже для расхода на стороне потребления"
+   "note": "единственный выход — топливные блоки (решение владельца, раунд 5: удобрения нет); курс — fuel_consumption ниже (4 торфа = 1 блок)"
   }
  },
  "fuel_consumption": {
@@ -638,23 +634,11 @@
     ]
    },
    {
-    "id": "black_box_plus_1",
-    "name_ru": "Чёрный ящик +1",
-    "price_usd": 2.9,
-    "grants": [
-     "black_box_slot+1"
-    ]
-   },
-   {
     "id": "premium_monthly",
     "name_ru": "Премиум / мес",
     "price_usd": 9.9,
     "grants": [
      "no_ads",
-     {
-      "black_box_tier": "premium",
-      "note": "конкретизация 'inventory_boost': GameState.black_box_tier='premium' на время подписки — склад, не грузоподъёмность (см. data/monetization.json -> iap_products)"
-     },
      {
       "cosmetic_bundle_monthly": true,
       "note": "ЗАМЕНА снятого 'strength_boost': один предмет из data/monetization.json -> cosmetic_catalog в месяц, а не прибавка к силе/копке"
@@ -675,10 +659,6 @@
     "grants": [
      "premium_monthly_benefits",
      {
-      "black_box_tier": "premium_plus",
-      "note": "GameState.black_box_tier='premium_plus', перекрывает 'premium'"
-     },
-     {
       "premium_currency_daily": {
        "value": 5,
        "proposed": true,
@@ -693,14 +673,6 @@
    "full_restore_pill",
    "energy_drink"
   ]
- },
- "black_box": {
-  "tiers": {
-   "base": 1,
-   "premium": 2,
-   "premium_plus": 3
-  },
-  "note": "клеток в ящике; клетки ящика не увеличивают грузоподъёмность (см. GDD п.14)"
  },
  "inventory": {
   "default_max_stack": 99

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5767ds0vurim"
-path="res://.godot/imported/icon_blackbox.png-70103a685eb8cd1c86814096ef454776.ctex"
+uid="uid://d3vanddvqxwlx"
+path="res://.godot/imported/grave_jar.png-43a9c0ba3c03c041b4e39bdeb8db7e76.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/ui/icon_blackbox.png"
-dest_files=["res://.godot/imported/icon_blackbox.png-70103a685eb8cd1c86814096ef454776.ctex"]
+source_file="res://art/env/grave_jar.png"
+dest_files=["res://.godot/imported/grave_jar.png-43a9c0ba3c03c041b4e39bdeb8db7e76.ctex"]
 
 [params]
 

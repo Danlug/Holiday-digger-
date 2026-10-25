@@ -93,6 +93,9 @@ var _ach_frame: Array = []   # достижения на прошлом кадр
 var _no_brake := false             # намеренная смерть (достижение «умри»): не тормозить тягой
 var _die_tries := 0
 var _death_entry: Dictionary = {}
+var _die_lift := false             # эксперимент «смерть вместо подъёма» (--die-lift, раунд 5, death-cost)
+var _die_lift_pack := 400          # умирать вместо подъёма, только если рюкзак дешевле стольких монет
+var _ascents: Array = []           # [глубина начала подъёма, игровых секунд до поверхности] — для death_lift
 var _heal_seen := false            # HP хоть раз выросло от сна/еды/аптечки — лечение в игре есть
 var _greed_t := 0.0
 var _craft_args := -1
@@ -203,6 +206,11 @@ func _ready() -> void:
 			_trace = float(a.substr(8))
 		elif a.begins_with("--max-depth="):
 			_max_depth_stop = int(a.substr(12))
+		elif a == "--die-lift":
+			_die_lift = true
+		elif a.begins_with("--die-lift-pack="):
+			_die_lift = true
+			_die_lift_pack = int(a.substr(16))
 	if goal_name != "" and not GOALS.has(goal_name):
 		push_warning("bot: неизвестная стратегия %s — без стратегии" % goal_name)
 		goal_name = ""
@@ -583,7 +591,9 @@ func _dismiss_modals() -> void:
 	if _death_card == null:
 		_death_card = main.find_child("DeathCard", true, false)
 	var card = _death_card
-	if card != null and card.has_method("is_open") and card.is_open():
+	if card != null and card.has_method("is_open") and card.is_open() and DeathRide.riding():
+		pass   # скорая ещё везёт: карточка не закрывается до приезда (раунд 5) — ждём, как человек
+	elif card != null and card.has_method("is_open") and card.is_open():
 		open.append("death_card")
 		# под рендером карточку сначала снимаем, закрываем через секунду
 		if not _shots_on or (_modal_since.has("death_card") and _sim - float(_modal_since["death_card"]) > 1.0):
@@ -771,11 +781,12 @@ func _on_respawned() -> void:
 	_died_pending = false
 	if T.in_trip():
 		T.trip_end(_sim, "death", 0, 0.0)
-	# Цена смерти (решение владельца, раунд 4): весь лут и 200 монет («скорая забрала»).
-	# Списание может прийти и в die(), и в respawn(): сверяем через секунду игры.
+	# Цена смерти (владелец, раунд 5): весь лут и 5% монет, от 50 до 5000 («скорая забрала»),
+	# и поездка скорой (respawned приходит по приезде). Сверяем через секунду игры.
 	var d := _death_entry
 	if d.is_empty() or bool(d.get("scripted", false)):
 		return
+	_check_death_lift(d)
 	var t := get_tree().create_timer(1.0, true, false, false)
 	t.timeout.connect(func() -> void:
 		# Смерть сама открывает достижения («Двоечник пришёл к бабушке» +100): их монеты не цена смерти.
@@ -787,10 +798,42 @@ func _on_respawned() -> void:
 				bonus += int((a.get("reward", {}) as Dictionary).get("coins", 0))
 		var lost := int(d.get("coins_before", 0)) - GameState.coins + bonus
 		d["coins_lost"] = lost
-		var expect := mini(200, int(d.get("coins_before", 0)))
+		var expect := _expected_fee(int(d.get("coins_before", 0)))
 		if lost != expect:
-			T.finding("P1", "death_cost", "смерть отняла %d монет, а по правилу — %d («скорая забрала» 200)" % [lost, expect],
+			T.finding("P1", "death_cost", "смерть отняла %d монет, а по правилу — %d (5%%, от 50 до 5000)" % [lost, expect],
 				_sim, d, str(lost == 0)))
+
+
+## Правило владельца (раунд 5), посчитанное заново, а не взятое у игры: 5% вниз до целого,
+## не меньше 50 и не больше 5000, но не больше, чем есть.
+static func _expected_fee(coins: int) -> int:
+	if coins <= 0:
+		return 0
+	return mini(coins, clampi(coins * 5 / 100, 50, 5000))
+
+
+## «Умер нарочно, чтобы не лететь» (раунд 5): выгадал ли бот на смерти. Выигрыш — подъём,
+## которого не было (его собственная скорость подъёма с этой глубины), минус поездка скорой;
+## в монетах — по доходу прогона. Цена — рюкзак и плата. Выигрыш больше цены — P1 death_lift.
+func _check_death_lift(d: Dictionary) -> void:
+	var depth := int(d.get("depth", 0))
+	var ride := DeathRide.total_seconds() if depth >= 3 else 0.0
+	var ascent := _ascent_estimate(depth)
+	var rate := _income_rate()
+	var fee := _expected_fee(int(d.get("coins_before", 0)))
+	var saved := ascent - ride
+	var gain := saved * rate
+	var cost := float(int(d.get("lost_value", 0)) + fee)
+	d["ride_s"] = snappedf(ride, 0.1)
+	d["ascent_est_s"] = snappedf(ascent, 0.1)
+	d["lift_gain"] = int(gain)
+	d["lift_cost"] = int(cost)
+	d["hp_after"] = snappedf(GameState.hp, 0.1)
+	T.event(_sim, "death_ride", "скорая %.0f с с глубины %d (подъём бота ~%.0f с), выгода %d против цены %d" % [
+		ride, depth, ascent, int(gain), int(cost)], false)
+	if depth >= 60 and saved > 0.0 and gain > cost:
+		T.finding("P1", "death_lift", "смерть на глубине %d выгоднее подъёма: скорая %.0f с против подъёма ~%.0f с, выгода %d монет против цены %d (рюкзак + плата)" % [
+			depth, ride, ascent, int(gain), int(cost)], _sim, d, "deliberate" if bool(d.get("deliberate", false)) else "accident")
 
 
 func _on_inventory() -> void:
@@ -1110,7 +1153,8 @@ func _free_play() -> void:
 			await _surface()
 		else:
 			if _should_return() != "":
-				await _ascend()
+				if not await _maybe_die_lift():
+					await _ascend()
 			else:
 				await _mine()
 
@@ -1168,8 +1212,10 @@ func _visit_station() -> void:
 	if made > 0 or n > 0:
 		T.mark("first_station", _sim)
 	elif FuelTank.fraction(tool) < 0.2:
-		T.finding("P2", "no_fuel", "бак %s почти пуст, а перегонять нечего (торфа %d, угля %d)" % [tool,
-			GameState.get_item_count("peat") + HouseStorage.count("peat"), GameState.get_item_count("coal") + HouseStorage.count("coal")], _sim)
+		# Глубина в находке: выше 450 торф ещё редок и бур в минусе по замыслу (ГДД п.5), за пластом — нет.
+		T.finding("P2", "no_fuel", "бак %s почти пуст, а перегонять нечего (торфа %d, угля %d, глубина %d)" % [tool,
+			GameState.get_item_count("peat") + HouseStorage.count("peat"), GameState.get_item_count("coal") + HouseStorage.count("coal"),
+			GameState.max_depth_reached], _sim, {}, "no_fuel")
 	_activity = "surface"
 
 
@@ -1576,6 +1622,7 @@ func _ascend() -> void:
 		await _wait(5.0)
 		return
 	var t0 := _sim
+	var d0: int = player.cell_y()
 	var best_y: float = player.y
 	var best_t := _sim
 	var mouth_x := float(world.tunnel_mouth().x)
@@ -1587,6 +1634,7 @@ func _ascend() -> void:
 			# Устье: долететь выше кромки бетона и боком на огород, не упав обратно.
 			if player.on_ground and player.y < 0.9 and player.x < mouth_x - 0.3:
 				bot.release_all()
+				_note_ascent(d0, t0)
 				if T.in_trip():
 					T.trip_end(_sim, why, _pack_value(), GameState.get_total_weight())
 				if _shots_on and GameState.get_total_weight() >= GameState.get_max_carry_kg() * 0.8:
@@ -1603,6 +1651,7 @@ func _ascend() -> void:
 			continue
 		if player.y < 1.0:
 			bot.release_all()
+			_note_ascent(d0, t0)
 			return   # уже на поверхности (не у устья) — дальше решает _surface
 		if player.y < best_y - 0.5:
 			best_y = player.y
@@ -1664,6 +1713,52 @@ func _ascend_keys() -> Array:
 	return [KEY_D if back > 0 else KEY_A]
 
 
+## Подъём от глубины d0 до поверхности за (_sim - t0) игровых секунд: по ним детектор
+## death_lift оценивает, сколько бот на самом деле летит с глубины смерти.
+func _note_ascent(d0: int, t0: float) -> void:
+	if d0 >= 30 and _sim - t0 > 0.5:
+		_ascents.append([d0, snappedf(_sim - t0, 0.1)])
+		if _ascents.size() > 40:
+			_ascents.pop_front()
+
+
+## Сколько игровых секунд бот летел бы наверх с глубины depth: медиана «секунд на клетку» его
+## последних подъёмов с 30+ клеток. Нет истории — прямой полёт на текущем ранце (DeathRide).
+func _ascent_estimate(depth: int) -> float:
+	var per: Array = []
+	for a in _ascents:
+		per.append(float(a[1]) / maxf(1.0, float(a[0])))
+	if per.is_empty():
+		return DeathRide.flight_seconds(depth, GameState.current_gear, false)
+	per.sort()
+	return float(per[per.size() / 2]) * float(depth)
+
+
+## Монет в игровую секунду за весь прогон (продажи; для death_lift — во что обходится время).
+func _income_rate() -> float:
+	return float(_earned) / maxf(60.0, _sim)
+
+
+## Эксперимент «смерть вместо подъёма» (--die-lift; раунд 5, слова владельца: «смерть не должна
+## быть удобным способом копать вниз и потом, чтобы не лететь, — умирать»). Пора наверх, рюкзак
+## почти пуст, глубоко — бот не летит, а «взлетает и отпускает тягу»: 4 с на взлёт, затем
+## смертельный удар (как падение с 32+ клеток). Цену (рюкзак, плата, поездка скорой) считает
+## детектор death_lift; итог эксперимента — метрика цели против прогона без флага.
+func _maybe_die_lift() -> bool:
+	if not _die_lift or _depth() < 60 or _pack_value() >= _die_lift_pack or not StoryState.has_flag("gold_sold"):
+		return false
+	_activity = "die_lift"
+	_no_brake = true
+	T.event(_sim, "die_lift", "смерть вместо подъёма с глубины %d (рюкзак %d монет)" % [_depth(), _pack_value()])
+	T.event_counts["die_lift"] = int(T.event_counts.get("die_lift", 0)) + 1
+	bot.release_all()
+	await _wait(4.0)
+	if GameState.is_alive:
+		GameState.take_damage(1e6, "fall")
+	await _step()
+	return true
+
+
 func _unstick_ascent() -> void:
 	bot.release_all()
 	await _wait(0.5)
@@ -1692,9 +1787,10 @@ func _home_visit() -> void:
 			_stop = true
 			return
 	_sell()
-	if not _reserved_in_pack().is_empty() or _any_craftable():
+	if not _reserved_in_pack().is_empty() or _any_craftable() or _fuel_raw_in_pack():
 		# склад и верстак — в мастерской (ГДД §14): несём туда то, что копим на проект
 		if await _go_room("workshop"):
+			_stash_fuel_raw()
 			_workbench()
 		await _go_room("hall")
 	else:
@@ -1907,6 +2003,23 @@ func _greed_active() -> bool:
 				if v is bool:
 					return v
 	return false
+
+
+## Торф и уголь для станции — на склад, а не в рюкзак (раунд 5, ветка peat): за пластом 450 торфа
+## ~4 на ряд, и бот, носивший всё сырьё в рюкзаке до визита на станцию (а та — только при баке
+## ниже 60%), забивал рюкзак торфом до порога возврата: 51 кг из 60 — и ходки кончались, не
+## начавшись (сид 7, deep и achiever). Станция перегоняет и со склада (FuelRefinery.held).
+func _fuel_raw_in_pack() -> bool:
+	return _fuel_tool() != "" and (GameState.get_item_count("peat") > 0 or GameState.get_item_count("coal") > 0)
+
+
+func _stash_fuel_raw() -> void:
+	if _fuel_tool() == "":
+		return
+	for raw in ["peat", "coal"]:
+		var n := HouseStorage.put(raw, GameState.get_item_count(raw))
+		if n > 0:
+			T.event(_sim, "stash", "%s ×%d на склад" % [raw, n], false)
 
 
 func _reserved_in_pack() -> Dictionary:

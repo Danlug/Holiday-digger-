@@ -149,19 +149,6 @@ def grave_marker():
     save(outline(img), "grave_marker.png")
 
 
-def grave_jar():
-    """Жестяная банка из-под чая с краешком тетради — стоит у плиты."""
-    img = new(16, 16)
-    rect(img, 3, 4, 12, 14, (150, 154, 164, 255))
-    rect(img, 3, 4, 5, 14, (190, 194, 204, 255))
-    rect(img, 11, 4, 12, 14, (104, 108, 120, 255))
-    rect(img, 2, 2, 13, 4, (118, 122, 134, 255))
-    rect(img, 4, 7, 11, 11, C("ruby_base"))
-    lines(img, [(5, 9), (10, 9)], C("parchment"))
-    rect(img, 8, 0, 11, 2, (66, 92, 70, 255))                  # тетрадь торчит
-    save(outline(img), "grave_jar.png")
-
-
 # ---------------------------------------------------------------------------
 # Наброски страниц дневника (24x24)
 # ---------------------------------------------------------------------------
@@ -378,7 +365,7 @@ def prop_nugget():
 
 def main():
     print("art/story:")
-    icon_diary(); icon_seal(); icon_pencil(); icon_flower(); grave_marker(); grave_jar()
+    icon_diary(); icon_seal(); icon_pencil(); icon_flower(); grave_marker()
     for f in (sketch_first, sketch_peat, sketch_diamond, sketch_relic, sketch_gold, sketch_heavy,
               sketch_whisper, sketch_rig, sketch_gems, sketch_lava, sketch_monsters, sketch_bottom,
               sketch_last):

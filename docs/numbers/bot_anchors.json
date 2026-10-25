@@ -1,0 +1,586 @@
+{
+ "source": "/home/user/Holiday-digger-/build/bot",
+ "builds": [
+  "20261024-1824"
+ ],
+ "runs": [
+  {
+   "goal": "achiever",
+   "character": "cautious",
+   "hours": 9.8,
+   "income_per_hour": 4543,
+   "max_depth": 373,
+   "level": 20,
+   "artifacts": 13
+  },
+  {
+   "goal": "collector",
+   "character": "greedy",
+   "hours": 9.1,
+   "income_per_hour": 17194,
+   "max_depth": 404,
+   "level": 23,
+   "artifacts": 14
+  },
+  {
+   "goal": "deep",
+   "character": "hasty",
+   "hours": 11.4,
+   "income_per_hour": 10701,
+   "max_depth": 1381,
+   "level": 29,
+   "artifacts": 11
+  },
+  {
+   "goal": "fighter",
+   "character": "cautious",
+   "hours": 11.4,
+   "income_per_hour": 9546,
+   "max_depth": 1127,
+   "level": 25,
+   "artifacts": 15
+  },
+  {
+   "goal": "tycoon",
+   "character": "greedy",
+   "hours": 10.5,
+   "income_per_hour": 18686,
+   "max_depth": 867,
+   "level": 28,
+   "artifacts": 17
+  },
+  {
+   "goal": "achiever",
+   "character": "cautious",
+   "hours": 11.9,
+   "income_per_hour": 9356,
+   "max_depth": 891,
+   "level": 23,
+   "artifacts": 10
+  },
+  {
+   "goal": "collector",
+   "character": "greedy",
+   "hours": 10.6,
+   "income_per_hour": 17994,
+   "max_depth": 658,
+   "level": 27,
+   "artifacts": 16
+  },
+  {
+   "goal": "deep",
+   "character": "hasty",
+   "hours": 12.2,
+   "income_per_hour": 9584,
+   "max_depth": 1310,
+   "level": 27,
+   "artifacts": 14
+  },
+  {
+   "goal": "fighter",
+   "character": "cautious",
+   "hours": 12.4,
+   "income_per_hour": 9503,
+   "max_depth": 1137,
+   "level": 27,
+   "artifacts": 17
+  },
+  {
+   "goal": "tycoon",
+   "character": "greedy",
+   "hours": 11.7,
+   "income_per_hour": 20221,
+   "max_depth": 907,
+   "level": 29,
+   "artifacts": 17
+  }
+ ],
+ "milestones_min": {
+  "buy:backpack_plus": {
+   "median": 9.7,
+   "min": 5.5,
+   "max": 13.0,
+   "n": 9,
+   "of": 10
+  },
+  "buy:diamond_pickaxe": {
+   "median": 148.8,
+   "min": 101.1,
+   "max": 244.2,
+   "n": 10,
+   "of": 10
+  },
+  "buy:iron_pickaxe": {
+   "median": 2.4,
+   "min": 1.3,
+   "max": 15.5,
+   "n": 9,
+   "of": 10
+  },
+  "buy:jetpack": {
+   "median": 20.9,
+   "min": 9.4,
+   "max": 54.9,
+   "n": 10,
+   "of": 10
+  },
+  "buy:jetpack_top": {
+   "median": 102.9,
+   "min": 50.0,
+   "max": 191.4,
+   "n": 10,
+   "of": 10
+  },
+  "buy:obsidian_pickaxe": {
+   "median": 254.1,
+   "min": 214.2,
+   "max": 364.0,
+   "n": 9,
+   "of": 10
+  },
+  "buy:platinum_pickaxe": {
+   "median": 47.2,
+   "min": 24.3,
+   "max": 148.0,
+   "n": 10,
+   "of": 10
+  },
+  "buy:titanium_pickaxe": {
+   "median": 13.0,
+   "min": 7.1,
+   "max": 32.7,
+   "n": 10,
+   "of": 10
+  },
+  "craft:hand_drill": {
+   "median": 338.0,
+   "min": 338.0,
+   "max": 338.0,
+   "n": 1,
+   "of": 10
+  },
+  "craft:well": {
+   "median": 67.2,
+   "min": 61.7,
+   "max": 112.7,
+   "n": 4,
+   "of": 10
+  },
+  "depth_10": {
+   "median": 2.7,
+   "min": 1.6,
+   "max": 3.3,
+   "n": 10,
+   "of": 10
+  },
+  "depth_100": {
+   "median": 16.0,
+   "min": 5.4,
+   "max": 59.4,
+   "n": 10,
+   "of": 10
+  },
+  "depth_1000": {
+   "median": 373.2,
+   "min": 310.1,
+   "max": 508.7,
+   "n": 4,
+   "of": 10
+  },
+  "depth_150": {
+   "median": 38.3,
+   "min": 12.5,
+   "max": 142.3,
+   "n": 10,
+   "of": 10
+  },
+  "depth_200": {
+   "median": 70.3,
+   "min": 20.1,
+   "max": 171.1,
+   "n": 10,
+   "of": 10
+  },
+  "depth_25": {
+   "median": 3.9,
+   "min": 2.1,
+   "max": 4.5,
+   "n": 10,
+   "of": 10
+  },
+  "depth_300": {
+   "median": 131.0,
+   "min": 34.9,
+   "max": 242.8,
+   "n": 10,
+   "of": 10
+  },
+  "depth_400": {
+   "median": 186.3,
+   "min": 67.6,
+   "max": 529.5,
+   "n": 9,
+   "of": 10
+  },
+  "depth_50": {
+   "median": 5.5,
+   "min": 3.1,
+   "max": 7.8,
+   "n": 10,
+   "of": 10
+  },
+  "depth_500": {
+   "median": 211.3,
+   "min": 97.8,
+   "max": 422.9,
+   "n": 8,
+   "of": 10
+  },
+  "depth_750": {
+   "median": 269.1,
+   "min": 188.1,
+   "max": 530.4,
+   "n": 7,
+   "of": 10
+  },
+  "first_artifact": {
+   "median": 0.9,
+   "min": 0.3,
+   "max": 1.2,
+   "n": 10,
+   "of": 10
+  },
+  "first_dig": {
+   "median": 0.6,
+   "min": 0.0,
+   "max": 0.9,
+   "n": 10,
+   "of": 10
+  },
+  "first_food_order": {
+   "median": 2.3,
+   "min": 1.2,
+   "max": 2.8,
+   "n": 10,
+   "of": 10
+  },
+  "first_heal_by_food": {
+   "median": 14.8,
+   "min": 14.0,
+   "max": 221.1,
+   "n": 5,
+   "of": 10
+  },
+  "first_heal_by_sleep": {
+   "median": 18.5,
+   "min": 14.8,
+   "max": 388.4,
+   "n": 5,
+   "of": 10
+  },
+  "first_quest_claim": {
+   "median": 2.4,
+   "min": 1.3,
+   "max": 9.7,
+   "n": 10,
+   "of": 10
+  },
+  "first_refuel": {
+   "median": 346.3,
+   "min": 346.3,
+   "max": 346.3,
+   "n": 1,
+   "of": 10
+  },
+  "first_sale": {
+   "median": 2.3,
+   "min": 1.2,
+   "max": 2.8,
+   "n": 10,
+   "of": 10
+  },
+  "first_skill": {
+   "median": 2.9,
+   "min": 1.3,
+   "max": 15.5,
+   "n": 10,
+   "of": 10
+  },
+  "first_sleep": {
+   "median": 25.8,
+   "min": 14.8,
+   "max": 46.3,
+   "n": 10,
+   "of": 10
+  },
+  "first_station": {
+   "median": 340.2,
+   "min": 340.2,
+   "max": 340.2,
+   "n": 1,
+   "of": 10
+  },
+  "level_10": {
+   "median": 40.5,
+   "min": 22.3,
+   "max": 79.9,
+   "n": 10,
+   "of": 10
+  },
+  "level_11": {
+   "median": 58.1,
+   "min": 25.9,
+   "max": 103.9,
+   "n": 10,
+   "of": 10
+  },
+  "level_12": {
+   "median": 79.1,
+   "min": 34.6,
+   "max": 144.9,
+   "n": 10,
+   "of": 10
+  },
+  "level_13": {
+   "median": 91.9,
+   "min": 35.2,
+   "max": 167.6,
+   "n": 10,
+   "of": 10
+  },
+  "level_14": {
+   "median": 111.1,
+   "min": 60.5,
+   "max": 180.7,
+   "n": 10,
+   "of": 10
+  },
+  "level_15": {
+   "median": 135.0,
+   "min": 73.3,
+   "max": 200.1,
+   "n": 10,
+   "of": 10
+  },
+  "level_16": {
+   "median": 147.1,
+   "min": 87.7,
+   "max": 242.7,
+   "n": 10,
+   "of": 10
+  },
+  "level_17": {
+   "median": 165.7,
+   "min": 99.2,
+   "max": 281.6,
+   "n": 10,
+   "of": 10
+  },
+  "level_18": {
+   "median": 195.3,
+   "min": 129.1,
+   "max": 300.3,
+   "n": 10,
+   "of": 10
+  },
+  "level_19": {
+   "median": 246.0,
+   "min": 154.8,
+   "max": 338.0,
+   "n": 10,
+   "of": 10
+  },
+  "level_2": {
+   "median": 0.9,
+   "min": 0.3,
+   "max": 1.2,
+   "n": 10,
+   "of": 10
+  },
+  "level_20": {
+   "median": 277.4,
+   "min": 159.7,
+   "max": 430.4,
+   "n": 10,
+   "of": 10
+  },
+  "level_21": {
+   "median": 312.7,
+   "min": 245.7,
+   "max": 468.3,
+   "n": 9,
+   "of": 10
+  },
+  "level_22": {
+   "median": 345.7,
+   "min": 301.1,
+   "max": 621.6,
+   "n": 9,
+   "of": 10
+  },
+  "level_23": {
+   "median": 413.3,
+   "min": 338.4,
+   "max": 697.5,
+   "n": 9,
+   "of": 10
+  },
+  "level_24": {
+   "median": 423.5,
+   "min": 386.8,
+   "max": 533.9,
+   "n": 7,
+   "of": 10
+  },
+  "level_25": {
+   "median": 474.9,
+   "min": 441.7,
+   "max": 569.5,
+   "n": 7,
+   "of": 10
+  },
+  "level_26": {
+   "median": 558.7,
+   "min": 452.1,
+   "max": 628.8,
+   "n": 6,
+   "of": 10
+  },
+  "level_27": {
+   "median": 603.1,
+   "min": 533.2,
+   "max": 677.0,
+   "n": 6,
+   "of": 10
+  },
+  "level_28": {
+   "median": 631.9,
+   "min": 604.0,
+   "max": 635.4,
+   "n": 3,
+   "of": 10
+  },
+  "level_29": {
+   "median": 660.3,
+   "min": 641.9,
+   "max": 678.7,
+   "n": 2,
+   "of": 10
+  },
+  "level_3": {
+   "median": 0.9,
+   "min": 0.3,
+   "max": 1.2,
+   "n": 10,
+   "of": 10
+  },
+  "level_4": {
+   "median": 4.4,
+   "min": 1.3,
+   "max": 5.5,
+   "n": 10,
+   "of": 10
+  },
+  "level_5": {
+   "median": 6.3,
+   "min": 5.0,
+   "max": 11.9,
+   "n": 10,
+   "of": 10
+  },
+  "level_6": {
+   "median": 8.9,
+   "min": 6.0,
+   "max": 15.8,
+   "n": 10,
+   "of": 10
+  },
+  "level_7": {
+   "median": 12.2,
+   "min": 8.7,
+   "max": 17.4,
+   "n": 10,
+   "of": 10
+  },
+  "level_8": {
+   "median": 19.6,
+   "min": 12.2,
+   "max": 48.9,
+   "n": 10,
+   "of": 10
+  },
+  "level_9": {
+   "median": 36.2,
+   "min": 16.6,
+   "max": 59.6,
+   "n": 10,
+   "of": 10
+  },
+  "well_level_2": {
+   "median": 67.2,
+   "min": 61.8,
+   "max": 72.6,
+   "n": 2,
+   "of": 10
+  },
+  "well_level_3": {
+   "median": 127.3,
+   "min": 121.9,
+   "max": 132.8,
+   "n": 2,
+   "of": 10
+  }
+ },
+ "per_hour": {
+  "dug": 615.55,
+  "ate": 5.76,
+  "slept": 1.94,
+  "chest_opened": 1.39,
+  "fever_started": 2.71,
+  "lucky_find": 7.9,
+  "mastery_star": 3.18,
+  "quest_done": 3.39,
+  "sold": 11.0,
+  "bought": 0.74,
+  "collapse": 0.8,
+  "healed": 0.24,
+  "deaths": 0.018,
+  "artifacts": 1.3
+ },
+ "income_by_phase": {
+  "0-1": 6987,
+  "1-3": 13147,
+  "3-6": 14383,
+  "6-12": 8904
+ },
+ "trips_by_depth": {
+  "0-100": {
+   "pack_value": 36,
+   "minutes": 0.1,
+   "n": 1069
+  },
+  "100-300": {
+   "pack_value": 680,
+   "minutes": 3.4,
+   "n": 413
+  },
+  "300-600": {
+   "pack_value": 1204,
+   "minutes": 4.5,
+   "n": 368
+  },
+  "600-1000": {
+   "pack_value": 1470,
+   "minutes": 6.7,
+   "n": 263
+  },
+  "1000-99999": {
+   "pack_value": 1155,
+   "minutes": 9.3,
+   "n": 109
+  }
+ },
+ "game_hours": 110.8,
+ "food_share": 0.0455,
+ "coins_earned_per_hour": 22378
+}

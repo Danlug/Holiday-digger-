@@ -133,7 +133,8 @@ _MINERALS = None
 
 def relevant_belts(name):
     """Пояса, где руда встречается заметно: от depth_min до min(depth_max, depth_min + 1500).
-    Торф живёт только у поверхности, уголь — с 1000: требовать видимость на поясах, где их нет, нет смысла."""
+    Торф живёт на 60–1000 (пояса «Корни» и шов с «Пещерами»), уголь — с 1000: требовать видимость на поясах,
+    где их нет, нет смысла."""
     global _BIOMES, _MINERALS
     if _BIOMES is None:
         _BIOMES = json.load(open(os.path.join(ROOT, "data", "world_layers.json"), encoding="utf-8"))["biomes"]["list"]

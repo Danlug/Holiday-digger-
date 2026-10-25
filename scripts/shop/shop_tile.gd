@@ -6,7 +6,7 @@ extends Button
 ##
 ## Плитка рисуется из словаря-«предложения» (см. ShopItems и GDD §16):
 ##   icon: Texture2D, tier: int 0..5, state: String, title/body/extra: String (Tip),
-##   pill: {icon, text, color, pips}, corner: "check"|"lock"|"cross"|"home"|"gift",
+##   pill: {icon, text, color, pips}, corner: "check"|"lock"|"cross"|"home"|"gift"|"door",
 ##   count_text: String (число в углу значка), selected: bool, new: bool,
 ##   sub_icon: Texture2D (мелкая «награда» на значке ролика),
 ##   need_icon: Texture2D — значок проекта «нужно для…» в левом верхнем углу
@@ -285,3 +285,21 @@ func deny() -> void:
 
 func pill_center() -> Vector2:
 	return get_global_rect().get_center()
+
+
+## Значок в правом углу подпрыгивает (дверь «у входной двери», раунд 5): плитка
+## не качается «нельзя», а показывает, где это купить.
+func hop_corner() -> void:
+	if not _corner_tr.visible or ShopFx.reduced() or not is_inside_tree():
+		return
+	var base := Vector2(W - 15, 1)
+	_corner_tr.pivot_offset = _corner_tr.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(_corner_tr, "position", base + Vector2(0, -6), 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(_corner_tr, "scale", Vector2.ONE * 1.5, 0.1)
+	tw.tween_property(_corner_tr, "position", base, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(_corner_tr, "scale", Vector2.ONE, 0.22)
+
+
+func corner_center() -> Vector2:
+	return _corner_tr.get_global_rect().get_center()

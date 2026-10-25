@@ -1133,8 +1133,10 @@ func _visit_station() -> void:
 	if made > 0 or n > 0:
 		T.mark("first_station", _sim)
 	elif FuelTank.fraction(tool) < 0.2:
-		T.finding("P2", "no_fuel", "бак %s почти пуст, а перегонять нечего (торфа %d, угля %d)" % [tool,
-			GameState.get_item_count("peat") + HouseStorage.count("peat"), GameState.get_item_count("coal") + HouseStorage.count("coal")], _sim)
+		# Глубина в находке: выше 450 торф ещё редок и бур в минусе по замыслу (ГДД п.5), за пластом — нет.
+		T.finding("P2", "no_fuel", "бак %s почти пуст, а перегонять нечего (торфа %d, угля %d, глубина %d)" % [tool,
+			GameState.get_item_count("peat") + HouseStorage.count("peat"), GameState.get_item_count("coal") + HouseStorage.count("coal"),
+			GameState.max_depth_reached], _sim, {}, "no_fuel")
 	_activity = "surface"
 
 

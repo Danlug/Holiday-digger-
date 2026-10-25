@@ -276,7 +276,6 @@ func _test_death_in_rig_lava() -> void:
 	GameState.player_depth = 3600
 	GameState.coins = 777
 	GameState.add_item("gold", 4)
-	GameState.black_box = {"diamond": 1}
 	var deaths0 := MetaState.counter("deaths")
 	p.x = 16.5
 	p.y = 3600.5

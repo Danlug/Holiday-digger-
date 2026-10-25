@@ -129,7 +129,7 @@
    "note": "решение владельца: пустая бодрость HP не трогает вовсе, она даёт штраф к скорости и расходу голода (см. exhausted_penalty). Убивает только голод."
   },
   "death": {
-   "loses_all_minerals_except_black_box": true,
+   "loses_whole_backpack": true,
    "respawn_location": "house"
   },
   "hazards": {
@@ -638,23 +638,11 @@
     ]
    },
    {
-    "id": "black_box_plus_1",
-    "name_ru": "Чёрный ящик +1",
-    "price_usd": 2.9,
-    "grants": [
-     "black_box_slot+1"
-    ]
-   },
-   {
     "id": "premium_monthly",
     "name_ru": "Премиум / мес",
     "price_usd": 9.9,
     "grants": [
      "no_ads",
-     {
-      "black_box_tier": "premium",
-      "note": "конкретизация 'inventory_boost': GameState.black_box_tier='premium' на время подписки — склад, не грузоподъёмность (см. data/monetization.json -> iap_products)"
-     },
      {
       "cosmetic_bundle_monthly": true,
       "note": "ЗАМЕНА снятого 'strength_boost': один предмет из data/monetization.json -> cosmetic_catalog в месяц, а не прибавка к силе/копке"
@@ -675,10 +663,6 @@
     "grants": [
      "premium_monthly_benefits",
      {
-      "black_box_tier": "premium_plus",
-      "note": "GameState.black_box_tier='premium_plus', перекрывает 'premium'"
-     },
-     {
       "premium_currency_daily": {
        "value": 5,
        "proposed": true,
@@ -693,14 +677,6 @@
    "full_restore_pill",
    "energy_drink"
   ]
- },
- "black_box": {
-  "tiers": {
-   "base": 1,
-   "premium": 2,
-   "premium_plus": 3
-  },
-  "note": "клеток в ящике; клетки ящика не увеличивают грузоподъёмность (см. GDD п.14)"
  },
  "inventory": {
   "default_max_stack": 99

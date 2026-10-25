@@ -804,7 +804,7 @@
 				},
 				{
 					"t": "item",
-					"icon": "res://art/ui/icon_blackbox.png",
+					"icon": "res://art/artifacts/antiquity_1.png",
 					"name": "item.dud_treasure",
 					"text": "dud_treasure.item_text"
 				},

@@ -14,13 +14,28 @@ signal pressed
 
 const TILE := 32
 const GRAVE_X := 14.0
-## Банка с тетрадью стоит у правого края плиты; сцена diary_first рисует её
-## в той же клетке (data/story_arc.json), пока флаг diary_found не поставлен.
-const JAR_X := 14.95
 const NEAR := 0.9
+## Графика — tools/gen_grave.py: текстуры 2 px на игровой пиксель (гравировке
+## портрета нужна сетка мельче тайла), отсюда масштаб 0.5. Две картинки одного
+## размера: плита на месте (до сцены diary_first) и сдвинутая, с ямой справа.
 const STONE_TEX := "res://art/env/grave.png"
-const STONE_SCALE := 1.5
-const JAR_TEX := "res://art/story/grave_jar.png"
+const STONE_OPEN_TEX := "res://art/env/grave_open.png"
+const STONE_SCALE := 0.5
+## Банка с тетрадью стоит в яме под сдвинутой плитой (правый край grave_open);
+## сцена diary_first рисует её в той же точке (data/story_arc.json), пока флаг
+## diary_found не поставлен. Низ банки — дно ямы, на 7 px выше линии земли.
+const JAR_X := 14.6
+const JAR_TEX := "res://art/env/grave_jar.png"
+const JAR_SCALE := 0.5
+const JAR_BOTTOM_Y := 25.0
+## Самородок из концовки (ending.n6: «положил на могильную плиту») остаётся
+## лежать на плите; сцена кладёт его туда же (story_arc.json), а когда плита
+## сдвинута, самородок едет вместе с ней.
+const NUGGET_TEX := "res://art/story/prop_nugget.png"
+const NUGGET_X := 14.15
+const NUGGET_SCALE := 0.5
+const NUGGET_BOTTOM_Y := 22.0
+const NUGGET_OPEN_DX := -6.0
 const MARKER_TEX := "res://art/story/grave_marker.png"
 const ICON_DIARY := "res://art/story/icon_diary.png"
 const ICON_FLOWER := "res://art/story/icon_flower.png"
@@ -29,7 +44,10 @@ var player: Node = null
 var hud: Node = null
 
 var _stone: Sprite2D
+var _stone_closed: Texture2D
+var _stone_open: Texture2D
 var _jar: Sprite2D
+var _nugget: Sprite2D
 var _marker: Sprite2D
 var _marker_base_y: float = 0.0
 var _layer: CanvasLayer
@@ -48,18 +66,29 @@ func _ready() -> void:
 func _build_world() -> void:
 	_stone = Sprite2D.new()
 	_stone.centered = false
-	var tex: Texture2D = load(STONE_TEX)
-	_stone.texture = tex
+	_stone_closed = load(STONE_TEX)
+	_stone_open = load(STONE_OPEN_TEX) if ResourceLoader.exists(STONE_OPEN_TEX) else _stone_closed
+	_stone.texture = _stone_closed
 	_stone.scale = Vector2(STONE_SCALE, STONE_SCALE)
-	var size := tex.get_size() * STONE_SCALE
+	var size := _stone_closed.get_size() * STONE_SCALE
 	_stone.position = Vector2(GRAVE_X * TILE - size.x / 2.0, TILE - size.y)
 	add_child(_stone)
 
 	_jar = Sprite2D.new()
 	_jar.centered = false
 	_jar.texture = load(JAR_TEX)
-	_jar.position = Vector2(JAR_X * TILE - 8.0, TILE - 16.0)
+	_jar.scale = Vector2(JAR_SCALE, JAR_SCALE)
+	var jar_size := _jar.texture.get_size() * JAR_SCALE
+	_jar.position = Vector2(JAR_X * TILE - jar_size.x / 2.0, JAR_BOTTOM_Y - jar_size.y)
 	add_child(_jar)
+
+	_nugget = Sprite2D.new()
+	_nugget.centered = false
+	if ResourceLoader.exists(NUGGET_TEX):
+		_nugget.texture = load(NUGGET_TEX)
+	_nugget.scale = Vector2(NUGGET_SCALE, NUGGET_SCALE)
+	_nugget.visible = false
+	add_child(_nugget)
 
 	_marker = Sprite2D.new()
 	_marker.centered = false
@@ -142,8 +171,17 @@ func _on_pressed() -> void:
 func _process(dt: float) -> void:
 	_t += dt
 	var visible_world: bool = GameState.era != "grandpa"
+	var opened := diary_found()
 	_stone.visible = visible_world
-	_jar.visible = visible_world and diary_found()
+	var want: Texture2D = _stone_open if opened else _stone_closed
+	if _stone.texture != want:
+		_stone.texture = want
+	_jar.visible = visible_world and opened
+	_nugget.visible = visible_world and _nugget.texture != null and StoryState.is_seen("ending")
+	if _nugget.visible:
+		var ns := _nugget.texture.get_size() * NUGGET_SCALE
+		var dx := NUGGET_OPEN_DX if opened else 0.0
+		_nugget.position = Vector2(NUGGET_X * TILE - ns.x / 2.0 + dx, NUGGET_BOTTOM_Y - ns.y)
 	_marker.visible = visible_world and has_news()
 	if _marker.visible:
 		_marker.position.y = _marker_base_y + sin(_t * 3.0) * 2.0

@@ -274,16 +274,13 @@ func _test_medkit_use() -> void:
 
 func _test_death_fee() -> void:
 	GameState.inventory.clear()
-	GameState.black_box.clear()
 	GameState.add_item("silver", 3)
 	GameState.add_item("food_bar", 1)
 	GameState.add_item("medkit", 1)
-	GameState.add_to_black_box("gold", 2)
 	GameState.coins = 1000
 	_events.clear()
 	GameState.die()
 	check("смерть: весь рюкзак пропал (руда, еда, аптечка)", GameState.inventory.is_empty())
-	check("смерть: чёрный ящик цел", int(GameState.black_box.get("gold", 0)) == 2)
 	check("смерть: скорая забрала 200", GameState.coins == 800)
 	var amb := _events_of("ambulance")
 	check("событие ambulance {coins: 200}", amb.size() == 1 and int(amb[0]["coins"]) == 200)

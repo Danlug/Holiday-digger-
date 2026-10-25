@@ -201,9 +201,6 @@
  },
  "food": {
   "delivery_seconds": 5,
-  "vegetable_satiety_percent": 20,
-  "vegetable_max_per_day": 5,
-  "fertilizer_unlocks_vegetables": true,
   "_house_comment": "ниже — данные системы дома (scripts/house): что можно заказать, сколько это стоит и что восстанавливает. Существующие поля выше не менялись. Вес порций лежит в minerals.json (одно место: оттуда его берёт GameState.get_total_weight).",
   "free_orders_per_day": {
    "value": 3,
@@ -554,10 +551,9 @@
    "name_ru": "Торфоперегонка",
    "location": "огород, с разрешения бабки",
    "output": {
-    "fuel_blocks": "торф -> топливные блоки",
-    "fertilizer": "торф -> удобрение"
+    "fuel_blocks": "торф -> топливные блоки"
    },
-   "note": "конверсия торфа в блоки/удобрение количественно не задана в GDD; см. fuel_consumption ниже для расхода на стороне потребления"
+   "note": "единственный выход — топливные блоки (решение владельца, раунд 5: удобрения нет); курс — fuel_consumption ниже (4 торфа = 1 блок)"
   }
  },
  "fuel_consumption": {

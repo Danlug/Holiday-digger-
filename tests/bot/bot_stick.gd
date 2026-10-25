@@ -42,6 +42,13 @@ func hold(keys: Array) -> void:
 	_pos = target
 
 
+## HUD отпускает джойстик, пока его ввод выключен (окно дня, дневник, катсцена), а бот
+## мог зажать «палец» как раз под окном и ждать: человек, закрыв окно, касается снова.
+func resync() -> void:
+	if _pressed and hud._stick_pointer == -100 and not hud._world_input_blocked():
+		hold(_down.keys())
+
+
 func key_down(k: Key) -> void:
 	var keys: Array = _down.keys()
 	if not keys.has(k):

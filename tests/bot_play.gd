@@ -308,6 +308,7 @@ func _step() -> void:
 	_real_time_waits()
 	_auto_story()
 	_dismiss_modals()
+	bot.resync()
 	_detectors()
 	if _sim - _last_sample >= SAMPLE_SEC:
 		_last_sample = _sim

@@ -468,6 +468,11 @@ class Model:
 		self.names = {k: m.get("name_ru", k) for k, m in self.min.items()}
 		for k, m in self.data.get("combat.json", {}).get("materials", {}).items():
 			self.names.setdefault(k, m.get("name", k))
+		for sect in ("monsters", "cave_monsters"):
+			for k, m in self.data.get("combat.json", {}).get(sect, {}).items():
+				if isinstance(m, dict) and m.get("name"):
+					self.names.setdefault(k, m["name"])
+		self.names.update({"hunger_tiers": "Голод", "stamina_tiers": "Бодрость", "hunger": "Голод", "stamina": "Выносливость"})
 		self.names.update({"coins": "монет", "dollars": "долл.", "premium_currency": "долл.", "xp": "опыта", "points": "очк."})
 		self.tile_to_id = {o.get("tile"): o.get("id") for o in self.data.get("world_layers.json", {}).get("ores", [])}
 		self.tile_to_id.update({"GOLD_ORE": "gold", "PLATINUM_ORE": "platinum", "URANIUM_ORE": "uranium", "DIAMOND": "diamond",
@@ -692,10 +697,10 @@ class Model:
 		if not isinstance(d, dict):
 			return None
 		fee = _unwrap(d.get("coins_fee"))
-		p = _unwrap(d.get("coins_fee_percent", d.get("fee_percent", d.get("percent"))))
+		p = _unwrap(d.get("coins_percent", d.get("coins_fee_percent", d.get("fee_percent", d.get("percent")))))
 		if isinstance(p, (int, float)):
-			lo = float(_unwrap(d.get("fee_min", d.get("coins_fee_min", d.get("min", 0)))) or 0)
-			hi = float(_unwrap(d.get("fee_max", d.get("coins_fee_max", d.get("max", 1e18)))) or 1e18)
+			lo = float(_unwrap(d.get("coins_min", d.get("fee_min", d.get("coins_fee_min", d.get("min", 0))))) or 0)
+			hi = float(_unwrap(d.get("coins_max", d.get("fee_max", d.get("coins_fee_max", d.get("max", 1e18))))) or 1e18)
 			return min(coins, max(lo, min(hi, coins * float(p) / 100.0)))
 		if isinstance(fee, (int, float)):
 			return min(coins, float(fee))

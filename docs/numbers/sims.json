@@ -157,7 +157,7 @@
    "seeds": 4,
    "milestones_min": {
     "5 артефактов": {
-     "mean": 64.6,
+     "mean": 63.2,
      "n": 4
     },
     "Алмазная кирка": {
@@ -173,7 +173,7 @@
      "n": 4
     },
     "Обсидиановая кирка": {
-     "mean": 129.2,
+     "mean": 126.0,
      "n": 4
     },
     "Платиновая кирка": {
@@ -225,7 +225,7 @@
      "n": 4
     },
     "уровень 100": {
-     "mean": 336.1,
+     "mean": 322.9,
      "n": 4
     },
     "уровень 15": {
@@ -261,52 +261,52 @@
      "n": 4
     },
     "уровень 50": {
-     "mean": 103.1,
+     "mean": 102.3,
      "n": 4
     },
     "уровень 55": {
-     "mean": 119.7,
+     "mean": 119.4,
      "n": 4
     },
     "уровень 60": {
-     "mean": 136.6,
+     "mean": 133.1,
      "n": 4
     },
     "уровень 65": {
-     "mean": 151.6,
+     "mean": 148.5,
      "n": 4
     },
     "уровень 70": {
-     "mean": 171.0,
+     "mean": 168.0,
      "n": 4
     },
     "уровень 75": {
-     "mean": 191.6,
+     "mean": 189.7,
      "n": 4
     },
     "уровень 80": {
-     "mean": 214.0,
+     "mean": 212.4,
      "n": 4
     },
     "уровень 85": {
-     "mean": 239.5,
+     "mean": 235.2,
      "n": 4
     },
     "уровень 90": {
-     "mean": 269.6,
+     "mean": 264.5,
      "n": 4
     },
     "уровень 95": {
-     "mean": 298.8,
+     "mean": 293.7,
      "n": 4
     }
    },
-   "sold_per_hour": 36616,
+   "sold_per_hour": 36551,
    "artifacts_found": 10.2,
    "artifact_coins": 45605,
-   "chests": 319.2,
-   "fevers": 159.8,
-   "mech_share_pct": 28.3
+   "chests": 319.0,
+   "fevers": 162.5,
+   "mech_share_pct": 28.9
   }
  },
  "daily": [
@@ -364,11 +364,11 @@
     800,
     2500
    ],
-   "sec_per_cell": 0.96,
-   "cells_per_min": 37.4,
-   "ore_pct": 53.5,
-   "coins_per_cell": 64.6,
-   "coins_per_min": 2415
+   "sec_per_cell": 0.97,
+   "cells_per_min": 37.2,
+   "ore_pct": 53.2,
+   "coins_per_cell": 64.04,
+   "coins_per_min": 2384
   },
   {
    "tier": 5,
@@ -376,12 +376,12 @@
     2500,
     4000
    ],
-   "sec_per_cell": 0.78,
-   "cells_per_min": 45.9,
-   "ore_pct": 57.5,
-   "coins_per_cell": 133.98,
-   "coins_per_min": 6156
+   "sec_per_cell": 0.79,
+   "cells_per_min": 45.6,
+   "ore_pct": 56.4,
+   "coins_per_cell": 130.56,
+   "coins_per_min": 5948
   }
  ],
- "data_fingerprint": "547f7c91f184"
+ "data_fingerprint": "2245450b8ca1"
 }

@@ -73,9 +73,10 @@ try:
 	# Параллельные ветки: новый файл с proposed-числами и чужая правка формы данных.
 	data = os.path.join(tmp, "data")
 	shutil.copytree(pn.DATA_DIR, data)
-	with open(os.path.join(data, "caves.json"), "w", encoding="utf-8") as f:
+	# Файл, которого ещё нет в data/ (настоящий caves.json уже влит и разобран в каталоге).
+	with open(os.path.join(data, "monster_lairs.json"), "w", encoding="utf-8") as f:
 		json.dump({"proposed": True, "shapes": {"star": {"guards": 3, "chest_value_cells": 20}},
-			"min_depth": {"value": 1500, "proposed": True, "note": "полости с монстрами с 1500 (слова владельца — пример)"}}, f)
+			"min_depth": {"value": 1500, "proposed": True, "note": "логова с монстрами с 1500 (пример новой ветки)"}}, f)
 	with open(os.path.join(data, "tech.json"), encoding="utf-8") as f:
 		tech = json.load(f)
 	tech["well"]["levels"]["value"] = [{"depth_cap": 200, "cells_per_hour": 35, "cap_hours": 8, "cost": None}]
@@ -84,9 +85,9 @@ try:
 	code, c = run(os.path.join(tmp, "c"), data)
 	new = {r["id"]: r for r in c["rows"] if not r["reviewed"]}
 	check("после правки формы данных инструмент не падает", code == 0)
-	check("новое число из новой ветки попало в выгрузку", "caves.json:min_depth" in new and "caves.json:shapes.star.guards" in new)
-	check("новое число получило тему «Бой»", new.get("caves.json:min_depth", {}).get("theme") == "combat")
-	check("новое число видно в REVIEW.md", "caves.json:min_depth" in open(os.path.join(tmp, "c", "REVIEW.md"), encoding="utf-8").read())
+	check("новое число из новой ветки попало в выгрузку", "monster_lairs.json:min_depth" in new and "monster_lairs.json:shapes.star.guards" in new)
+	check("новое число получило тему «Бой»", new.get("monster_lairs.json:min_depth", {}).get("theme") == "combat")
+	check("новое число видно в REVIEW.md", "monster_lairs.json:min_depth" in open(os.path.join(tmp, "c", "REVIEW.md"), encoding="utf-8").read())
 	check("старые id не поплыли от нового файла", set(ids) - {i for i in ids if i.startswith("tech.json:well.levels")} <= {r["id"] for r in c["rows"]})
 finally:
 	shutil.rmtree(tmp, ignore_errors=True)

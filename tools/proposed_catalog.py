@@ -993,6 +993,62 @@ def eff_sub_currency(m, row):
 # rec: (вердикт, почему). Вердикты: оставить / поднять / опустить / решить / снять пометку / убрать / отложить.
 # ---------------------------------------------------------------------------
 
+_TIER_RU = {"low": "на 25%", "critical": "на 10%", "empty": "на нуле"}
+_TIER_KEY_RU = {"dig": "скорость копки", "luck": "шанс удачи", "move": "скорость ходьбы", "jump": "высота прыжка",
+	"stagger_amplitude": "шатание: размах", "stagger_period_seconds": "шатание: период, с"}
+
+
+def title_surv_tier(m, row):
+	segs = row["segs"]
+	who = "Голод" if segs[0] == "hunger_tiers" else "Бодрость"
+	tier = _TIER_RU.get(segs[1], segs[1]) if len(segs) > 1 else ""
+	return "%s %s: %s ×" % (who, tier, _TIER_KEY_RU.get(segs[-1], segs[-1]))
+
+
+def title_surv_cost(m, row):
+	segs = row["segs"]
+	who = "«Голод»" if "[hunger]" in segs else "«Выносливость»"
+	if segs[-1] == "percent_per_stage":
+		return "%s: прибавка за ступень, %%" % who
+	last = segs[-1]
+	return "%s: ступень %d" % (who, int(last[1:-1]) + 1) if last.startswith("[") and last[1:-1].isdigit() else "%s: %s" % (who, row["key_ru"])
+
+
+_SHAPE_RU = {"circle": "круг", "rhombus": "ромб", "star": "звезда", "heart": "сердце"}
+
+
+def title_cave(m, row):
+	segs = row["segs"]
+	if segs[0] == "shapes" and len(segs) >= 3:
+		return "Полость «%s»: %s" % (_SHAPE_RU.get(segs[1], segs[1]), "доля среди фигур" if segs[-1] == "weight" else "прибавка к радиусу, клеток")
+	if segs[0] == "radius" and len(segs) >= 3:
+		i = segs[1][1:-1]
+		return "Полости, ступень %s: %s" % (int(i) + 1 if i.isdigit() else i, "радиус от/до, клеток" if segs[-1] == "r" else "с глубины")
+	return {"chance_top": "Шанс полости в слоте на 1500", "chance_bottom": "Шанс полости в слоте у 4000",
+		"slot_h": "Высота слота, рядов", "tries": "Попыток поставить полость в слоте", "y_max": "Последняя глубина с полостями",
+		"y_min": "Первая глубина с полостями"}.get(segs[0], "Полости: " + row["key_ru"])
+
+
+def title_cave_guard(m, row):
+	segs = row["segs"]
+	t = {"aggro_extra": "замечают героя: радиус полости +, клеток", "count": "сколько стражей по глубине",
+		"forget_dist": "полость «забывается» дальше, клеток", "leash_extra": "не уходят от полости дальше радиуса +, клеток",
+		"max_shooters": "не больше стрелков в полости", "spawn_dist": "появляются, когда герой ближе, клеток",
+		"touch_radius": "сундук открывается касанием с, клеток"}.get(segs[-1], row["key_ru"])
+	return ("Сундук: " if segs[0] == "chest" else "Стражи: ") + t
+
+
+_CAVE_MON_KEY = {"depth": "глубины, где живёт", "stagger_chance": "шанс сбить с атаки ударом", "knock_resist": "сопротивление отбросу"}
+
+
+def title_cave_monster(m, row):
+	segs = row["segs"]
+	name = m.name(segs[1]) if len(segs) > 1 else "?"
+	if "projectile" in segs:
+		return "%s: снаряд — %s" % (name, {"gravity": "тяжесть", "radius": "размер", "speed": "скорость", "ttl": "время полёта, с"}.get(segs[-1], segs[-1]))
+	return "%s: %s" % (name, _CAVE_MON_KEY.get(segs[-1], row["key_ru"]))
+
+
 def F(id, theme, imp, title, match, row=None, unit="", affects="", effect=None, summary=None, rec=None, flags=None, vtext=None):
 	return {"id": id, "theme": theme, "imp": imp, "title": title, "match": match if isinstance(match, list) else [match],
 		"row": row, "unit": unit, "affects": affects, "effect": effect, "summary": summary, "rec": rec, "flags": flags,
@@ -1087,8 +1143,8 @@ FAMILIES = [
 		"Аптечка: {key}", "", "лечиться дешевле, чем умереть",
 		lambda m, r: eff_medkit_hp(m, r) if r["segs"][-1] == "hp_percent" else (eff_medkit_price(m, r) if r["segs"][-1] == "price_coins" else eff_weight(m, r)),
 		summary=sum_medkit,
-		rec=("решить", "цену 150 считали против смерти за 200. Если смерть станет «5%, но не меньше 50» (п.4 владельца), в начале игры "
-			"смерть с пустым рюкзаком дешевле аптечки и лечит до 100% — нужна аптечка ≈ 50–80 монет или правило «смерть не лечит»"),
+		rec=("оставить", "смерть теперь «5%, но не меньше 50» (п.4 владельца) и возвращает только 50% HP, полоски — не ниже 25%, "
+			"плюс поездка скорой и весь рюкзак: аптечка за 150 снова дешевле и быстрее смерти"),
 		flags=lambda m, r: flags_medkit_price(m, r) if r["segs"][-1] == "price_coins" else []),
 	F("surv.sleep_rules", "survival", 3, "Правила сна", ["balance.json:house.sleep_min_deficit_percent", "balance.json:house.sleep_hunger_factor",
 		"balance.json:house.sleep_animation_seconds"], "Сон: {key}", "", "когда пускает кровать и сколько ест сон", None,
@@ -1103,6 +1159,22 @@ FAMILIES = [
 		rec=("оставить", "мелочь; вес пельменей ни на что не влияет — их нельзя унести, суп в меню доставки не продаётся"),
 		flags=lambda m, r: ["блюдо нельзя унести с собой (portable: false) — вес не используется"] if elem(r, "minerals") == "food_dumplings"
 			else (["супа нет в меню доставки — вес не используется"] if elem(r, "minerals") == "food_soup" else [])),
+	F("surv.death_ride", "survival", 4, "Скорая после смерти: сколько везёт", "healing.json:death.ride.*",
+		"Скорая: {key}", "", "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
+		lambda m, r: death_text(m) if r["segs"][-1] == "factor_deep" else None,
+		rec=("решить", "поездка = коэффициент × прямой полёт на текущем ранце, не дольше 150 с. Бедный игрок на 700–1300 клетках всё ещё "
+			"выигрывает 1–4 минуты против честного подъёма — строже: коэффициент 3 или потолок 240 с?")),
+	F("surv.death_respawn", "survival", 4, "После смерти: здоровье и полоски", "healing.json:death.respawn.*",
+		"После смерти: {key}", "%", "смерть больше не бесплатное лечение и обед", None,
+		rec=("оставить", "50% HP — как одна аптечка; сытость и бодрость остаются, но не ниже 25%")),
+	F("surv.drain", "survival", 5, "Голод и усталость: как быстро тают", ["survival.json:drain_multiplier.*", "survival.json:soft_start.*"],
+		"Таяние: {key}", "×", "как часто есть и спать",
+		None, rec=("оставить", "п.1 владельца «голод и усталость влияли больше»: голод ×1.5 (полоска — 13 минут копки), бодрость ×1.3 (~15 минут); "
+			"включается после урока сна или с 5-го уровня, чтобы не душить новичка")),
+	F("surv.tiers", "survival", 4, "Штрафы голода и усталости по ступеням", ["survival.json:hunger_tiers.**", "survival.json:stamina_tiers.**"],
+		title_surv_tier, "×", "насколько больно тянуть с едой и сном", None,
+		rec=("оставить", "25% — заметно (копка −15%), 10% — тяжело (−30%), ноль — голод бьёт по HP, усталость шатает; тупика нет: "
+			"на ступеньку в одну клетку сил хватает всегда")),
 	F("surv.lava_stages", "survival", 1, "Ступени стойкости к жаре (старая запись)", "balance.json:survival.hazards.lava.heat_resistance_stages",
 		"Ступени стойкости (пусто)", "", "ничего", None, rec=("убрать", "ступени есть в tech.json → heat.suit_tiers (тема «Техника»)")),
 
@@ -1110,7 +1182,7 @@ FAMILIES = [
 	F("prog.skill_points", "progression", 5, "Очки навыков за уровень", "upgrades.json:skill_points.per_level_tiers",
 		"Очки за уровень по ступеням", "очков за уровень", "скорость прокачки всех веток (голод, бодрость, скорость копки…)",
 		eff_skill_points, rec=("оставить", "решение владельца «уровни дают постепенно больше» выполнено: 1 → 2 → 3. Если голод и бодрость "
-			"начнут давить сильнее (п.1 владельца), этих очков должно хватать на их ветки к 2–3 часу — проверить после слияния выживания"),
+			"давят сильнее (п.1 владельца) — их ветки подешевели до 30 очков каждая; хватает ли очков к 2–3 часу, покажет ночной прогон ботов"),
 		vtext=lambda m, r: ", ".join("%s до %s-го ур." % (t.get("points"), t.get("up_to_level")) for t in r["value"]) + " (каждый 5-й — ещё +%s)" % (
 			m.get("upgrades.json", "skill_points", "bonus_every_5th_level", default=0))),
 	F("prog.base_hp", "progression", 4, "Здоровье героя без прокачки", "upgrades.json:branches[hp].effect.base",
@@ -1118,6 +1190,12 @@ FAMILIES = [
 	F("prog.greed_cost", "progression", 3, "Цена ветки «Жадность»", "upgrades.json:branches[greed].cost_note",
 		"Жадность: очков за ступень", "очков", "как быстро вкачивается лихорадка", eff_greed_cost,
 		rec=("оставить", "столько же, сколько «Удача — шанс»; проценты и секунды — владельца")),
+	F("prog.survival_cost", "progression", 4, "Цена веток «Голод» и «Выносливость»",
+		["upgrades.json:branches[hunger].cost_points[*]", "upgrades.json:branches[stamina].cost_points[*]",
+		"upgrades.json:branches[stamina].effect.percent_per_stage"],
+		title_surv_cost, "очков", "как быстро игрок отбивается от голода и усталости", None,
+		rec=("оставить", "п.1 владельца «чуть меньше условия для прокачки»: обе ветки 1,1,2,2,3,3,4,4,5,5 — 30 очков вместо 55 и 65; "
+			"бодрость +20% за ступень")),
 	F("prog.story_xp", "progression", 2, "Награды сюжетных сцен", "story_arc.json:scenes[*].effects[*].n",
 		title_story, "опыта / долларов", "мелкая прибавка к уровню", eff_story_xp,
 		rec=("оставить", "доли уровня; сюжет не должен быть фермой опыта; 5 долларов в финале — разово")),
@@ -1213,8 +1291,8 @@ FAMILIES = [
 	# ---------------- Бой ----------------
 	F("cmb.reach", "combat", 4, "Где начинается бой", ["balance.json:world.raid_boss_depth", "combat.json:spawn.**"],
 		"Появление монстров: {key}", "", "встретит ли игрок монстра вообще", None, summary=sum_reach,
-		rec=("решить", "ни один бот за 12 игровых часов не дошёл до 4000 — бой никто не видел. Полости с монстрами с 1500 (п.2 владельца) это "
-			"закрывают; после их слияния сверить, что первая встреча — на 3–5 часу")),
+		rec=("решить", "ни один бот за 12 игровых часов не дошёл до 4000. Теперь с 1500 есть полости со стражами (п.2 владельца), "
+			"но бот проверил их только стартом прямо в полости — когда игрок встретит первого стража, покажет следующий ночной прогон")),
 	F("cmb.monster_hp", "combat", 3, "Монстры: здоровье и урон", ["combat.json:monsters.*.hp", "combat.json:monsters.*.damage"],
 		"{name}: {key}", "HP / урон за удар", "сколько длится бой и как больно", lambda m, r: eff_monster_hp(m, r) if r["segs"][-1] == "hp" else eff_monster_dmg(m, r),
 		rec=("оставить", "без игроков на этих глубинах не проверено; тесты боя (tests/test_combat*) держат порядок цифр")),
@@ -1232,6 +1310,17 @@ FAMILIES = [
 	F("cmb.parts", "combat", 1, "Вес деталей монстров", ["minerals.json:minerals[%s].weight_kg" % k for k in (
 		"cinder_ash", "moth_dust", "hopper_fang", "mimic_geode", "spark_core", "warden_plate", "abyss_core", "idol_shard")],
 		"{name}: вес", "кг", "сколько места в рюкзаке", eff_weight, rec=("оставить", "лёгкие, чтобы бой не забивал рюкзак")),
+
+	F("cmb.caves", "combat", 3, "Полости-фигуры: где и сколько", "caves.json:**",
+		title_cave, "", "как часто между 1500 и 4000 попадается полость с сундуком", None,
+		rec=("оставить", "круг, ромб, звезда и сердце; ≈26 на мир, глубже — чаще и крупнее; глубже 4000 — прежний бой")),
+	F("cmb.cave_guards", "combat", 3, "Стражи полостей и сундук", ["caves.json:guards.**", "caves.json:chest.**"],
+		title_cave_guard, "", "сколько врагов охраняет сундук и когда они замечают героя", None,
+		rec=("оставить", "2 стража на 1500, 3 — с 2300, 4 — с 3100, не больше двух стрелков; сундук открывается, когда все стражи мертвы")),
+	F("cmb.cave_monsters", "combat", 3, "Стражи: здоровье, урон, повадки", "combat.json:cave_monsters.**",
+		title_cave_monster, "", "трудность боя у сундука",
+		None, rec=("оставить", "симуляция: на 1500 — 100% побед, остаётся 56–69% HP; на 3500 — 60%, если стоять столбом, и 100% с уклонением. "
+			"Рисунки — заготовка до художника")),
 
 	# ---------------- Механики ----------------
 	F("mech.chests", "mechanics", 4, "Тайники-сундуки", "mechanics.json:chests.**",

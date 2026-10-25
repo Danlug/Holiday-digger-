@@ -1090,9 +1090,10 @@ func _deep_start(depth: int) -> void:
 		var c: Dictionary = caves[0]
 		col = int(c.cx)
 		top = int(c.y0) - 4
+	# шахта и через торфяной пласт (450–455): игрок прокопал бы его по пути вниз, а бот
+	# на подъёме не копает — второй прогон встал под пластом на 48 минут
 	for y in range(6, top + 1):
-		if not world.is_permanent_feature(col, y):
-			world.diffs[y * WorldGen.WIDTH + col] = true
+		world.diffs[y * WorldGen.WIDTH + col] = true
 	for x in range(col - 1, col + 2):
 		for y in range(top - 1, top + 1):
 			world.diffs[y * WorldGen.WIDTH + x] = true

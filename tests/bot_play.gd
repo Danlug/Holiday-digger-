@@ -1036,15 +1036,26 @@ func _fast_start() -> void:
 	_activity = "free"
 
 
-## Старт на глубине (раунд 5, полости и стражи с 1500): карман в породе, герой в нём,
-## туман открыт, рекорд глубины и несколько ступеней HP — как у игрока, дошедшего сюда.
+## Старт на глубине (раунд 5, полости и стражи с 1500): шахта от поверхности до
+## кармана (иначе боту не подняться продавать — первый прогон встал «ascent_stuck»),
+## карман над ближайшей полостью по её центру: копая вниз, бот входит к стражам.
 func _deep_start(depth: int) -> void:
-	for x in range(15, 19):
-		for y in range(depth - 1, depth + 1):
+	var col := 16
+	var top := depth
+	var caves := Caves.caves_between(world, depth, depth + 400)
+	if not caves.is_empty():
+		var c: Dictionary = caves[0]
+		col = int(c.cx)
+		top = int(c.y0) - 4
+	for y in range(6, top + 1):
+		if not world.is_permanent_feature(col, y):
+			world.diffs[y * WorldGen.WIDTH + col] = true
+	for x in range(col - 1, col + 2):
+		for y in range(top - 1, top + 1):
 			world.diffs[y * WorldGen.WIDTH + x] = true
 	world.mark_changed()
-	player.x = 16.5
-	player.y = float(depth) + 0.6
+	player.x = float(col) + 0.5
+	player.y = float(top) + 0.6
 	player.vx = 0.0
 	player.vy = 0.0
 	player.on_ground = true

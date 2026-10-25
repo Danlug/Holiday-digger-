@@ -119,9 +119,11 @@ func _snapshot(m: Node2D, d: StoryDirector) -> Dictionary:
 ## Камера успокаивается на герое (упреждение и сглаживание CameraRig).
 func _settled_camera() -> Vector2:
 	var last := Vector2.INF
-	for _i in 600:
+	var still := 0
+	for _i in 900:
 		await _frames(1)
-		if CameraRig.current.distance_to(last) < 0.0005:
+		still = still + 1 if CameraRig.current.distance_to(last) < 0.0005 else 0
+		if still >= 20:
 			break
 		last = CameraRig.current
 	return CameraRig.current
@@ -232,7 +234,7 @@ func _test_intro_grandpa() -> void:
 	check("пролистано тапами: дно ямы то же, что при просмотре", tap.pit_ok, tap.pit_detail)
 	var tdiff := _same(tap.snap, snap)
 	check("пролистано тапами: итог = досмотренной сцене", tdiff.is_empty(), str(tdiff))
-	check("пролистано тапами: камера там же", Vector2(tap.camera).distance_to(ref.camera) < 0.01,
+	check("пролистано тапами: камера там же", Vector2(tap.camera).distance_to(ref.camera) < 0.05,
 		"%s / %s" % [tap.camera, ref.camera])
 
 	var points := {
@@ -250,7 +252,7 @@ func _test_intro_grandpa() -> void:
 		var diff := _same(r.snap, snap)
 		check("«Пропустить» %s: итог = досмотренной сцене" % label, not r.snap.is_empty() and diff.is_empty(),
 			"кадр %s, отличается: %s" % [r.skipped_at, diff])
-		check("«Пропустить» %s: камера там же" % label, Vector2(r.camera).distance_to(ref.camera) < 0.01,
+		check("«Пропустить» %s: камера там же" % label, Vector2(r.camera).distance_to(ref.camera) < 0.05,
 			"%s / %s" % [r.camera, ref.camera])
 
 

@@ -362,7 +362,31 @@ def eff_medkit_hp(m, row):
 		return None
 	steak = num(_food_items(m).get("food_steak", {}).get("price_coins"), 200)
 	per = num(m.get("healing.json", "food", "hp_percent_per_satiety_percent"), 0.25)
-	return "%s монет за 1%% HP (стейк — %s за 1%%, но он ещё и кормит)" % (fnum(price / hp, 1), fnum(steak / (100 * per), 1))
+	return "1%% HP аптечкой стоит %s монеты, стейком — %s (зато стейк ещё и кормит)" % (fnum(price / hp, 1), fnum(steak / (100 * per), 1))
+
+
+def sum_medkit(m, rows):
+	parts = []
+	for r in rows:
+		key = r["segs"][-1]
+		if key in ("hp_percent", "price_coins") and r.get("effect"):
+			parts.append(r["effect"])
+	d = death_text(m)
+	if d and not any(d in p for p in parts):
+		parts.append(d)
+	return "; ".join(parts) or None
+
+
+def sum_reach(m, rows):
+	fnum, fmin, _, _ = _f(m)
+	runs = m.bots.get("runs", [])
+	start = m.get("combat.json", "start_depth", default=4000)
+	if not runs:
+		return None
+	depths = sorted(r.get("max_depth") or 0 for r in runs)
+	hours = sorted(r.get("hours") or 0 for r in runs)
+	return "бой с глубины %s; боты за %s–%s игровых часов дошли до %s–%s (медиана %s) и не встретили ни одного монстра" % (
+		fnum(start), fnum(hours[0]), fnum(hours[-1]), fnum(depths[0]), fnum(depths[-1]), fnum(depths[len(depths) // 2]))
 
 
 def death_text(m):
@@ -460,18 +484,22 @@ def _tier_rates(m):
 
 
 def eff_quest_reward(m, row):
-	fnum, fmin, _, _ = _f(m)
+	"""Весь день: 5 заданий (множители слотов) + сундук против продажи за ~40 минут игры на ступени."""
+	fnum, fmin, _, pct = _f(m)
 	v = row["value"]
 	coins = v.get("coins") if isinstance(v, dict) else None
 	rates = _tier_rates(m)
 	if not isinstance(coins, list) or not any(rates):
 		return None
+	daily = m.data.get("quests.json", {}).get("daily", {})
+	mults = sum(num(s.get("reward"), 1.0) for s in daily.get("slots", []) if isinstance(s, dict)) or 5.0
+	chest = num((daily.get("bonus_all") or {}).get("coins_x"), 0.0)
 	parts = []
 	for t, c in enumerate(coins):
 		r = rates[t] if t < len(rates) else None
 		if r and r.get("coins_per_min"):
-			parts.append("ст.%d %s" % (t, fmin(c / r["coins_per_min"])))
-	return "одно задание = столько минут продажи руды на своей ступени: " + ", ".join(parts)
+			parts.append("ст.%d %s" % (t, pct(c * (mults + chest) / (r["coins_per_min"] * 40.0))))
+	return ("день (5 заданий + сундук ×%s) против продажи руды за 40 минут игры на своей ступени: " % fnum(chest)) + ", ".join(parts)
 
 
 def eff_quest_target(m, row):
@@ -798,20 +826,50 @@ def eff_suit(m, row):
 		k = _heat_mult(m, 3000, v)
 		return "до %s °C без штрафа; на 3000 — бодрость ×%s" % (fnum(v), fnum(k, 1)) if k else None
 	if key == "cost":
-		d = _parent_num(row, "unlock_depth") or 1000
-		return m.cost_hours_text(row["value"], int(d) + (200 if d >= 3000 else 0))
+		d = int(_parent_num(row, "unlock_depth") or 1000)
+		return m.cost_hours_text(row["value"], d, d + (200 if d >= 3000 else 0))
 	return None
 
 
 def flags_suit(m, row):
 	if row["segs"][-1] != "cost":
 		return []
-	d = _parent_num(row, "unlock_depth") or 1000
-	r = m.cost_hours(row["value"], int(d) + (200 if d >= 3000 else 0))
+	d = int(_parent_num(row, "unlock_depth") or 1000)
+	r = m.cost_hours(row["value"], d, d + (200 if d >= 3000 else 0))
 	if r and not math.isinf(r[0]) and r[0] > 8:
 		return ["%.1f ч активной игры — дольше границы 8 ч, которую держит tools/sim_tech.py" % r[0]]
 	return []
 
+
+def sum_suits(m, rows):
+	_, _, fhours, _ = _f(m)
+	parts = []
+	for r in rows:
+		if r["segs"][-1] != "cost":
+			continue
+		d = int(_parent_num(r, "unlock_depth") or 1000)
+		h = m.cost_hours(r["value"], d, d + (200 if d >= 3000 else 0))
+		if h:
+			parts.append("%s с %d — %s" % (r["title"].split(":")[0], d, fhours(h[0])))
+	return ("цена ступени в часах активной игры на её глубине: " + "; ".join(parts)) if parts else None
+
+
+def sum_well(m, rows):
+	fnum, _, _, _ = _f(m)
+	if not m.st:
+		return None
+	try:
+		levels = m.get("tech.json", "well", "levels")
+		parts = []
+		for lv in range(2, len(levels) + 1):
+			rate = m.st.well_rate(lv, levels[lv - 1]["depth_cap"])
+			prev = m.st.well_rate(lv - 1, levels[lv - 2]["depth_cap"])
+			days = m.st.cost_value(levels[lv - 1]["cost"]) / max((rate - prev) * min(levels[lv - 1]["cap_hours"], 8) * 2, 1.0)
+			parts.append("%d: %s" % (lv, fnum(days, 1)))
+		top = m.st.well_rate(len(levels), levels[-1]["depth_cap"])
+	except Exception:
+		return None
+	return "окупаемость ступеней, суток (два сбора в сутки) — %s; верхняя ступень даёт ≈ %s монет в час" % (", ".join(parts), fnum(top))
 
 # --- бой ---
 
@@ -997,6 +1055,7 @@ FAMILIES = [
 		["healing.json:medkit.hp_percent", "shop.json:goods_coins.extra[medkit].price_coins", "minerals.json:minerals[medkit].weight_kg"],
 		"Аптечка: {key}", "", "лечиться дешевле, чем умереть",
 		lambda m, r: eff_medkit_hp(m, r) if r["segs"][-1] == "hp_percent" else (eff_medkit_price(m, r) if r["segs"][-1] == "price_coins" else eff_weight(m, r)),
+		summary=sum_medkit,
 		rec=("решить", "цену 150 считали против смерти за 200. Если смерть станет «5%, но не меньше 50» (п.4 владельца), в начале игры "
 			"смерть с пустым рюкзаком дешевле аптечки и лечит до 100% — нужна аптечка ≈ 50–80 монет или правило «смерть не лечит»"),
 		flags=lambda m, r: flags_medkit_price(m, r) if r["segs"][-1] == "price_coins" else []),
@@ -1084,12 +1143,12 @@ FAMILIES = [
 			"опустить бронзу 100 → 50 и железо 500 → 300")),
 	F("tech.drill_rig", "tech", 5, "Цена бурмобиля и глубина открытия", ["balance.json:tools.drill_rig.cost", "shop.json:craft.unlock_depth.drill_rig"],
 		"Бурмобиль: {key}", "", "вторые ворота: ×2 к буру, полёт внутри, деньги ×10", eff_drill_rig,
-		rec=("решить", "ни один бот за 12 ч бурмобиль не собрал (никель 11/50, платина 0/20 — она с 1000). Цена разумна для 1000+, но до "
-			"1000 доходят за 5–8 ч. Оставить, если бурмобиль — цель второго дня")),
+		rec=("оставить", "на тысяче цена — минут двадцать игры: держит не цена, а сама глубина 1000 и платина с неё (боты: никель 11/50, "
+			"платина 0/20, до 1000 — 5–8 ч). Бурмобиль — цель второго дня; если нужен раньше, двигать открытие, а не цену")),
 	F("tech.well", "tech", 4, "Скважина: постройка, ступени, доход",
 		["balance.json:idle_well.**", "tech.json:well.levels**", "shop.json:craft.unlock_depth.well"],
 		"Скважина: {key}", "", "доход без игры (офлайн)", lambda m, r: eff_well_build(m, r) if r["id"].endswith("build_cost") else eff_well(m, r),
-		rec=("оставить", "ступени окупаются за 0.6–12 суток, заход за кап не дороже 5 ч активной игры (границы tools/sim_tech.py)"),
+		summary=sum_well, rec=("оставить", "ступени окупаются за 0.6–12 суток, заход за кап не дороже 5 ч активной игры (границы tools/sim_tech.py)"),
 		flags=flags_well),
 	F("tech.fuel", "tech", 4, "Расход топлива", "balance.json:fuel_consumption.**",
 		"Топливо: {key}", "блоков на клетку / штук на блок", "сколько копки уходит на добычу топлива", lambda m, r: eff_fuel_rate(m, r) if "blocks_per_cell" in r["id"] else None,
@@ -1100,7 +1159,7 @@ FAMILIES = [
 		lambda m, r: eff_tank_caps(m, r) if r["segs"][-1] == "capacity_blocks" else eff_tank_cost(m, r),
 		rec=("оставить", "бак 0 — 133 клетки (до ~230 от сотни), ступени — дешёвые цели середины игры")),
 	F("tech.suits", "tech", 4, "Костюм от жары: ступени", "tech.json:heat.suit_tiers**",
-		"{name}: {key}", "", "проходимость глубин 1000–3500 и лавы", eff_suit,
+		"{name}: {key}", "", "проходимость глубин 1000–3500 и лавы", eff_suit, summary=sum_suits,
 		rec=("опустить", "пятая ступень (1 000 000 монет) — 8.4 ч активной игры, вне границы симулятора 0.8–8 ч; срезать до ≈ 900 000. "
 			"Остальное — рабочее предложение, пока владелец не пришлёт свои ступени"), flags=flags_suit),
 	F("tech.heat", "tech", 3, "Жара по глубине", ["tech.json:heat.temperature_c", "tech.json:heat.ambient.*"],
@@ -1120,7 +1179,7 @@ FAMILIES = [
 
 	# ---------------- Бой ----------------
 	F("cmb.reach", "combat", 4, "Где начинается бой", ["balance.json:world.raid_boss_depth", "combat.json:spawn.**"],
-		"Появление монстров: {key}", "", "встретит ли игрок монстра вообще", None,
+		"Появление монстров: {key}", "", "встретит ли игрок монстра вообще", None, summary=sum_reach,
 		rec=("решить", "ни один бот за 12 игровых часов не дошёл до 4000 — бой никто не видел. Полости с монстрами с 1500 (п.2 владельца) это "
 			"закрывают; после их слияния сверить, что первая встреча — на 3–5 часу")),
 	F("cmb.monster_hp", "combat", 3, "Монстры: здоровье и урон", ["combat.json:monsters.*.hp", "combat.json:monsters.*.damage"],
@@ -1147,7 +1206,7 @@ FAMILIES = [
 		rec=("оставить", "боты открывают ≈ 1.4 тайника в час; добыча — 3/10/35 «клеток руды»")),
 	F("mech.streak", "mechanics", 4, "Азарт и жадность", "mechanics.json:streak.*",
 		"Азарт: {key}", "", "как часто включается жадность", lambda m, r: eff_fever_at(m, r) if r["segs"][-1] == "fever_at" else None,
-		rec=("оставить", "секунды и проценты жадности — владельца; 60 клеток подряд — около минуты копки")),
+		rec=("оставить", "секунды и проценты жадности — владельца; 60 клеток подряд — минута-две копки, боты входят в жадность 2–3 раза в час")),
 	F("mech.mastery", "mechanics", 3, "Мастерство руд", "mechanics.json:mastery.**",
 		"Мастерство: {key}", "", "долгая цель «звёзды руды» и +2% двойной добычи за звезду", eff_mastery,
 		rec=("оставить", "пятая звезда — десятки часов: это коллекция, а не прокачка")),
@@ -1197,7 +1256,7 @@ TOP = [
 	("tech.hand_drill", "Ручной бур почти никто не собирает (1 бот из 10). Подтвердить рецепт или опустить бронзу/железо, чтобы бур приходил к 3–4 часу?"),
 	("surv.medkit", "Аптечка 150 против новой цены смерти «5%, но не меньше 50»: в начале смерть снова дешевле лечения. Аптечка 50–80?"),
 	("cmb.reach", "Бой с 4000 недостижим за 12 игровых часов; полости с монстрами с 1500 — сверить, что первая встреча на 3–5 часу."),
-	("tech.drill_rig", "Бурмобиль (10 000 + 50 никеля + 20 платины, с 1000): цель второго дня или раньше?"),
+	("tech.drill_rig", "Бурмобиль: на 1000 он стоит ~20 минут игры, ворота — сама глубина 1000 (боты — 5–8 ч). Цель второго дня — так и задумано?"),
 	("prog.skill_points", "Очки за уровни 1/2/3 (до 10 / до 25 / дальше): хватит ли их на ветки голода и бодрости, если выживание станет строже?"),
 	("q.daily_reward", "Награды заданий дня: оставить «четверть–треть дохода за то же время»?"),
 	("tech.suits", "Костюм от жары: 5-я ступень (1 млн) дольше 8 ч игры — срезать до ~900 тыс.? Ступени ждут вашего дизайна."),
@@ -1225,9 +1284,10 @@ THEME_NOTES = {
 	"artifacts": (["Монеты за находку — 1.5 × опыта, линейно по ветке; доход с глубиной растёт быстрее.",
 		"Итог: мелкие находки щедрее руды в разы, глубокие — незаметны."],
 		"Опустить мелкие, поднять глубокие: ≈ одна полная ходка на глубине находки."),
-	"tech": (["Бур и бурмобиль — ворота середины игры; боты их почти не собирают за 12 ч.",
-		"Скважина, баки и костюм окупаются в разумных границах симулятора, кроме 5-й ступени костюма."],
-		"Решить бур/бурмобиль (темп середины); убрать неиспользуемые числа перегрева и топлива джетпака."),
+	"tech": (["Бур и бурмобиль — ворота середины игры; бур за 10–12 ч собрал один бот из десяти, бурмобиль — ни один.",
+		"Бурмобиль держит глубина 1000, а не цена; бур — материалы (железо, бронза из лома).",
+		"Скважина, баки и костюм укладываются в границы симулятора, кроме 5-й ступени костюма."],
+		"Решить рецепт бура; срезать 5-й костюм; убрать неиспользуемые числа перегрева и топлива джетпака."),
 	"combat": (["Все числа боя проверены только тестами: живой игрок до 4000 за 12 ч не доходит.",
 		"Полости с монстрами с 1500 добавят новые числа — они попадут сюда как «новые»."],
 		"Оставить до первых живых встреч; решить, где начинается бой."),

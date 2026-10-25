@@ -616,8 +616,9 @@ class Model:
 		except Exception:
 			return None
 
-	def cost_hours(self, cost, depth):
-		"""Цена в часах активной игры на глубине: (итого, монеты, материалы, самый долгий материал)."""
+	def cost_hours(self, cost, depth, mat_depth=None):
+		"""Цена в часах активной игры на глубине: (итого, монеты, материалы, самый долгий материал).
+		Как в sim_tech.py: монеты — по доходу на depth, материалы — по их доле в породе на mat_depth."""
 		inc = self.income(depth)
 		if not inc or not isinstance(cost, dict):
 			return None
@@ -629,21 +630,21 @@ class Model:
 		worst, mh = None, 0.0
 		for mid, n in mats.items():
 			if mid == "bronze":
-				mid, n = "scrap", n  # бронза плавится из лома 1:1
-			h = self.mat_hours(mid, n, depth)
+				mid = "scrap"  # бронза плавится из лома 1:1
+			h = self.mat_hours(mid, n, mat_depth or depth)
 			if h is None:
 				continue
 			if h > mh:
 				mh, worst = h, mid
 		return ch + mh, ch, mh, worst
 
-	def cost_hours_text(self, cost, depth):
-		r = self.cost_hours(cost, depth)
+	def cost_hours_text(self, cost, depth, mat_depth=None):
+		r = self.cost_hours(cost, depth, mat_depth)
 		if not r:
 			return None
 		total, ch, mh, worst = r
 		if math.isinf(total):
-			return "на глубине %s нужного материала (%s) нет вовсе — не собрать" % (fnum(depth), self.name(worst))
+			return "на глубине %s нужного материала (%s) нет вовсе — не собрать" % (fnum(mat_depth or depth), self.name(worst))
 		s = "≈ %s активной игры на глубине %s" % (fhours(total), fnum(depth))
 		if mh > 0 and ch > 0:
 			s += " (деньги %s, материалы %s — дольше всего %s)" % (fhours(ch), fhours(mh), self.name(worst))
@@ -746,7 +747,47 @@ KEY_RU = {
 	"base_tolerance_c": "без костюма терпит до", "stamina_extra_per_50c": "+расход бодрости за 50 °C",
 	"max_multiplier": "потолок множителя", "coal_per_fuel_block": "угля на блок", "uranium_per_fuel_block": "урана на блок",
 	"hand_drill": "ручной бур", "drill_rig": "бурмобиль", "blocks_per_cell": "блоков на клетку",
+	"cooldown_exponent": "кривая остывания", "default_cells_to_overheat": "клеток до перегрева",
+	"overheat_hp_damage_per_second": "урон перегрева, HP/с", "fuel_source": "топливо джетпака", "no_fuel_fallback": "если топлива нет",
+	"raid_boss_depth": "глубина рейдбосса", "premium_currency_onetime": "доллары разово", "premium_currency_daily": "доллары в день",
+	"dissipation_speed": "скорость рассеивания", "card_min_value": "порог карточки потерь",
+	"tracker_hide_built_seconds": "галочка «собрано», с", "burn_damage_per_second": "урон, HP/с", "skill_penalty_percent": "штраф навыкам, %",
+	"hp_drain_per_second": "потеря HP в секунду", "heat_resistance_stages": "ступени стойкости", "interact_radius_cells": "радиус двери",
+	"cavern": "каверны", "pit": "провалы", "grotto": "гроты", "ruin": "руины", "vein": "жилы", "treasure": "клад в кавернах",
+	"gems": "самоцветы гротов", "ruin_loot": "добыча руин", "slot_h": "высота слота, рядов", "slot_chance": "шанс образования в слоте",
+	"first_delay_sec": "первый монстр через, с", "max_alive": "монстров одновременно", "interval_sec": "интервал появления, с",
+	"min_dist": "ближе всего, клеток", "max_dist": "дальше всего, клеток", "active_dist": "активен в радиусе", "despawn_dist": "исчезает дальше",
+	"rampup": "разгон сложности, клеток", "depth_full": "полная сложность с глубины", "bfs_limit": "поиск места, клеток",
+	"view_half": "полуэкран обзора", "iframes_sec": "неуязвимость после удара, с", "stun_sec": "оглушение, с",
+	"knockback_cells": "отбрасывание, клеток", "regen_delay_sec": "реген через, с", "regen_base_per_sec": "реген HP/с",
+	"armor_k": "константа брони", "res_cap_pct": "потолок сопротивления, %", "min_damage": "минимальный урон",
+	"hp_per_1000": "+HP монстров за 1000", "dmg_per_1000": "+урон монстров за 1000", "dmg": "урон", "cd": "перезарядка, с",
+	"reach": "дальность", "swing_height": "высота замаха", "tap_enemy_radius_px": "радиус тапа по монстру",
+	"y_min": "с глубины", "chance_at_start": "доля озёр на 3000", "drop": "что остаётся",
+	"low_fuel_fraction": "порог «мало топлива»", "report_min_seconds": "отчёт не короче, с", "max_skew_back_seconds": "откат часов, с",
+	"unpriced_weight_price": "вес материала без цены", "unpriced_xp": "опыт за материал без цены", "xp_share": "доля опыта",
+	"value_spread": "разброс ценности", "deep_shift_per_1000": "сдвиг ступеней за 1000", "thresholds": "пороги звёзд",
+	"price_mid": "граница «средняя руда»", "price_precious": "граница «драгоценная»", "chance_per_star": "+двойная добыча за звезду",
+	"xp_per_star": "опыт звезды", "min_star_xp": "минимум опыта звезды", "cheap": "дешёвые руды", "mid": "средние руды",
+	"precious": "драгоценные", "expected_cells_dug_per_find_by_branch": "клеток до находки", "min_candidate_cells": "клеток-кандидатов минимум",
+	"max_candidate_cells": "клеток-кандидатов максимум", "single_row_is_guaranteed": "находка в одном ряду гарантирована",
+	"completion_reward": "награда ветки", "free_orders_per_day": "бесплатных заказов в сутки",
 }
+# Списки, номер элемента в которых — «ступень» (а не просто №).
+STEP_LISTS = {"levels", "upgrade_cost", "road", "bonuses", "per_level_tiers", "slots", "upgrade_tiers", "suit_tiers", "cycle"}
+
+
+def plural(n, forms):
+	n = abs(int(n))
+	if n % 10 == 1 and n % 100 != 11:
+		return forms[0]
+	if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+		return forms[1]
+	return forms[2]
+
+
+def n_numbers(n):
+	return "%d %s" % (n, plural(n, ("число", "числа", "чисел")))
 
 
 def human_key(row):
@@ -756,9 +797,11 @@ def human_key(row):
 	last = segs[-1]
 	if last.startswith("["):
 		inner = last[1:-1]
-		return ("ступень %d" % (int(inner) + 1)) if inner.isdigit() else inner
+		if inner.isdigit():
+			return "ступень %d" % (int(inner) + 1) if len(segs) >= 2 and segs[-2] in STEP_LISTS else "№%d" % (int(inner) + 1)
+		return KEY_RU.get(inner, inner)
 	label = KEY_RU.get(last, last.replace("_", " "))
-	if len(segs) >= 2 and segs[-2].startswith("[") and segs[-2][1:-1].isdigit():
+	if len(segs) >= 3 and segs[-2].startswith("[") and segs[-2][1:-1].isdigit() and segs[-3] in STEP_LISTS:
 		label = "ступень %d: %s" % (int(segs[-2][1:-1]) + 1, label)
 	elif len(segs) >= 2 and not segs[-2].startswith("[") and last in ("hand_drill", "drill_rig", "base", "value"):
 		label = "%s: %s" % (KEY_RU.get(segs[-2], segs[-2].replace("_", " ")), label)
@@ -868,8 +911,8 @@ def _family_value(m, rows):
 		return rows[0]["value_text"]
 	nums = [r["value"] for r in rows if isinstance(r["value"], (int, float)) and not isinstance(r["value"], bool)]
 	if len(nums) == len(rows):
-		return "%d чисел, от %s до %s" % (len(rows), fnum(min(nums)), fnum(max(nums)))
-	return "%d чисел" % len(rows)
+		return "%s, от %s до %s" % (n_numbers(len(rows)), fnum(min(nums)), fnum(max(nums)))
+	return n_numbers(len(rows))
 
 
 def build(rows, m):
@@ -982,7 +1025,7 @@ def write_review(path, rows, families, themes, top, sources):
 		L.append("| %s | %d | %s |" % (t["title"], t["count"], _md(t["recommendation"])))
 	L.append("")
 	for t in themes:
-		L.append("## %s — %d чисел" % (t["title"], t["count"]))
+		L.append("## %s — %s" % (t["title"], n_numbers(t["count"])))
 		L.append("")
 		for d in t["decide"]:
 			L.append("- %s" % d)
@@ -1005,16 +1048,16 @@ def write_review(path, rows, families, themes, top, sources):
 		flagged = [(r, fl) for r in rows if r["theme"] == t["id"] and r["reviewed"] for fl in r["flags"]]
 		if flagged:
 			L.append("Подозрительные места:")
-			seen = set()
+			by_text = {}
 			for r, fl in flagged:
-				k = (r["family"], fl)
-				if k in seen and "ключ" not in fl:
-					continue
-				seen.add(k)
-				L.append("- %s (`%s`) — %s" % (r["title"], r["id"], fl))
+				by_text.setdefault(fl, []).append(r)
+			for fl, rs in by_text.items():
+				more = " (и ещё %d)" % (len(rs) - 1) if len(rs) > 1 else ""
+				L.append("- %s (`%s`%s) — %s" % (rs[0]["title"], rs[0]["id"], more, fl))
 			L.append("")
+		if new:
+			L.append("Новые числа без разбора (появились после этого разбора — смотреть заметку агента в proposed.json):")
 		for e in new:
-			L.append("Новые числа без разбора (появились после этого разбора, смотреть заметку агента):")
 			for rid in e["rows"]:
 				r = next(x for x in rows if x["id"] == rid)
 				L.append("- `%s` = %s — %s" % (rid, _md(r["value_text"]), _md(r["affects"] or r["note"])))

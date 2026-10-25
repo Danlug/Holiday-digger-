@@ -449,6 +449,10 @@ def _unwrap(v):
 	return v["value"] if isinstance(v, dict) and "value" in v else v
 
 
+def num_or(v, default):
+	return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else default
+
+
 class Model:
 	def __init__(self, data_dir, sims=None, bots=None):
 		self.data = {}
@@ -551,6 +555,10 @@ class Model:
 				return " / ".join(fnum(x) for x in v)
 			if all(isinstance(x, str) for x in v):
 				return ", ".join(self.name(x) for x in v)
+			if all(isinstance(x, dict) and "chance" in x for x in v):
+				return ", ".join("%s %s%% ×%s" % (self.name(str(x.get("id", "?"))), fnum(num_or(x.get("chance"), 0) * 100),
+					fnum(x.get("min", 1)) if x.get("min", 1) == x.get("max", x.get("min", 1)) else "%s–%s" % (fnum(x.get("min", 1)), fnum(x.get("max", 1))))
+					for x in v)
 			if all(isinstance(x, dict) for x in v):
 				return "; ".join(self._dict_short(x) for x in v)
 		if isinstance(v, dict):
@@ -772,6 +780,35 @@ KEY_RU = {
 	"precious": "драгоценные", "expected_cells_dug_per_find_by_branch": "клеток до находки", "min_candidate_cells": "клеток-кандидатов минимум",
 	"max_candidate_cells": "клеток-кандидатов максимум", "single_row_is_guaranteed": "находка в одном ряду гарантирована",
 	"completion_reward": "награда ветки", "free_orders_per_day": "бесплатных заказов в сутки",
+	"armor_mult": "доля урона, что проходит сквозь броню", "intro_sec": "появление, с", "phase_hp": "смена фаз при доле HP",
+	"transition_sec": "смена фазы, с", "phase_heal_pct": "лечится при смене фазы", "telegraph_sec": "предупреждение удара, с",
+	"recover_sec": "отдых после удара, с", "gap_sec": "пауза между ударами, с", "slam": "удар", "rain": "камнепад", "wave": "волна",
+	"summon": "призыв", "reach_pad": "запас дальности", "arena": "арена", "wake_radius": "просыпается в радиусе",
+	"hit_pad": "запас попадания", "knock_resist": "сопротивление отбрасыванию", "pitch": "высота голоса",
+	"blip_db": "громкость «бипа»", "cps": "букв в секунду", "cps_long": "букв в секунду (длинные)", "blip_every": "бип каждые N букв",
+	"pause_comma": "пауза на запятой", "pause_stop": "пауза на точке", "pause_ellipsis": "пауза на многоточии",
+	"stops": "затемнение по глубине", "torch": "факел", "night": "ночь", "default_scale": "недельная цель = дней",
+	"follow_tau_x_s": "сглаживание по горизонтали, с", "follow_tau_y_s": "сглаживание по вертикали, с",
+	"lead_x_cells": "упреждение по взгляду, клеток", "lead_x_tau_s": "плавность упреждения, с", "lead_y_tau_s": "плавность по вертикали, с",
+	"fall_look_gain": "взгляд вниз при падении", "fall_look_from": "взгляд вниз с скорости", "fall_look_max": "взгляд вниз, максимум",
+	"rise_look_gain": "взгляд вверх при подъёме", "rise_look_max": "взгляд вверх, максимум", "dig_look_down": "взгляд вниз при копке",
+	"snap_cells": "прыжок камеры дальше, клеток", "punch_decay_s": "затухание наезда, с", "punch_max": "наезд камеры, максимум",
+	"hitstop_min_total_s": "микропауза на породе от, с", "hitstop_s": "микропауза удара, с", "hitstop_share": "микропауза, доля клетки",
+	"hitstop_credit_ttl_s": "зачёт микропаузы, с", "crack_dark_from": "трещины темнеют с", "crack_dark_to": "трещины темнеют до",
+	"stack_window_s": "слияние «+N», с", "fly_min_price": "летит в рюкзак дороже", "epic_price": "«момент» дороже",
+	"epic_hitstop_s": "пауза «момента», с", "auto_hide_s": "карточка исчезает через, с", "heavy_shake_px": "тряска, пикселей",
+	"heavy_shake_s": "тряска, с", "hit_period_s": "удар кирки каждые, с", "hit_db": "громкость удара", "fade_s": "переход музыки, с",
+	"fade_story_s": "переход в сцену, с", "fade_boss_s": "переход к боссу, с", "switch_delay_s": "смена трека не раньше, с",
+	"mine_from": "музыка шахты с глубины", "mine2_from": "вторая тема шахты с", "deep_from": "глубинная тема с",
+	"distance_cells": "шаг каждые, клеток", "land_min_speed": "слышно приземление со скорости", "max_particles": "частиц максимум",
+	"emitters": "источников частиц", "max_fliers": "летящих значков", "max_popups": "всплывающих чисел", "web_density": "частиц в вебе, доля",
+	"hurt_min_hp": "«ой» от потери HP", "drip_hp": "копить мелкий урон до", "rare_price": "звук редкой добычи дороже",
+	"coyote_s": "прыжок после схода с уступа, с", "jump_buffer_s": "запоминание прыжка, с", "key_last_wins": "последняя клавиша главнее",
+	"poll": "проверка условий, с", "first_delay": "первая подсказка через, с", "gap": "между подсказками, с", "hold": "условие держится, с",
+	"ttl": "подсказка висит, с", "lost_after": "снять, если цель пропала, с", "frac": "доля", "pct": "процент", "max": "максимум",
+	"projects": "проекты по порядку", "auto_track": "трекер сам берёт проект", "max_alpha": "плотность ночи",
+	"radius_min_cells": "радиус факела", "radius_extra_cells": "прибавка радиуса", "inner_cells": "яркое ядро", "warm_k": "тёплый оттенок",
+	"flicker": "мерцание", "up_px": "высота дымки", "down_px": "глубина дымки",
 }
 # Списки, номер элемента в которых — «ступень» (а не просто №).
 STEP_LISTS = {"levels", "upgrade_cost", "road", "bonuses", "per_level_tiers", "slots", "upgrade_tiers", "suit_tiers", "cycle"}
@@ -801,6 +838,11 @@ def human_key(row):
 			return "ступень %d" % (int(inner) + 1) if len(segs) >= 2 and segs[-2] in STEP_LISTS else "№%d" % (int(inner) + 1)
 		return KEY_RU.get(inner, inner)
 	label = KEY_RU.get(last, last.replace("_", " "))
+	if last.isdigit() and len(segs) >= 2:
+		return "%s, №%s" % (KEY_RU.get(segs[-2], segs[-2].replace("_", " ")), last)
+	if len(segs) >= 3 and segs[-3] == "slots" and segs[-2].startswith("[") and not segs[-2][1:-1].isdigit():
+		slot = {"dig": "копка", "sell": "продажа", "spend": "траты", "care": "забота", "hunt": "охота"}.get(segs[-2][1:-1], segs[-2][1:-1])
+		return "слот «%s»: %s" % (slot, "множитель награды" if last == "reward" else label)
 	if len(segs) >= 3 and segs[-2].startswith("[") and segs[-2][1:-1].isdigit() and segs[-3] in STEP_LISTS:
 		label = "ступень %d: %s" % (int(segs[-2][1:-1]) + 1, label)
 	elif len(segs) >= 2 and not segs[-2].startswith("[") and last in ("hand_drill", "drill_rig", "base", "value"):
@@ -873,6 +915,17 @@ def annotate(rows, m):
 					r["title"] = fam["title"]
 			else:
 				r["title"] = "%s: %s" % (fam["title"], r["key_ru"]) if fam_count[fam["id"]] > 1 else fam["title"]
+			last = r["segs"][-1] if r["segs"] else ""
+			if (not last.startswith("[") and not last.isdigit() and last not in KEY_RU and r["note"]
+					and r["title"].endswith(r["key_ru"])):
+				# ключа нет в словаре — подпись из заметки агента (она по-русски), а не «lead y tau s»
+				r["title"] = r["title"][: -len(r["key_ru"])] + _note_title(r["note"]).rstrip(".;:")[:70]
+			r["title"] = re.sub(r"\{(n|depth_min)\}", "N", r["title"])
+			if fam.get("vtext"):
+				try:
+					r["value_text"] = fam["vtext"](m, r) or r["value_text"]
+				except Exception:
+					pass
 			r["unit"] = fam["unit"]
 			r["affects"] = fam["affects"]
 			r["reviewed"] = True

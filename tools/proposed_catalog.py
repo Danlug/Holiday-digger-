@@ -460,6 +460,7 @@ def eff_greed_cost(m, row):
 
 def title_story(m, row):
 	scene = elem(row, "scenes") or "?"
+	scene = (m.data.get("story_ru.json", {}) or {}).get(scene + ".title", scene)
 	what = (row.get("parent") or {}).get("do", "")
 	return "Сцена «%s»: %s" % (scene, {"xp": "опыт", "dollars": "доллары", "coins": "монеты"}.get(what, what or "награда"))
 
@@ -541,9 +542,11 @@ def eff_reward_minutes(m, row):
 	v = row["value"]
 	coins = num(v.get("coins")) if isinstance(v, dict) else None
 	rate = m.bots.get("coins_earned_per_hour")
+	first = m.bots.get("income_by_phase", {}).get("0-1")
 	if not coins or not rate:
 		return None
-	txt = "≈ %s игры по среднему доходу ботов (%s монет/ч)" % (fmin(coins / rate * 60), fnum(rate))
+	txt = "≈ %s продажи руды в первый час игры или %s игры по среднему доходу за 10 ч (боты: %s и %s монет/ч)" % (
+		fmin(coins / first * 60) if first else "—", fmin(coins / rate * 60), fnum(first) if first else "—", fnum(rate))
 	if isinstance(v, dict) and num(v.get("dollars")):
 		txt += "; +%s долл. = %s монет" % (fnum(v["dollars"]), fnum(v["dollars"] * 1000))
 	return txt
@@ -598,7 +601,7 @@ def eff_art_coins(m, row):
 	t = m.trip(d) if d else None
 	if not c or not t:
 		return None
-	return "= %s полной ходки на глубине %s (ходка ≈ %s монет)" % (fnum(c / t, 1), fnum(d), fnum(t))
+	return "= %s полной ходки на глубине %s (ходка ≈ %s монет)" % (fnum(c / t, 1), fnum(round(d)), fnum(t))
 
 
 def flags_art_coins(m, row):
@@ -990,9 +993,37 @@ def eff_sub_currency(m, row):
 # rec: (вердикт, почему). Вердикты: оставить / поднять / опустить / решить / снять пометку / убрать / отложить.
 # ---------------------------------------------------------------------------
 
-def F(id, theme, imp, title, match, row=None, unit="", affects="", effect=None, summary=None, rec=None, flags=None):
+def F(id, theme, imp, title, match, row=None, unit="", affects="", effect=None, summary=None, rec=None, flags=None, vtext=None):
 	return {"id": id, "theme": theme, "imp": imp, "title": title, "match": match if isinstance(match, list) else [match],
-		"row": row, "unit": unit, "affects": affects, "effect": effect, "summary": summary, "rec": rec, "flags": flags}
+		"row": row, "unit": unit, "affects": affects, "effect": effect, "summary": summary, "rec": rec, "flags": flags,
+		"vtext": vtext}
+
+
+def v_density(m, row):
+	fnum, _, _, _ = _f(m)
+	v = row["value"]
+	if not isinstance(v, dict):
+		return None
+	if v.get("type") == "parabola":
+		return "с %s, пик %s%% на %s, хвост %s%%" % (fnum(v.get("depth_min")), fnum(v.get("peak_percent")), fnum(v.get("peak_depth")),
+			fnum(v.get("tail_percent")))
+	if v.get("type") == "flat":
+		return "%s–%s%% ровно" % (fnum(v.get("percent_min")), fnum(v.get("percent_max")))
+	return None
+
+
+def title_quest(m, row):
+	tid = elem(row, "templates")
+	t = next((x for x in m.data.get("quests.json", {}).get("templates", []) if x.get("id") == tid), {})
+	name = t.get("name_ru", tid or "?")
+	item = (t.get("filter") or {}).get("item")
+	name = name.replace("{item}", m.name(item) if isinstance(item, str) else "руда").replace("{n}", "N").replace("{depth_min}", "N")
+	return "«%s»: %s" % (name, human_key_short(row))
+
+
+def human_key_short(row):
+	return {"targets": "цели по ступеням 0–5", "weekly_scale": "множитель недели", "depth_min": "глубина по ступеням"}.get(
+		row["segs"][-1], row["segs"][-1])
 
 
 FAMILIES = [
@@ -1021,7 +1052,7 @@ FAMILIES = [
 	F("min.density", "mining", 5, "Где и сколько руды (плотность по глубине)", "minerals.json:minerals[*].density",
 		"{name}: где лежит и сколько", "доля породы, %", "доход с каждой глубины, рецепты бура, скважины и костюма, задания «добудь»",
 		eff_density, rec=("оставить", "кривые сверены с генератором (ГДД §4.1, tools/check_ores.py). Если глубины 500–1000 должны манить "
-			"сильнее (боты «скучают» на 780–880), поднимать стоит золото и алмаз глубже 600, а не всё сразу"), flags=flags_density),
+			"сильнее (боты «скучают» на 780–880), поднимать стоит золото и алмаз глубже 600, а не всё сразу"), flags=flags_density, vtext=v_density),
 	F("min.drill_seconds", "mining", 4, "Время копки руды", "minerals.json:minerals[*].drill_seconds",
 		"{name}: секунд на клетку", "с (до множителей кирки и ×1.3)", "темп копки: клеток и монет в час",
 		eff_drill, summary=sum_drill, rec=("оставить", "секунды по твёрдости; общий темп владелец уже задал одним ×1.3. Титан (12 с за 80 монет) "
@@ -1095,7 +1126,7 @@ FAMILIES = [
 		lambda m, r: eff_quest_reward(m, r) if r["segs"][-1] == "reward" and isinstance(r["value"], dict) else None,
 		rec=("оставить", "день заданий ≈ четверть–треть того, что игрок заработал бы продажей за то же время; на нижних ступенях щедрее — там «пустой» первый час")),
 	F("q.targets", "quests", 4, "Цели заданий по ступеням", ["quests.json:templates[*].targets", "quests.json:templates[*].weekly_scale",
-		"quests.json:templates[*].filter_by_tier.**"], "«{name}»: цели по ступеням", "штук (ступени 0–5)", "сколько минут занимает задание",
+		"quests.json:templates[*].filter_by_tier.**"], title_quest, "штук (ступени 0–5)", "сколько минут занимает задание",
 		eff_quest_target, rec=("оставить", "копка ≈ 25 минут игры на любой ступени; ступень 2 — ровно слова владельца (500 клеток, 1000 монет, 500 трат, 3 еды)")),
 	F("q.tiers", "quests", 3, "Ступени заданий по глубине", "quests.json:tier_by_max_depth",
 		"Рекорд глубины для ступени", "клетки", "когда задания становятся крупнее", None, rec=("оставить", "границы совпадают с поясами копки")),

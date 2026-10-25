@@ -120,8 +120,21 @@ func _shoot_grave(main: Node) -> void:
 	for _k in 12:
 		await get_tree().process_frame
 	_shot("grave_diary_news")
+	# После концовки: самородок на плите (все страницы прочитаны — значка нет).
+	for id in StoryDiary.unlocked_ids():
+		StoryDiary.mark_read(id)
+	StoryState.mark_seen("ending")
+	for _k in 12:
+		await get_tree().process_frame
+	_shot("grave_ending")
+	# Ночь (22:00): читаемость плиты и гравировки под синей дымкой.
+	GameState.game_clock_hours = 16.0
+	for _k in 40:
+		await get_tree().process_frame
+	_shot("grave_night")
+	GameState.game_clock_hours = 0.0
 	player.x = 15.5
-	for _k in 6:
+	for _k in 30:
 		await get_tree().process_frame
 	_shot("grave_far")
 

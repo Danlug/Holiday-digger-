@@ -124,8 +124,9 @@
 		},
 		"grave": {
 			"tex": "res://art/env/grave.png",
-			"scale": 2.0,
-			"y": 0.0
+			"scale": 1.5,
+			"y": 0.0,
+			"_comment": "Текстура 2 px на игровой пиксель (tools/gen_grave.py): 1.5 / ART_SCALE 3 = 0.5 — тот же размер, что у могилы во дворе (GraveSite.STONE_SCALE)."
 		},
 		"workbench": {
 			"tex": "res://art/env/workbench.png",
@@ -450,7 +451,7 @@
 					"tex": "res://art/env/grave.png",
 					"x": 4.0,
 					"y": 0.5,
-					"scale": 2.0
+					"scale": 1.5
 				},
 				{
 					"t": "world_actor",

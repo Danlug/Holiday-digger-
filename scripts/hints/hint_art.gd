@@ -11,6 +11,9 @@ const PREFIX_DIRS := {
 	"meta": "res://art/meta/%s.png",
 	"story": "res://art/story/%s.png",
 	"gear": "res://art/gear/%s.png",
+	"items": "res://art/items/%s.png",
+	"shop": "res://art/ui/shop/%s.png",
+	"guidance": "res://art/guidance/%s.png",
 }
 ## Файл вдвое больше рисунка: на экране один пиксель рисунка = одна единица.
 const SCALE := 0.5

@@ -334,8 +334,8 @@ func _level_up(s: Dictionary, order: Array) -> void:
 	while int(s["xp"]) >= Balance.xp_required_for_level(int(s["level"])) and int(s["level"]) < 100:
 		s["xp"] = int(s["xp"]) - Balance.xp_required_for_level(int(s["level"]))
 		s["level"] += 1
-		s["points"] += 1 + (2 if int(s["level"]) % 5 == 0 else 0)
-		if not s["mile"].has("уровень %d" % int(s["level"])) and int(s["level"]) in [5, 10, 20]:
+		s["points"] += Balance.skill_points_for_level(int(s["level"]))  # то же правило, что в игре (ГДД §11)
+		if not s["mile"].has("уровень %d" % int(s["level"])) and int(s["level"]) % 5 == 0:
 			s["mile"]["уровень %d" % int(s["level"])] = s["t"]
 	var bought := true
 	while bought:

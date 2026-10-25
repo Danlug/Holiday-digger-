@@ -1027,6 +1027,9 @@ func _update_bubble_dynamic() -> void:
 				extra = "%d ч · бодрость +%d%% · сытость −%d%%" % [
 					int(round(float(plan["hours"]))), int(round(float(plan["stamina_gain"]))),
 					int(round(float(plan["hunger_cost"])))]
+				# сон лечит (раунд 4): сытым — в полную силу, голодным — слабее
+				if float(plan.get("hp_gain", 0.0)) >= 1.0:
+					extra += " · здоровье +%d%%" % int(round(float(plan["hp_gain"])))
 			else:
 				extra = String(plan["reason"])
 				dim = true

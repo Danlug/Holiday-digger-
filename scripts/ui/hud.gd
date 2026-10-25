@@ -1419,9 +1419,11 @@ func _connect_game_state() -> void:
 	GameState.xp_changed.connect(func(_xp, _lvl): _sync_xp())
 	GameState.leveled_up.connect(func(lvl, pts):
 		_sync_xp()
+		# Значки — как на экране навыков: уровень (искра опыта) и очки навыков (звезда);
+		# очков за уровень с раунда 4 бывает 1–5, число видно сразу (ГДД §11).
 		toast_parts([
-			{"icon": "star"}, {"text": str(lvl), "color": TOAST_COLORS["rare"]},
-			{"icon": "plus"}, {"text": "+%d" % pts, "color": Color8(0xB4, 0xE0, 0x9C)},
+			{"icon_tex": HeroIcons.get_icon("ui_xp")}, {"text": str(lvl), "color": TOAST_COLORS["rare"]},
+			{"icon_tex": HeroIcons.get_icon("ui_star")}, {"text": "+%d" % pts, "color": Color8(0xB4, 0xE0, 0x9C)},
 		], 2.6, "rare"))
 	GameState.survival_warning.connect(_on_survival_warning)
 	GameState.respawned.connect(func(): _sync_all())
@@ -1919,11 +1921,19 @@ func _eat_from_inventory(id: String) -> void:
 		toast(String(res.get("reason", "")))
 		Sfx.play("ui_deny")
 		return
-	toast_parts([
+	var parts: Array = [
 		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": Color8(0xE8, 0x7E, 0x6E)},
 		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": Color8(0xE8, 0xC5, 0x47)},
-	], 2.0)
-	Sfx.play("eat")
+	]
+	# Еда и аптечка лечат (раунд 4, healing): +HP в тосте, у аптечки — только он.
+	var medkit := Healing.is_medkit(id)
+	var hp_pct := int(round(100.0 * float(res.get("hp", 0.0)) / maxf(1.0, GameState.get_max_hp())))
+	if medkit:
+		parts.clear()
+	if hp_pct > 0 or medkit:
+		parts.append({"icon": "hp", "text": "+%d" % hp_pct, "color": Color8(0xE8, 0x6A, 0x6A)})
+	toast_parts(parts, 2.0)
+	Sfx.play("heal" if medkit else "eat")
 	_render_inventory()
 	_sync_all()
 

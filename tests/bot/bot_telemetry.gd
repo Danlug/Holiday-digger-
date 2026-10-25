@@ -14,6 +14,7 @@ const SPIKE_MS := 50.0
 var meta: Dictionary = {}
 var milestones: Dictionary = {}          # имя -> sim
 var curve: Array = []                    # [t, coins, xp, level, depth, max_depth, hp, hunger, stamina, weight, max_w]
+var goal_curve: Array = []               # [t, метрика стратегии]
 var trips: Array = []
 var purchases: Array = []
 var sales: Array = []
@@ -189,6 +190,7 @@ func to_dict(end_t: float) -> Dictionary:
 		"frame_spikes": spikes,
 		"curve_columns": ["t", "coins", "xp", "level", "depth", "max_depth", "hp", "hunger", "stamina", "weight", "max_weight"],
 		"curve": curve,
+		"goal_curve": goal_curve,
 		"events": events,
 		"lines": lines,
 		"shots": shots,

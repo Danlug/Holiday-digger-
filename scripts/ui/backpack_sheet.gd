@@ -197,7 +197,7 @@ func apply_drop() -> void:
 ## Редкость 0..4 по цене за штуку; у находок без цены (артефактные материалы
 ## глубин) — эпическая, у еды и топлива — обычная.
 static func tier_of(id: String) -> int:
-	if HouseConfig.is_food(id) or id == "fuel_block":
+	if HouseConfig.is_food(id) or id == "fuel_block" or Healing.is_medkit(id):
 		return 0
 	var p := Balance.get_mineral_price(id)
 	if p <= 0:
@@ -387,8 +387,11 @@ static func make_tile(id: String, count: int, selected: bool = false) -> Button:
 	if HouseConfig.is_food(id):
 		name_ru = HouseConfig.food_name(id)
 	var price := Balance.get_mineral_price(id)
-	Tip.bind(b, name_ru,
-		"%d шт · %.1f кг" % [count, Balance.get_mineral_weight(id) * count],
+	var body := "%d шт · %.1f кг" % [count, Balance.get_mineral_weight(id) * count]
+	var hp := Healing.item_hp_percent(id)   # еда и аптечка лечат (раунд 4, healing)
+	if hp > 0:
+		body += " · здоровье +%d%%" % hp
+	Tip.bind(b, name_ru, body,
 		("%s за штуку · всего %s" % [CountLabel.group_digits(price),
 			CountLabel.group_digits(price * count)]) if price > 0 else "Не продаётся")
 	return b
@@ -431,7 +434,14 @@ func _select(id: String) -> void:
 func _refresh_actions() -> void:
 	var has := _selected != ""
 	_drop_btn.modulate = Color(1, 1, 1, 1.0 if has else 0.4)
-	_eat_btn.visible = has and HouseConfig.is_food(_selected)
+	var medkit := Healing.is_medkit(_selected)
+	_eat_btn.visible = has and (HouseConfig.is_food(_selected) or medkit)
+	# Аптечка «применяется» той же кнопкой (раунд 4, healing): значок сердца вместо ложки.
+	_eat_btn.icon = UiIcons.tex("hp") if medkit else UiIcons.tex("eat")
+	if medkit:
+		Tip.bind(_eat_btn, "Применить", "Здоровье +%d%%" % Healing.medkit_hp_percent())
+	else:
+		Tip.bind(_eat_btn, "Съесть", "Голод и бодрость вернутся, и немного здоровья")
 
 
 # --- окно «сколько» -------------------------------------------------------

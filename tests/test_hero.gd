@@ -192,6 +192,7 @@ func _test_buy_logic() -> void:
 	var stages := int(Balance.get_upgrade_branch("luck_multiplier").get("stages", 0))
 	GameState.reset_progress()
 	GameState.skill_points_available = 10000
+	SkillTree.try_buy("luck_chance", false)  # множитель открывается после ступени шанса (раунд 4)
 	for i in range(stages + 2):
 		SkillTree.try_buy("luck_multiplier", false)
 	check_eq("выше максимума ступеней не поднять", GameState.get_skill_stage("luck_multiplier"), stages)

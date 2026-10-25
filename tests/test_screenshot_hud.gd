@@ -120,6 +120,12 @@ func _ready() -> void:
 		await _frames(3)
 		await _shot("toast_eat")
 
+	if _want("levelup"):
+		# Тост уровня: «★ 25  + +4» — очков за уровень теперь больше (ГДД §11, раунд 4).
+		GameState.leveled_up.emit(25, Balance.skill_points_for_level(25))
+		await _frames(6)
+		await _shot("toast_levelup")
+
 	if _want("objective"):
 		_hud.set_objective("Накопай золота и продай его в мастерской — на кирку.")
 		await _frames(4)

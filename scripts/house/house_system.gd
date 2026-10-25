@@ -697,16 +697,22 @@ func _on_view_action(action: String, arg: String) -> void:
 func _sleep() -> void:
 	var stamina_before := GameState.stamina
 	var hunger_before := GameState.hunger
+	var hp_before := _hp_percent()
 	var result := HouseSleep.sleep_now()
 	if not bool(result["ok"]):
 		_toast(String(result["reason"]), 3.4)
 		return
 	GameState.emit_event(&"slept", {"hours": float(result["hours"]),
-		"stamina": int(round(GameState.stamina - stamina_before)), "skipped": _skipped_sleep})
-	# Итог сна — вспышками на полосках шапки, а не строкой текста.
+		"stamina": int(round(GameState.stamina - stamina_before)), "skipped": _skipped_sleep,
+		"hp": float(result.get("hp", 0.0))})
+	# Итог сна — вспышками на полосках шапки, а не строкой текста (HP — с раунда 4: сон лечит).
 	if _view != null and _view.has_method("flash_bars"):
 		_view.flash_bars({"stamina": GameState.stamina - stamina_before,
-			"hunger": GameState.hunger - hunger_before})
+			"hunger": GameState.hunger - hunger_before, "hp": _hp_percent() - hp_before})
+
+
+static func _hp_percent() -> float:
+	return 100.0 * GameState.hp / maxf(1.0, GameState.get_max_hp())
 
 
 ## Кнопка «Спать» у кровати (ГДД, решение владельца: «спит быстро, буквально
@@ -836,8 +842,11 @@ static func order_food(id: String) -> Dictionary:
 	GameState.emit_event(&"food_ordered", {"id": id, "free": price_was_free})
 	if not HouseConfig.is_portable(id):
 		var eaten := HouseFood.eat_now(id)
-		return {"ok": true, "remote": bool(gate["needs_ad"]), "message": "%s — съедено на месте: голод +%d%%." % [
-			name, int(eaten.get("hunger", 0.0))]}
+		var healed := ""
+		if float(eaten.get("hp", 0.0)) > 0.0:
+			healed = ", здоровье +%d%%" % int(round(100.0 * float(eaten["hp"]) / maxf(1.0, GameState.get_max_hp())))
+		return {"ok": true, "remote": bool(gate["needs_ad"]), "message": "%s — съедено на месте: голод +%d%%%s." % [
+			name, int(eaten.get("hunger", 0.0)), healed]}
 	if instance != null:
 		instance._start_delivery(id)
 	else:
@@ -959,10 +968,11 @@ func _start_forced_sleep() -> void:
 
 func _finish_forced_sleep() -> void:
 	var stamina_before := GameState.stamina
+	var hp_before := _hp_percent()
 	HouseSleep.sleep_now(true)
 	GameState.house_tutorial_stage = 1
 	_view.set_forced("")
-	_view.flash_bars({"stamina": GameState.stamina - stamina_before})
+	_view.flash_bars({"stamina": GameState.stamina - stamina_before, "hp": _hp_percent() - hp_before})
 	_toast("Выспался. Дальше кровать работает так же, но за сон тратится сытость.", 4.2)
 
 

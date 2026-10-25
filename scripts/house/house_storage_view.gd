@@ -310,6 +310,7 @@ func _offer(id: String, count: int, store: bool, accessible: bool) -> Dictionary
 		o["extra"] = "Тап — забрать в рюкзак"
 	else:
 		o["extra"] = "Тап — сложить на склад"
+	ProjectChain.decorate_offer(o, id)   # «нужно для бура: 40/100» (ветка guidance)
 	return o
 
 

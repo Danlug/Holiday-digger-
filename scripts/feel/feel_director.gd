@@ -29,6 +29,7 @@ var _inv_prev: Dictionary = {}
 var _inv_cur: Dictionary = {}
 var _pending: Dictionary = {}
 var _last_fall_msec: int = -100000
+var _fee: int = 0   # «скорая забрала» при этой смерти (событие ambulance, раунд 4)
 var _connected: bool = false
 
 ## Для тестов: что режиссёр сделал (счётчики), не завязываясь на сервисы Fx/Sfx.
@@ -136,6 +137,8 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			_punch(0.05)
 		&"collapse":
 			_punch(0.02)
+		&"ambulance":
+			_fee = int(data.get("coins", 0))
 
 
 ## Находка, добытая киркой: значок летит в рюкзак; дорогая — «момент».
@@ -250,7 +253,8 @@ func _on_died() -> void:
 		cause = "hunger"
 	elif cause == "" and _near_lava():
 		cause = "lava"
-	_pending = DeathCard.build_report(_inv_prev if _inv_cur.is_empty() else _inv_cur, GameState.player_depth, cause)
+	_pending = DeathCard.build_report(_inv_prev if _inv_cur.is_empty() else _inv_cur, GameState.player_depth, cause, _fee)
+	_fee = 0
 
 
 func _near_lava() -> bool:

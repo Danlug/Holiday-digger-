@@ -407,6 +407,7 @@ static func load_game() -> bool:
 
 	var migrated := _migrate(_sanitize(parsed))
 	_apply(migrated)
+	GameState.top_up_skill_points()  # очки за уровни растут с раунда 4 — доплата старому сейву
 	return true
 
 

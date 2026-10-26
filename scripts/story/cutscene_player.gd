@@ -654,6 +654,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _advance() -> void:
+	# "grow" держит сцену сам, так что любой переход дальше — конец развёртки.
+	_stop_grow()
 	_world_finish_pending()
 	# Карточка находки — окно «тапни и дальше»: по тапу она уходит. Иначе она
 	# висела бы посреди экрана всю следующую копку — и как дед проходит
@@ -954,7 +956,7 @@ func _show_actor(beat: Dictionary) -> void:
 	var enter_from := String(beat.get("enter", ""))
 	if is_new and not enter_from.is_empty():
 		var a: Dictionary = _actors[id]
-		var w: float = a.frame_w * a.scale / ART_SCALE
+		var w: float = a.frame_w * a.scale * StoryData.actor_height(id) / ART_SCALE
 		var start_off: float = _fit_x(_stage_x(enter_from), w) - _fit_x(_stage_x(String(a.at)), w)
 		_actors[id].dx = start_off
 		_place_actor(id)
@@ -1010,7 +1012,7 @@ func _hide_actor(beat: Dictionary) -> void:
 		_actors.erase(id)
 		return
 	var a: Dictionary = _actors[id]
-	var w: float = a.frame_w * a.scale / ART_SCALE
+	var w: float = a.frame_w * a.scale * StoryData.actor_height(id) / ART_SCALE
 	var to_off: float = _fit_x(_stage_x(exit_to), w) - _fit_x(_stage_x(String(a.at)), w)
 	var sec: float = maxf(0.05, float(beat.get("exit_sec", 0.6)))
 	# Пока уходит, тоже проигрываем позу ходьбы, если она есть (см. _show_actor:
@@ -1060,6 +1062,7 @@ func _show_prop(beat: Dictionary) -> void:
 ## (оба зовут _clear_stage напрямую или через _finish/abort) — одна точка
 ## гарантирует откат независимо от того, досмотрели сцену или пропустили.
 func _clear_stage() -> void:
+	_stop_grow()
 	for id in _actors.keys():
 		_actors[id].node.queue_free()
 	_actors.clear()
@@ -1111,7 +1114,8 @@ func _place_all() -> void:
 func _place_actor(id: String) -> void:
 	var a: Dictionary = _actors[id]
 	var node: TextureRect = a.node
-	var s: float = a.scale
+	# Рост актёра (бабушки чуть ниже внука) — тот же, что на живой карте.
+	var s: float = a.scale * StoryData.actor_height(id)
 	# Лист на диске в ART_SCALE раз крупнее логики (см. CHAR_FRAME выше) —
 	# делим перед тем, как накладывать "scale" сцены, иначе актёр выходит
 	# втрое крупнее замысла постановщика и не помещается на сцене портрета.
@@ -1279,6 +1283,18 @@ func _start_grow(beat: Dictionary) -> void:
 	_grow_left = _grow_step * poses.size()
 	_beat_timer = _grow_left
 	_tick_grow(0.0)
+
+
+## БАГ (скриншот владельца 26.10, «бабка маленькая»): тап по развёртке
+## уводил сцену дальше, а тикер продолжал листать позы и после "hide" и
+## "clear" заново ставил классического актёра — мальчика age_15 в масштабе
+## 2.2 по центру экрана. В режиме «мир» эта иллюстрация висела поверх живой
+## карты, заслоняя настоящего мальчика-актёра (того же роста, что бабушка),
+## — вот и «великан» рядом с бабушкой. Развёртка живёт ровно пока держит сцену.
+func _stop_grow() -> void:
+	_grow_poses = []
+	_grow_left = 0.0
+	_grow_idx = -1
 
 
 func _tick_grow(dt: float) -> void:

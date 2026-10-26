@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "ebcd71782b7b",
+  "data_fingerprint": "15cf2aa39da5",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",

@@ -140,12 +140,14 @@ func _test_needed_for() -> void:
 	GameState.inventory["scrap"] = 30
 	GameState.house_storage["bronze"] = 40
 	var n := ProjectChain.needed_for("scrap")
-	# рецепт бура с 26.10 — 80 бронзы (владелец: −20%)
-	check("лом нужен буру через бронзу: 30 из 40 (80 − 40 бронзы)", n.size() == 1
-		and String(n[0]["project"]) == "hand_drill" and String(n[0]["via"]) == "bronze"
-		and int(n[0]["have"]) == 30 and int(n[0]["need"]) == 40)
-	check("скважине бронзы хватает (40 из 20) — лом ей не нужен",
-		not n.any(func(e) -> bool: return String(e["project"]) == "well"))
+	# с 26.10 (владелец): бур — 80 бронзы (−20%), скважина дороже бура — 100 бронзы
+	var for_drill := n.filter(func(e) -> bool: return String(e["project"]) == "hand_drill")
+	var for_well := n.filter(func(e) -> bool: return String(e["project"]) == "well")
+	check("лом нужен буру через бронзу: 30 из 40 (80 − 40 бронзы)", for_drill.size() == 1
+		and String(for_drill[0]["via"]) == "bronze"
+		and int(for_drill[0]["have"]) == 30 and int(for_drill[0]["need"]) == 40)
+	check("и скважине через бронзу: 30 из 60 (100 − 40 бронзы) — она дороже бура", for_well.size() == 1
+		and String(for_well[0]["via"]) == "bronze" and int(for_well[0]["need"]) == 60)
 	check("текст Tip: «Ручной бур (бронза) — 30/40»", ProjectChain.needed_text("scrap").contains("30/40")
 		and ProjectChain.needed_text("scrap").contains("бронза"))
 	var iron := ProjectChain.needed_for("iron_ore")

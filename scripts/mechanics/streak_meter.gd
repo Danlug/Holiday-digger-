@@ -73,7 +73,7 @@ func on_greed_start() -> void:
 
 
 func wanted() -> bool:
-	return streak != null and (streak.in_greed() or streak.work >= SHOW_FROM_S or (streak.count > 0 and streak.work > 0.0))
+	return streak != null and (streak.in_greed() or streak.work >= SHOW_FROM_S)
 
 
 func _process(delta: float) -> void:

@@ -158,11 +158,12 @@ func _check_data() -> void:
 	check("цели правил разобраны (hud/menu/tech_hud/world/group/attached)", bad_target == 0)
 	check("значки тостов найдены в art/", bad_icon == 0)
 	var timing: Dictionary = HintData.data().get("timing", {})
-	var proposed := true
+	# владелец утвердил тайминги подсказок на странице разбора чисел (26.10): обёртки с proposed: false
+	var approved := true
 	for k in timing.keys():
-		if not (typeof(timing[k]) == TYPE_DICTIONARY and bool(timing[k].get("proposed", false))):
-			proposed = false
-	check("числа таймингов помечены proposed", proposed and not timing.is_empty())
+		if not (typeof(timing[k]) == TYPE_DICTIONARY and timing[k].has("value") and timing[k].get("proposed", true) == false):
+			approved = false
+	check("числа таймингов — обёртки, утверждённые владельцем", approved and not timing.is_empty())
 	check("тайминги: пауза между подсказками больше нуля, показ больше паузы опроса",
 		HintData.timing("gap", 0.0) > 0.0 and HintData.timing("ttl", 0.0) > HintData.timing("poll", 1.0))
 	check("метки «new»: заданы пункты меню", HintData.menu_new_entries().size() >= 2)

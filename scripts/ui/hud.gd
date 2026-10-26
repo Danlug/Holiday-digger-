@@ -137,7 +137,8 @@ var _inv_sheet: BackpackSheet
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — НЕ для релиза
 ## игрокам, см. её собственный файл. Живёт отдельным классом, а не куском
 ## кода здесь, — не завязана на раскладку остального HUD, добавляется в
-## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего.
+## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего HUD
+## (но не поверх окон: те на слое UiLayers.HUD_WINDOWS).
 var _debug_panel: DebugPanel
 
 ## Шторка настроек (scripts/ui/settings_sheet.gd): звук/музыка, вибро, управление,
@@ -145,6 +146,11 @@ var _debug_panel: DebugPanel
 ## что у рюкзака, — регуляторам (ползунки громкости) нужна ширина экрана, узкая
 ## popup-панель «•••» для них тесна.
 var _settings_sheet: SettingsSheet
+
+## Слой окон HUD (UiLayers.HUD_WINDOWS): шторки и меню «•••», см. _build_windows_layer.
+var _windows_layer: CanvasLayer
+var _windows_root: Control    # размер HUD — для меню «•••», прижатого к правому нижнему углу
+var _windows_stage: Control   # как Stage — всё, кроме нижней полосы: шторки её не закрывают
 
 
 func _ready() -> void:
@@ -247,10 +253,39 @@ func _build_ui() -> void:
 	_build_stick(stage)
 	_build_hold_hint(stage)
 	_build_arrows(stage)
-	_build_inventory_sheet(stage)
-	_build_settings_sheet(stage)
+	_build_windows_layer()
+	_build_inventory_sheet(_windows_stage)
+	_build_settings_sheet(_windows_stage)
 	_build_strip()
 	_build_debug_panel()
+
+
+## Окна HUD — рюкзак, настройки, меню «•••» — на своём слое UiLayers.HUD_WINDOWS:
+## выше слоёв HUD-виджетов (трекер проекта, бак бура, шкала азарта, курьер — 2…10),
+## ниже склада и мастерской. В самом HUD (слой 1) их перекрывал любой виджет со
+## своим слоем (владелец 26.10: «штука с буром светится поверх других менюшек»).
+## Слой — не CanvasItem и видимость HUD сам не наследует: прячем вместе с HUD (дом, сцены).
+func _build_windows_layer() -> void:
+	_windows_layer = CanvasLayer.new()
+	_windows_layer.name = "HudWindows"
+	_windows_layer.layer = UiLayers.HUD_WINDOWS
+	add_child(_windows_layer)
+	_windows_root = Control.new()
+	_windows_root.name = "Root"
+	_windows_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_windows_layer.add_child(_windows_root)
+	_windows_stage = Control.new()
+	_windows_stage.name = "Stage"
+	_windows_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_windows_stage.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_windows_stage.offset_bottom = -STRIP_H
+	_windows_root.add_child(_windows_stage)
+	visibility_changed.connect(_sync_windows_layer)
+
+
+func _sync_windows_layer() -> void:
+	if _windows_layer != null:
+		_windows_layer.visible = is_visible_in_tree()
 
 
 ## Левый верхний угол: портрет героя (кнопка «Герой», уровень и опыт под ним)
@@ -943,7 +978,8 @@ func _build_strip() -> void:
 
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — добавляется в HUD
 ## САМОЙ ПОСЛЕДНЕЙ (после основной нижней полосы), поэтому её триггер рисуется
-## и кликается поверх всего остального. Не в общей нижней полосе (задание
+## и кликается поверх всего остального HUD; окна HUD (рюкзак, настройки, «•••»)
+## — над ним, на своём слое (_build_windows_layer). Не в общей нижней полосе (задание
 ## владельца: там уже инструмент/«•••»/топливо, и рядом другой агент двигает
 ## стрелки по бокам) — свой маленький триггер «Тест» стоит НАД полосой слева,
 ## зеркально «•••» справа, и раскрывается вверх, не занимая места, пока закрыт.
@@ -980,7 +1016,7 @@ func _build_more_menu() -> void:
 	_more_panel.add_theme_stylebox_override("panel",
 		ProgressUiKit.popup_box(ProgressUiKit.EDGE, Color8(0x1A, 0x14, 0x0F, 0xF5), 5))
 	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	add_child(_more_panel)
+	_windows_root.add_child(_more_panel)   # окно, а не виджет: слой окон HUD
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 3)
@@ -1346,6 +1382,8 @@ func _update_layout() -> void:
 	# x=-100, нижняя полоса — на y=-32). Размер задаём явно.
 	position = Vector2.ZERO
 	size = vp
+	_windows_root.position = Vector2.ZERO
+	_windows_root.size = vp
 	stick_r = maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
 	knob_r = stick_r * 0.39
 	stage_rect = Rect2(0, 0, vp.x, vp.y - STRIP_H)

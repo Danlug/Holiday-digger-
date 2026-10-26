@@ -78,7 +78,7 @@ func _build() -> void:
 		view_root.add_child(badge)
 	var meter_layer := CanvasLayer.new()
 	meter_layer.name = "StreakLayer"
-	meter_layer.layer = 2   # рядом с HUD и значками техники, ниже шторок и экранов
+	meter_layer.layer = UiLayers.HUD_WIDGETS   # рядом с HUD и значками техники, ниже шторок и экранов
 	add_child(meter_layer)
 	meter = StreakMeter.new()
 	meter.name = "StreakMeter"

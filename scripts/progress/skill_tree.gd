@@ -413,7 +413,7 @@ static func effect_text(branch: Dictionary, stage: int) -> String:
 			return "земля %.0f%%, ресурс %.0f%%" % [chance["earth"], chance["resource"]]
 		"greed":
 			# ветка «Жадность» (scripts/mechanics/greed_rules.gd): секунды режима и порог шкалы
-			return "жадность %d с, шкала %d кл." % [roundi(GreedRules.seconds(stage)), GreedRules.threshold(stage)]
+			return "жадность %d с, шкала %d с копки" % [roundi(GreedRules.seconds(stage)), roundi(GreedRules.threshold(stage))]
 		_:
 			return String(branch.get("notes", ""))
 

@@ -8,12 +8,12 @@ extends Node
 ##       godot --path . res://tests/test_screenshot_mechanics.tscn \
 ##       --rendering-driver opengl3 --resolution 448x960 -- /tmp/mech_shots [виды через запятую]
 ##
-## Виды: chest, open, streak, fever, greed_run, surface, journal, chests_tab. По умолчанию все.
+## Виды: chest, open, streak, states (почти полна / тает), fever, greed_run, surface, journal, chests_tab. По умолчанию все.
 
 const SEED := 4242
 
 var _out_dir := "/tmp/mech_shots"
-var _spec := "chest,open,streak,fever,greed_run,surface,journal,chests_tab"
+var _spec := "chest,open,streak,states,fever,greed_run,surface,journal,chests_tab"
 var main: Node2D
 var d: MechDirector
 
@@ -46,6 +46,8 @@ func _ready() -> void:
 				await _open()
 			"streak":
 				await _streak(false)
+			"states":
+				await _streak_states()
 			"fever":
 				await _streak(true)
 			"greed_run":
@@ -129,13 +131,38 @@ func _streak(fever: bool) -> void:
 	_stand_left_of(Vector2i(ch["cell"].x, ch["cell"].y))
 	d.streak.reset()
 	var y: int = ch["cell"].y
-	# через режиссёра, как в игре: на пороге лихорадки — звук, вспышка, «×2» над героем
-	for i in range(d.streak.fever_at if fever else 37):
+	# через режиссёра, как в игре: шкала копится секундами копки; на полной шкале
+	# клетка включает жадность — звук, вспышка шкалы, кольцо от героя, «×7» над ним
+	d.on_dug({"cell": Vector2i(2, y + 3), "mineral": "", "loot": false})
+	d.streak.work = d.streak.fever_s * (1.0 if fever else 0.62)
+	if fever:
 		d.on_dug({"cell": Vector2i(2, y + 3), "mineral": "", "loot": false})
-	main.player.digging = {"x": int(main.player.x) + 1, "y": y, "t": 0.3, "total": 1.0, "type": TileTypes.Type.DIRT}
-	await _frames(14 if fever else 40)
+	main.player.digging = {"x": int(main.player.x) + 1, "y": y, "t": 0.3, "total": 99.0, "type": TileTypes.Type.DIRT}
+	if fever:
+		await _frames(4)
+		await _shot("greed_start")   # миг начала: вспышка шкалы, кольцо от героя
+	await _frames(10 if fever else 40)
 	await _shot("fever" if fever else "streak")
 	main.player.digging = null
+	d.streak.reset()
+
+
+## Шкала почти полна (пламя дышит) и шкала тает (герой стоит дольше hold_s).
+func _streak_states() -> void:
+	var ch := _find("wood", 400)
+	_stand_left_of(Vector2i(ch["cell"].x, ch["cell"].y))
+	var y: int = ch["cell"].y
+	d.streak.reset()
+	d.on_dug({"cell": Vector2i(2, y + 3), "mineral": "", "loot": false})
+	d.streak.work = d.streak.fever_s * 0.9
+	main.player.digging = {"x": int(main.player.x) + 1, "y": y, "t": 0.3, "total": 99.0, "type": TileTypes.Type.DIRT}
+	await _frames(30)
+	await _shot("streak_near")
+	main.player.digging = null
+	d.streak.work = d.streak.fever_s * 0.55
+	d.streak.idle = d.streak.hold_s + 0.1
+	await _frames(20)
+	await _shot("streak_drain")
 	d.streak.reset()
 
 
@@ -145,8 +172,9 @@ func _greed_run() -> void:
 	_stand_left_of(Vector2i(ch["cell"].x, ch["cell"].y))
 	d.streak.reset()
 	var y: int = ch["cell"].y
-	for i in range(d.streak.fever_at):
-		d.on_dug({"cell": Vector2i(2, y + 3), "mineral": "", "loot": false})
+	d.on_dug({"cell": Vector2i(2, y + 3), "mineral": "", "loot": false})
+	d.streak.work = d.streak.fever_s
+	d.on_dug({"cell": Vector2i(2, y + 3), "mineral": "", "loot": false})
 	main.player.set_intent(0, false, true)
 	await _frames(40)
 	await _shot("greed_run")
@@ -185,9 +213,11 @@ func _surface() -> void:
 	d.set_process(false)
 	d.streak.reset()
 	d.streak.count = 33
+	d.streak.work = d.streak.fever_s * 0.55
 	await _frames(30)
 	await _shot("surface_streak")
 	d.streak.count = 0
+	d.streak.work = 0.0
 	d.set_process(true)
 	await _frames(10)
 

@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "776bf5b9b624",
+  "data_fingerprint": "bf728eb26fc9",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
@@ -11,7 +11,7 @@
   ]
  },
  "summary": {
-  "rows": 671,
+  "rows": 673,
   "families": 47,
   "new_unreviewed": 0,
   "flagged": 22,
@@ -22,7 +22,7 @@
    "Артефакты и музей": 56,
    "Техника и топливо": 62,
    "Бой": 210,
-   "Механики: тайники, азарт и жадность, мастерство, удача": 12,
+   "Механики: тайники, азарт и жадность, мастерство, удача": 14,
    "Монетизация и ролики": 31,
    "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 95
   }
@@ -31,7 +31,7 @@
   {
    "family": "mech.streak",
    "decide": "«У меня вообще не сработала жадность» — причину ищет отдельная ветка. Числа азарта (60 клеток подряд) — после её отчёта.",
-   "now": "с глубины 6; пауза до обрыва серии 2.5; клеток до жадности 60; лишняя добыча в жадности 1",
+   "now": "6 чисел, от 0.6 до 60",
    "verdict": "оставить"
   },
   {
@@ -202,7 +202,7 @@
   {
    "id": "mechanics",
    "title": "Механики: тайники, азарт и жадность, мастерство, удача",
-   "count": 12,
+   "count": 14,
    "families": [
     "mech.streak",
     "mech.mastery"
@@ -1292,17 +1292,19 @@
    "importance": 4,
    "rows": [
     "mechanics.json:streak.min_depth",
-    "mechanics.json:streak.idle_break_s",
-    "mechanics.json:streak.fever_at",
+    "mechanics.json:streak.fever_s",
+    "mechanics.json:streak.gap_s",
+    "mechanics.json:streak.hold_s",
+    "mechanics.json:streak.drain_per_s",
     "mechanics.json:streak.fever_extra"
    ],
-   "count": 4,
-   "value_text": "с глубины 6; пауза до обрыва серии 2.5; клеток до жадности 60; лишняя добыча в жадности 1",
+   "count": 6,
+   "value_text": "6 чисел, от 0.6 до 60",
    "affects": "как часто включается жадность",
    "reviewed": true,
-   "effect": "Азарт: клеток до жадности — 60 клеток подряд ≈ 2 мин непрерывной копки на глубине 80–250; боты входят в жадность 2.7 раза в час",
+   "effect": "Азарт: секунд работы до жадности — 60 с работы ≈ 1 мин непрерывной копки на любом инструменте (человек с паузами — ~1.2 мин); боты входят в жадность 2.7 раза в час",
    "verdict": "оставить",
-   "why": "секунды и проценты жадности — владельца; 60 клеток подряд — минута-две копки, боты входят в жадность 2–3 раза в час",
+   "why": "секунды и проценты жадности — владельца; 60 с работы (до 26.10 — 60 клеток подряд, у живого игрока не наступало) — раз в ~1.2 мин копки с паузами человека",
    "flags": []
   },
   {
@@ -11886,18 +11888,18 @@
    "reviewed": true
   },
   {
-   "id": "mechanics.json:streak.fever_at",
+   "id": "mechanics.json:streak.drain_per_s",
    "file": "data/mechanics.json",
-   "path": "streak.fever_at",
+   "path": "streak.drain_per_s",
    "theme": "mechanics",
    "family": "mech.streak",
-   "title": "Азарт: клеток до жадности",
-   "value": 60,
-   "value_text": "60",
+   "title": "Азарт: таяние шкалы, с/с",
+   "value": 5,
+   "value_text": "5",
    "unit": "",
-   "note": "клеток подряд до жадности на нулевой ступени; ветка «Жадность» (data/upgrades.json) снимает 5–25% (владелец): 57/54/51/48/45",
+   "note": "дальше шкала тает: столько секунд работы за секунду простоя — полная шкала сгорает за 12 с. Вернулся к шахте, перелетел к руде — потерял чуть-чуть, а не всё",
    "affects": "как часто включается жадность",
-   "effect": "60 клеток подряд ≈ 2 мин непрерывной копки на глубине 80–250; боты входят в жадность 2.7 раза в час",
+   "effect": null,
    "importance": 4,
    "flags": [],
    "reviewed": true
@@ -11920,16 +11922,50 @@
    "reviewed": true
   },
   {
-   "id": "mechanics.json:streak.idle_break_s",
+   "id": "mechanics.json:streak.fever_s",
    "file": "data/mechanics.json",
-   "path": "streak.idle_break_s",
+   "path": "streak.fever_s",
    "theme": "mechanics",
    "family": "mech.streak",
-   "title": "Азарт: пауза до обрыва серии",
+   "title": "Азарт: секунд работы до жадности",
+   "value": 60,
+   "value_text": "60",
+   "unit": "",
+   "note": "секунд работы до жадности на нулевой ступени (было: 60 клеток подряд — 2.5–4 мин без пауз). Ветка «Жадность» (data/upgrades.json) снимает 5–25% (владелец): 57/54/51/48/45 с. Ориентир владельца — раз в 1–2 минуты непрерывной копки: с паузами человека выходит ~1.2 мин (tests/test_greed_live)",
+   "affects": "как часто включается жадность",
+   "effect": "60 с работы ≈ 1 мин непрерывной копки на любом инструменте (человек с паузами — ~1.2 мин); боты входят в жадность 2.7 раза в час",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "mechanics.json:streak.gap_s",
+   "file": "data/mechanics.json",
+   "path": "streak.gap_s",
+   "theme": "mechanics",
+   "family": "mech.streak",
+   "title": "Азарт: шаг между клетками — тоже работа, с",
+   "value": 0.6,
+   "value_text": "0.6",
+   "unit": "",
+   "note": "шаг или падение между клетками до стольких секунд — тоже работа: иначе быстрый инструмент (бур, бурмобиль), который копает клетку быстрее, чем герой в неё входит, копил бы шкалу втрое медленнее кирки",
+   "affects": "как часто включается жадность",
+   "effect": null,
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "mechanics.json:streak.hold_s",
+   "file": "data/mechanics.json",
+   "path": "streak.hold_s",
+   "theme": "mechanics",
+   "family": "mech.streak",
+   "title": "Азарт: пауза без потерь, с",
    "value": 2.5,
    "value_text": "2.5",
    "unit": "",
-   "note": "сколько секунд без копки серия ждёт: шаг-два по тоннелю к следующей руде не рвёт, подъём на ранце — рвёт",
+   "note": "сколько секунд без копки шкала стоит, ничего не теряя (было idle_break_s: 2.5 с — и серия обнулялась целиком)",
    "affects": "как часто включается жадность",
    "effect": null,
    "importance": 4,

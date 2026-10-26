@@ -92,9 +92,9 @@ func _test_rules() -> void:
 	var at := []
 	var sec := []
 	for s in range(0, 6):
-		at.append(GreedRules.threshold(s))
+		at.append(roundi(GreedRules.threshold(s)))
 		sec.append(roundi(GreedRules.seconds(s)))
-	check("порог по ступеням 60/57/54/51/48/45 (−5…−25%%): %s" % str(at), at == [60, 57, 54, 51, 48, 45])
+	check("порог по ступеням 60/57/54/51/48/45 с работы (−5…−25%%): %s" % str(at), at == [60, 57, 54, 51, 48, 45])
 	check("длительность по ступеням 3/4/5/6/7/8 с: %s" % str(sec), sec == [3, 4, 5, 6, 7, 8])
 	check("ветка «Жадность» — 5 ступеней", GreedRules.max_stage() == 5)
 	check("скорость ×7", is_equal_approx(GreedRules.speed_mult(), 7.0))
@@ -106,21 +106,22 @@ func _test_rules() -> void:
 
 func _test_logic_by_stage() -> void:
 	var s := StreakLogic.new(5)
-	check("ступень 5: шкала 45 клеток, жадность 8 с", s.fever_at == 45 and is_equal_approx(s.greed_s, 8.0))
-	for i in range(44):
-		s.on_dug(100)
-	check("44 клетки — ещё нет", not s.in_greed())
-	check("45-я — жадность", bool(s.on_dug(100)["started"]) and s.in_greed())
+	check("ступень 5: шкала 45 с работы, жадность 8 с", is_equal_approx(s.fever_s, 45.0) and is_equal_approx(s.greed_s, 8.0))
+	s.on_dug(100)
+	s.tick(44.0, true, true)
+	check("44 с копки — ещё нет", not bool(s.on_dug(100)["started"]) and not s.in_greed())
+	s.tick(1.0, true, true)
+	check("45 с и клетка — жадность", bool(s.on_dug(100)["started"]) and s.in_greed())
 	s.tick(7.9, true, true)
 	check("7.9 с — ещё жадность", s.in_greed())
 	s.tick(0.2, false, true)
-	check("8 с — конец, серия с нуля", not s.in_greed() and s.count == 0)
+	check("8 с — конец, серия с нуля", not s.in_greed() and s.count == 0 and s.work == 0.0)
 	var t := StreakLogic.new(0)
-	for i in range(50):
-		t.on_dug(100)
+	t.on_dug(100)
+	t.tick(50.0, true, true)
 	t.set_stage(4)
-	check("купил ступень посреди серии — порог ближе, серия цела", t.count == 50 and t.fever_at == 48)
-	check("следующая клетка — сразу жадность (51 ≥ 48)", bool(t.on_dug(100)["started"]))
+	check("купил ступень посреди серии — порог ближе, шкала цела", is_equal_approx(t.work, 50.0) and is_equal_approx(t.fever_s, 48.0))
+	check("следующая клетка — сразу жадность (50 ≥ 48)", bool(t.on_dug(100)["started"]))
 
 
 func _test_first_hit() -> void:
@@ -332,10 +333,9 @@ func _test_director() -> void:
 	await get_tree().process_frame
 	d.set_process(false)
 	d.step(DT)
-	check("ступень 2: шкала 54 клетки, жадность 5 с", d.streak.fever_at == 54 and is_equal_approx(d.streak.greed_s, 5.0))
-	for i in range(54):
-		GameState.emit_event(&"dug", {"cell": Vector2i(3, FLOOR_Y + 10), "tile": TileTypes.Type.DIRT, "mineral": "", "loot": false})
-	check("54 клетки — жадность, герой ×7", d.streak.in_greed() and is_equal_approx(p.greed_mult, 7.0))
+	check("ступень 2: шкала 54 с работы, жадность 5 с", is_equal_approx(d.streak.fever_s, 54.0) and is_equal_approx(d.streak.greed_s, 5.0))
+	_fill(d)
+	check("54 с копки и клетка — жадность, герой ×7", d.streak.in_greed() and is_equal_approx(p.greed_mult, 7.0))
 	check("значок над героем создан", d.badge != null and d.badge.get_parent() == host.view_root)
 	# копаем вниз: клетка за первый удар, падение и снова копка
 	p.set_intent(0, false, true)
@@ -379,13 +379,20 @@ func _test_director() -> void:
 		d.step(DT)
 	check("через 5 с жадность кончилась: ×1, сигнал конца", not d.streak.in_greed() and is_equal_approx(p.greed_mult, 1.0) and ended[0])
 	# дом/смерть рвут жадность
-	for i in range(54):
-		GameState.emit_event(&"dug", {"cell": Vector2i(3, FLOOR_Y + 10), "tile": TileTypes.Type.DIRT, "mineral": "", "loot": false})
+	_fill(d)
 	check("снова жадность", d.streak.in_greed())
 	GameState.died.emit()
 	check("смерть гасит жадность и ×7", not d.streak.in_greed() and is_equal_approx(p.greed_mult, 1.0))
 	host.queue_free()
 	GameState.skill_stages.erase("greed")
+
+
+## Шкала до краёв (StreakLogic: секунды копки) и клетка-порог через шину, как у живой копки.
+func _fill(d: MechDirector) -> void:
+	var dug := {"cell": Vector2i(3, FLOOR_Y + 10), "tile": TileTypes.Type.DIRT, "mineral": "", "loot": false}
+	GameState.emit_event(&"dug", dug)
+	d.streak.tick(d.streak.fever_s, true, true)
+	GameState.emit_event(&"dug", dug)
 
 
 func _test_save_and_tree() -> void:
@@ -401,5 +408,5 @@ func _test_save_and_tree() -> void:
 	SaveSystem._apply(data)
 	check("ступень 3 пережила сейв", GameState.get_skill_stage("greed") == 3)
 	var txt := SkillTree.effect_text(Balance.get_upgrade_branch("greed"), 3)
-	check("подсказка ступени: «%s»" % txt, txt.contains("6 с") and txt.contains("51"))
+	check("подсказка ступени: «%s»" % txt, txt.contains("6 с") and txt.contains("51 с"))
 	check("у ветки есть значок", HeroIcons.skill_icon("greed") != null)

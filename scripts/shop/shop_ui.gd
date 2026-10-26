@@ -95,6 +95,8 @@ var _card_panel: Control = null   # плашка карточки: над ней
 var _info_pulse: Tween = null     # пульсация «i», пока игрок не научился тапать
 var _craft_qty: CraftQtyBox = null   # ползунок «сколько» в карточке переработки (_craft_qty_*)
 var _craft_qty_ok: Label = null      # «×N» на зелёной кнопке карточки переработки
+var _furnace_pop := 0       # бронза, забранная из печи при входе: «+N» на плитке, когда покажут «Технику»
+var _furnace_acc := 0.0     # отсчёт печи на плитке бронзы — раз в секунду (_furnace_tick)
 
 var _notice_panel: Panel
 var _notice_label: Label
@@ -180,6 +182,9 @@ func open(tab: String = TAB_FOOD) -> void:
 		_selected[row["id"]] = true
 	_busy = false
 	_close_card(false)
+	# Печь бронзы: всё сплавленное за время вылазки само ложится в рюкзак/на склад.
+	if ShopService.is_at_workshop():
+		_furnace_pop += int(BronzeFurnace.collect()["count"])
 	_root.visible = true
 	_root.modulate.a = 1.0
 	Sfx.play("ui_open")
@@ -209,6 +214,7 @@ func close() -> void:
 		return
 	_close_card(false)
 	_leave_tab()
+	_furnace_pop = 0
 	_root.visible = false
 	Tip.hide_all()
 	Sfx.play("ui_close")
@@ -759,6 +765,9 @@ func _render() -> void:
 	_update_badges()
 	_update_action_bar()
 	_sync_door_strip()
+	if _tab == TAB_TECH and _furnace_pop > 0:
+		_furnace_show_pickup(_furnace_pop)
+		_furnace_pop = 0
 
 
 func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
@@ -850,6 +859,11 @@ func _on_tile_pressed(offer: Dictionary, tile: ShopTile) -> void:
 				"locked", "away":
 					if bool(offer.get("at_door", false)):
 						_remind_door(tile)
+						return
+					if bool(offer.get("furnace", false)):
+						# Печь работает: из шахты карточку можно открыть — посмотреть очередь и отсчёт.
+						Sfx.play("ui_tap")
+						_open_card(offer, tile)
 						return
 					Sfx.play("ui_deny")
 					Haptics.tap()
@@ -1092,6 +1106,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 		for e in offer.get("effects", []):
 			side.add_child(_make_chip_row(e["icon"], String(e["text"]), Color.WHITE))
 	_bind_card_info(preview, side, offer)
+	_furnace_mount(side, offer)
 
 	if is_recipe:
 		col.add_child(_make_inputs_grid(offer))
@@ -1411,6 +1426,10 @@ func _craft_qty_perform(ref: String) -> Dictionary:
 	var res := ShopService.craft(ref, _craft_qty.amount())
 	if bool(res.get("ok", false)):
 		res["craft_fx"] = true
+		if bool(res.get("timed", false)):
+			# Печь: лом летит в плитку, а выпрыгивает огонёк с «+N» в очередь — бронза будет позже.
+			res["count"] = int(res.get("queued", 0))
+			res["fx_icon"] = ShopArt.tex("glyph_flame")
 		_craft_qty_celebrate(ref, res, from, at)
 	return res
 
@@ -1434,8 +1453,9 @@ func _craft_qty_celebrate(ref: String, res: Dictionary, from: Dictionary, fallba
 	var left := [0]
 	for f in flights:
 		left[0] += int(f[1])
+	var fx_icon: Texture2D = res.get("fx_icon", null)
 	if int(left[0]) <= 0 or ShopFx.reduced():
-		_craft_qty_hit(ref, int(res.get("count", 0)))
+		_craft_qty_hit(ref, int(res.get("count", 0)), fx_icon)
 		return
 	for f in flights:
 		var id := String(f[0])
@@ -1445,7 +1465,7 @@ func _craft_qty_celebrate(ref: String, res: Dictionary, from: Dictionary, fallba
 				left[0] -= 1
 				Sfx.play("ui_tap", 0.8 + 0.05 * float(left[0]))
 				if int(left[0]) == 0:
-					_craft_qty_hit(ref, int(res.get("count", 0))), 14.0)
+					_craft_qty_hit(ref, int(res.get("count", 0)), fx_icon), 14.0)
 
 
 ## Плитка рецепта в сетке, если она ещё жива (витрину могли пересобрать или закрыть).
@@ -1458,7 +1478,7 @@ func _craft_qty_tile(ref: String) -> ShopTile:
 
 ## Удар по верстаку и вылет результата с числом. Плитку ищем заново, а не
 ## держим в лямбде полёта: пока сырьё летит, витрину могут закрыть.
-func _craft_qty_hit(ref: String, made: int) -> void:
+func _craft_qty_hit(ref: String, made: int, icon_override: Texture2D = null) -> void:
 	Sfx.play("dig_hard")
 	Haptics.thud()
 	var tile := _craft_qty_tile(ref)
@@ -1469,7 +1489,8 @@ func _craft_qty_hit(ref: String, made: int) -> void:
 		Sfx.play("pickup")
 		return
 	var r := ShopCatalog.recipe(ref)
-	var icon := ShopArt.item_icon(String(r.get("output", {}).get("id", ref)))
+	var icon := icon_override if icon_override != null \
+		else ShopArt.item_icon(String(r.get("output", {}).get("id", ref)))
 	# Вылет вешается на саму плитку: витрину пересоберут или закроют — уйдёт вместе с ней.
 	var c := tile.size * 0.5
 	var ic := ShopArt.rect(icon, c - Vector2(12, 12), Vector2(24, 24))
@@ -1491,6 +1512,63 @@ func _craft_qty_hit(ref: String, made: int) -> void:
 		ic.queue_free()
 		lbl.queue_free())
 	Sfx.play("pickup")
+
+
+# ---------------------------------------------------------------------------
+# Печь бронзы (BronzeFurnace): «бронза делается со скоростью минута штука»
+#
+# Карточка бронзы — очередь, отсчёт и «готово N» (FurnaceBox справа от плитки);
+# плитка — огонёк и отсчёт на значке, раз в секунду. Готовое забирается при
+# открытии витрины дома (open) и тапом по «готово N».
+# ---------------------------------------------------------------------------
+
+func _furnace_mount(side: Control, offer: Dictionary) -> void:
+	if String(offer.get("kind", "")) != "recipe" or not BronzeFurnace.handles(String(offer.get("ref", ""))):
+		return
+	var box := FurnaceBox.new().setup(_card_panel)
+	box.cancelled.connect(func(_n: int) -> void: _furnace_reopen(0))
+	box.collected.connect(func(n: int) -> void: _furnace_reopen(n))
+	side.add_child(box)
+
+
+## Очередь отменили или забрали готовое: материалы и ползунок карточки уже
+## другие — пересобрать витрину и открыть карточку заново (как после «На склад»).
+func _furnace_reopen(got: int) -> void:
+	_close_card(false)
+	_render()
+	if got > 0:
+		_furnace_show_pickup(got)
+	var t := _craft_qty_tile(BronzeFurnace.RECIPE)
+	if t != null:
+		_on_tile_pressed(t.offer, t)
+
+
+## Забранная бронза выпрыгивает из плитки с «+N» (тот же удар, что у крафта).
+func _furnace_show_pickup(n: int) -> void:
+	await get_tree().process_frame
+	if is_open():
+		_craft_qty_hit(BronzeFurnace.RECIPE, n)
+
+
+func _process(delta: float) -> void:
+	if not is_open() or _tab != TAB_TECH:
+		return
+	_furnace_acc += delta
+	if _furnace_acc < 1.0:
+		return
+	_furnace_acc = 0.0
+	_furnace_tick()
+
+
+## Отсчёт на плитке бронзы. Плитку не пересобираем: только число, угол и Tip.
+func _furnace_tick() -> void:
+	var t := _craft_qty_tile(BronzeFurnace.RECIPE)
+	if t == null:
+		return
+	var was := bool(t.offer.get("furnace", false))
+	ShopItems.furnace_decor(t.offer)
+	if was or bool(t.offer.get("furnace", false)):
+		t.refresh_badges(t.offer)
 
 
 ## Часы-телепорт: единственный товар, который трогает не GameState, а героя.

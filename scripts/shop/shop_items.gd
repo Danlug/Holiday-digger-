@@ -323,9 +323,40 @@ static func recipe_offers() -> Array:
 			var most := ShopService.max_craft(rid)
 			o["pill"] = {"pips": pips, "text": "×" + ShopArt.compact(most), "color": COL_GOOD}
 			o["extra"] = "Хватит на %s" % ShopArt.full(most)
+		if BronzeFurnace.handles(rid):
+			furnace_decor(o)
 		out.append(o)
 	_flag_new(out)
 	return out
+
+
+## Печь бронзы на её плитке: плавится или ждёт готовое — огонёк в левом углу,
+## на значке отсчёт до следующей штуки («0:42») или «+N» готового, строка в Tip.
+## Витрина зовёт это и раз в секунду (ShopUI._furnace_tick) — отсчёт идёт.
+static func furnace_decor(o: Dictionary) -> void:
+	if not o.has("extra_base"):
+		o["extra_base"] = String(o.get("extra", ""))
+	var base := String(o["extra_base"])
+	var now := BronzeFurnace.now_unix()
+	var q := BronzeFurnace.queued(now)
+	var ready := BronzeFurnace.ready_count(now)
+	o["furnace"] = q > 0 or ready > 0
+	if not bool(o["furnace"]):
+		o["corner_tl"] = ""
+		o["count_text"] = ""
+		o["extra"] = base
+		return
+	o["corner_tl"] = "flame"
+	o["count_text"] = BronzeFurnace.clock_text(BronzeFurnace.next_in(now)) if q > 0 \
+		else "+" + ShopArt.compact(ready)
+	var parts: Array = []
+	if q > 0:
+		parts.append("В печи %s, следующая через %s" % [ShopArt.full(q),
+			BronzeFurnace.clock_text(BronzeFurnace.next_in(now))])
+	if ready > 0:
+		parts.append("готово %s" % ShopArt.full(ready))
+	var line := ", ".join(parts)
+	o["extra"] = line if base == "" else line + "\n" + base
 
 
 static func recipe_icon(r: Dictionary) -> Texture2D:

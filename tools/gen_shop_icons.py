@@ -377,6 +377,42 @@ def glyph_depth():
     cv.save("glyph_depth")
 
 
+def glyph_flame():
+    # печь мастерской работает (плавка бронзы по таймеру)
+    cv = Cv(16, 16)
+    cv.poly([(7.5, 0), (11, 4), (13, 8), (12.5, 12), (10, 14.5), (5, 14.5), (2.5, 12), (2, 8),
+             (4, 5), (5.5, 7), (6, 3)], rgba("#D9442A"))
+    cv.poly([(8, 4), (10.5, 7.5), (11, 11), (9.5, 13.5), (5.5, 13.5), (4, 11), (4.5, 8.5), (6, 10)],
+            rgba("#F28A2E"))
+    cv.poly([(7.5, 7), (9.5, 10), (9, 12.5), (6, 12.5), (5.5, 10.5)], rgba("#FFD84A"))
+    cv.rect(7, 11, 8, 12, rgba("#FFF3A0"))
+    cv.px(4, 9, rgba("#FFB070"))
+    cv.outline()
+    cv.save("glyph_flame")
+
+
+def glyph_hourglass():
+    # отсчёт до следующей штуки
+    cv = Cv(16, 16)
+    wood, wood_hi, wood_lo = rgba("#8F6238"), rgba("#B4854E"), rgba("#6B4428")
+    glass = rgba("#CFE6F2")
+    sand, sand_hi = rgba("#E8B32E"), rgba("#FFE066")
+    cv.poly([(4, 2), (11, 2), (11, 4), (8, 7.5), (8, 8.5), (11, 12), (11, 13), (4, 13), (4, 12),
+             (7, 8.5), (7, 7.5), (4, 4)], glass)
+    cv.poly([(5, 4), (10, 4), (8, 6.5), (7, 6.5)], sand)
+    cv.rect(7, 7, 8, 10, sand)
+    cv.poly([(5, 12), (7.5, 10), (10, 12)], sand)
+    cv.px(6, 4, sand_hi)
+    cv.px(7, 11, sand_hi)
+    cv.rect(2, 0, 13, 1, wood)
+    cv.rect(2, 0, 13, 0, wood_hi)
+    cv.rect(2, 14, 13, 15, wood)
+    cv.rect(2, 15, 13, 15, wood_lo)
+    cv.px(5, 5, WHITE)
+    cv.outline()
+    cv.save("glyph_hourglass")
+
+
 def glyph_stat_dot():
     # метка «хватает / не хватает» в строке материалов: простой кружок
     cv = Cv(16, 16)
@@ -1134,7 +1170,7 @@ def main():
     gen_frames()
     for fn in (glyph_check, glyph_cross, glyph_lock, glyph_new, glyph_video, glyph_gift, glyph_house,
                glyph_arrow, glyph_hammer, glyph_storage, glyph_x2, glyph_plus, glyph_dig, glyph_fly,
-               glyph_depth, glyph_stat_dot):
+               glyph_depth, glyph_stat_dot, glyph_flame, glyph_hourglass):
         fn()
     gen_ores()
     gen_crafted()

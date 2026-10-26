@@ -132,9 +132,10 @@ def summarize(run_dir):
     deaths = tel.get("deaths", [])
     if deaths:
         L.append("Смерти (%d): %s" % (len(deaths), "; ".join("%s %s гл.%s −%s%s" % (mmss(d["t"]), d["cause"], d["depth"], d.get("lost_value", 0),
-            # раунд 5: плата, поездка скорой против своего подъёма, выгода/цена смерти (детектор death_lift)
-            (" (плата %s, скорая %sс / подъём ~%sс, выгода %s / цена %s%s)" % (d.get("coins_lost", "?"), d["ride_s"], d.get("ascent_est_s"),
-                d.get("lift_gain"), d.get("lift_cost"), ", нарочно" if d.get("deliberate") else "")) if "ride_s" in d else "")
+            # плата больнице, свой подъём и лечение против цены смерти (детектор death_lift, ГДД §7)
+            (" (плата %s, подъём ~%sс, лечение %s, выгода %s / цена %s%s)" % (d.get("coins_lost", "?"), d["ascent_est_s"],
+                d.get("heal_value", 0), d.get("lift_gain"), d.get("lift_cost"), ", нарочно" if d.get("deliberate") else ""))
+            if "ascent_est_s" in d else "")
             for d in deaths[:8])))
     trips = tel.get("trips", [])
     if trips:

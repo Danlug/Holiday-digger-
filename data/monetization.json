@@ -18,31 +18,31 @@
     "product_id": "dollars_pack_s",
     "name_ru": "Пачка долларов S",
     "price_usd": {"value": 0.99, "proposed": true, "note": "стартовая цена входного импульсного пакета — стандарт жанра, не расчёт по ARPDAU (его ещё нет)"},
-    "grants_dollars": {"value": 100, "proposed": true}
+    "grants_dollars": {"value": 25, "proposed": false, "note": "владелец (разбор чисел, 26.10): «нельзя за 4.99 давать 550 долларов»; подписка Премиум+ теперь даёт 450 долларов за $14.90 (≈30 за доллар), поэтому пачки — ≈25 долларов за доллар с прибавкой за крупную пачку; было 100"}
    },
    {
     "product_id": "dollars_pack_m",
     "name_ru": "Пачка долларов M",
     "price_usd": {"value": 4.99, "proposed": true, "note": "≈ +9% долларов за доллар по сравнению с пачкой S — поощряет пачку побольше, не создавая ощущения, что мелкая пачка это 'обман'"},
-    "grants_dollars": {"value": 550, "proposed": true}
+    "grants_dollars": {"value": 135, "proposed": false, "note": "владелец (разбор чисел, 26.10): «нельзя за 4.99 давать 550 долларов»; подписка Премиум+ теперь даёт 450 долларов за $14.90 (≈30 за доллар), поэтому пачки — ≈25 долларов за доллар с прибавкой за крупную пачку; +9% к S; было 550"}
    },
    {
     "product_id": "dollars_pack_l",
     "name_ru": "Пачка долларов L",
     "price_usd": {"value": 9.99, "proposed": true, "note": "≈ +19% к базовой ставке"},
-    "grants_dollars": {"value": 1200, "proposed": true}
+    "grants_dollars": {"value": 300, "proposed": false, "note": "владелец (разбор чисел, 26.10): «нельзя за 4.99 давать 550 долларов»; подписка Премиум+ теперь даёт 450 долларов за $14.90 (≈30 за доллар), поэтому пачки — ≈25 долларов за доллар с прибавкой за крупную пачку; +20% к S; было 1200"}
    },
    {
     "product_id": "dollars_pack_xl",
     "name_ru": "Пачка долларов XL",
     "price_usd": {"value": 19.99, "proposed": true, "note": "≈ +29% к базовой ставке"},
-    "grants_dollars": {"value": 2600, "proposed": true}
+    "grants_dollars": {"value": 650, "proposed": false, "note": "владелец (разбор чисел, 26.10): «нельзя за 4.99 давать 550 долларов»; подписка Премиум+ теперь даёт 450 долларов за $14.90 (≈30 за доллар), поэтому пачки — ≈25 долларов за доллар с прибавкой за крупную пачку; +30% к S; было 2600"}
    },
    {
     "product_id": "dollars_pack_mega",
     "name_ru": "Пачка долларов MEGA",
     "price_usd": {"value": 49.99, "proposed": true, "note": "верхний ('whale') уровень, ≈ +39% к базовой ставке. Даже на этом уровне пачка покупает только доллары — а доллары не покупают силу (см. _fairness_note)"},
-    "grants_dollars": {"value": 7000, "proposed": true}
+    "grants_dollars": {"value": 1750, "proposed": false, "note": "владелец (разбор чисел, 26.10): «нельзя за 4.99 давать 550 долларов»; подписка Премиум+ теперь даёт 450 долларов за $14.90 (≈30 за доллар), поэтому пачки — ≈25 долларов за доллар с прибавкой за крупную пачку; +40% к S; было 7000"}
    }
   ]
  },
@@ -64,7 +64,7 @@
     "grants": [
      "no_ads",
      {"cosmetic_bundle_monthly": true, "note": "ЗАМЕНА 'strength' из прежнего черновика balance.json — вместо прибавки к силе/копке (pay-to-win) подписчик получает доступ к одному предмету из cosmetic_catalog в месяц по выбору, бесплатно. Требует утверждения владельца — это предложение агента, не решение"},
-     {"premium_currency_onetime": {"value": 50, "proposed": true, "note": "разовая выдача при оформлении — количество не задано в GDD"}}
+     {"premium_currency_onetime": {"value": 150, "proposed": false, "note": "владелец (разбор чисел, 26.10): «за премиум-подписки больше долларов в 3 раза» — было 50"}}
     ]
    },
    {
@@ -73,7 +73,7 @@
     "price_usd": 14.9,
     "grants": [
      "premium_monthly_benefits",
-     {"premium_currency_daily": {"value": 5, "proposed": true, "note": "ежедневная выдача — количество не задано в GDD"}},
+     {"premium_currency_daily": {"value": 15, "proposed": false, "note": "владелец (разбор чисел, 26.10): «за премиум-подписки больше долларов в 3 раза» — было 5"}},
      {"cosmetic_bundle_monthly_plus": true, "note": "тот же принцип, что у premium_monthly, но выбор из двух предметов вместо одного — разница уровней в ассортименте косметики, а не в силе"}
     ]
    }
@@ -83,14 +83,14 @@
  "cosmetic_catalog": {
   "_note": "Косметика продаётся за доллары (премиум-валюту), не напрямую за реальные деньги — тот же принцип, что уже применён к гаджетам в data/balance.json -> monetization.gadgets_premium_currency. Ни один предмет не меняет никакую формулу Balance: это чисто визуальная замена спрайта/сцены поверх существующего инструмента/ранца/комнаты, тот же приём, что и tools/gear (id инструмента остаётся прежним, скин — отдельное поле поверх него, ещё не реализованное в character_view.gd/tile_art.gd — раздел ниже описывает ЦЕЛЬ, не готовую систему рендера скинов).",
   "items": [
-   {"id": "skin_hero_winter", "name_ru": "Зимний свитер", "slot": "character_skin", "price_dollars": {"value": 15, "proposed": true}},
-   {"id": "skin_hero_beach", "name_ru": "Пляжный костюм", "slot": "character_skin", "price_dollars": {"value": 15, "proposed": true}},
-   {"id": "skin_tool_golden", "name_ru": "Золотая обшивка инструмента", "slot": "tool_skin", "price_dollars": {"value": 10, "proposed": true}, "note": "перекрашивает ТЕКУЩИЙ инструмент игрока — не даёт новый инструмент и не меняет его характеристики (see Balance.get_tool)"},
-   {"id": "skin_tool_painted", "name_ru": "Разрисованный инструмент", "slot": "tool_skin", "price_dollars": {"value": 10, "proposed": true}},
-   {"id": "decor_house_poster_set", "name_ru": "Набор постеров в прихожую", "slot": "house_decor_hall", "price_dollars": {"value": 8, "proposed": true}},
-   {"id": "decor_house_plant", "name_ru": "Комнатное растение", "slot": "house_decor_bedroom", "price_dollars": {"value": 8, "proposed": true}},
-   {"id": "decor_workshop_display_case", "name_ru": "Витрина для находок в мастерской", "slot": "house_decor_workshop", "price_dollars": {"value": 12, "proposed": true}, "note": "чисто декоративная витрина рядом с верстаком; не путать с MuseumPanel — коллекция находок остаётся отдельной системой прогресса, не платной"},
-   {"id": "fx_jetpack_trail", "name_ru": "Блёстки за джетпаком", "slot": "gear_fx", "price_dollars": {"value": 20, "proposed": true}, "note": "частицы поверх полёта — jetpack/jetpack_top остаются тем же множителем скорости, что и без эффекта"}
+   {"id": "skin_hero_winter", "name_ru": "Зимний свитер", "slot": "character_skin", "price_dollars": {"value": 75, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 15"}},
+   {"id": "skin_hero_beach", "name_ru": "Пляжный костюм", "slot": "character_skin", "price_dollars": {"value": 75, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 15"}},
+   {"id": "skin_tool_golden", "name_ru": "Золотая обшивка инструмента", "slot": "tool_skin", "price_dollars": {"value": 50, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 10"}, "note": "перекрашивает ТЕКУЩИЙ инструмент игрока — не даёт новый инструмент и не меняет его характеристики (see Balance.get_tool)"},
+   {"id": "skin_tool_painted", "name_ru": "Разрисованный инструмент", "slot": "tool_skin", "price_dollars": {"value": 50, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 10"}},
+   {"id": "decor_house_poster_set", "name_ru": "Набор постеров в прихожую", "slot": "house_decor_hall", "price_dollars": {"value": 40, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 8"}},
+   {"id": "decor_house_plant", "name_ru": "Комнатное растение", "slot": "house_decor_bedroom", "price_dollars": {"value": 40, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 8"}},
+   {"id": "decor_workshop_display_case", "name_ru": "Витрина для находок в мастерской", "slot": "house_decor_workshop", "price_dollars": {"value": 60, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 12"}, "note": "чисто декоративная витрина рядом с верстаком; не путать с MuseumPanel — коллекция находок остаётся отдельной системой прогресса, не платной"},
+   {"id": "fx_jetpack_trail", "name_ru": "Блёстки за джетпаком", "slot": "gear_fx", "price_dollars": {"value": 100, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 20"}, "note": "частицы поверх полёта — jetpack/jetpack_top остаются тем же множителем скорости, что и без эффекта"}
   ]
  },
 
@@ -100,25 +100,25 @@
    {
     "id": "extra_sleep_skip",
     "name_ru": "Мгновенный сон (сверх дневного лимита роликов)",
-    "price_dollars": {"value": 3, "proposed": true},
+    "price_dollars": {"value": 15, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 3"},
     "note": "сверх 5 бесплатных в день за ролик (balance.json -> ads.daily_limits.skip_sleep_at_home)"
    },
    {
     "id": "extra_mine_restore",
     "name_ru": "Восстановить бодрость/голод в шахте (сверх лимита)",
-    "price_dollars": {"value": 3, "proposed": true},
+    "price_dollars": {"value": 15, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 3"},
     "note": "сверх 3 бесплатных в день за ролик (ads.daily_limits.restore_stamina_hunger_in_mine)"
    },
    {
     "id": "extra_remote_dump",
     "name_ru": "Сбросить лут на продажу дистанционно (сверх лимита)",
-    "price_dollars": {"value": 2, "proposed": true},
+    "price_dollars": {"value": 10, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 2"},
     "note": "сверх 3 бесплатных в день за ролик (ads.daily_limits.remote_dump_loot_for_sale)"
    },
    {
     "id": "well_offline_cap_extend",
     "name_ru": "Удвоить офлайн-кап скважины на один сбор",
-    "price_dollars": {"value": 10, "proposed": true},
+    "price_dollars": {"value": 50, "proposed": true, "note": "владелец (разбор чисел, 26.10): «цена на донат-продукты дороже в 5 раз» — было 10"},
     "note": "разово поднимает idle_well.offline_cap_hours с 8 до 16 часов для ближайшего окна отчёта — не влияет на базовую ставку дохода и не даёт скважине платить доллары (это запрещено owner-решением, см. data/balance.json -> idle_well.pays.note)"
    }
   ]

@@ -179,6 +179,8 @@ func _build_world_props() -> void:
 	_exterior.centered = false
 	add_child(_exterior)
 	_update_exterior_sprite()
+	# Трава перед цоколем (дом и лачуга) — поверх фасада, но под пакетом у двери.
+	add_child(FrontLawn.new())
 
 	# Пакет с едой у входной двери: виден снаружи, пока заказ не забрали.
 	_door_pack = Sprite2D.new()
@@ -336,7 +338,7 @@ func _update_outdoor_hotspot() -> void:
 	# "вход не нужен") — гасим кнопку явно, не полагаясь на то, что герой
 	# заморожен/спрятан на время сцены и без того далеко от двери.
 	if GameState.era == "grandpa" or GameState.house_is_indoors or not GameState.is_alive \
-			or player == null or not near_door():
+			or player == null or not near_door() or _story_scene_playing():
 		_outdoor_button.visible = false
 		return
 	_outdoor_button.visible = true
@@ -346,6 +348,14 @@ func _update_outdoor_hotspot() -> void:
 	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
 	_outdoor_button.position = head - Vector2(
 		_outdoor_button.custom_minimum_size.x / 2.0 + _side_shift(-1.0), _outdoor_button.custom_minimum_size.y + 4.0)
+
+
+## Сцена на живой карте водит героя сама (его x/y — за актёром, см.
+## cutscene_player._tick_world): без этой проверки пузырь «Зайти» вспыхивал над
+## внуком, проходящим мимо двери в интро.
+func _story_scene_playing() -> bool:
+	var cs = _story.get("cutscene") if _story != null else null
+	return cs != null and bool(cs.get("is_playing"))
 
 
 ## Машина припаркована у самой двери: два пузыря не должны лечь друг на друга.

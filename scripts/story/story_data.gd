@@ -124,6 +124,19 @@ static func actor_sheet_path(actor_id: String, pose: String) -> String:
 	return "res://art/character/%s/%s.png" % [dir, pose]
 
 
+## Рост актёра относительно героя (поле "height" в data/story.json:actors,
+## по умолчанию 1). Все листы персонажей нарисованы одного роста (121 px из
+## кадра 144), а пожилой бабушке рядом с внуком-подростком положено быть
+## чуть ниже — множитель поверх ART_SCALE, ступни остаются на земле.
+static func actor_height(actor_id: String) -> float:
+	var h = actor(actor_id).get("height", 1.0)
+	# {value, proposed, note} — конвенция предложенных чисел (см. Balance.unwrap;
+	# сам автолоад здесь не зовём: StoryData читают и тесты без автозагрузок).
+	if typeof(h) == TYPE_DICTIONARY:
+		h = h.get("value", 1.0)
+	return clampf(float(h), 0.5, 1.5)
+
+
 static func actor_speaker_key(actor_id: String) -> String:
 	return String(actor(actor_id).get("speaker", ""))
 

@@ -171,11 +171,13 @@
 		},
 		"grandma_poor": {
 			"dir": "grandma_poor",
-			"speaker": "speaker.grandma"
+			"speaker": "speaker.grandma",
+			"height": {"value": 0.92, "proposed": true, "note": "рост бабушки относительно внука и деда: все листы персонажей нарисованы одного роста, пожилой бабушке положено быть чуть ниже (ориентир 90–95%)"}
 		},
 		"grandma_rich": {
 			"dir": "grandma_rich",
-			"speaker": "speaker.grandma"
+			"speaker": "speaker.grandma",
+			"height": {"value": 0.92, "proposed": true, "note": "рост бабушки относительно внука (ориентир 90–95% его роста на экране), как у grandma_poor"}
 		},
 		"boy": {
 			"dir": "boy",
@@ -599,7 +601,7 @@
 				{
 					"t": "world_walk",
 					"actor": "boy",
-					"x": 13.5,
+					"x": 12.8,
 					"sec": 1.4,
 					"arrive_pose": "idle"
 				},
@@ -623,7 +625,7 @@
 				{
 					"t": "world_walk",
 					"actor": "grandma_rich",
-					"x": 14.5,
+					"x": 15.55,
 					"sec": 1.4,
 					"arrive_pose": "idle"
 				},
@@ -682,7 +684,7 @@
 				{
 					"t": "world_walk",
 					"actor": "grandma_rich",
-					"x": 14.5,
+					"x": 15.55,
 					"sec": 1.2,
 					"arrive_pose": "idle"
 				},

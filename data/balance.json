@@ -689,9 +689,9 @@
   "start_resource_radius_cells": 1,
   "persists_until_reset_event": true,
   "dissipation_speed": {
-   "value": "instant_on_proximity",
-   "proposed": true,
-   "note": "скорость рассеивания тумана не задана в GDD (п.18); предложено мгновенное раскрытие при входе в радиус ауры, без анимации — простейший вариант, легко заменить позже"
+   "value": "fade_on_proximity",
+   "proposed": false,
+   "note": "владелец (разбор чисел, 26.10): «сделай плавность раскрытия, минимальную, но приятную для глаз» — клетка проявляется за feel.json → fog.reveal_fade_s (0.2 с, ease-out); загрузка, обвал, телепорт и смерть рисуются сразу. Кодом это поле не читается — описание, длительность живёт в feel.json"
   }
  },
  "reset_events": {

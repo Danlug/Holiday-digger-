@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "9ebd0500c962",
+  "data_fingerprint": "e3712a5d40ad",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
@@ -11,10 +11,10 @@
   ]
  },
  "summary": {
-  "rows": 627,
-  "families": 39,
+  "rows": 623,
+  "families": 37,
   "new_unreviewed": 0,
-  "flagged": 16,
+  "flagged": 14,
   "by_theme": {
    "Прокачка и уровни": 9,
    "Задания и награды": 189,
@@ -23,7 +23,7 @@
    "Бой": 210,
    "Механики: тайники, азарт и жадность, мастерство, удача": 6,
    "Монетизация и ролики": 17,
-   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 79
+   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 75
   }
  },
  "top_decisions": [
@@ -215,10 +215,8 @@
   {
    "id": "feel",
    "title": "Ощущение, звук, свет и подсказки (мелочи интерфейса)",
-   "count": 79,
+   "count": 75,
    "families": [
-    "feel.guidance",
-    "feel.fog",
     "feel.camera",
     "feel.dig",
     "feel.sound",
@@ -1293,46 +1291,6 @@
    "verdict": "отложить",
    "why": "в витрине этих товаров нет (ГДД §15)",
    "flags": []
-  },
-  {
-   "id": "feel.guidance",
-   "theme": "feel",
-   "title": "Проекты на HUD",
-   "importance": 2,
-   "rows": [
-    "guidance.json:projects",
-    "guidance.json:auto_track",
-    "guidance.json:tracker_hide_built_seconds"
-   ],
-   "count": 3,
-   "value_text": "проекты по порядку hand_drill, well, drill_rig, heat_suit; трекер сам берёт проект да; галочка «собрано», с 3",
-   "affects": "трекер «следующая цель»",
-   "reviewed": true,
-   "effect": null,
-   "verdict": "оставить",
-   "why": "мелочи; tracker_hide_built_seconds кодом не читается",
-   "flags": [
-    "кодом не читается"
-   ]
-  },
-  {
-   "id": "feel.fog",
-   "theme": "feel",
-   "title": "Туман войны: скорость рассеивания",
-   "importance": 1,
-   "rows": [
-    "balance.json:fog_of_war.dissipation_speed"
-   ],
-   "count": 1,
-   "value_text": "instant_on_proximity",
-   "affects": "вид",
-   "reviewed": true,
-   "effect": null,
-   "verdict": "снять пометку",
-   "why": "так и работает: мгновенно при входе в радиус",
-   "flags": [
-    "ключ «dissipation_speed» не найден в scripts/ — проверить, читает ли его игра"
-   ]
   },
   {
    "id": "feel.camera",
@@ -11932,83 +11890,6 @@
    "effect": "= 50 000 монет по курсу; = 50 ролик(а) «доллар» (их 3 в сутки)",
    "importance": 2,
    "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "guidance.json:auto_track",
-   "file": "data/guidance.json",
-   "path": "auto_track",
-   "theme": "feel",
-   "family": "feel.guidance",
-   "title": "Проекты: трекер сам берёт проект",
-   "value": true,
-   "value_text": "да",
-   "unit": "",
-   "note": "как только открылся проект, а следить не за чем, трекер на HUD сам берёт его (как «следующая цель» в мобильных играх). Игрок, снявший слежку руками, больше автоматически не получает новую — его выбор важнее.",
-   "affects": "трекер «следующая цель»",
-   "effect": null,
-   "importance": 2,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "guidance.json:projects",
-   "file": "data/guidance.json",
-   "path": "projects",
-   "theme": "feel",
-   "family": "feel.guidance",
-   "title": "Проекты: проекты по порядку",
-   "value": [
-    "hand_drill",
-    "well",
-    "drill_rig",
-    "heat_suit"
-   ],
-   "value_text": "hand_drill, well, drill_rig, heat_suit",
-   "unit": "",
-   "note": "крупные цели из материалов в порядке открытия: ручной бур и скважина открываются на 100, бурмобиль на 1000, костюм от жары — следующая ступень с 1000. Кирки и ранцы не проекты: они покупаются за монеты (решение владельца), материалов не просят.",
-   "affects": "трекер «следующая цель»",
-   "effect": null,
-   "importance": 2,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "guidance.json:tracker_hide_built_seconds",
-   "file": "data/guidance.json",
-   "path": "tracker_hide_built_seconds",
-   "theme": "feel",
-   "family": "feel.guidance",
-   "title": "Проекты: галочка «собрано», с",
-   "value": 3.0,
-   "value_text": "3",
-   "unit": "",
-   "note": "сколько трекер показывает галочку «собрано», прежде чем перейти к следующему проекту.",
-   "affects": "трекер «следующая цель»",
-   "effect": null,
-   "importance": 2,
-   "flags": [
-    "кодом не читается"
-   ],
-   "reviewed": true
-  },
-  {
-   "id": "balance.json:fog_of_war.dissipation_speed",
-   "file": "data/balance.json",
-   "path": "fog_of_war.dissipation_speed",
-   "theme": "feel",
-   "family": "feel.fog",
-   "title": "Туман: скорость рассеивания",
-   "value": "instant_on_proximity",
-   "value_text": "instant_on_proximity",
-   "unit": "",
-   "note": "скорость рассеивания тумана не задана в GDD (п.18); предложено мгновенное раскрытие при входе в радиус ауры, без анимации — простейший вариант, легко заменить позже",
-   "affects": "вид",
-   "effect": null,
-   "importance": 1,
-   "flags": [
-    "ключ «dissipation_speed» не найден в scripts/ — проверить, читает ли его игра"
-   ],
    "reviewed": true
   },
   {

@@ -438,16 +438,16 @@ func _test_road() -> void:
 func _test_ads() -> void:
 	_fresh()
 	check("лимит «×2» дня — 1 из наших данных", MetaAds.limit(MetaAds.DAILY) == 1)
-	check("лимит «×2» заданий — 3 из наших данных", MetaAds.limit(MetaAds.QUEST) == 3)
+	check("лимит «×2» заданий — 4 из наших данных (владелец 26.10)", MetaAds.limit(MetaAds.QUEST) == 4)
 	check("существующий лимит из balance.json читается той же схемой", MetaAds.limit("small_coins") == 3)
 	var got := [0]
 	var cb := func() -> void: got[0] += 1
 	check("ролик за ×2 дня: первый раз — награда", MetaAds.request(MetaAds.DAILY, cb) and got[0] == 1)
 	check("второй раз за сутки — отказ без выдачи", not MetaAds.request(MetaAds.DAILY, cb) and got[0] == 1)
-	for i in range(3):
+	for i in range(5):
 		MetaAds.request(MetaAds.QUEST, cb)
-	check("«×2» заданий — не больше трёх в сутки", got[0] == 4 and not MetaAds.can(MetaAds.QUEST))
-	check("счёт идёт в общие дневные лимиты рекламы GameState", GameState.get_ad_uses_today(MetaAds.QUEST) == 3)
+	check("«×2» заданий — не больше четырёх в сутки", got[0] == 5 and not MetaAds.can(MetaAds.QUEST))
+	check("счёт идёт в общие дневные лимиты рекламы GameState", GameState.get_ad_uses_today(MetaAds.QUEST) == 4)
 	GameState.ad_daily_counts.clear()
 	check("после суточного сброса лимит снова открыт", MetaAds.can(MetaAds.DAILY))
 	check("точки показа есть в реестре AdManager", not AdManager.placement(MetaAds.DAILY).is_empty() and not AdManager.placement(MetaAds.QUEST).is_empty())

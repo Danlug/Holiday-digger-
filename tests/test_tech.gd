@@ -608,11 +608,12 @@ func _test_double_and_ads() -> void:
 	check("«×2» не трогает доллары и монеты", GameState.dollars == 0 and GameState.coins == 0)
 
 	GameState.ad_daily_counts.clear()
-	check("лимит роликов в сутки — 3", TechAds.daily_limit() == 3 and TechAds.left_today() == 3)
+	# владелец (26.10): «можно больше чуть» — 4 в сутки (было 3)
+	check("лимит роликов в сутки — 4", TechAds.daily_limit() == 4 and TechAds.left_today() == 4)
 	var results: Array = []
-	for i in range(4):
+	for i in range(5):
 		TechAds.request(func(ok: bool) -> void: results.append(ok))
-	check("три ролика дали награду, четвёртый — отказ", results == [true, true, true, false])
+	check("четыре ролика дали награду, пятый — отказ", results == [true, true, true, true, false])
 	check("осталось ноль", TechAds.left_today() == 0)
 	check("рекламная сеть не подключена: AdManager честно говорит «нет готового»", not AdManager.is_ad_ready(TechAds.PLACEMENT))
 	check("точка показа заведена в monetization.json (AdManager её знает)", not AdManager.placement(TechAds.PLACEMENT).is_empty())

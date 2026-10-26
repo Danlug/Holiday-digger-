@@ -390,13 +390,15 @@ func _test_data_marked_proposed() -> void:
 	check("data/survival.json читается", not d.is_empty())
 	var bad: Array = []
 	for bar in ["hunger", "stamina"]:
-		if not Balance.is_proposed(d["drain_multiplier"][bar]):
-			bad.append("drain_multiplier." + bar)
+		# множители таяния владелец утвердил на странице разбора чисел (26.10) — обёртка с proposed: false
+		var dm = d["drain_multiplier"][bar]
+		if typeof(dm) != TYPE_DICTIONARY or dm.get("proposed", true) != false:
+			bad.append("drain_multiplier." + bar + " (ждём утверждённую обёртку)")
 		for t in d[bar + "_tiers"]:
 			for k in d[bar + "_tiers"][t]:
 				if not Balance.is_proposed(d[bar + "_tiers"][t][k]):
 					bad.append("%s.%s.%s" % [bar, t, k])
-	check("все числа survival.json — proposed (%s)" % ", ".join(bad), bad.is_empty())
+	check("штрафы survival.json — proposed, таяние — утверждено (%s)" % ", ".join(bad), bad.is_empty())
 	for id in ["hunger", "stamina"]:
 		var costs: Array = Balance.get_upgrade_branch(id)["cost_points"]
 		check("%s: цены ступеней — proposed" % id, costs.all(func(c): return Balance.is_proposed(c)))

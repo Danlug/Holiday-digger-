@@ -257,9 +257,10 @@ func _test_recipe_card() -> void:
 	_fresh()
 	GameState.max_depth_reached = 200
 	GameState.coins = 3000
-	GameState.inventory["iron_ore"] = 500
-	GameState.inventory["silver"] = 50
-	GameState.inventory["bronze"] = 100
+	var drill_in: Dictionary = ShopCatalog.recipe("hand_drill")["inputs"]
+	GameState.inventory["iron_ore"] = int(drill_in["iron_ore"])
+	GameState.inventory["silver"] = int(drill_in["silver"])
+	GameState.inventory["bronze"] = int(drill_in["bronze"])
 	ui.open(ShopUI.TAB_TECH)
 	await _frames(1)
 	var o := _offer("tech", "recipe:hand_drill")

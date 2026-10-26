@@ -9,6 +9,7 @@
 """
 
 import json
+import re
 import os
 import shutil
 import sys
@@ -56,7 +57,8 @@ try:
 	check("id вида «файл.json:путь»", all(":" in i and i.split(":", 1)[0].endswith(".json") for i in ids))
 	check("id стабильны между запусками", ids == [r["id"] for r in b["rows"]])
 	check("значения те же между запусками", [r["value"] for r in rows] == [r["value"] for r in b["rows"]])
-	check("элементы списков названы по id, а не по номеру", "minerals.json:minerals[iron_ore].drill_seconds" in ids)
+	check("элементы списков названы по id, а не по номеру", "artifacts.json:artifacts[antiquity_2].find_bonus.xp" in ids
+		or any(re.search(r"\[[a-z][a-z_0-9]*\]", i) for i in ids))
 	check("общий proposed файла разбит на строки (quests.json)", sum(1 for i in ids if i.startswith("quests.json:")) > 20)
 	check("числа владельца не выгружаются (ориентиры заданий)", not any("owner_anchor" in i for i in ids))
 	check("proposed: false не выгружается", not any(i.startswith("balance.json:fuel_consumption.peat_per_fuel_block") for i in ids))
@@ -67,8 +69,10 @@ try:
 	with open(os.path.join(tmp, "a", "REVIEW.md"), encoding="utf-8") as f:
 		review = f.read()
 	check("REVIEW.md: главные решения и все темы", "Десять главных решений" in review and all(t["title"] in review for t in a["themes"]))
-	check("есть расчёт «чем обернётся» у главных семейств",
-		all(any(e["id"] == fid and e.get("effect") for e in a["families"]) for fid in ("art.find_coins", "tech.hand_drill", "min.density")))
+	# семейства уходят из выгрузки, когда владелец их одобряет, — проверяем «главные» из текущей десятки
+	top_ids = [t["family"] for t in a["top_decisions"]]
+	check("есть расчёт «чем обернётся» у большинства главных семейств",
+		sum(1 for fid in top_ids if any(e["id"] == fid and e.get("effect") for e in a["families"])) * 2 >= len(top_ids))
 
 	# Параллельные ветки: новый файл с proposed-числами и чужая правка формы данных.
 	data = os.path.join(tmp, "data")

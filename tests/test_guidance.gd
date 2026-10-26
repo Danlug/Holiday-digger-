@@ -93,7 +93,8 @@ func _test_chain_counts() -> void:
 		int(br["have"]) == 40 and int(br["effective"]) == 70 and int(br["via"][0]["makes"]) == 30)
 	check("лом в бронзе не считается «готово», пока не переплавлен", not bool(br["done"]))
 	var silver_frac := 0.0
-	var exp := (120.0 / 500.0 + 70.0 / 100.0 + silver_frac + 0.0) / 4.0
+	var drill_in: Dictionary = ShopCatalog.recipe("hand_drill")["inputs"]
+	var exp := (120.0 / float(drill_in["iron_ore"]) + 70.0 / float(drill_in["bronze"]) + silver_frac + 0.0) / 4.0
 	check("общий прогресс бура = среднее материалов (с переработкой) и монет",
 		absf(ProjectChain.progress("hand_drill") - exp) < 0.001)
 	check("не всё есть — не готов", not ProjectChain.ready("hand_drill"))
@@ -139,12 +140,13 @@ func _test_needed_for() -> void:
 	GameState.inventory["scrap"] = 30
 	GameState.house_storage["bronze"] = 40
 	var n := ProjectChain.needed_for("scrap")
-	check("лом нужен буру через бронзу: 30 из 60 (100 − 40 бронзы)", n.size() == 1
+	# рецепт бура с 26.10 — 80 бронзы (владелец: −20%)
+	check("лом нужен буру через бронзу: 30 из 40 (80 − 40 бронзы)", n.size() == 1
 		and String(n[0]["project"]) == "hand_drill" and String(n[0]["via"]) == "bronze"
-		and int(n[0]["have"]) == 30 and int(n[0]["need"]) == 60)
+		and int(n[0]["have"]) == 30 and int(n[0]["need"]) == 40)
 	check("скважине бронзы хватает (40 из 20) — лом ей не нужен",
 		not n.any(func(e) -> bool: return String(e["project"]) == "well"))
-	check("текст Tip: «Ручной бур (бронза) — 30/60»", ProjectChain.needed_text("scrap").contains("30/60")
+	check("текст Tip: «Ручной бур (бронза) — 30/40»", ProjectChain.needed_text("scrap").contains("30/40")
 		and ProjectChain.needed_text("scrap").contains("бронза"))
 	var iron := ProjectChain.needed_for("iron_ore")
 	check("железо нужно и буру, и скважине", iron.size() == 2)

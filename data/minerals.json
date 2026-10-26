@@ -23,7 +23,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 3.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -76,7 +76,7 @@
 			"depth_min": 1,
 			"depth_max": {
 				"value": 500,
-				"proposed": true,
+				"proposed": false,
 				"note": "глубина не задана в GDD. Было 200, но ручному буру нужно 100 бронзы = 100 металлолома, а в полосе 1..200 при плотности 1-3% его всего ~130 на весь проход «ряд за рядом»: у двух сидов из шести нужные сто не набирались вовсе (tools/sim_economy.gd). Полоса до 500 даёт запас ×2.5 и держит бур в пределах ~6 игровых часов. Синхронно с data/world_layers.json (scrap.y_max)."
 			},
 			"density": {
@@ -85,14 +85,14 @@
 					"percent_min": 1,
 					"percent_max": 3
 				},
-				"proposed": true,
+				"proposed": false,
 				"note": "плотность не задана в GDD; невысокая, чтобы не конкурировать с железом"
 			},
 			"weight_kg": 1.0,
 			"max_stack": 99,
 			"tool_required": {
 				"value": "shovel",
-				"proposed": true,
+				"proposed": false,
 				"note": "GDD не уточняет инструмент; предполагается, что лом лежит у поверхности, как земля"
 			},
 			"hazard": [],
@@ -100,7 +100,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 4.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -110,16 +110,16 @@
 			"category": "crafted",
 			"price_coins": {
 				"value": 30,
-				"proposed": true,
+				"proposed": false,
 				"note": "цена продажи не задана; чуть выше сырьевой стоимости (5×5=25 монет металлолома), чтобы плавка была не убыточна"
 			},
 			"depth_min": null,
 			"depth_max": null,
 			"density": null,
 			"weight_kg": {
-				"value": 2.0,
-				"proposed": true,
-				"note": "вес не задан в GDD"
+				"value": 1.0,
+				"proposed": false,
+				"note": "владелец (разбор чисел, 26.10): «уменьши вес» — было 2 кг"
 			},
 			"max_stack": 99,
 			"tool_required": null,
@@ -146,7 +146,7 @@
 				"peak_percent": 8.0,
 				"fall_width": 600,
 				"tail_percent": 2.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": 1.0,
@@ -156,7 +156,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 5.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -174,7 +174,7 @@
 				"peak_percent": 3.5,
 				"fall_width": 600,
 				"tail_percent": 0.875,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": 3.0,
@@ -184,7 +184,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 5.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -202,7 +202,7 @@
 				"peak_percent": 2.8,
 				"fall_width": 700,
 				"tail_percent": 0.7,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": 1.2,
@@ -212,7 +212,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 6.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -230,7 +230,7 @@
 				"peak_percent": 5.0,
 				"fall_width": 900,
 				"tail_percent": 1.25,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
@@ -241,7 +241,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 5.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -266,12 +266,12 @@
 				"peak_percent": 6.0,
 				"fall_width": 1000,
 				"tail_percent": 1.5,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"drill_seconds": {
 				"value": 5.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -289,7 +289,7 @@
 				"peak_percent": 10.0,
 				"fall_width": 1200,
 				"tail_percent": 2.5,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": 3.0,
@@ -300,7 +300,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 7.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -318,7 +318,7 @@
 				"peak_percent": 1.5,
 				"fall_width": 1800,
 				"tail_percent": 0.375,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": 0.1,
@@ -329,7 +329,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 12.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -339,7 +339,7 @@
 			"category": "fuel",
 			"price_coins": {
 				"value": 1,
-				"proposed": true,
+				"proposed": false,
 				"note": "GDD прямо говорит 'денег почти не даёт' без числа; приравнено к земле как ловушка-подсказка ('может продать его? а может не надо')"
 			},
 			"depth_min": 60,
@@ -356,7 +356,7 @@
 			"max_stack": 99,
 			"tool_required": {
 				"value": "shovel",
-				"proposed": true,
+				"proposed": false,
 				"note": "GDD не уточняет инструмент; торф — мягкая органика, добывается лопатой"
 			},
 			"hazard": [],
@@ -364,7 +364,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 3.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -382,7 +382,7 @@
 				"peak_percent": 38.0,
 				"fall_width": 1500,
 				"tail_percent": 28.5,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": 3.0,
@@ -393,7 +393,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 5.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -411,13 +411,13 @@
 				"peak_percent": 7.6,
 				"fall_width": 1500,
 				"tail_percent": 5.7,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 2.8,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -427,7 +427,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 6.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -445,13 +445,13 @@
 				"peak_percent": 3.8,
 				"fall_width": 1600,
 				"tail_percent": 2.85,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 4.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD; платина — очень плотный металл"
 			},
 			"max_stack": 99,
@@ -461,7 +461,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 10.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -479,13 +479,13 @@
 				"peak_percent": 6.65,
 				"fall_width": 1600,
 				"tail_percent": 4.9875,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 1.8,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD; титан лёгкий при высокой прочности"
 			},
 			"max_stack": 99,
@@ -494,7 +494,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 12.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -512,13 +512,13 @@
 				"peak_percent": 6.65,
 				"fall_width": 1600,
 				"tail_percent": 4.9875,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 0.3,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD; литий — самый лёгкий металл"
 			},
 			"max_stack": 99,
@@ -528,7 +528,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 8.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -546,7 +546,7 @@
 				"peak_percent": 4.75,
 				"fall_width": 1500,
 				"tail_percent": 3.5625,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
@@ -562,7 +562,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 6.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -580,7 +580,7 @@
 				"peak_percent": 2.1,
 				"fall_width": 1800,
 				"tail_percent": 1.58,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
@@ -596,7 +596,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 12.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -614,13 +614,13 @@
 				"peak_percent": 3.8,
 				"fall_width": 2000,
 				"tail_percent": 2.85,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 1.5,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -630,7 +630,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 14.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -648,13 +648,13 @@
 				"peak_percent": 3.2,
 				"fall_width": 2000,
 				"tail_percent": 2.4,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 3.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -664,7 +664,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 18.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -682,13 +682,13 @@
 				"peak_percent": 2.6,
 				"fall_width": 2000,
 				"tail_percent": 1.95,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 2.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -698,7 +698,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 16.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -716,7 +716,7 @@
 				"peak_percent": 3.42,
 				"fall_width": 1800,
 				"tail_percent": 2.565,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
@@ -728,7 +728,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 10.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -746,7 +746,7 @@
 				"peak_percent": 3.42,
 				"fall_width": 1800,
 				"tail_percent": 2.565,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; от нуля на depth_min растёт по параболе к peak_depth (rise=zero); за пиком спад к вечному хвосту tail_percent. Расчёт: docs/GDD.md §4.1",
 				"rise": "zero"
 			},
@@ -758,7 +758,7 @@
 			"sellable": true,
 			"drill_seconds": {
 				"value": 10.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -776,12 +776,12 @@
 				"peak_percent": 5.7,
 				"fall_width": 2000,
 				"tail_percent": 4.275,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": {
 				"value": 3.5,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -793,7 +793,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 20.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -811,12 +811,12 @@
 				"peak_percent": 2.85,
 				"fall_width": 2000,
 				"tail_percent": 2.1375,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": {
 				"value": 0.8,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD; экзотическая почти безмассовая материя"
 			},
 			"max_stack": 99,
@@ -826,7 +826,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 24.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -844,12 +844,12 @@
 				"peak_percent": 1.9,
 				"fall_width": 2000,
 				"tail_percent": 1.425,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": {
 				"value": 0.5,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -859,7 +859,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 28.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -877,12 +877,12 @@
 				"peak_percent": 1.52,
 				"fall_width": 2000,
 				"tail_percent": 1.14,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": {
 				"value": 1.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -892,7 +892,7 @@
 			"notes": "не продаётся: материал для брони и оружия",
 			"drill_seconds": {
 				"value": 32.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -910,12 +910,12 @@
 				"peak_percent": 0.95,
 				"fall_width": 2000,
 				"tail_percent": 0.7125,
-				"proposed": true,
+				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
 			"weight_kg": {
 				"value": 1.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "вес не задан в GDD"
 			},
 			"max_stack": 99,
@@ -925,7 +925,7 @@
 			"sellable": false,
 			"drill_seconds": {
 				"value": 40.0,
-				"proposed": true,
+				"proposed": false,
 				"note": "владелец задал только камень=10с и \"минералы бурятся с разной скоростью\"; время выведено по твёрдости и тиру ценности от базовых 3с за землю"
 			}
 		},
@@ -1159,9 +1159,9 @@
 			"category": "medical",
 			"price_coins": 0,
 			"weight_kg": {
-				"value": 0.5,
-				"proposed": true,
-				"note": "вес не задан владельцем; аптечка легче обеда (пельмени 1 кг), но заметна: пять аптечек в рюкзаке — это 2.5 кг руды, оставленной в шахте"
+				"value": 0.1,
+				"proposed": false,
+				"note": "владелец (разбор чисел, 26.10): «вес аптечки 0.1» — было 0.5"
 			},
 			"max_stack": 99,
 			"hazard": [],
@@ -1193,26 +1193,6 @@
 			"notes": "топливо для ручного бура и буровой скважины (GDD п.5: 4 торфа = 1 блок). Не скупается мастерской: блок из торфа на 4 монеты, принимать его обратно — значит печатать монеты перегонкой",
 			"proposed": true,
 			"note": "самой статьи топливного блока в GDD нет — есть только конверсия 4:1 (п.5); статья заведена, чтобы блок имел вес в рюкзаке"
-		}
-	],
-	"terrain_hazards": [
-		{
-			"id": "hot_rock",
-			"name_ru": "Горячая порода",
-			"depth_min": {
-				"value": 1000,
-				"proposed": true,
-				"note": "глубина появления не задана в GDD (п.18, 'с какой глубины горячие породы'); выбрана глубина слоя угля/бура как символ индустриальной жары"
-			},
-			"burn_damage_per_second": {
-				"value": 2.0,
-				"proposed": true,
-				"note": "урон не задан в GDD (п.18, 'сколько жгут')"
-			},
-			"hazard": [
-				"hot"
-			],
-			"notes": "ожоги наносят урон HP при контакте; также источник перегрева бура (см. balance.json -> tools)"
 		}
 	],
 	"_legend_density_parabola": "до depth_min минерала нет; от depth_min к peak_depth плотность растёт по параболе до peak_percent (rise=zero — начиная с нуля; без rise — не ниже tail_percent, как у ранних руд); глубже peak_depth спадает по параболе с полушириной fall_width, но не ниже tail_percent",

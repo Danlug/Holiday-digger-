@@ -8,18 +8,21 @@
   "count": 5,
   "_slots_note": "Пять слотов — пять заданий разной сложности: копка (главное, ~25 мин игры), продажа, трата, забота о герое, «охота» (руда, глубина, металл, монстры). pool — какие шаблоны может выпасть в слоте и с каким весом; замена задания берёт другой шаблон из того же пула. reward — множитель награды слота (сложность).",
   "slots": [
-   {"id": "dig", "pool": {"dig_any": 6, "dig_stone": 1}, "scale": 1.0, "reward": 1.5},
-   {"id": "sell", "pool": {"sell_coins": 3, "sell_items": 1}, "scale": 1.0, "reward": 1.0},
-   {"id": "spend", "pool": {"spend_coins": 3, "buy_any": 1}, "scale": 1.0, "reward": 0.8},
-   {"id": "care", "pool": {"eat": 3, "sleep": 1}, "scale": 1.0, "reward": 0.6},
-   {"id": "hunt", "pool": {"dig_ore": 3, "dig_deep": 2, "depth_record": 2, "pick_iron": 1, "pick_lead": 1, "pick_silver": 1, "pick_copper": 1, "pick_gold": 1, "pick_aluminium": 1, "pick_diamond": 1, "pick_nickel": 1, "pick_titanium": 1, "pick_platinum": 1, "pick_ruby": 1, "kill_monsters": 3, "refuel": 1}, "scale": 1.0, "reward": 1.1}
+   {"id": "dig", "pool": {"dig_any": 6, "dig_stone": 1}, "scale": 1.0, "reward": 1.5, "_approved": ["reward"]},
+   {"id": "sell", "pool": {"sell_coins": 3, "sell_items": 1}, "scale": 1.0, "reward": 1.0, "_approved": ["reward"]},
+   {"id": "spend", "pool": {"spend_coins": 3, "buy_any": 1}, "scale": 1.0, "reward": 0.8, "_approved": ["reward"]},
+   {"id": "care", "pool": {"eat": 3, "sleep": 1}, "scale": 1.0, "reward": 0.6, "_approved": ["reward"]},
+   {"id": "hunt", "pool": {"dig_ore": 3, "dig_deep": 2, "depth_record": 2, "pick_iron": 1, "pick_lead": 1, "pick_silver": 1, "pick_copper": 1, "pick_gold": 1, "pick_aluminium": 1, "pick_diamond": 1, "pick_nickel": 1, "pick_titanium": 1, "pick_platinum": 1, "pick_ruby": 1, "kill_monsters": 3, "refuel": 1}, "scale": 1.0, "reward": 1.1, "_approved": ["reward"]}
   ],
-  "_reward_note": "Награда задания = reward[ступень] × reward слота. Весь день (5 заданий + сундук) ≈ четверть-треть того, что игрок ступени зарабатывает продажей за те же ~35–45 минут (sim_daily: 3 · 16 · 132 · 459 · 2415 · 6156 монет в минуту игры): на нижних ступенях щедрее — там «мёртвый» первый час (ГДД §20).",
+  "_reward_note": "Награда задания = reward[ступень] × reward слота. Весь день (5 заданий + сундук) ≈ 80% того, что игрок ступени зарабатывает продажей за те же ~40 минут (владелец, 26.10: «поднять пропорционально прокачке и глубине»; раньше — четверть-треть) (sim_daily: 3 · 16 · 132 · 459 · 2415 · 6156 монет в минуту игры): на нижних ступенях щедрее — там «мёртвый» первый час (ГДД §20).",
   "reward": {
-   "coins": [40, 80, 250, 800, 3500, 9000],
-   "xp": [80, 150, 300, 1000, 2500, 5000]
+   "proposed": false,
+   "_note": "владелец (разбор чисел, 26.10): «поднять задания пропорционально прокачке и глубине». Монеты ступеней 2–5 подняты так, чтобы день (5 заданий + сундук ×1.5 = 6.5 награды ступени) везде давал ≈ 80% продажи руды за 40 минут игры на своей ступени — как на ступени 1 (sim_daily: 3 · 16 · 132 · 459 · 2384 · 5948 монет в минуту); было 250, 800, 3500, 9000. Ступени 0–1 — как были (на нулевой день и так щедрее продажи). Опыт — той же мерой (≈ 80% опыта копки за 40 минут; опыт копки ≈ цена руды / 5): ступени 0–4 и так не ниже, на ступени 5 поднят 5000 → 6000.",
+   "coins": [40, 80, 650, 2300, 12000, 29000],
+   "xp": [80, 150, 300, 1000, 2500, 6000]
   },
   "points": 1,
+  "_approved": ["points"],
   "bonus_all": {"coins_x": 1.5, "xp_x": 1.5, "points": 2, "item": {"id": "energy_drink", "count": 1},
    "_note": "Сундук дня: открывается, когда забраны награды всех заданий дня."},
   "streak": {"pct_per_day": 10, "max_pct": 50, "grace_days": 1, "dollar_every": 7,

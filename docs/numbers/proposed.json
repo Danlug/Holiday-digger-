@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "15cf2aa39da5",
+  "data_fingerprint": "9ebd0500c962",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
@@ -11,8 +11,8 @@
   ]
  },
  "summary": {
-  "rows": 625,
-  "families": 38,
+  "rows": 627,
+  "families": 39,
   "new_unreviewed": 0,
   "flagged": 16,
   "by_theme": {
@@ -23,7 +23,7 @@
    "Бой": 210,
    "Механики: тайники, азарт и жадность, мастерство, удача": 6,
    "Монетизация и ролики": 17,
-   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 77
+   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 79
   }
  },
  "top_decisions": [
@@ -215,7 +215,7 @@
   {
    "id": "feel",
    "title": "Ощущение, звук, свет и подсказки (мелочи интерфейса)",
-   "count": 77,
+   "count": 79,
    "families": [
     "feel.guidance",
     "feel.fog",
@@ -223,7 +223,8 @@
     "feel.dig",
     "feel.sound",
     "feel.dialogue",
-    "feel.light"
+    "feel.light",
+    "feel.actor_height"
    ],
    "decide": [
     "Камера, звук, свет, подсказки, диалоги — подбор по глазам и на слух, на баланс не влияют."
@@ -1484,6 +1485,24 @@
    "effect": null,
    "verdict": "оставить",
    "why": "подбор по глазам",
+   "flags": []
+  },
+  {
+   "id": "feel.actor_height",
+   "theme": "feel",
+   "title": "Рост бабушки рядом с внуком",
+   "importance": 1,
+   "rows": [
+    "story.json:actors.grandma_poor.height",
+    "story.json:actors.grandma_rich.height"
+   ],
+   "count": 2,
+   "value_text": "2 числа, от 0.92 до 0.92",
+   "affects": "вид сцен у дома (ГДД §15.1, «Рост актёров»)",
+   "reviewed": true,
+   "effect": null,
+   "verdict": "оставить",
+   "why": "все листы персонажей одного роста; бабушке рядом с внуком-подростком — чуть ниже, ориентир 90–95 %",
    "flags": []
   }
  ],
@@ -13353,6 +13372,40 @@
    "unit": "",
    "note": "Свет мира (ветка world-fx, scripts/world/light_layer.gd). Числа, которых владелец не задавал, — подбор по глазам (proposed). Затемнение глубиной и факел героя — один полноэкранный шейдер; ореолы руд — аддитивные спрайты по видимым клеткам.",
    "affects": "вид глубины",
+   "effect": null,
+   "importance": 1,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "story.json:actors.grandma_poor.height",
+   "file": "data/story.json",
+   "path": "actors.grandma_poor.height",
+   "theme": "feel",
+   "family": "feel.actor_height",
+   "title": "Рост на экране: бабушка в эпоху деда",
+   "value": 0.92,
+   "value_text": "0.92",
+   "unit": "доля роста героя",
+   "note": "рост бабушки относительно внука и деда: все листы персонажей нарисованы одного роста, пожилой бабушке положено быть чуть ниже (ориентир 90–95%)",
+   "affects": "вид сцен у дома (ГДД §15.1, «Рост актёров»)",
+   "effect": null,
+   "importance": 1,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "story.json:actors.grandma_rich.height",
+   "file": "data/story.json",
+   "path": "actors.grandma_rich.height",
+   "theme": "feel",
+   "family": "feel.actor_height",
+   "title": "Рост на экране: бабушка",
+   "value": 0.92,
+   "value_text": "0.92",
+   "unit": "доля роста героя",
+   "note": "рост бабушки относительно внука (ориентир 90–95% его роста на экране), как у grandma_poor",
+   "affects": "вид сцен у дома (ГДД §15.1, «Рост актёров»)",
    "effect": null,
    "importance": 1,
    "flags": [],

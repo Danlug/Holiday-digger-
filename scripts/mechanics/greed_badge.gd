@@ -2,7 +2,9 @@ class_name GreedBadge
 extends Node2D
 ## Значок жадности над героем (в мире, слой ViewRoot поверх всего): бело-золотое
 ## пламя и «×7», под ними тонкая полоска оставшегося времени; за героем — золотые
-## штрихи скорости по его пути. «Меньше движения» — без покачивания и штрихов.
+## штрихи скорости по его пути, вокруг — дышащий золотой ореол; в миг начала от
+## героя расходится золотое кольцо с лучами (26.10: момент жадности должен быть
+## ярким). «Меньше движения» — без покачивания, штрихов, кольца и дыхания ореола.
 
 const COL_GOLD := Color8(0xFF, 0xE5, 0x7A)
 const COL_DEEP := Color8(0xF0, 0x7A, 0x1E)
@@ -17,6 +19,8 @@ var _time: float = 0.0
 var _trail: Array = []     # последние позиции героя, пиксели мира
 var _icon: Texture2D
 var _label: Label
+var _ring: float = 0.0     # кольцо начала жадности: 1 → 0
+var _hero := Vector2.ZERO  # центр героя относительно значка
 
 
 func _ready() -> void:
@@ -32,6 +36,11 @@ func _ready() -> void:
 	visible = false
 
 
+## Жадность началась: кольцо от героя.
+func on_greed_start() -> void:
+	_ring = 0.0 if Settings.reduce_motion else 1.0
+
+
 func _process(delta: float) -> void:
 	var streak: StreakLogic = director.streak if director != null else null
 	var player = director.player if director != null else null
@@ -42,6 +51,7 @@ func _process(delta: float) -> void:
 			_trail.clear()
 		return
 	_time += delta
+	_ring = maxf(0.0, _ring - delta * 2.2)
 	_alpha = 1.0 if on and Settings.reduce_motion else move_toward(_alpha, 1.0 if on else 0.0, delta * (8.0 if on else 3.0))
 	if Settings.reduce_motion and not on:
 		_alpha = 0.0
@@ -56,6 +66,7 @@ func _process(delta: float) -> void:
 			_trail.pop_back()
 		var bob := 0.0 if Settings.reduce_motion else roundf(sin(_time * 6.0) * 1.5)
 		position = p + Vector2(0, HEAD_DY + bob)
+		_hero = Vector2(0, -HEAD_DY - bob)
 		_label.text = "×%d" % roundi(GreedRules.speed_mult())
 	queue_redraw()
 
@@ -76,6 +87,20 @@ func _draw() -> void:
 		var col := Color(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 0.55 * k * _alpha)
 		for off in [-7.0, 0.0, 7.0]:
 			draw_line(a + n * off - position, b + n * off - position, col, 1.0)
+	# ореол вокруг героя: всё время жадности, дышит
+	var breathe := 0.0 if Settings.reduce_motion else 0.5 + 0.5 * sin(_time * 7.0)
+	draw_arc(_hero, 21.0 + 2.0 * breathe, 0.0, TAU, 40, Color(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, (0.22 + 0.18 * breathe) * _alpha), 2.0)
+	draw_arc(_hero, 24.0 + 2.0 * breathe, 0.0, TAU, 40, Color(COL_DEEP.r, COL_DEEP.g, COL_DEEP.b, 0.14 * _alpha), 1.0)
+	if _ring > 0.0:
+		# начало жадности: кольцо расходится, восемь коротких лучей летят наружу
+		var k := 1.0 - _ring
+		var r := 10.0 + 58.0 * (1.0 - pow(1.0 - k, 2.0))
+		var a := _ring
+		draw_arc(_hero, r, 0.0, TAU, 56, Color(1.0, 0.95, 0.7, 0.95 * a), 3.0)
+		draw_arc(_hero, r - 4.0, 0.0, TAU, 56, Color(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 0.6 * a), 2.0)
+		for i in 8:
+			var dir := Vector2.RIGHT.rotated(TAU * float(i) / 8.0 + 0.39)
+			draw_line(_hero + dir * (r * 0.55), _hero + dir * (r * 0.55 + 9.0), Color(1.0, 0.9, 0.45, a), 2.0)
 	# пламя + «×7»
 	var font_w := _label.get_minimum_size().x
 	var icon_s := 14.0

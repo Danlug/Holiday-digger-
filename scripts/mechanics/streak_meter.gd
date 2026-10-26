@@ -1,16 +1,19 @@
 class_name StreakMeter
 extends Control
-## Шкала азарта — четвёртая «полоска» под HP/голодом/бодростью (видна только во
-## время серии): значок пламени с самородком и шкала до жадности. В жадности —
-## бело-золотое пламя, шкала превращается в таймер и тает, по краям экрана дышит
-## золотая кайма. Слов нет: название и правило — в Tip.
+## Шкала азарта — четвёртая «полоска» под HP/голодом/бодростью (видна, пока
+## копится): значок пламени с самородком и шкала до жадности. Растёт, пока кирка
+## в деле; герой стоит — шкала тускнеет и тает; почти полная — пламя дышит. Полная —
+## вспышка по шкале, и в жадности бело-золотое пламя, шкала превращается в таймер
+## и тает, по краям экрана дышит золотая кайма. Слов нет: правило — в Tip.
 ##
 ## Геометрия — как у HudBar (значок 16 слева, зазор 3, дорожка 8 по высоте) и
 ## берётся от настоящей полоски бодрости (HudAnchors.get_rect("stamina")):
 ## значок стоит ровно под молнией, дорожка — под дорожкой, шаг строки тот же.
 
 const ROW_H := 16.0
-const SHOW_FROM := 3          # серия короче — шкалу не показываем: это не событие
+const SHOW_FROM_S := 0.5      # с полсекунды работы: шкала видна с первого удара, но не мигает от толчка в камень
+const NEAR_FULL := 0.8        # отсюда пламя дышит: жадность близко
+const COL_DRAIN := Color8(0x9A, 0x5A, 0x2A)
 const COL_FILL := Color8(0xF0, 0x7A, 0x1E)
 const COL_FILL_HI := Color8(0xFF, 0xC8, 0x3A)
 const COL_FEVER := Color8(0xFF, 0xE5, 0x7A)
@@ -30,6 +33,7 @@ var _edge: Control
 var _track := StyleBoxFlat.new()
 var _fill := StyleBoxFlat.new()
 var _place_left: float = 0.0
+var _burst: float = 0.0       # вспышка шкалы в миг начала жадности (1 → 0)
 
 
 func _ready() -> void:
@@ -47,7 +51,7 @@ func _ready() -> void:
 	_edge.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_edge.draw.connect(_draw_edge)
 	get_parent().add_child.call_deferred(_edge)
-	Tip.bind(self, "Азарт и жадность", "Копай без пауз — шкала растёт. Полная — жадность: несколько секунд всё копается с первого удара, ход и падение ×7, руда вдвое. Пауза или подъём наверх — серия сгорает. Качается в ветке «Жадность».")
+	Tip.bind(self, "Азарт и жадность", "Копай — шкала растёт, пока кирка в деле. Стоишь — тает. Полная — жадность: несколько секунд всё копается с первого удара, ход и падение ×7, руда вдвое. Подъём наверх или дом — шкала сгорает. Качается в ветке «Жадность».")
 	modulate.a = 0.0
 	visible = false
 
@@ -61,8 +65,15 @@ func on_break() -> void:
 	_pop = 0.0
 
 
+## Шкала заполнилась — жадность: шкала вспыхивает и подпрыгивает.
+func on_greed_start() -> void:
+	_burst = 1.0
+	_pop = 1.6
+	_alpha = 1.0
+
+
 func wanted() -> bool:
-	return streak != null and (streak.in_greed() or streak.count >= SHOW_FROM)
+	return streak != null and (streak.in_greed() or streak.work >= SHOW_FROM_S or (streak.count > 0 and streak.work > 0.0))
 
 
 func _process(delta: float) -> void:
@@ -94,6 +105,7 @@ func _process(delta: float) -> void:
 	_shown_fill = fill if Settings.reduce_motion or (streak != null and streak.in_greed()) \
 		else lerpf(_shown_fill, fill, minf(1.0, delta * 14.0))
 	_pop = maxf(0.0, _pop - delta * 4.0)
+	_burst = maxf(0.0, _burst - delta * 1.6)
 	queue_redraw()
 	if _edge != null and is_instance_valid(_edge):
 		_edge.visible = visible and streak != null and streak.in_greed()
@@ -114,6 +126,8 @@ func _place() -> void:
 
 func _draw() -> void:
 	var greed := streak != null and streak.in_greed()
+	var drain := streak != null and streak.draining()
+	var near := not greed and not drain and _shown_fill >= NEAR_FULL and not Settings.reduce_motion
 	var h := size.y
 	var x0 := HudBar.ICON_PX + HudBar.GAP
 	var bar := Rect2(x0, (h - HudBar.BAR_H) * 0.5, maxf(size.x - x0, 8.0), HudBar.BAR_H)
@@ -130,21 +144,36 @@ func _draw() -> void:
 			if not Settings.reduce_motion:
 				col = col.lerp(COL_FEVER, 0.5 + 0.5 * sin(_time * 9.0)) if not low \
 					else (COL_GREED if sin(_time * 18.0) > 0.0 else COL_FEVER_DEEP)
+		elif drain:
+			col = COL_DRAIN   # стоишь — шкала тускнеет и тает
+		elif near:
+			col = COL_FILL.lerp(COL_FILL_HI, 0.5 + 0.5 * sin(_time * 10.0))
 		_fill.bg_color = col
 		draw_style_box(_fill, Rect2(inner.position, Vector2(fw, inner.size.y)))
 		draw_rect(Rect2(inner.position.x + 1, inner.position.y, maxf(fw - 2, 0.0), 2),
-			Color(1, 1, 1, 0.28) if greed else Color(COL_FILL_HI.r, COL_FILL_HI.g, COL_FILL_HI.b, 0.85))
+			Color(1, 1, 1, 0.28) if greed else (Color(1, 1, 1, 0.12) if drain \
+				else Color(COL_FILL_HI.r, COL_FILL_HI.g, COL_FILL_HI.b, 0.85)))
 		draw_rect(Rect2(inner.position.x + 1, inner.end.y - 1, maxf(fw - 2, 0.0), 1), Color(0, 0, 0, 0.22))
 	if not greed:
-		# риски каждые 10 клеток: видно, сколько осталось до жадности
-		var marks := maxi(1, int(roundf(float(streak.fever_at) / 10.0))) if streak != null else 6
+		# риски каждые 10 секунд работы: видно, сколько осталось до жадности
+		var marks := maxi(1, roundi(streak.fever_s / 10.0)) if streak != null else 6
 		for i in range(1, marks):
 			var tx := inner.position.x + floorf(inner.size.x * float(i) / float(marks))
 			draw_rect(Rect2(tx, inner.position.y, 1, inner.size.y), Color(0, 0, 0, 0.28))
+	if _burst > 0.0:
+		# миг начала жадности: шкала вспыхивает белым, от неё расходится золотой ореол
+		var k := _burst * _burst
+		draw_rect(bar, Color(1, 1, 1, 0.85 * k))
+		var grow := (1.0 - _burst) * 6.0
+		draw_rect(Rect2(bar.position - Vector2(grow, grow), bar.size + Vector2(grow, grow) * 2.0),
+			Color(1.0, 0.86, 0.35, 0.9 * k), false, 2.0)
 	var icon := _icon_fever if greed else _icon
 	if icon != null:
-		var s := HudBar.ICON_PX * (1.0 + 0.25 * _pop)
-		draw_texture_rect(icon, Rect2(Vector2((HudBar.ICON_PX - s) * 0.5, (h - s) * 0.5), Vector2(s, s)), false)
+		var breathe := 0.12 * (0.5 + 0.5 * sin(_time * 10.0)) if near else 0.0
+		var s := HudBar.ICON_PX * (1.0 + 0.25 * _pop + breathe)
+		var tint := Color(1, 1, 1, 0.55 + 0.45 * absf(sin(_time * 6.0))) if drain and not Settings.reduce_motion \
+			else Color.WHITE
+		draw_texture_rect(icon, Rect2(Vector2((HudBar.ICON_PX - s) * 0.5, (h - s) * 0.5), Vector2(s, s)), false, tint)
 
 
 ## Золотая кайма по краям экрана в жадности: тонкая, дышит; «меньше движения» — ровная.

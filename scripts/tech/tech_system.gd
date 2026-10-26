@@ -84,7 +84,7 @@ func _setup(host: Node) -> void:
 
 	var hud_layer := CanvasLayer.new()
 	hud_layer.name = "TechHudLayer"
-	hud_layer.layer = 2
+	hud_layer.layer = UiLayers.HUD_WIDGETS   # бак и термометр: над миром, под окнами (и рюкзаком)
 	host.add_child(hud_layer)
 	_tech_hud = TechHud.new()
 	_tech_hud.name = "TechHud"

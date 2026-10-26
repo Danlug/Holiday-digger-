@@ -3,9 +3,9 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "750fa5d6811a",
+  "data_fingerprint": "ed3016a61e8d",
   "notes": [
-   "симуляторы sim_economy.gd (серпантин, дайв, без артефактов; 4 сида) и sim_daily.gd — запущены сейчас",
+   "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
    "tools/sim_tech.py — доход и окупаемость по глубине"
   ]

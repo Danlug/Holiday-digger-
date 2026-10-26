@@ -353,7 +353,7 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 // не дотягивается. Подмена стоит ДО загрузки index.js: движок просит wasm,
 // пак и ворклеты сам.
 (function () {
-	const V = "20261026-1226";
+	const V = "20261026-1300";
 	const TOUCH = /index(\.[a-z.]+)?\.(js|wasm|pck)(\?|$)/;
 	function bust(url) {
 		if (typeof url !== "string" || !TOUCH.test(url) || url.indexOf("v=" + V) !== -1) {
@@ -383,14 +383,14 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 	}
 }());
 		</script>
-		<script src="index.js?v=20261026-1226"></script>
+		<script src="index.js?v=20261026-1300"></script>
 <script>
 (function () {
 	'use strict';
 	var shell = window.RaskopkiShell;
 	var $ = function (id) { return document.getElementById(id); };
 	var canvas = $('canvas'), splash = $('splash');
-	var GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":20515824,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
+	var GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":20552032,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
 	var GODOT_THREADS_ENABLED = false;
 
 	// ---------- проверка возможностей браузера

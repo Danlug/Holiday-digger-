@@ -53,6 +53,22 @@ def main() -> None:
 // пак и ворклеты сам.
 (function () {{
 \tconst V = "{build}";
+\t// Свежая ли сама страница: GitHub Pages отдаёт index.html с кэшем до 10 минут,
+\t// и Chrome показывает прошлую сборку. version.json берётся мимо кэша; если там
+\t// метка новее — перезагрузка на адрес с ?b=<новая метка>, которого в кэше нет.
+\t// Второй раз на тот же ?b= не уходим (защита от петли, если раздача отстаёт).
+\ttry {{
+\t\twindow.fetch("version.json?t=" + Date.now(), {{ cache: "no-store" }})
+\t\t\t.then(function (r) {{ return r.ok ? r.json() : null; }})
+\t\t\t.then(function (j) {{
+\t\t\t\tif (!j || !j.build || j.build === V) {{ return; }}
+\t\t\t\tconst u = new URL(location.href);
+\t\t\t\tif (u.searchParams.get("b") === j.build) {{ return; }}
+\t\t\t\tu.searchParams.set("b", j.build);
+\t\t\t\tlocation.replace(u.toString());
+\t\t\t}})
+\t\t\t.catch(function () {{ /* нет файла или офлайн — играем тем, что есть */ }});
+\t}} catch (e) {{ /* старый браузер без fetch/URL */ }}
 \tconst TOUCH = /index(\\.[a-z.]+)?\\.(js|wasm|pck)(\\?|$)/;
 \tfunction bust(url) {{
 \t\tif (typeof url !== "string" || !TOUCH.test(url) || url.indexOf("v=" + V) !== -1) {{
@@ -89,6 +105,8 @@ def main() -> None:
         sys.exit("в index.html не найден тег загрузки index.js — экспорт изменился")
     html = html.replace(old, patch, 1)
     HTML.write_text(html, encoding="utf-8")
+    # метка для проверки свежести страницы (см. version.json в подмене выше)
+    (HTML.parent / "version.json").write_text(json.dumps({"build": build}) + "\n", encoding="utf-8")
     print(f"build/web/index.html: метка v={build}")
     build_web_shell.install(HTML.parent)
 

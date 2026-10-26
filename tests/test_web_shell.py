@@ -82,6 +82,11 @@ def test_stamp(html):
 		check("штамп: index.js получает ?v=<метка>", '<script src="index.js?v=20990101-0000"></script>' in out)
 		check("штамп: подмена fetch стоит ДО index.js", out.index("window.fetch = function") < out.index('src="index.js?v='))
 		check("штамп: подмена идёт и для аудио-ворклетов", "AudioWorklet.prototype.addModule" in out)
+		check("штамп: version.json с меткой лёг рядом (проверка свежести страницы)",
+			json.loads((index.parent / "version.json").read_text(encoding="utf-8")).get("build") == "20990101-0000")
+		check("штамп: страница сверяется с version.json мимо кэша и уходит на ?b=<метка>",
+			'version.json?t=' in out and 'cache: "no-store"' in out and 'searchParams.set("b"' in out)
+		check("штамп: проверка свежести стоит ДО index.js", out.index("version.json?t=") < out.index('src="index.js?v='))
 		check("штамп: manifest и иконки легли рядом с index.html",
 			all((tmp / "web" / n).exists() for n in ["manifest.webmanifest"] + build_web_shell.PWA_FILES))
 		try:

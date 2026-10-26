@@ -1,7 +1,9 @@
 class_name ProjectsScreen
 extends CanvasLayer
 ## Экран «Проекты»: крупные постройки из материалов и цепочки их материалов.
-## Внизу — вкладки-значки проектов (бур, скважина, бурмобиль, костюм) и крестик;
+## Сверху — заголовок «Проект: Ручной бур» и строка «что это за экран» (владелец, разбор чисел 26.10:
+## «сверху сделай заголовок, а то когда ты на странице проекта — непонятно, что это»), под ним — сколько
+## проектов собрано и монеты. Внизу — вкладки-значки проектов (бур, скважина, бурмобиль, костюм) и крестик;
 ## в теле — карточка проекта (значок, общая полоска, «следить») и строки
 ## материалов: значок, полоска «есть/нужно» (рюкзак + склад), где копать
 ## (значок глубины и число, значок бура, если киркой не взять). Промежуточное
@@ -21,6 +23,9 @@ const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
 const COL_FILL_VIA := Color8(0xE0, 0xA9, 0x3B, 0x70)
 const COL_DONE := Color8(0x7F, 0xD0, 0x6B)
 const COL_TRACK := Color8(0x0E, 0x0B, 0x08)
+const HEAD_TOP := 6.0
+const HEAD_H := 62.0          # заголовок, подзаголовок, фишки и черта под ними
+const TITLE_SIZES := [13, 12, 11, 10]   # длинное имя проекта ужимается, а не обрезается
 
 static var _instance: ProjectsScreen = null
 
@@ -28,6 +33,9 @@ var _root: Control
 var _scroll: ScrollContainer
 var _body: VBoxContainer
 var _head: HBoxContainer
+var _title_row: HBoxContainer
+var _title_label: Label
+var _subtitle_label: Label
 var _bar: HBoxContainer
 var _tab_buttons: Dictionary = {}
 var _current := ""
@@ -162,21 +170,53 @@ func _build() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bg)
 
+	var top := VBoxContainer.new()
+	top.name = "Heading"
+	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	top.offset_left = 8
+	top.offset_right = -8
+	top.offset_top = HEAD_TOP
+	top.offset_bottom = HEAD_TOP + HEAD_H
+	top.add_theme_constant_override("separation", 2)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(top)
+
+	_title_row = HBoxContainer.new()
+	_title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_title_row.add_theme_constant_override("separation", 5)
+	_title_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	_title_row.custom_minimum_size = Vector2(0, 18)
+	_title_label = ProgressUiKit.make_label("", TITLE_SIZES[0], ProgressUiKit.TEXT_HI)
+	_title_label.name = "Title"
+	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_title_label.add_theme_constant_override("shadow_offset_y", 1)
+	_title_row.add_child(_title_label)
+	top.add_child(_title_row)
+
+	_subtitle_label = ProgressUiKit.make_label(subheading(), 9, ProgressUiKit.MUTED)
+	_subtitle_label.name = "Subtitle"
+	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(_subtitle_label)
+
 	_head = HBoxContainer.new()
-	_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_head.offset_left = 8
-	_head.offset_right = -8
-	_head.offset_top = 8
-	_head.offset_bottom = 30
 	_head.alignment = BoxContainer.ALIGNMENT_CENTER
 	_head.add_theme_constant_override("separation", 12)
-	_root.add_child(_head)
+	_head.custom_minimum_size = Vector2(0, 20)
+	top.add_child(_head)
+
+	var rule := ColorRect.new()
+	rule.color = ProgressUiKit.EDGE
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(rule)
 
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
-	_scroll.offset_top = 36
+	_scroll.offset_top = HEAD_TOP + HEAD_H + 4
 	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
@@ -232,9 +272,61 @@ func refresh() -> void:
 		_body.add_child(_coins_row(ProjectChain.coins_need(_current)))
 
 
-# --- шапка: собрано проектов, монеты ---------------------------------------------
+# --- шапка: заголовок проекта, собрано проектов, монеты --------------------------
+
+## Тексты шапки на языке игрока (data/guidance.json → screen_text); нет перевода — русские.
+static func _screen_text(key: String) -> Variant:
+	var all: Dictionary = ProjectChain.data().get("screen_text", {})
+	for code in [String(Settings.language), "ru"]:
+		var d: Dictionary = all.get(code, {})
+		if d.has(key):
+			return d[key]
+	return null
+
+
+## Имя проекта для заголовка: своё у языка (костюм — «Костюм от жары», а не имя ступени), иначе — имя
+## рецепта (balance.json/tech.json, одно место правды).
+static func project_name(id: String) -> String:
+	for code in [String(Settings.language), "ru"]:
+		var names: Dictionary = ProjectChain.data().get("screen_text", {}).get(code, {}).get("names", {})
+		if names.has(id):
+			return String(names[id])
+	return ProjectChain.title(id)
+
+
+## «Проект: Ручной бур» — что за экран и какой проект открыт.
+static func heading(id: String) -> String:
+	var fmt = _screen_text("title")
+	return (String(fmt) if fmt != null else "Проект: %s") % project_name(id)
+
+
+## Строка под заголовком: что на этом экране.
+static func subheading() -> String:
+	var t = _screen_text("subtitle")
+	return String(t) if t != null else ""
+
+
+func _fill_title() -> void:
+	if _title_label == null:
+		return
+	var text := heading(_current) if _current != "" else ""
+	_title_label.text = text
+	_subtitle_label.text = subheading()
+	# Длинное имя (костюм, «Буровая скважина» на узком экране) — шрифт поменьше, но целиком.
+	var room := maxf(_root.size.x if _root.size.x > 0.0 else get_viewport().get_visible_rect().size.x, 120.0) - 16.0
+	var font := _title_label.get_theme_font("font")
+	var size: int = TITLE_SIZES[TITLE_SIZES.size() - 1]
+	for sz: int in TITLE_SIZES:
+		if font == null or font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x <= room:
+			size = sz
+			break
+	_title_label.add_theme_font_size_override("font_size", size)
+	var tip = _screen_text("tip")
+	Tip.bind_tap(_title_row, ProjectChain.title(_current), String(tip) if tip != null else "")
+
 
 func _fill_head() -> void:
+	_fill_title()
 	for c in _head.get_children():
 		_head.remove_child(c)
 		c.queue_free()

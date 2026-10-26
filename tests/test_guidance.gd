@@ -270,9 +270,22 @@ func _test_screen() -> void:
 	check("повторно — снимает", ProjectChain.tracked() == "")
 	s._set_project("drill_rig")
 	check("вкладка бурмобиля: никель и платина, без подстрок", s.current() == "drill_rig" and s._body.get_child_count() == 4)
+	await _test_heading(s)
 	s.close()
 	await get_tree().create_timer(0.4).timeout
 	check("закрывается", not s.is_open())
+	# вход из меню «•••» (без проекта) и с трекера/подсказки (на проекте) — та же шапка
+	ProjectsScreen.open_for("")
+	await get_tree().process_frame
+	check("из меню: заголовок про открытый проект", s.is_open() and s.current() != ""
+		and s._title_label.text == ProjectsScreen.heading(s.current()))
+	s.close()
+	await get_tree().create_timer(0.4).timeout
+	ProjectsScreen.open_for("well")
+	await get_tree().process_frame
+	check("с трекера: «Проект: Буровая скважина»", s._title_label.text == "Проект: " + ProjectChain.title("well"))
+	s.close()
+	await get_tree().create_timer(0.4).timeout
 
 	# вход с карточки рецепта мастерской
 	var host := Control.new()
@@ -286,12 +299,51 @@ func _test_screen() -> void:
 		btn.pressed.emit()
 		await get_tree().process_frame
 		check("кнопка открывает экран на буре", s.is_open() and s.current() == "hand_drill")
+		check("из мастерской: заголовок «Проект: Ручной бур»", s._title_label.text == "Проект: Ручной бур")
 	ProjectsScreen.decorate_card(panel, {"kind": "recipe", "ref": "bronze"})
 	check("у плавки бронзы кнопки нет (не проект)", host.get_child_count() == 2)
 	s.close()
 	host.queue_free()
 	await get_tree().create_timer(0.4).timeout
 	s.queue_free()
+
+
+## Шапка экрана (владелец, разбор чисел 26.10: «сверху сделай заголовок, а то когда ты на странице
+## проекта — непонятно, что это»): у каждого проекта — «Проект: имя» и строка «что это за экран», сверху
+## над карточкой, целиком в ширину экрана; на английском — свой текст.
+func _test_heading(s: ProjectsScreen) -> void:
+	var ids := ProjectChain.ids()
+	check("в списке все четыре проекта (бур, скважина, бурмобиль, костюм)",
+		ids.has("hand_drill") and ids.has("well") and ids.has("drill_rig") and ids.has("heat_suit"))
+	var width := minf(s._root.size.x, 224.0)   # проектная ширина телефона; в headless окно бывает шире
+	for id in ids:
+		s._set_project(String(id))
+		await get_tree().process_frame
+		var t := s._title_label
+		var name := ProjectsScreen.project_name(String(id))
+		check("[%s] заголовок «Проект: %s»" % [id, name], t.text == "Проект: " + name and name != "" and name != String(id))
+		check("[%s] заголовок виден и стоит над карточкой" % id, t.is_visible_in_tree()
+			and t.get_global_rect().end.y <= s._body.get_child(0).get_global_rect().position.y)
+		check("[%s] заголовок помещается в ширину экрана (%d из %d)" % [id, int(t.get_minimum_size().x), int(width)],
+			t.get_minimum_size().x <= width - 16.0)
+		check("[%s] под заголовком — что на экране" % id, s._subtitle_label.text != "" and s._subtitle_label.is_visible_in_tree())
+	check("костюм — «Костюм от жары», а не имя ступени", ProjectsScreen.project_name("heat_suit") == "Костюм от жары")
+	check("у бура имя из рецепта (balance.json)", ProjectsScreen.project_name("hand_drill") == ProjectChain.title("hand_drill"))
+	var was := Settings.language
+	Settings.language = "en"
+	s._set_project("hand_drill")
+	check("en: «Project: Hand drill»", s._title_label.text == "Project: Hand drill")
+	check("en: подзаголовок по-английски", s._subtitle_label.text == "What to gather and where to dig it")
+	var en_ok := true
+	for id in ids:
+		var h := ProjectsScreen.heading(String(id))
+		if not h.begins_with("Project: ") or h.contains("Проект"):
+			en_ok = false
+	check("en: у всех проектов свой английский заголовок", en_ok)
+	Settings.language = "xx"
+	check("нет перевода — русский", ProjectsScreen.heading("well") == "Проект: " + ProjectChain.title("well"))
+	Settings.language = was
+	s._set_project("drill_rig")
 
 
 func _test_hint_hooks() -> void:

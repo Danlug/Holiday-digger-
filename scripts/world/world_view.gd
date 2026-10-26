@@ -107,6 +107,8 @@ var decor_external: bool = false
 # Цвета «серой» разведанной породы по поясам (ГДД §4.2): считаются один раз.
 var _gray_solid: PackedColorArray = PackedColorArray()
 var _gray_empty: PackedColorArray = PackedColorArray()
+## Плавное раскрытие тумана (scripts/world/fog_fade.gd): открывшаяся клетка проявляется из прежнего вида.
+var fog_fade: FogFade = null
 
 
 func _ready() -> void:
@@ -127,6 +129,9 @@ func _ready() -> void:
 	_overlay.name = "Overlay"
 	_overlay.draw.connect(_on_overlay_draw)
 	add_child(_overlay)
+	fog_fade = FogFade.new()
+	fog_fade.name = "FogFade"
+	_overlay.add_child(fog_fade)
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
 
@@ -259,6 +264,8 @@ func render(cam: Vector2) -> void:
 		_stale_k = 0
 		_stale_col = 0
 
+	if (full or stale_all) and fog_fade != null:
+		fog_fade.clear()   # окно рисуется заново целиком (загрузка, сброс, смена эпохи) — проявлять нечего
 	if full:
 		_paint_rect(x0, y0, cols, rows)
 	else:
@@ -291,7 +298,7 @@ func render(cam: Vector2) -> void:
 				var fx: int = key % WorldGen.WIDTH
 				var fy: int = key / WorldGen.WIDTH
 				if fx >= x0 and fx < x0 + cols and fy >= y0 and fy < y0 + rows:
-					_paint_at(fx, fy)
+					_paint_fog_cell(fx, fy)
 
 	_win_ok = true
 	_win_x = x0
@@ -378,6 +385,22 @@ func _paint_stale(x0: int, y0: int) -> void:
 
 func _paint_at(wx: int, wy: int) -> void:
 	_paint_rect(wx, wy, 1, 1)
+
+
+## Клетка, у которой сменился туман. Открылась (была заливкой тумана, стала светлее) — прежний вид гаснет
+## поверх нового (FogFade). Пока окно доперекрашивается после «менялось всё», слоты могут держать прежнюю
+## картинку — там просто рисуем.
+func _paint_fog_cell(wx: int, wy: int) -> void:
+	var si := posmod(wy, _pool_rows) * _pool_cols + posmod(wx, _pool_cols)
+	var s: Sprite2D = _pool[si]
+	var from := Color(0, 0, 0, 0)
+	if fog_fade != null and not _stale_active and _slot_wx[si] == wx and _slot_wy[si] == wy \
+			and s.visible and s.texture == _white_tex:
+		from = s.modulate
+	_paint_at(wx, wy)
+	if from.a > 0.0 and (not s.visible or s.texture != _white_tex
+			or (s.modulate != from and s.modulate != COLOR_FOG_BLACK)):
+		fog_fade.start(wx, wy, from)
 
 
 var _lava_list: Array = []

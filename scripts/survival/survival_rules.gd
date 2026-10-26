@@ -166,7 +166,7 @@ static func _pct(f: float) -> int:
 static func _hunger_status(t: String) -> Dictionary:
 	var dig := _pct(_tier_num("hunger", t, "dig", 1.0))
 	var luck := _tier_num("hunger", t, "luck", 1.0)
-	var luck_text := "удачи нет" if luck <= 0.0 else "удача в %d раза реже" % int(round(1.0 / luck))
+	var luck_text := "удачи нет" if luck <= 0.0 else "удача −%d%%" % _pct(luck)
 	if t == EMPTY:
 		return {"icon": "st_drain", "tier": t, "title": "Голодаешь",
 			"text": "Здоровье тает по %s HP в секунду, копка −%d%%, %s. Поешь!" % [

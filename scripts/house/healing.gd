@@ -1,7 +1,7 @@
 class_name Healing
 extends RefCounted
 ## Healing — чем лечится HP (решение владельца, раунд 4, ГДД §7 «Лечение»):
-## сон, еда, аптечка из лавки, и что стоит смерть («скорая забрала»).
+## сон, еда, аптечка из лавки, и что стоит смерть (плата больнице).
 ##
 ## Раньше HP возвращали только таблетка за доллары и смерть — и смерть с пустым
 ## рюкзаком была бесплатным лечением (docs/PLAYTEST.md, P1-3). Теперь:
@@ -10,14 +10,15 @@ extends RefCounted
 ##  * еда лечит по питательности (доля её процентов сытости);
 ##  * аптечка — предмет рюкзака, «применить» лечит заметную часть сразу;
 ##  * смерть, кроме рюкзака, забирает 5% монет, от 50 до 5000 (раунд 5, не в
-##    минус); поездка скорой и полоски после неё — DeathRide.
-## Числа — data/healing.json (proposed, кроме платы владельца).
+##    минус) — «потрачено на больницу» в окне смерти; после смерти HP полное,
+##    сытость и бодрость не ниже 25% (владелец, разбор чисел 26.10).
+## Числа — data/healing.json.
 
 const DATA_PATH := "res://data/healing.json"
 
 static var _data: Dictionary = {}
 static var _loaded := false
-## Сколько забрала скорая при последней смерти: тост main.gd читает его после
+## Сколько взяла больница при последней смерти: окно смерти показывает его после
 ## респавна. Число, а не состояние игры — переживать перезагрузку ему не вредно.
 static var last_death_fee := 0
 
@@ -143,10 +144,10 @@ static func use_medkit() -> Dictionary:
 
 
 # ---------------------------------------------------------------------------
-# Смерть: «скорая забрала»
+# Смерть: плата больнице и полоски после неё
 # ---------------------------------------------------------------------------
 
-## Плата скорой с coins монет при себе (владелец, раунд 5): 5% вниз до целого,
+## Плата больнице с coins монет при себе (владелец, раунд 5): 5% вниз до целого,
 ## не меньше 50 и не больше 5000; меньше 50 монет — сколько есть, в минус не уходим.
 static func death_fee_for(coins: int) -> int:
 	if coins <= 0:
@@ -168,12 +169,12 @@ static func death_fee_max() -> int:
 	return int(_num("death", "coins_max", 5000.0))
 
 
-## Сколько скорая заберёт, если умереть сейчас (подсказки, карточка смерти).
+## Сколько возьмёт больница, если умереть сейчас (подсказки).
 static func death_fee_coins() -> int:
 	return death_fee_for(GameState.coins)
 
 
-## Списывает плату скорой при несюжетной смерти (зовёт GameState.die()). Мимо
+## Списывает плату больнице при несюжетной смерти (зовёт GameState.die()). Мимо
 ## spend_coins: это не покупка, и задание дня «потрать N монет» смерть
 ## засчитывать не должна. Возвращает списанное.
 static func charge_death_fee() -> int:
@@ -182,5 +183,32 @@ static func charge_death_fee() -> int:
 		GameState.coins -= fee
 		GameState.coins_changed.emit(GameState.coins)
 	last_death_fee = fee
-	GameState.emit_event(&"ambulance", {"coins": fee})
+	GameState.emit_event(&"hospital", {"coins": fee})
 	return fee
+
+
+static func respawn_hp_percent() -> float:
+	return clampf(float(Balance.unwrap(data().get("death", {}).get("respawn", {}).get("hp_percent", 100.0))), 1.0, 100.0)
+
+
+static func respawn_bars_min_percent() -> float:
+	return clampf(float(Balance.unwrap(data().get("death", {}).get("respawn", {}).get("bars_min_percent", 25.0))), 0.0, 100.0)
+
+
+## Респавн дома после смерти (main.gd): HP — respawn.hp_percent (владелец: полное),
+## сытость и бодрость — как были в миг смерти, но не ниже bars_min_percent. Мёртвый
+## герой полоски не тратит (GameState не тикает), поэтому «как были» — это они сейчас.
+## До конца онбординга (флаг gold_sold) — все полоски полные, как было всегда.
+static func respawn_after_death() -> void:
+	var hunger := GameState.hunger
+	var stamina := GameState.stamina
+	GameState.ext.erase("death_ride")   # остаток поездки из сейвов раунда 5: поездки больше нет
+	GameState.respawn()
+	if not StoryState.has_flag("gold_sold"):
+		return
+	var max_hp := GameState.get_max_hp()
+	GameState.hp = max_hp * respawn_hp_percent() / 100.0
+	GameState.hp_changed.emit(GameState.hp, max_hp)
+	var min_bar := respawn_bars_min_percent()
+	GameState.set_hunger(maxf(hunger, min_bar))
+	GameState.set_stamina(maxf(stamina, min_bar))

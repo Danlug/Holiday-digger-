@@ -1,6 +1,6 @@
 extends Node
 ## Скриншоты «ощущения» (ветка aaa-feel): трещины на копаемой клетке по стадиям,
-## «+N» со слиянием, карточка смерти, камера на ходу (упреждение) и наезд. Не
+## «+N» со слиянием, окно смерти, камера на ходу (упреждение) и наезд. Не
 ## автотест. Запуск:
 ##
 ##   XDG_DATA_HOME=$PWD/.godot/xdg xvfb-run -a -s "-screen 0 1280x1024x24" \
@@ -142,12 +142,13 @@ func _death() -> void:
 	GameState.level = 12
 	GameState.max_depth_reached = 640
 	GameState.player_depth = 410
-	# флаг gold_sold не ставим: он включает мета-слой, и окно дня ляжет поверх карточки (open() флаг не проверяет)
-	var rep := DeathCard.build_report(GameState.inventory.duplicate(), 410, "fall")
-	var card: DeathCard = main.get_node("FeelDirector").card
+	# флаг gold_sold не ставим: он включает мета-слой, и окно дня ляжет поверх окна смерти (open() флаг не проверяет)
+	var rep := DeathWindow.build_report(GameState.inventory.duplicate(), 410, DeathCause.make("fall", {"cells": 47}),
+		Healing.death_fee_for(GameState.coins))
+	var card: DeathWindow = main.get_node("FeelDirector").card
 	card.open(rep)
 	await _frames(14)
-	await _shot("death_card")
+	await _shot("death_window")
 	card.close()
 
 

@@ -9,7 +9,7 @@ extends Node
 ##  2. «Сброс» и перезагрузка посреди боя с боссом не оставляют ворота арены закрытыми
 ##     (BossArena.sealed — статика, переживает сцену): иначе в новой игре на дне нельзя войти.
 ##  3. Сейв и загрузка посреди боя: герой дома, монстров/босса нет, прогресс боя цел.
-##  4. Смерть в лаве за рулём бурмобиля на глубине: скорая везёт (раунд 5), респавн дома, машина на
+##  4. Смерть в лаве за рулём бурмобиля на глубине: сразу дома с полным HP, окно смерти, машина на
 ##     парковке, инструмент снят, HUD/ввод/боевой директор живы, лут потерян по правилам, глубина и мета целы.
 ##  5. Пустой бак бурмобиля на глубине: копать нельзя, но лететь вверх можно; лопата на поверхности.
 ##  6. Сейв старой схемы и мусор в ext новых подсистем: игра поднимается, подсистемы не падают.
@@ -290,14 +290,11 @@ func _test_death_in_rig_lava() -> void:
 	check("лава убивает героя без костюма", not GameState.is_alive and died[0] == 1)
 	check("лут потерян, монеты целы (награды за достижения могли добавить)", not GameState.inventory.has("gold") and GameState.coins >= 777,
 		"рюкзак %s монеты %d" % [str(GameState.inventory), GameState.coins])
+	check("причина смерти — лава", String(GameState.death_cause.get("source", "")) == "lava")
 	await _frames(4)
-	# Раунд 5 (death-cost): скорая везёт с 3600 клеток — до приезда герой мёртв и дома, поездку проматываем.
-	check("скорая везёт: герой ещё мёртв, уже дома, карточка с отсчётом", not GameState.is_alive and DeathRide.riding()
-		and p.y < 1.0 and DeathRide.seconds_left() > 1.0, "ride %.1f" % DeathRide.seconds_left())
-	DeathRide.skip()
-	await _frames(4)
-	check("респавн: герой жив, дома, HP — половина (после скорой)", GameState.is_alive and p.y < 1.0
-		and absf(GameState.hp - GameState.get_max_hp() * DeathRide.respawn_hp_percent() / 100.0) < 0.5)
+	# Разбор чисел 26.10: поездки нет — герой сразу дома, HP полное (владелец: «только хп полное»).
+	check("респавн: герой жив, дома, HP полное", GameState.is_alive and p.y < 1.0
+		and absf(GameState.hp - GameState.get_max_hp()) < 0.5)
 	check("машина запаркована, герой снова с киркой, а не «за рулём» под землёй",
 		GameState.current_tool != "drill_rig" and GameState.is_rig_parked(),
 		"инструмент %s парковка %s" % [GameState.current_tool, str(GameState.rig_parked_at)])
@@ -311,8 +308,6 @@ func _test_death_in_rig_lava() -> void:
 	check("после смерти герой ходит", absf(p.x - x0) > 0.1, "x %.2f -> %.2f" % [x0, p.x])
 	# вторая смерть подряд (без монстров, голод и урон) тоже ничего не ломает
 	GameState.take_damage(1e6, "test")
-	await _frames(2)
-	DeathRide.skip()   # у поверхности поездка короткая, но не нулевая
 	await _frames(4)
 	check("вторая смерть подряд: снова жив дома", GameState.is_alive and p.y < 1.0)
 	main.free()

@@ -89,11 +89,12 @@ var _metric_t := 0.0
 var _earned := 0
 var _coins_seen := 0
 var _coins_frame := 0
+var _hp_frame := 100.0             # HP на прошлом кадре: сколько здоровья вернула смерть (death_lift)
 var _ach_frame: Array = []   # достижения на прошлом кадре: награда за смерть приходит раньше нашего обработчика
 var _no_brake := false             # намеренная смерть (достижение «умри»): не тормозить тягой
 var _die_tries := 0
 var _death_entry: Dictionary = {}
-var _die_lift := false             # эксперимент «смерть вместо подъёма» (--die-lift, раунд 5, death-cost)
+var _die_lift := false             # эксперимент «смерть вместо подъёма» (--die-lift; ГДД §7 «Цена смерти»)
 var _die_lift_pack := 400          # умирать вместо подъёма, только если рюкзак дешевле стольких монет
 var _ascents: Array = []           # [глубина начала подъёма, игровых секунд до поверхности] — для death_lift
 var _heal_seen := false            # HP хоть раз выросло от сна/еды/аптечки — лечение в игре есть
@@ -142,8 +143,6 @@ var _dig_blocked := 0
 var _shaft_x := SHAFT_X
 
 var _last_hp := 100.0
-var _last_fall_sim := -100.0
-var _last_fall_dmg := 0.0
 var _died_pending := false
 var _pack_before_death: Dictionary = {}
 var _progress_sig := ""
@@ -158,7 +157,7 @@ var _shot_count := 0
 var _next_periodic_shot := 300.0
 var _rng := RandomNumberGenerator.new()
 var _trace := 0.0
-var _death_card: Node = null
+var _death_window: Node = null
 var _from_house := false
 var _frame_events: Array = []
 var _mech: Object = null
@@ -401,6 +400,8 @@ func _step() -> void:
 	var cpu_ms := float(now_us - _last_us - bot_us) / 1000.0
 	T.bot_ms += float(bot_us) / 1000.0
 	_coins_frame = GameState.coins
+	if GameState.is_alive:
+		_hp_frame = GameState.hp
 	if MetaState.sub("ach").size() != _ach_frame.size():
 		_ach_frame = MetaState.sub("ach").keys().duplicate()
 	_last_us = now_us
@@ -596,18 +597,16 @@ func _dismiss_modals() -> void:
 	if director.diary_ui != null and director.diary_ui.is_open and _activity != "diary":
 		open.append("diary")
 		director.diary_ui.close_diary()
-	if _death_card == null:
-		_death_card = main.find_child("DeathCard", true, false)
-	var card = _death_card
-	if card != null and card.has_method("is_open") and card.is_open() and DeathRide.riding():
-		pass   # скорая ещё везёт: карточка не закрывается до приезда (раунд 5) — ждём, как человек
-	elif card != null and card.has_method("is_open") and card.is_open():
-		open.append("death_card")
-		# под рендером карточку сначала снимаем, закрываем через секунду
-		if not _shots_on or (_modal_since.has("death_card") and _sim - float(_modal_since["death_card"]) > 1.0):
-			card.close()
-		elif not _modal_since.has("death_card"):
-			_shot_later("death_card", 0.4)
+	if _death_window == null:
+		_death_window = main.find_child("DeathWindow", true, false)
+	var win = _death_window
+	if win != null and win.has_method("is_open") and win.is_open():
+		open.append("death_window")
+		# под рендером окно сначала снимаем, закрываем через секунду
+		if not _shots_on or (_modal_since.has("death_window") and _sim - float(_modal_since["death_window"]) > 1.0):
+			win.close()
+		elif not _modal_since.has("death_window"):
+			_shot_later("death_window", 0.4)
 	if ShopUI.instance != null and ShopUI.instance.is_open() and _activity != "shop":
 		open.append("shop_stray")
 		ShopUI.instance.close()
@@ -740,8 +739,6 @@ func _on_fell(dmg: float, v: float) -> void:
 		return
 	if _greed_active():
 		T.finding("P1", "greed_fall", "урон от падения в режиме жадности: −%.0f HP на скорости %.1f" % [dmg, v], _sim, {}, "greed_fall")
-	_last_fall_sim = _sim
-	_last_fall_dmg = dmg
 	T.event(_sim, "fall", "падение: −%.0f HP (скорость %.1f)" % [dmg, v], false)
 
 
@@ -756,23 +753,20 @@ func _on_max_depth(d: int) -> void:
 
 
 func _on_died() -> void:
-	var cause := "unknown"
-	# died приходит из take_damage раньше, чем player.fell: падение видно по скорости удара
-	if _sim - _last_fall_sim < 1.0 or float(player.vy) > 12.0 or _activity == "descend" and GameState.hunger > 0.0:
-		cause = "fall"
-	elif GameState.hunger <= 0.0:
-		cause = "hunger"
-	elif _near_tile(TileTypes.Type.LAVA):
-		cause = "lava"
-	elif CombatService.in_war_zone(_depth()):
-		cause = "monster"
+	# Причину называет сама игра (добивший удар → GameState.death_cause, её же пишет окно
+	# смерти); бот её не угадывает. «unknown» у несюжетной смерти — окно не знает, от чего
+	# умер герой: значит, какой-то источник урона не назвал себя в take_damage.
+	var gc: Dictionary = GameState.death_cause
+	var cause := String(gc.get("source", "unknown"))
+	if gc.has("id"):
+		cause += ":" + String(gc["id"])
 	var value := 0
 	for id in _pack_before_death.keys():
 		value += Balance.get_mineral_price(String(id)) * int(_pack_before_death[id])
 	var d := {"t": snappedf(_sim, 0.1), "cause": cause, "depth": _depth(), "activity": _activity,
 		"lost_items": _pack_before_death.duplicate(), "lost_value": value, "scripted": not StoryState.is_seen("death"),
-		"coins_before": _coins_frame, "deliberate": _no_brake,
-		"ach_before": _ach_frame.duplicate()}
+		"coins_before": _coins_frame, "deliberate": _no_brake, "cause_text": DeathCause.phrase(gc),
+		"hp_before": snappedf(_hp_frame, 0.1), "ach_before": _ach_frame.duplicate()}
 	_no_brake = false
 	_death_entry = d
 	T.deaths.append(d)
@@ -780,6 +774,9 @@ func _on_died() -> void:
 	if StoryState.is_seen("death"):
 		T.finding("P2", "death", "смерть (%s) на глубине %d в занятии «%s», потеряно на %d монет" % [
 			cause, _depth(), _activity, value], _sim, d, cause + "@" + _activity)
+		if cause == "unknown":
+			T.finding("P1", "death_cause_unknown", "окно смерти не знает причину: источник урона не назвал себя (глубина %d, занятие «%s»)" % [
+				_depth(), _activity], _sim, d, _activity)
 	_died_pending = true
 	bot.release_all()
 	_branch_goal = Vector2i(-1, -1)
@@ -789,8 +786,8 @@ func _on_respawned() -> void:
 	_died_pending = false
 	if T.in_trip():
 		T.trip_end(_sim, "death", 0, 0.0)
-	# Цена смерти (владелец, раунд 5): весь лут и 5% монет, от 50 до 5000 («скорая забрала»),
-	# и поездка скорой (respawned приходит по приезде). Сверяем через секунду игры.
+	# Цена смерти (владелец, раунд 5): весь лут и 5% монет, от 50 до 5000 (плата больнице).
+	# Сверяем через секунду игры.
 	var d := _death_entry
 	if d.is_empty() or bool(d.get("scripted", false)):
 		return
@@ -820,28 +817,38 @@ static func _expected_fee(coins: int) -> int:
 	return mini(coins, clampi(coins * 5 / 100, 50, 5000))
 
 
-## «Умер нарочно, чтобы не лететь» (раунд 5): выгадал ли бот на смерти. Выигрыш — подъём,
-## которого не было (его собственная скорость подъёма с этой глубины), минус поездка скорой;
-## в монетах — по доходу прогона. Цена — рюкзак и плата. Выигрыш больше цены — P1 death_lift.
+## «Умер нарочно, чтобы не лететь» (владелец, раунд 5; поездки после смерти нет с 26.10):
+## выгадал ли бот на смерти. Выигрыш — подъём, которого не было (его собственная скорость
+## подъёма с этой глубины, в монетах — по доходу прогона), плюс здоровье, которое вернула
+## смерть (HP полное после смерти; по цене аптечки — сколько стоило бы долечиться после
+## подъёма). Цена — рюкзак и плата больнице. Выигрыш больше цены — P1 death_lift: смерть
+## стала лифтом наверх, решать владельцу (плата, рюкзак или что-то ещё).
 func _check_death_lift(d: Dictionary) -> void:
 	var depth := int(d.get("depth", 0))
-	var ride := DeathRide.total_seconds() if depth >= 3 else 0.0
 	var ascent := _ascent_estimate(depth)
 	var rate := _income_rate()
 	var fee := _expected_fee(int(d.get("coins_before", 0)))
-	var saved := ascent - ride
-	var gain := saved * rate
+	var hp_pct := 100.0 * float(d.get("hp_before", GameState.get_max_hp())) / maxf(1.0, GameState.get_max_hp())
+	var heal := _heal_value(hp_pct)
+	var gain := ascent * rate + heal
 	var cost := float(int(d.get("lost_value", 0)) + fee)
-	d["ride_s"] = snappedf(ride, 0.1)
 	d["ascent_est_s"] = snappedf(ascent, 0.1)
+	d["heal_value"] = int(heal)
 	d["lift_gain"] = int(gain)
 	d["lift_cost"] = int(cost)
 	d["hp_after"] = snappedf(GameState.hp, 0.1)
-	T.event(_sim, "death_ride", "скорая %.0f с с глубины %d (подъём бота ~%.0f с), выгода %d против цены %d" % [
-		ride, depth, ascent, int(gain), int(cost)], false)
-	if depth >= 60 and saved > 0.0 and gain > cost:
-		T.finding("P1", "death_lift", "смерть на глубине %d выгоднее подъёма: скорая %.0f с против подъёма ~%.0f с, выгода %d монет против цены %d (рюкзак + плата)" % [
-			depth, ride, ascent, int(gain), int(cost)], _sim, d, "deliberate" if bool(d.get("deliberate", false)) else "accident")
+	T.event(_sim, "death_lift_calc", "смерть на глубине %d: подъём бота ~%.0f с + лечение %d, выгода %d против цены %d" % [
+		depth, ascent, int(heal), int(gain), int(cost)], false)
+	if depth >= 60 and gain > cost:
+		T.finding("P1", "death_lift", "смерть на глубине %d выгоднее подъёма: подъём ~%.0f с и лечение (%d) — выгода %d монет против цены %d (рюкзак + плата больнице)" % [
+			depth, ascent, int(heal), int(gain), int(cost)], _sim, d, "deliberate" if bool(d.get("deliberate", false)) else "accident")
+
+
+## Сколько монет стоило бы долечить HP с hp_pct до полного аптечкой (смерть лечит даром).
+func _heal_value(hp_pct: float) -> float:
+	var kit := float(ShopCatalog.good_price(ShopCatalog.good(Healing.medkit_id(), "coins"), "coins"))
+	var per := float(Healing.medkit_hp_percent())
+	return maxf(0.0, 100.0 - hp_pct) / maxf(1.0, per) * kit
 
 
 func _on_inventory() -> void:
@@ -866,18 +873,6 @@ func _on_game_event(id: StringName, data: Dictionary) -> void:
 			T.event(_sim, "bought", String(data.get("id", "")))
 		"slept":
 			T.event(_sim, "slept", "сон %.1f ч" % float(data.get("hours", 0.0)), false)
-
-
-func _near_tile(tile: int) -> bool:
-	if player == null:
-		return false
-	var cx: int = player.cell_x()
-	var cy: int = player.cell_y()
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			if world.get_tile(cx + dx, cy + dy) == tile:
-				return true
-	return false
 
 
 # ---------------------------------------------------------------------------
@@ -1744,13 +1739,19 @@ func _note_ascent(d0: int, t0: float) -> void:
 
 
 ## Сколько игровых секунд бот летел бы наверх с глубины depth: медиана «секунд на клетку» его
-## последних подъёмов с 30+ клеток. Нет истории — прямой полёт на текущем ранце (DeathRide).
+## последних подъёмов с 30+ клеток. Нет истории — прямой полёт на текущем ранце: путь на
+## потолке скорости ступени плюс половина разгона (3 с у пропеллеров, 5 с у реактивной тяги).
 func _ascent_estimate(depth: int) -> float:
 	var per: Array = []
 	for a in _ascents:
 		per.append(float(a[1]) / maxf(1.0, float(a[0])))
 	if per.is_empty():
-		return DeathRide.flight_seconds(depth, GameState.current_gear, false)
+		var gear := GameState.current_gear
+		var v := Balance.get_gear_max_speed(gear) if gear != "" else 0.0
+		if v <= 0.0:
+			v = Balance.get_gear_base_speed()
+		var ramp := 5.0 if gear != "" and Balance.get_gear_kind(gear) == "jet" else 3.0
+		return float(depth) / maxf(v, 0.1) + ramp * 0.5
 	per.sort()
 	return float(per[per.size() / 2]) * float(depth)
 
@@ -1763,8 +1764,8 @@ func _income_rate() -> float:
 ## Эксперимент «смерть вместо подъёма» (--die-lift; раунд 5, слова владельца: «смерть не должна
 ## быть удобным способом копать вниз и потом, чтобы не лететь, — умирать»). Пора наверх, рюкзак
 ## почти пуст, глубоко — бот не летит, а «взлетает и отпускает тягу»: 4 с на взлёт, затем
-## смертельный удар (как падение с 32+ клеток). Цену (рюкзак, плата, поездка скорой) считает
-## детектор death_lift; итог эксперимента — метрика цели против прогона без флага.
+## смертельный удар (как падение с 32+ клеток). Цену (рюкзак, плата больнице) и выгоду (подъём,
+## лечение) считает детектор death_lift; итог эксперимента — метрика цели против прогона без флага.
 func _maybe_die_lift() -> bool:
 	if not _die_lift or _depth() < 60 or _pack_value() >= _die_lift_pack or not StoryState.has_flag("gold_sold"):
 		return false
@@ -2378,7 +2379,7 @@ func _session_restart() -> void:
 	director = main.find_child("StoryDirector", true, false)
 	house = HouseSystem.instance
 	nav.world = world
-	_death_card = null
+	_death_window = null
 	_mech = null
 	if bot is Stick:
 		bot.release_all()

@@ -37,6 +37,10 @@ var stamina: float = 100.0  # проценты 0..100
 var hunger: float = 100.0   # проценты 0..100
 var is_digging: bool = false  # ставится извне (player-контроллером) каждый кадр
 var is_alive: bool = true
+## Последняя смерть (окно смерти, ГДД §7): причина — DeathCause.make(источник урона),
+## потеряно — рюкзак до очистки. Не сохраняются: окно показывают сразу.
+var death_cause: Dictionary = {}
+var death_lost: Dictionary = {}
 
 # --- Прокачка ---
 var xp: int = 0
@@ -139,7 +143,8 @@ func _tick_survival(delta: float) -> void:
 	# усталость мешает. Пустая бодрость сама по себе HP не трогает.
 	var drain := Balance.get_hp_drain_per_second(hunger <= 0.0, stamina <= 0.0)
 	if drain > 0.0:
-		take_damage(drain * delta, "starvation")
+		# причина в окне смерти: голод, если пуста сытость; иначе — изнеможение
+		take_damage(drain * delta, "starvation" if hunger <= 0.0 else "exhaustion")
 
 
 func _update_exhausted() -> void:
@@ -181,7 +186,10 @@ func set_hunger(value: float) -> void:
 	hunger_changed.emit(hunger)
 
 
-func take_damage(amount: float, _source: String = "") -> void:
+## source — откуда урон («fall», «lava», «starvation», «monster:<id>», «boss:<удар>»…),
+## info — подробности для причины смерти ({cells} у падения, {id} у снаряда). Добивший
+## удар становится причиной в окне смерти — её не угадывают задним числом.
+func take_damage(amount: float, source: String = "", info: Dictionary = {}) -> void:
 	if not is_alive or amount <= 0.0:
 		return
 	# Отладочный тумблер «Бессмертие» (debug_panel.gd): урон игнорируется
@@ -193,7 +201,7 @@ func take_damage(amount: float, _source: String = "") -> void:
 	hp = clamp(hp - amount, 0.0, get_max_hp())
 	hp_changed.emit(hp, get_max_hp())
 	if hp <= 0.0:
-		die()
+		die(DeathCause.make(source, info))
 
 
 func heal(amount: float) -> void:
@@ -211,17 +219,18 @@ func get_max_hp() -> float:
 	return float(Balance.get_max_hp(get_skill_stage("hp")))
 
 
-## Смерть: теряется весь рюкзак (см. GDD раздел 7) и плата «скорой»: 5% монет,
-## от 50 до 5000 (владелец, раунд 5; не в минус — Healing). Поездку скорой и
-## полоски после неё ведёт DeathRide из main.gd.
-func die() -> void:
+## Смерть: теряется весь рюкзак (см. GDD раздел 7) и плата больнице: 5% монет,
+## от 50 до 5000 (владелец, раунд 5; не в минус — Healing). Респавн и полоски
+## после смерти — Healing.respawn_after_death() из main.gd, окно — DeathWindow.
+func die(cause: Dictionary = {}) -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	death_cause = cause if not cause.is_empty() else DeathCause.make("")
+	death_lost = inventory.duplicate()
 	inventory.clear()
 	inventory_changed.emit()
 	Healing.charge_death_fee()
-	DeathRide.on_died()
 	died.emit()
 
 
@@ -246,6 +255,8 @@ func reset_progress() -> void:
 	stamina = 100.0
 	hunger = 100.0
 	is_alive = true
+	death_cause = {}
+	death_lost = {}
 	xp = 0
 	level = 1
 	skill_points_available = 0
@@ -695,9 +706,8 @@ var ext: Dictionary = {}
 ##   ate            {id: String, hunger: float, stamina: float, hp: float} — герой поел (рюкзак или стол дома,
 ##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
 ##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
-##   ambulance      {coins: int} — смерть: «скорая забрала» монеты (5%, от 50 до 5000, не в минус), перед сигналом died
-##   ambulance_ride {seconds: float, depth: int, resumed?: bool} — скорая везёт героя наверх (DeathRide), герой мёртв до приезда
-##   ambulance_arrived {seconds: float, depth: int, hp: float} — приехали: респавн с половиной HP (DeathRide.respawn)
+##   hospital       {coins: int} — смерть: плата больнице (5% монет, от 50 до 5000, не в минус), перед сигналом died;
+##                  причина и потерянное — GameState.death_cause / death_lost
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)

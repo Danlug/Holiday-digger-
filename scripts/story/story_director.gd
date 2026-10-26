@@ -579,6 +579,8 @@ func _modal_open() -> bool:
 		return true
 	if ProgressScreen.is_open():
 		return true
+	if DeathWindow.is_open_any():   # сцена подождёт, пока игрок прочтёт окно смерти
+		return true
 	return hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open()
 
 

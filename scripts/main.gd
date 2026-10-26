@@ -116,9 +116,8 @@ func _ready() -> void:
 	canvas.add_child(hud)
 	hud.set_player(player)
 
-	# Сейв посреди поездки скорой (раунд 5, death-cost) продолжает её, а не воскрешает сразу.
-	if not GameState.is_alive and not DeathRide.resume():
-		GameState.respawn()
+	if not GameState.is_alive:
+		Healing.respawn_after_death()
 
 	_restore_top_soil_if_needed()
 	_position_from_save_or_start()
@@ -270,7 +269,7 @@ func _process(delta: float) -> void:
 	sky_view.set_camera(cam, _view_w())
 
 	if not GameState.is_alive:
-		_handle_death(dt)
+		_handle_death()
 	# Отложенное землетрясение ждёт не следующего тика таймера обвалов, а
 	# самого героя: "как только вылез" — это про его шаг, а не про минуту.
 	_apply_pending_earthquake_if_safe()
@@ -278,7 +277,6 @@ func _process(delta: float) -> void:
 
 func _exit_tree() -> void:
 	CameraRig.reset_static()   # статика переживает перезагрузку сцены
-	DeathRide.reset()
 
 
 ## Высоту неба держит рендер мира — берём число оттуда, а не заводим второе:
@@ -298,19 +296,11 @@ func _camera() -> Vector2:
 	return Vector2(cam_x, cam_y)
 
 
-## Смерть (см. GDD раздел 7 и 9): инвентарь теряется (GameState.die() уже
-## это сделал), верхний слой земли зарастает, герой возрождается дома.
-## Полноценная сцена смерти (замедленная киносцена, см. GDD раздел 9) не
-## реализована — см. итоговый отчёт; здесь мгновенный респаун.
-func _handle_death(dt: float = 0.0) -> void:
-	# «Скорая везёт долго» (раунд 5, death-cost, scripts/house/death_ride.gd): пока
-	# едет, герой мёртв (управление и выживание стоят), респавн — по приезде.
-	if DeathRide.riding():
-		if DeathRide.tick(dt):
-			_respawn_after_death(true)
-		return
-	# поездка считается до телепорта: бурмобиль ещё надет, глубина ещё настоящая
-	var ride := DeathRide.start(player.cell_y())
+## Смерть (см. GDD раздел 7 и 9): рюкзак и плату больнице GameState.die() уже
+## забрал, верхний слой земли зарастает, герой возрождается дома с полным HP
+## (Healing.respawn_after_death), окно смерти открывает FeelDirector.
+## Сюжетная смерть онбординга (§9) — своя сцена, сюда не приходит.
+func _handle_death() -> void:
 	var x0 := 0
 	var x1 := WorldGen.WIDTH
 	var y0 := 1
@@ -325,19 +315,7 @@ func _handle_death(dt: float = 0.0) -> void:
 	# только то, что переписали).
 	fog.reset_rect(x0, y0, x1 - x0, y1 - y0)
 	player.teleport_home()
-	if ride > 0.0:
-		return
-	_respawn_after_death(false)
-
-
-func _respawn_after_death(rode: bool) -> void:
-	DeathRide.respawn()   # GameState.respawn() и полоски «после скорой»
-	# respawn() выше уже решил, покажет ли режиссёр «ощущения» карточку потерь (значки и числа вместо этой фразы);
-	# после поездки карточка и так открыта
-	if not Feel.card_pending and not rode:
-		var fee := Healing.last_death_fee   # «скорая забрала» (раунд 4, healing)
-		hud.toast("Ты погиб. Минералы потеряны%s." % (
-			(", скорая забрала %d монет" % fee) if fee > 0 else ""), 4.2)
+	Healing.respawn_after_death()
 
 
 func _on_collapse_tick() -> void:

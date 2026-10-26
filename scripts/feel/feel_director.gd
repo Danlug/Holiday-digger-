@@ -7,8 +7,8 @@ extends Node
 ##  * инструмент: бур и бурмобиль дробят экран лёгкой дрожью, пока идёт копка;
 ##  * камера: наезд на тяжёлом ударе и на жёстком приземлении;
 ##  * глубина: вехи каждые 10 / 100 / 1000 клеток (опыт за них давали молча);
-##  * смерть: карточка «что потеряно, что уцелело» — с поездкой скорой сразу (отсчёт до
-##    приезда), без неё — после респавна.
+##  * смерть: окно смерти (DeathWindow) после респавна — причина, потерянный рюкзак,
+##    плата больнице (ГДД §7).
 ## Пары к JuiceDirector («Звук и сок»): тот отвечает за звук и частицы, этот — за
 ## вес событий. Подписки на сигналы, чужой код не правится.
 
@@ -17,7 +17,7 @@ const COL_GOLD := Color("FFE066")
 const COL_RARE := Color("6FE0D8")
 
 var player: Node = null
-var card: DeathCard = null
+var card: DeathWindow = null
 
 var _pick_item: String = ""
 var _pick_frame: int = -1
@@ -26,11 +26,7 @@ var _was_digging: bool = false
 var _next_micro: float = 0.0
 var _prev_on_ground: bool = false
 var _prev_vy: float = 0.0
-var _inv_prev: Dictionary = {}
-var _inv_cur: Dictionary = {}
 var _pending: Dictionary = {}
-var _last_fall_msec: int = -100000
-var _fee: int = 0   # «скорая забрала» при этой смерти (событие ambulance, раунд 4)
 var _connected: bool = false
 
 ## Для тестов: что режиссёр сделал (счётчики), не завязываясь на сервисы Fx/Sfx.
@@ -45,12 +41,10 @@ func _ready() -> void:
 			player = host.player
 		else:
 			player = host.find_child("Player", true, false)
-	card = DeathCard.new()
-	card.name = "DeathCard"
+	card = DeathWindow.new()
+	card.name = "DeathWindow"
 	add_child(card)
 	_prev_depth = GameState.max_depth_reached
-	_inv_cur = GameState.inventory.duplicate()
-	_inv_prev = _inv_cur.duplicate()
 	_connect()
 
 
@@ -60,27 +54,19 @@ func _connect() -> void:
 	_connected = true
 	GameState.game_event.connect(_on_event)
 	GameState.max_depth_changed.connect(_on_max_depth)
-	GameState.inventory_changed.connect(_on_inventory)
 	GameState.died.connect(_on_died)
 	GameState.respawned.connect(_on_respawned)
-	if player != null and player.has_signal("fell"):
-		player.fell.connect(_on_fell)
 
 
 func _exit_tree() -> void:
-	Feel.card_pending = false
 	if not _connected:
 		return
 	_connected = false
 	for pair in [[GameState.game_event, _on_event], [GameState.max_depth_changed, _on_max_depth],
-			[GameState.inventory_changed, _on_inventory], [GameState.died, _on_died],
-			[GameState.respawned, _on_respawned]]:
+			[GameState.died, _on_died], [GameState.respawned, _on_respawned]]:
 		var sig: Signal = pair[0]
 		if sig.is_connected(pair[1]):
 			sig.disconnect(pair[1])
-	if player != null and is_instance_valid(player) and player.has_signal("fell") \
-			and player.fell.is_connected(_on_fell):
-		player.fell.disconnect(_on_fell)
 
 
 # ---------------------------------------------------------------------------
@@ -138,10 +124,6 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 			_punch(0.05)
 		&"collapse":
 			_punch(0.02)
-		&"ambulance":
-			_fee = int(data.get("coins", 0))
-		&"ambulance_ride":
-			_on_ride(data)
 
 
 ## Находка, добытая киркой: значок летит в рюкзак; дорогая — «момент».
@@ -173,10 +155,6 @@ static func is_epic_item(item: String) -> bool:
 	if EPIC_CATEGORIES.has(String(m.get("category", ""))):
 		return true
 	return Feel.is_epic_price(Balance.get_mineral_price(item))
-
-
-func _on_fell(_damage: float, _speed: float) -> void:
-	_last_fall_msec = Time.get_ticks_msec()
 
 
 # ---------------------------------------------------------------------------
@@ -243,67 +221,20 @@ func _on_max_depth(depth: int) -> void:
 # Смерть
 # ---------------------------------------------------------------------------
 
-func _on_inventory() -> void:
-	_inv_prev = _inv_cur
-	_inv_cur = GameState.inventory.duplicate()
-
-
-## К моменту «died» рюкзак уже очищен (GameState.die): потерянное берём из
-## снимка перед последним изменением.
+## Отчёт собирается в миг смерти: причину назвал добивший удар (GameState.death_cause),
+## рюкзак GameState.die() запомнил до очистки, плату больнице посчитал Healing.
 func _on_died() -> void:
-	var cause := "fall" if Time.get_ticks_msec() - _last_fall_msec < 1500 else ""
-	if GameState.hunger <= 0.0:
-		cause = "hunger"
-	elif cause == "" and _near_lava():
-		cause = "lava"
-	_pending = DeathCard.build_report(_inv_prev if _inv_cur.is_empty() else _inv_cur, GameState.player_depth, cause, _fee)
-	_fee = 0
+	_pending = DeathWindow.report_now()
 
 
-func _near_lava() -> bool:
-	if player == null or player.world == null:
-		return false
-	var cx: int = player.cell_x()
-	var cy: int = player.cell_y()
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			if player.world.get_tile(cx + dx, cy + dy) == TileTypes.Type.LAVA:
-				return true
-	return false
-
-
-## «Скорая везёт» (раунд 5, death-cost): карточка открывается сразу и ведёт
-## отсчёт поездки, респавн — по приезде. Поездка, продолженная после перезапуска
-## игры, приходит без отчёта: потерь уже не перечесть, показываем саму поездку.
-func _on_ride(data: Dictionary) -> void:
-	var rep := _pending
-	_pending = {}
-	if rep.is_empty():
-		rep = DeathCard.build_report({}, int(data.get("depth", 0)), "", 0)
-	rep["ride_s"] = float(data.get("seconds", 0.0))
-	stats["cards"] += 1
-	Feel.card_pending = true
-	var t := get_tree().create_timer(0.7 if not bool(data.get("resumed", false)) else 0.05)
-	t.timeout.connect(func() -> void:
-		Feel.card_pending = false
-		if is_instance_valid(card) and card.is_inside_tree():
-			card.open(rep))
-
-
+## Герой уже дома: пауза в 0.7 с даёт отыграть красной вспышке смерти, затем окно.
 func _on_respawned() -> void:
-	if card != null and card.is_open():
-		card.ride_arrived()   # приехали: карточка уже открыта поездкой
 	if _pending.is_empty():
 		return
 	var rep := _pending
 	_pending = {}
-	if not DeathCard.worth_showing(rep):
-		return
 	stats["cards"] += 1
-	Feel.card_pending = true
-	# герой уже дома; пауза в 0.7 с даёт отыграть красной вспышке смерти
 	var t := get_tree().create_timer(0.7)
 	t.timeout.connect(func() -> void:
-		Feel.card_pending = false
 		if is_instance_valid(card) and card.is_inside_tree():
 			card.open(rep))

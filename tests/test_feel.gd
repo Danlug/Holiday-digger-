@@ -53,7 +53,7 @@ func _ready() -> void:
 	await _test_cracks()
 	await _test_loot_stack()
 	await _test_director()
-	await _test_death_card()
+	await _test_death_window()
 
 	StoryState.set_flag("gold_sold", false)
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -522,7 +522,7 @@ func _test_director() -> void:
 
 # ---------------------------------------------------------------------------
 
-func _test_death_card() -> void:
+func _test_death_window() -> void:
 	GameState.reset_progress()
 	GameState.add_item("iron_ore", 5)
 	GameState.add_item("diamond", 2)
@@ -545,26 +545,21 @@ func _test_death_card() -> void:
 	check("смерть: ящика-страховки в отчёте нет (убран, раунд 5)", not rep.has("box") and not rep.has("box_cap"))
 	check("смерть: глубина смерти запомнена", int(rep["depth"]) == 120)
 	check("смерть: рюкзак на самом деле пуст (правило §7)", GameState.inventory.is_empty())
-	check("смерть: до онбординга карточки нет (сцену смерти играет сюжет)", not DeathCard.worth_showing(rep))
-	StoryState.set_flag("gold_sold", true)
-	check("смерть: после онбординга карточка нужна", DeathCard.worth_showing(rep))
+	check("смерть: причина в отчёте (die() без удара — «Погиб»)", String(rep["phrase"]) == "Погиб")
 	dir._on_respawned()
-	check("смерть: после респавна main знает, что фраза-тост не нужна (карточка в пути)", Feel.card_pending)
-	check("смерть: карточка посчитана режиссёром", dir.stats["cards"] == 1)
-	Feel.card_pending = false
-	var card := DeathCard.new()
+	check("смерть: окно посчитано режиссёром", dir.stats["cards"] == 1)
+	var card := DeathWindow.new()
 	add_child(card)
 	await _frames(1)
 	card.open(rep)
-	check("карточка открыта", card.is_open())
+	check("окно смерти открыто", card.is_open())
 	var tiles := _count_nodes(card, "PanelContainer")
-	check("карточка: плитки потерь и рамка нарисованы (%d панелей)" % tiles, tiles >= 4)
-	check("карточка: нет абзацев — ни одной метки длиннее 12 знаков", _longest_label(card) <= 12)
+	check("окно: плитки потерь, значок причины и рамка нарисованы (%d панелей)" % tiles, tiles >= 5)
+	# владелец (26.10) просил в окне слова: заголовок, причину, «потеряно», больницу — абзацев нет
+	check("окно: нет абзацев — ни одной метки длиннее 40 знаков", _longest_label(card) <= 40)
 	card.close()
-	check("карточка закрывается", not card.is_open())
+	check("окно закрывается", not card.is_open())
 	GameState.respawn()
-	var rep2 := DeathCard.build_report({}, 0, "")
-	check("пустой рюкзак, глубина 0, без платы → показывать нечего", not DeathCard.worth_showing(rep2))
 	card.queue_free()
 	dir.queue_free()
 	await _frames(1)

@@ -160,6 +160,9 @@ var y: float = 0.5
 var vx: float = 0.0
 var vy: float = 0.0
 var on_ground: bool = false
+## Верхняя точка текущего полёта (y растёт вниз): с какой высоты упал — для причины
+## смерти в окне смерти («с высоты N клеток»), на урон не влияет.
+var _air_top_y: float = 0.5
 var facing: int = 1
 var anim: float = 0.0
 
@@ -914,6 +917,7 @@ func _move_y(dt: float) -> void:
 	if not on_ground:
 		var b2 := y + HH + 0.02
 		on_ground = vy == 0.0 and (_solid_at(left, b2) or _solid_at(right, b2))
+	_air_top_y = y if on_ground else minf(_air_top_y, y)
 
 
 ## Урон от падения — от СКОРОСТИ удара, а не от пройденной высоты (ГДД п.6).
@@ -936,7 +940,10 @@ func _land() -> void:
 	var dmg := roundf(Balance.get_fall_damage_from_speed(v, G, dmg_mult, height_mult))
 	if dmg < 1.0:
 		return
-	GameState.take_damage(dmg, "fall")
+	# высота для окна смерти: от верхней точки полёта, но не меньше той, что дала бы
+	# эта скорость удара (после телепорта верхняя точка бывает ниже приземления)
+	var cells := maxf(y - _air_top_y, v * v / (2.0 * G))
+	GameState.take_damage(dmg, "fall", {"cells": int(round(cells))})
 	fell.emit(dmg, v)
 
 

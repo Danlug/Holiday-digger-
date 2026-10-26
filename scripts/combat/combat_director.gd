@@ -281,7 +281,7 @@ func _on_projectile_event(p: Projectile, e: Dictionary) -> void:
 	var pos := Vector2(p.x, p.y) * TILE
 	match String(e["type"]):
 		"hit":
-			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "projectile:" + p.kind)
+			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "projectile:" + p.kind, {"id": p.owner_id})
 			Fx.burst("spark", pos, 0.8, _projectile_tint(p.kind))
 		"break":
 			# бьётся о породу: видно и слышно, что снаряд можно переждать за выступом
@@ -321,7 +321,7 @@ func _tick_monsters(dt: float) -> void:
 func _on_monster_event(m: Monster, e: Dictionary) -> void:
 	match String(e["type"]):
 		"hit":
-			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "monster:" + m.id)
+			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "monster:" + m.id, {"guard": m.cave_id != ""})
 		"emerge":
 			Fx.burst("dig_stone", Vector2(m.x, m.y) * TILE, 1.5)
 			Sfx.play("tile_break")
@@ -510,15 +510,16 @@ func _tick_slashes(dt: float) -> void:
 # Урон по герою
 # ---------------------------------------------------------------------------
 
-## raw — урон до брони; dir — сторона, куда отбросить (+1 вправо).
-func _hurt_hero(raw: float, kind: String, dir: int, source: String) -> void:
+## raw — урон до брони; dir — сторона, куда отбросить (+1 вправо). info — кто именно
+## бил (стрелок снаряда, страж полости): причина в окне смерти (DeathCause).
+func _hurt_hero(raw: float, kind: String, dir: int, source: String, info: Dictionary = {}) -> void:
 	if not GameState.is_alive or iframes > 0.0 or raw <= 0.0:
 		return
 	var st := stats()
 	var dmg := CombatService.mitigate(raw, kind, st)
 	var armored := float(st["reduction"]) >= 0.2
 	_last_hurt_ms = Time.get_ticks_msec()
-	GameState.take_damage(dmg, source)
+	GameState.take_damage(dmg, source, info)
 	hero_hurt.emit(dmg, source)
 	var pos := Vector2(player.x, player.y) * TILE
 	Fx.float_text(pos + Vector2(0, -18), "-%d" % int(round(dmg)), Color8(0xFF, 0x70, 0x70))

@@ -671,7 +671,10 @@ var ext: Dictionary = {}
 ##   sold           {coins: int, count: int}   — сделка в мастерской
 ##   bought         {id: String, currency: String} — покупка в магазине
 ##   crafted        {recipe: String, item: String, count: int, to_pack: int, to_storage: int}
-##                  — верстак (ShopService.craft); у переработки count — вся пачка с ползунка
+##                  — верстак (ShopService.craft); у переработки count — вся пачка с ползунка.
+##                  Бронза — при заборе из печи (BronzeFurnace.collect), а не при загрузке
+##   smelt_started  {recipe: String, count: int, used: Dictionary, queued: int} — лом загружен в печь
+##   smelt_cancelled {recipe: String, count: int} — очередь печи снята, лом за count штук вернулся
 ##   fuel_used / refueled {amount: float}      — топливо бура
 ##   fuel_refined   {raw: String, used: int, blocks: int, to_pack: int, to_storage: int}
 ##                  — перегонка на станции заправки (торф/уголь -> топливные блоки)

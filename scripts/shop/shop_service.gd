@@ -408,6 +408,8 @@ static func craft_plan(recipe_id: String, count: int) -> Dictionary:
 		room = mini(room, int(floor(free / w)) if free > 0.0 else 0)
 	plan["to_pack"] = mini(want, room)
 	plan["to_storage"] = int(plan["made"]) - int(plan["to_pack"])
+	# Штук целиком из рюкзачного сырья: печь (BronzeFurnace) кладёт их в рюкзак позже.
+	plan["pack_units"] = pack_units
 	return plan
 
 
@@ -415,12 +417,16 @@ static func craft_plan(recipe_id: String, count: int) -> Dictionary:
 ## результат. count > 1 — только у переработки (is_batch), и пачка проходит
 ## целиком или не проходит вовсе: всё проверяется до первого списания.
 ## Возвращает {ok, message, count (сколько вышло), used {id: n}, to_pack, to_storage}.
-## Без материалов не крафтит и ничего не трогает.
+## Бронза — исключение: пачка уходит в печь (count 0, queued N, timed true), готовое
+## забирается позже (BronzeFurnace.collect). Без материалов не крафтит и ничего не трогает.
 static func craft(recipe_id: String, count: int = 1) -> Dictionary:
 	var check := check_craft(recipe_id, count)
 	if not bool(check["ok"]):
 		return {"ok": false, "message": String(check["reason"]), "count": 0}
 	if is_batch(recipe_id):
+		# Бронза не мгновенная: лом уходит в печь, готовое заберётся позже (BronzeFurnace).
+		if BronzeFurnace.handles(recipe_id):
+			return BronzeFurnace.start(count)
 		return _craft_batch(recipe_id, count)
 
 	var r := ShopCatalog.recipe(recipe_id)

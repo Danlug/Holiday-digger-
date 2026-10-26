@@ -117,6 +117,11 @@ var _wall_cap := 1800.0
 var _max_depth_stop := 0
 
 var _sim := 0.0
+## Часы печи бронзы (BronzeFurnace плавит минуту штука по реальному времени): бот живёт в
+## игровых секундах (в headless ×20 к настоящим), поэтому печь идёт по его часам — секунда
+## игры = секунда печи, а «перезапуск» (_session_restart) добавляет сутки, как MetaClock.
+var _furnace_t0 := -1
+var _furnace_skip := 0
 var _frames := 0
 var _wall0 := 0
 var _end := 0.0
@@ -403,6 +408,9 @@ func _step() -> void:
 	_frames += 1
 	var dt := get_process_delta_time()
 	_sim += dt
+	if _furnace_t0 < 0:
+		_furnace_t0 = int(Time.get_unix_time_from_system())
+	BronzeFurnace.override_unix = _furnace_t0 + _furnace_skip + int(_sim)
 	T.add_activity(_activity, dt)
 	if _frames > 10:
 		T.frame(cpu_ms, _sim, _activity + "@" + str(_depth()) + ("" if _frame_events.is_empty() else " " + ",".join(_frame_events)))
@@ -1891,7 +1899,8 @@ func _reserved_materials() -> Dictionary:
 		if (kind == "tool" and GameState.owns_tool(out_id)) or (kind == "machine" and GameState.well_level > 0):
 			continue
 		for id in r["inputs"].keys():
-			var need := int(r["inputs"][id]) - HouseStorage.count(String(id))
+			# бронза в печи (плавится минуту штука, BronzeFurnace) — уже почти на складе
+			var need := int(r["inputs"][id]) - HouseStorage.count(String(id)) - BronzeFurnace.in_furnace(String(id))
 			if need > 0:
 				keep[String(id)] = int(keep.get(String(id), 0)) + need
 				# материал, который не копают, а плавят (бронза из металлолома), — копим сырьё
@@ -1905,6 +1914,12 @@ func _reserved_materials() -> Dictionary:
 
 
 func _workbench() -> void:
+	# Печь бронзы: сплавленное за ходку — забрать (витрина делает это сама при входе,
+	# здесь — на случай, если бот дошёл до верстака мимо неё).
+	var smelted: Dictionary = BronzeFurnace.collect()
+	if int(smelted["count"]) > 0:
+		T.mark("smelt_collected", _sim)
+		T.event(_sim, "smelt", "из печи: бронза ×%d" % int(smelted["count"]), false)
 	for r in ShopCatalog.recipes():
 		var rid := String(r.get("id", ""))
 		var kind := String(r.get("kind", ""))
@@ -1923,6 +1938,7 @@ func _workbench() -> void:
 			if out_id == FuelTank.block_item() and _fuel_tool() != "":
 				want = FuelTank.in_pack() < 6
 			var n := 0
+			var break_loop := false
 			if want and ShopService.can_craft(rid) and _craft_qty_args() >= 2:
 				# ползунок количества (ветка craft-qty, раунд 4): одна сделка на N штук — проверяем, что пришло N
 				var need := clampi(int(_reserved_or_need(out_id)) if out_id == "bronze" else 6, 1, 40)
@@ -1930,9 +1946,19 @@ func _workbench() -> void:
 				var ss = load("res://scripts/shop/shop_service.gd")
 				if _has_static(ss, "max_craft"):
 					need = mini(need, int(ss.call("max_craft", rid)))   # верх ползунка: пачка проходит целиком или никак
+				var q0 := BronzeFurnace.queued()
 				var rq: Dictionary = ss.call("craft", rid, need) if need >= 1 else {}
 				var got := GameState.get_item_count(out_id) + HouseStorage.count(out_id) - have0
-				if bool(rq.get("ok", false)):
+				if bool(rq.get("ok", false)) and bool(rq.get("timed", false)):
+					# печь (с 26.10): бронза не сразу — лом уходит в очередь, заберётся позже
+					n = need
+					T.mark("craft_qty_used", _sim)
+					T.mark("smelt_started", _sim)
+					if BronzeFurnace.queued() - q0 != need:
+						T.finding("P1", "smelt", "в печь загружено %d × «%s», а очередь выросла на %d" % [
+							need, rid, BronzeFurnace.queued() - q0], _sim, {}, rid)
+					break_loop = true
+				elif bool(rq.get("ok", false)):
 					n = need
 					T.mark("craft_qty_used", _sim)
 					var per := maxi(1, int(r["output"]["count"]))
@@ -1940,9 +1966,11 @@ func _workbench() -> void:
 						T.finding("P1", "craft_qty", "заказано %d × «%s», пришло %d (ждали %d)" % [need, rid, got, need * per], _sim, {}, rid)
 					elif got <= 0:
 						T.finding("P1", "craft_qty", "крафт %d × «%s» сказал «готово», а предметов не прибавилось" % [need, rid], _sim, {}, rid)
-			while want and ShopService.can_craft(rid) and n < 40:
-				ShopService.craft(rid)
+			while want and not break_loop and ShopService.can_craft(rid) and n < 40:
+				var one := ShopService.craft(rid)
 				n += 1
+				if bool(one.get("timed", false)) and int(_reserved_or_need(out_id)) <= 0:
+					break   # печь: сколько нужно — уже плавится
 			if n > 0:
 				T.event(_sim, "craft", "%s ×%d" % [rid, n], false)
 			continue
@@ -2340,6 +2368,7 @@ func _session_restart() -> void:
 	GameState.house_is_indoors = false
 	var now_unix := int(Time.get_unix_time_from_system())
 	MetaClock.override_unix = maxi(MetaClock.override_unix, now_unix) + MetaClock.DAY
+	_furnace_skip += MetaClock.DAY   # печь за «ночь вне игры» доплавила всё
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames_n(4)

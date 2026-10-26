@@ -186,6 +186,18 @@ func setup(o: Dictionary) -> void:
 	Tip.bind(self, String(o.get("title", "")), String(o.get("body", "")), String(o.get("extra", "")))
 
 
+## Только число на значке, левый угол и Tip — без пересборки плитки: так витрина
+## раз в секунду двигает отсчёт печи бронзы (ShopItems.furnace_decor), не
+## перезапуская пульс ореола.
+func refresh_badges(o: Dictionary) -> void:
+	offer = o
+	var ct := String(o.get("count_text", ""))
+	_count.visible = ct != ""
+	_count.text = ct
+	_set_corner(_corner_tl, "new" if bool(o.get("new", false)) else String(o.get("corner_tl", "")))
+	Tip.bind(self, String(o.get("title", "")), String(o.get("body", "")), String(o.get("extra", "")))
+
+
 ## Значок «нужно для…» (ветка guidance): у материала открытого проекта. Если
 ## такая плитка отмечена к продаже — янтарная рамка и пульс значка.
 func _set_need(o: Dictionary) -> void:

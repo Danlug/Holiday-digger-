@@ -159,10 +159,14 @@ func _test_atomic_refusals() -> void:
 	check("и ничего не списано", _same(before, _snapshot()))
 
 
-## Рюкзак почти полон: бронза (2 кг) тяжелее лома (1 кг). Вес не превышается
-## никогда — то, что не выдержит рюкзак, ложится на склад.
+## Рюкзак почти полон, а продукт тяжелее сырья. Вес не превышается никогда —
+## то, что не выдержит рюкзак, ложится на склад. Бронза с 26.10 весит как лом
+## (1 кг, решение владельца), поэтому на время проверки она «тяжёлая» — 2 кг.
 func _test_space_weight_spills_to_storage() -> void:
 	_fresh()
+	var bronze_m: Dictionary = Balance.get_mineral("bronze")
+	var bronze_w_saved = bronze_m.get("weight_kg")
+	bronze_m["weight_kg"] = 2.0
 	var cap := GameState.get_max_carry_kg()
 	var scrap_w := Balance.get_mineral_weight("scrap")
 	var bronze_w := Balance.get_mineral_weight("bronze")
@@ -183,6 +187,7 @@ func _test_space_weight_spills_to_storage() -> void:
 		and GameState.get_item_count("bronze") + HouseStorage.count("bronze") == 20)
 	check("в рюкзак ушло ровно столько, сколько выдерживает вес (%d)" % expect_pack,
 		int(res["to_pack"]) == expect_pack and GameState.get_item_count("bronze") == expect_pack)
+	bronze_m["weight_kg"] = bronze_w_saved
 
 
 func _test_space_stack_spills_to_storage() -> void:

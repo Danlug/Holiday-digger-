@@ -93,7 +93,8 @@ func _test_data() -> void:
 	for key in ["capacity_blocks", "upgrade_cost"]:
 		var n = TechData.fuel()["tanks"]["hand_drill"][key]
 		check("числа бака %s помечены proposed" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", false) == true)
-	check("ступени костюма помечены proposed", TechData.heat()["suit_tiers"].get("proposed", false) == true)
+	# владелец принял совет на странице разбора чисел (26.10): ступени костюма утверждены
+	check("ступени костюма утверждены владельцем (proposed: false)", TechData.heat()["suit_tiers"].get("proposed", true) == false)
 	check("ступени скважины помечены proposed", TechData.well()["levels"].get("proposed", false) == true)
 	check("лава — решения владельца: 3000 / 20 HP/с / 5 с",
 		Heat.lava_min_depth() == 3000 and Heat.lava_raw_dps() == 20.0 and Heat.lava_dig_seconds() == 5.0)

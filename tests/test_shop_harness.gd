@@ -247,7 +247,8 @@ func _test_hand_drill_from_storage() -> void:
 	check("рецепт ручного бура существует", not recipe.is_empty())
 	if recipe.is_empty():
 		return
-	check("рецепт бура: 500 железа", int(recipe["inputs"]["iron_ore"]) == 500)
+	check("рецепт бура: 400 железа (владелец, 26.10: −20%)", int(recipe["inputs"]["iron_ore"]) == 400)
+	var iron_need := int(recipe["inputs"]["iron_ore"])
 	check("рецепт бура: 2000 монет", int(recipe["coins"]) == 2000)
 
 	var total_kg := 0.0
@@ -257,10 +258,10 @@ func _test_hand_drill_from_storage() -> void:
 		total_kg > GameState.get_max_carry_kg())
 
 	# Первая ходка: принесли часть железа и сложили на склад.
-	GameState.inventory["iron_ore"] = 400
+	GameState.inventory["iron_ore"] = iron_need - 100
 	ShopService.invest("hand_drill")
 	check("сложенное ушло из рюкзака", GameState.get_item_count("iron_ore") == 0)
-	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == 400)
+	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == iron_need - 100)
 	check("неполного рецепта не хватает на крафт", not ShopService.can_craft("hand_drill"))
 
 	# Вторая ходка: остальное. Лишнее железо сверх рецепта остаётся в рюкзаке —
@@ -269,7 +270,7 @@ func _test_hand_drill_from_storage() -> void:
 	GameState.inventory["bronze"] = 100
 	GameState.inventory["silver"] = 50
 	ShopService.invest("hand_drill")
-	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == 500)
+	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == iron_need)
 	check("излишек остался у игрока", GameState.get_item_count("iron_ore") == 50)
 
 	GameState.coins = 1999

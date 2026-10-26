@@ -58,15 +58,15 @@
  "mastery": {
   "_what": "Мастерство руд и журнал (Stardew Valley: коллекции; Melvor Idle и Deep Rock Galactic: мастерство): у каждой добываемой породы пять звёзд за число выкопанных клеток; звезда даёт опыт и +шанс двойной добычи этой руды. Журнал — сетка всех пород по глубине, ненайденные — силуэтом.",
   "thresholds": {
-   "cheap": {"value": [10, 40, 150, 500, 1500], "proposed": true, "note": "цена < 30 (железо, медь, алюминий, никель, серебро, торф, уголь, металлолом)"},
-   "mid": {"value": [5, 20, 75, 250, 750], "proposed": true, "note": "цена 30–299 и материалы без цены (свинец, золото, титан, литий, ртуть, экзотика, всё глубже 4000)"},
-   "precious": {"value": [3, 10, 30, 100, 300], "proposed": true, "note": "цена ≥ 300 (алмаз, платина, рубин, изумруд, уран)"}
+   "cheap": {"value": [10, 40, 150, 500, 1500], "proposed": false, "note": "цена < 30 (железо, медь, алюминий, никель, серебро, торф, уголь, металлолом)"},
+   "mid": {"value": [5, 20, 75, 250, 750], "proposed": false, "note": "цена 30–299 и материалы без цены (свинец, золото, титан, литий, ртуть, экзотика, всё глубже 4000)"},
+   "precious": {"value": [3, 10, 30, 100, 300], "proposed": false, "note": "цена ≥ 300 (алмаз, платина, рубин, изумруд, уран)"}
   },
-  "price_mid": {"value": 30, "proposed": true},
-  "price_precious": {"value": 300, "proposed": true},
-  "chance_per_star": {"value": 0.02, "proposed": true, "note": "+2% двойной добычи этой руды за звезду, до +10% на пяти"},
-  "xp_per_star": {"value": 0.25, "proposed": true, "note": "опыт звезды = четверть опыта за все клетки до порога (порог × опыт клетки × 0.25), не меньше min_star_xp"},
-  "min_star_xp": {"value": 10, "proposed": true},
+  "price_mid": {"value": 30, "proposed": false},
+  "price_precious": {"value": 300, "proposed": false},
+  "chance_per_star": {"value": 0.02, "proposed": false, "note": "+2% двойной добычи этой руды за звезду, до +10% на пяти"},
+  "xp_per_star": {"value": 0.25, "proposed": false, "note": "опыт звезды = четверть опыта за все клетки до порога (порог × опыт клетки × 0.25), не меньше min_star_xp"},
+  "min_star_xp": {"value": 10, "proposed": false},
   "kinds": ["iron_ore", "scrap", "lead", "silver", "peat", "copper", "gold", "aluminium", "diamond", "nickel", "mercury", "coal", "platinum", "titanium", "lithium", "uranium", "ruby", "emerald", "geocrystal", "ancient_metal", "obsidian", "hellstone", "dark_matter", "universum", "angelstone", "divine_heart"],
   "_kinds_note": "порядок — по глубине появления: журнал читается как спуск"
  }

@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "bf728eb26fc9",
+  "data_fingerprint": "057910d0d611",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
@@ -11,12 +11,11 @@
   ]
  },
  "summary": {
-  "rows": 673,
-  "families": 47,
+  "rows": 664,
+  "families": 45,
   "new_unreviewed": 0,
-  "flagged": 22,
+  "flagged": 21,
   "by_theme": {
-   "Выживание и лечение": 7,
    "Прокачка и уровни": 9,
    "Задания и награды": 189,
    "Артефакты и музей": 56,
@@ -24,7 +23,7 @@
    "Бой": 210,
    "Механики: тайники, азарт и жадность, мастерство, удача": 14,
    "Монетизация и ролики": 31,
-   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 95
+   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 93
   }
  },
  "top_decisions": [
@@ -53,18 +52,6 @@
    "verdict": "оставить"
   },
   {
-   "family": "surv.death_ride",
-   "decide": "Скорая после смерти: сколько везёт: поездка = коэффициент × прямой полёт на текущем ранце, не дольше 150 с. Бедный игрок на 700–1300 клетках всё ещё выигрывает 1–4 минуты против честного подъёма — строже: коэффициент 3 или потолок 240 с??",
-   "now": "5 чисел, от 1 до 300",
-   "verdict": "решить"
-  },
-  {
-   "family": "surv.death_respawn",
-   "decide": "После смерти: здоровье и полоски: 50% HP — как одна аптечка; сытость и бодрость остаются, но не ниже 25%?",
-   "now": "HP за раз 50; bars min percent 25",
-   "verdict": "оставить"
-  },
-  {
    "family": "cmb.reach",
    "decide": "Где начинается бой: ни один бот за 12 игровых часов не дошёл до 4000. Теперь с 1500 есть полости со стражами (п.2 владельца), но бот проверил их только стартом прямо в полости — когда игрок встретит первого стража, покажет следующий ночной прогон?",
    "now": "12 чисел",
@@ -87,24 +74,21 @@
    "decide": "Ступени заданий по глубине: границы совпадают с поясами копки?",
    "now": "0 / 25 / 80 / 250 / 800 / 2500",
    "verdict": "оставить"
+  },
+  {
+   "family": "q.chest_streak",
+   "decide": "Сундук дня, серия, замена: как в мобильных играх: 5 заданий, сундук ×1.5, серия до +50%?",
+   "now": "18 чисел",
+   "verdict": "оставить"
+  },
+  {
+   "family": "q.weekly",
+   "decide": "Недельные задания: недельная цель = 4 дня работы; второй слот даёт 1 доллар?",
+   "now": "5 чисел",
+   "verdict": "оставить"
   }
  ],
  "themes": [
-  {
-   "id": "survival",
-   "title": "Выживание и лечение",
-   "count": 7,
-   "families": [
-    "surv.death_ride",
-    "surv.death_respawn"
-   ],
-   "decide": [
-    "Лечение сном и едой — ровно слова владельца (до 100% с едой).",
-    "Аптечку считали против смерти за 200; с новой ценой смерти она снова дороже умирания."
-   ],
-   "recommendation": "Решить цену аптечки после слияния цены смерти; убрать мёртвые записи (суп, ступени стойкости).",
-   "new": 0
-  },
   {
    "id": "progression",
    "title": "Прокачка и уровни",
@@ -235,7 +219,7 @@
   {
    "id": "feel",
    "title": "Ощущение, звук, свет и подсказки (мелочи интерфейса)",
-   "count": 95,
+   "count": 93,
    "families": [
     "feel.controls",
     "feel.hints",
@@ -256,45 +240,6 @@
   }
  ],
  "families": [
-  {
-   "id": "surv.death_ride",
-   "theme": "survival",
-   "title": "Скорая после смерти: сколько везёт",
-   "importance": 4,
-   "rows": [
-    "healing.json:death.ride.factor_shallow",
-    "healing.json:death.ride.factor_deep",
-    "healing.json:death.ride.factor_deep_from_cells",
-    "healing.json:death.ride.max_seconds",
-    "healing.json:death.ride.min_depth_cells"
-   ],
-   "count": 5,
-   "value_text": "5 чисел, от 1 до 300",
-   "affects": "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
-   "reviewed": true,
-   "effect": "Скорая: глубже скорая вдвое медленнее прямого полёта — смерть сейчас стоит 50 при 300 в кошельке, 100 при 2000 в кошельке, 1000 при 20 000 в кошельке (и весь рюкзак)",
-   "verdict": "решить",
-   "why": "поездка = коэффициент × прямой полёт на текущем ранце, не дольше 150 с. Бедный игрок на 700–1300 клетках всё ещё выигрывает 1–4 минуты против честного подъёма — строже: коэффициент 3 или потолок 240 с?",
-   "flags": []
-  },
-  {
-   "id": "surv.death_respawn",
-   "theme": "survival",
-   "title": "После смерти: здоровье и полоски",
-   "importance": 4,
-   "rows": [
-    "healing.json:death.respawn.hp_percent",
-    "healing.json:death.respawn.bars_min_percent"
-   ],
-   "count": 2,
-   "value_text": "HP за раз 50; bars min percent 25",
-   "affects": "смерть больше не бесплатное лечение и обед",
-   "reviewed": true,
-   "effect": null,
-   "verdict": "оставить",
-   "why": "50% HP — как одна аптечка; сытость и бодрость остаются, но не ниже 25%",
-   "flags": []
-  },
   {
    "id": "prog.story_xp",
    "theme": "progression",
@@ -1597,24 +1542,20 @@
     "feel.json:loot.fly_min_price",
     "feel.json:loot.epic_price",
     "feel.json:loot.epic_hitstop_s",
-    "feel.json:death.card_min_value",
-    "feel.json:death.auto_hide_s",
     "juice.json:dig.hit_period_s",
     "juice.json:dig.hit_db",
     "juice.json:dig.heavy_shake_px",
     "juice.json:dig.heavy_shake_s",
     "juice.json:rare_price"
    ],
-   "count": 17,
-   "value_text": "17 чисел, от -7 до 500",
+   "count": 15,
+   "value_text": "15 чисел, от -7 до 500",
    "affects": "«сочность»",
    "reviewed": true,
    "effect": null,
    "verdict": "оставить",
    "why": "подбор по глазам",
-   "flags": [
-    "ключ «card_min_value» не найден в scripts/ — проверить, читает ли его игра"
-   ]
+   "flags": []
   },
   {
    "id": "feel.sound",
@@ -1710,125 +1651,6 @@
   }
  ],
  "rows": [
-  {
-   "id": "healing.json:death.ride.factor_deep",
-   "file": "data/healing.json",
-   "path": "death.ride.factor_deep",
-   "theme": "survival",
-   "family": "surv.death_ride",
-   "title": "Скорая: глубже скорая вдвое медленнее прямого полёта",
-   "value": 2.0,
-   "value_text": "2",
-   "unit": "",
-   "note": "глубже скорая вдвое медленнее прямого полёта: настоящий подъём идёт с остановками на поворотах ствола и разгоном (бот-игрок летит в 2–6 раз медленнее прямой), поэтому ×2 — это примерно честный подъём живого игрока",
-   "affects": "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
-   "effect": "смерть сейчас стоит 50 при 300 в кошельке, 100 при 2000 в кошельке, 1000 при 20 000 в кошельке (и весь рюкзак)",
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "healing.json:death.ride.factor_deep_from_cells",
-   "file": "data/healing.json",
-   "path": "death.ride.factor_deep_from_cells",
-   "theme": "survival",
-   "family": "surv.death_ride",
-   "title": "Скорая: между поверхностью и этой глубиной коэффициент растёт по прямой от fac",
-   "value": 300,
-   "value_text": "300",
-   "unit": "",
-   "note": "между поверхностью и этой глубиной коэффициент растёт по прямой от factor_shallow к factor_deep: мелкие (обычно случайные) смерти не наказываются сверх полёта",
-   "affects": "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
-   "effect": null,
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "healing.json:death.ride.factor_shallow",
-   "file": "data/healing.json",
-   "path": "death.ride.factor_shallow",
-   "theme": "survival",
-   "family": "surv.death_ride",
-   "title": "Скорая: у поверхности скорая едет как сам герой по прямой",
-   "value": 1.0,
-   "value_text": "1",
-   "unit": "",
-   "note": "у поверхности скорая едет как сам герой по прямой: новичок, разбившийся на 30–60 клетке, ждёт столько же, сколько летел бы (10–25 с), не больше",
-   "affects": "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
-   "effect": null,
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "healing.json:death.ride.max_seconds",
-   "file": "data/healing.json",
-   "path": "death.ride.max_seconds",
-   "theme": "survival",
-   "family": "surv.death_ride",
-   "title": "Скорая: потолок поездки 2,5 минуты",
-   "value": 150,
-   "value_text": "150",
-   "unit": "",
-   "note": "потолок поездки 2,5 минуты: глубже ~3700 клеток с топовым джетпаком скорая уже быстрее прямого полёта, но там смерть и так дорога — 5000 монет и рюкзак экзотики; дольше ждать над карточкой — уже наказание, а не цена",
-   "affects": "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
-   "effect": null,
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "healing.json:death.ride.min_depth_cells",
-   "file": "data/healing.json",
-   "path": "death.ride.min_depth_cells",
-   "theme": "survival",
-   "family": "surv.death_ride",
-   "title": "Скорая: смерть на огороде и у самой поверхности (голод дома, падение в устье) ",
-   "value": 3,
-   "value_text": "3",
-   "unit": "",
-   "note": "смерть на огороде и у самой поверхности (голод дома, падение в устье) — без поездки",
-   "affects": "смерть не быстрее собственного подъёма — «умереть, чтобы не лететь» не выгодно",
-   "effect": null,
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "healing.json:death.respawn.bars_min_percent",
-   "file": "data/healing.json",
-   "path": "death.respawn.bars_min_percent",
-   "theme": "survival",
-   "family": "surv.death_respawn",
-   "title": "После смерти: сытость и бодрость остаются как были в момент смерти, но не ниже 25%",
-   "value": 25,
-   "value_text": "25",
-   "unit": "%",
-   "note": "сытость и бодрость остаются как были в момент смерти, но не ниже 25%: умерший от голода успевает дома поесть (25% — около 15 минут игры), обессиленный не просыпается на нуле со штрафом −50% к скоростям",
-   "affects": "смерть больше не бесплатное лечение и обед",
-   "effect": null,
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "healing.json:death.respawn.hp_percent",
-   "file": "data/healing.json",
-   "path": "death.respawn.hp_percent",
-   "theme": "survival",
-   "family": "surv.death_respawn",
-   "title": "После смерти: HP за раз",
-   "value": 50,
-   "value_text": "50",
-   "unit": "%",
-   "note": "HP после смерти — половина полоски, как одна аптечка (+50%). Смерть никогда не лечит лучше аптечки за 150 монет, поэтому и при плате 50 «умереть ради здоровья» невыгодно",
-   "affects": "смерть больше не бесплатное лечение и обед",
-   "effect": null,
-   "importance": 4,
-   "flags": [],
-   "reviewed": true
-  },
   {
    "id": "story_arc.json:scenes[abyss_warning].effects[0].n",
    "file": "data/story_arc.json",
@@ -13265,42 +13087,6 @@
    "effect": null,
    "importance": 1,
    "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "feel.json:death.auto_hide_s",
-   "file": "data/feel.json",
-   "path": "death.auto_hide_s",
-   "theme": "feel",
-   "family": "feel.dig",
-   "title": "Отклик: карточка исчезает через, с",
-   "value": 7.0,
-   "value_text": "7",
-   "unit": "",
-   "note": "",
-   "affects": "«сочность»",
-   "effect": null,
-   "importance": 1,
-   "flags": [],
-   "reviewed": true
-  },
-  {
-   "id": "feel.json:death.card_min_value",
-   "file": "data/feel.json",
-   "path": "death.card_min_value",
-   "theme": "feel",
-   "family": "feel.dig",
-   "title": "Отклик: порог карточки потерь",
-   "value": 1,
-   "value_text": "1",
-   "unit": "",
-   "note": "карточка потерь показывается, если потеряно хоть что-то или были сохранённые вещи",
-   "affects": "«сочность»",
-   "effect": null,
-   "importance": 1,
-   "flags": [
-    "ключ «card_min_value» не найден в scripts/ — проверить, читает ли его игра"
-   ],
    "reviewed": true
   },
   {

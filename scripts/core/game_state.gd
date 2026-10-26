@@ -255,6 +255,8 @@ func reset_progress() -> void:
 	stamina = 100.0
 	hunger = 100.0
 	is_alive = true
+	death_cause = {}
+	death_lost = {}
 	xp = 0
 	level = 1
 	skill_points_available = 0

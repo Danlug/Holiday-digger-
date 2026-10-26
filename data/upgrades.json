@@ -32,7 +32,7 @@
     {"up_to_level": 25, "points": 2},
     {"up_to_level": 100, "points": 3}
    ],
-   "proposed": true,
+   "proposed": false,
    "note": "Решение владельца (раунд 4): «уровни дают постепенно больше очков». Уровень до up_to_level включительно даёт points очков, каждый 5-й — ещё bonus_every_5th_level. До 10-го уровня — как раньше (per_level), дальше 2 и 3. Таблица и время до уровней — ГДД §11"
   },
   "legacy_note": "per_level — правило до раунда 4 (одно очко за любой уровень); по нему считается доплата старым сейвам (GameState.top_up_skill_points)",

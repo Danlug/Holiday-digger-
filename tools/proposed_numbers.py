@@ -142,9 +142,12 @@ class Extractor:
 					self._emit(fname, segs, ctx + [name], node, note, False, parent)
 				return
 			own_note = node.get("_note") if isinstance(node.get("_note"), str) else None
+			approved = node.get("_approved") if isinstance(node.get("_approved"), list) else ()
 			for k, v in node.items():
 				if k.startswith("_") or k in ("proposed", "note") or k in SKIP_KEYS and not _has_wrapper(v):
 					continue
+				if k in approved:
+					continue  # число владельца внутри раздела с общим proposed (ключ в "_approved" этого словаря)
 				self._walk(fname, v, segs + [k], ctx + [name], implicit, own_note or note, node)
 		elif isinstance(node, list):
 			if implicit and (_is_scalar_list(node) or _is_small_table(node) or cat.is_bundle(rid)):
@@ -1024,7 +1027,15 @@ def build(rows, m):
 		e = next((x for x in families if x["id"] == fid), None)
 		if e:
 			top.append({"family": fid, "decide": text, "now": e["value_text"], "verdict": e["verdict"]})
-	return families, themes, top
+	# Владелец одобряет семейства — они уходят из выгрузки; до десяти добираем самыми важными из оставшихся.
+	taken = {t["family"] for t in top}
+	for e in sorted(families, key=lambda x: -x["importance"]):
+		if len(top) >= 10:
+			break
+		if e["id"] not in taken and e.get("why"):
+			top.append({"family": e["id"], "decide": "%s: %s?" % (e["title"], e["why"].rstrip(".")), "now": e["value_text"],
+				"verdict": e["verdict"]})
+	return families, themes, top[:10]
 
 
 # ---------------------------------------------------------------------------

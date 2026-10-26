@@ -160,8 +160,12 @@ func _rebuild_sum() -> void:
 		_sum.add_child(_num("−" + ShopArt.compact(coins), 12,
 			Color.WHITE if GameState.coins >= coins or GameState.debug_free_shop else ShopArt.COL_BAD))
 		used_parts.append("монеты ×%s" % ShopArt.full(coins))
+	var lands := "Ляжет: " + ", ".join(where)
+	if int(r.get("seconds", 0)) > 0:
+		# Печь бронзы (BronzeFurnace): ляжет не сразу, а по штуке в минуту.
+		lands = "Плавится %s, потом ляжет: %s" % [BronzeFurnace.clock_text(n * int(r["seconds"])), ", ".join(where)]
 	Tip.bind_tap(_sum, "%s ×%s" % [String(r["name_ru"]), ShopArt.full(int(plan["made"]))],
-		"Уйдёт: " + ", ".join(used_parts), "Ляжет: " + ", ".join(where), _tip_anchor)
+		"Уйдёт: " + ", ".join(used_parts), lands, _tip_anchor)
 
 
 static func _icon(t: Texture2D, px: float) -> TextureRect:

@@ -395,8 +395,12 @@ func _material_row(m: Dictionary) -> Control:
 	var bag := GameState.get_item_count(id)
 	var store := HouseStorage.count(id)
 	var body := "Есть %d из %d: в рюкзаке %d, на складе %d." % [have, need, bag, store]
-	if not done and int(m["effective"]) > have:
-		body += "\nЕщё %d выйдет из сырья под рукой." % (int(m["effective"]) - have)
+	var smelting := int(m.get("smelting", 0))
+	if smelting > 0:
+		body += "\nВ печи: %d (по %s на штуку, заберётся в мастерской)." % [smelting,
+			BronzeFurnace.clock_text(BronzeFurnace.seconds_per_unit())]
+	if not done and int(m["effective"]) - smelting > have:
+		body += "\nЕщё %d выйдет из сырья под рукой." % (int(m["effective"]) - smelting - have)
 	Tip.bind_tap(p, ShopCatalog.item_name(id), body, ProjectChain.where_text(id))
 	return p
 

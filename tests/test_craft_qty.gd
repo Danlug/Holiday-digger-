@@ -4,6 +4,10 @@ extends Node
 ## ползунок». Проверяет ShopService.max_craft / craft_plan / craft(id, n) и
 ## карточку рецепта с ползунком (CraftQtyBox в ShopUI).
 ##
+## С 26.10 бронза плавится в печи по минуте на штуку (BronzeFurnace, подробно —
+## tests/test_bronze_timer): здесь пачка «плавится» через _smelt — загрузка,
+## часы печи вперёд на всю очередь, забор. Раскладка по рюкзаку и складу та же.
+##
 ##   godot --headless --path . res://tests/test_craft_qty.tscn
 
 var failures := 0
@@ -14,6 +18,7 @@ var _events: Array = []
 func _ready() -> void:
 	print("=== test_craft_qty ===")
 	GameState.reset_progress()
+	BronzeFurnace.override_unix = 1_800_000_000
 	GameState.game_event.connect(func(id: StringName, data: Dictionary) -> void:
 		if id == &"crafted":
 			_events.append(data.duplicate()))
@@ -57,16 +62,34 @@ func _fresh() -> void:
 	GameState.debug_free_shop = false
 	GameState.house_is_indoors = true
 	GameState.house_room = "hall"
+	GameState.ext.erase(BronzeFurnace.KEY)
 	_events.clear()
 
 
 func _snapshot() -> Dictionary:
 	return {"inv": GameState.inventory.duplicate(), "st": GameState.house_storage.duplicate(),
-		"coins": GameState.coins}
+		"coins": GameState.coins, "furnace": BronzeFurnace.queued()}
 
 
 func _same(a: Dictionary, b: Dictionary) -> bool:
-	return a["inv"] == b["inv"] and a["st"] == b["st"] and a["coins"] == b["coins"]
+	return a["inv"] == b["inv"] and a["st"] == b["st"] and a["coins"] == b["coins"] \
+		and a["furnace"] == b["furnace"]
+
+
+## Пачка бронзы целиком: загрузить в печь, прокрутить её часы на всю очередь и
+## забрать. Ответ — как у мгновенного крафта раньше: {ok, count, used, to_pack,
+## to_storage, message}. n < 0 — craft без числа (одна штука).
+func _smelt(n: int) -> Dictionary:
+	var res := ShopService.craft("bronze") if n < 0 else ShopService.craft("bronze", n)
+	if not bool(res.get("ok", false)):
+		return res
+	var queued := int(res.get("queued", 0))
+	check("пачка %d ушла в печь, готового сразу нет" % queued, bool(res.get("timed", false))
+		and int(res["count"]) == 0 and BronzeFurnace.queued() == queued and _events.is_empty())
+	BronzeFurnace.override_unix += queued * BronzeFurnace.seconds_per_unit()
+	var got := BronzeFurnace.collect()
+	return {"ok": true, "count": int(got["count"]), "used": res.get("used", {}),
+		"to_pack": int(got["to_pack"]), "to_storage": int(got["to_storage"]), "message": res["message"]}
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +135,7 @@ func _test_batch_from_storage_and_pack() -> void:
 	_fresh()
 	GameState.inventory["scrap"] = 14
 	GameState.house_storage["scrap"] = 23
-	var res := ShopService.craft("bronze", 37)
+	var res := _smelt(37)
 	check("пачка 37 прошла", bool(res["ok"]) and int(res["count"]) == 37)
 	check("металлолом списан целиком (рюкзак и склад)",
 		GameState.get_item_count("scrap") == 0 and HouseStorage.count("scrap") == 0)
@@ -128,7 +151,7 @@ func _test_batch_from_storage_and_pack() -> void:
 	_fresh()
 	GameState.inventory["scrap"] = 14
 	GameState.house_storage["scrap"] = 23
-	res = ShopService.craft("bronze", 9)
+	res = _smelt(9)
 	check("пачка 9 берёт со склада, рюкзак не тронут",
 		bool(res["ok"]) and HouseStorage.count("scrap") == 14 and GameState.get_item_count("scrap") == 14)
 	check("и 9 бронзы легли на склад", HouseStorage.count("bronze") == 9 and GameState.get_item_count("bronze") == 0)
@@ -178,7 +201,7 @@ func _test_space_weight_spills_to_storage() -> void:
 	GameState.inventory[ballast] = int(floor((cap - GameState.get_total_weight()) / bw))
 	var free_before := cap - GameState.get_total_weight()
 	var expect_pack := mini(20, int(floor((free_before + 20.0 * scrap_w) / bronze_w)))
-	var res := ShopService.craft("bronze", 20)
+	var res := _smelt(20)
 	check("пачка на полном рюкзаке проходит целиком", bool(res["ok"]) and int(res["count"]) == 20)
 	check("вес рюкзака не превышен (%.1f ≤ %.1f)" % [GameState.get_total_weight(), cap],
 		GameState.get_total_weight() <= cap + 0.001)
@@ -198,7 +221,7 @@ func _test_space_stack_spills_to_storage() -> void:
 	var stack := Balance.get_mineral_max_stack("bronze")
 	GameState.inventory["bronze"] = stack - 4
 	GameState.inventory["scrap"] = 14
-	var res := ShopService.craft("bronze", 14)
+	var res := _smelt(14)
 	check("стопка бронзы в рюкзаке не выше %d" % stack, GameState.get_item_count("bronze") == stack)
 	check("лишнее сверх стопки — на склад (10)", bool(res["ok"]) and HouseStorage.count("bronze") == 10
 		and int(res["to_pack"]) == 4 and int(res["to_storage"]) == 10)
@@ -220,7 +243,7 @@ func _test_plan_matches_result() -> void:
 		if int(c[4]) > 0:
 			GameState.inventory["iron_ore"] = int(c[4])
 		var plan := ShopService.craft_plan("bronze", int(c[2]))
-		var res := ShopService.craft("bronze", int(c[2]))
+		var res := _smelt(int(c[2]))
 		var ok := bool(res["ok"]) and int(plan["to_pack"]) == int(res["to_pack"]) \
 			and int(plan["to_storage"]) == int(res["to_storage"]) and int(plan["made"]) == int(res["count"]) \
 			and GameState.get_total_weight() <= GameState.get_max_carry_kg() + 0.001
@@ -233,7 +256,7 @@ func _test_plan_matches_result() -> void:
 func _test_single_recipes_unchanged() -> void:
 	_fresh()
 	GameState.inventory["scrap"] = 4
-	var res := ShopService.craft("bronze")
+	var res := _smelt(-1)
 	check("крафт без числа — одна штука, как раньше",
 		bool(res["ok"]) and GameState.get_item_count("scrap") == 3 and GameState.get_item_count("bronze") == 1)
 
@@ -255,7 +278,7 @@ func _test_batch_persists_save_load() -> void:
 	_fresh()
 	GameState.inventory["scrap"] = 14
 	GameState.house_storage["scrap"] = 23
-	check("пачка прошла", bool(ShopService.craft("bronze", 30)["ok"]))
+	check("пачка прошла", bool(_smelt(30)["ok"]))
 	var inv_b := GameState.get_item_count("bronze")
 	var st_b := HouseStorage.count("bronze")
 	var inv_s := GameState.get_item_count("scrap")
@@ -300,10 +323,17 @@ func _test_card_slider() -> void:
 	slider.value = 9
 	ui._confirm_card()
 	await get_tree().process_frame
-	check("галочка сплавила ровно 9", HouseStorage.count("scrap") == 14 and HouseStorage.count("bronze") == 9
-		and GameState.get_item_count("scrap") == 14)
-	check("событие crafted с количеством 9", _events.size() == 1 and int(_events[-1]["count"]) == 9)
+	check("галочка загрузила в печь ровно 9", HouseStorage.count("scrap") == 14 and BronzeFurnace.queued() == 9
+		and GameState.get_item_count("scrap") == 14 and HouseStorage.count("bronze") == 0)
 	check("карточка закрылась", ui._card == null)
+	# Девять минут спустя — снова в магазин: бронза забирается сама.
+	BronzeFurnace.override_unix += 9 * BronzeFurnace.seconds_per_unit()
+	ui.close()
+	ui.open(ShopUI.TAB_TECH)
+	await get_tree().process_frame
+	check("при входе в магазин 9 бронзы легли на склад", HouseStorage.count("bronze") == 9
+		and BronzeFurnace.queued() == 0 and BronzeFurnace.ready_count() == 0)
+	check("событие crafted с количеством 9", _events.size() == 1 and int(_events[-1]["count"]) == 9)
 
 	# Разовый рецепт — без ползунка.
 	GameState.max_depth_reached = 1200

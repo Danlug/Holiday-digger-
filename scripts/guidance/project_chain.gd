@@ -152,21 +152,23 @@ static func sources(item: String) -> Array:
 	return out
 
 
-## Строка материала: {id, need, have, via: [{id, have, per, out, makes}], effective,
-## done}. have — сам материал; makes — сколько его выйдет из сырья под рукой;
-## effective = have + makes (так полоска честно показывает, что лом — это уже
-## почти бронза). done — хватает без переработки.
+## Строка материала: {id, need, have, via: [{id, have, per, out, makes}], smelting,
+## effective, done}. have — сам материал; makes — сколько его выйдет из сырья под
+## рукой; smelting — уже в печи (бронза плавится минуту штука, BronzeFurnace:
+## лом списан, бронзы ещё нет); effective = have + makes + smelting (так полоска
+## честно показывает, что лом — это уже почти бронза). done — хватает без переработки.
 static func material(item: String, need: int) -> Dictionary:
 	var have := held(item)
 	var via: Array = []
-	var makes_total := 0
+	var smelting := BronzeFurnace.in_furnace(item)
+	var makes_total := smelting
 	for s: Dictionary in sources(item):
 		var src_have := held(String(s["id"]))
 		var makes := floori(float(src_have) / float(s["per"])) * int(s["out"])
 		makes_total += makes
 		via.append({"id": String(s["id"]), "have": src_have, "per": int(s["per"]),
 			"out": int(s["out"]), "makes": makes})
-	return {"id": item, "need": need, "have": have, "via": via,
+	return {"id": item, "need": need, "have": have, "via": via, "smelting": smelting,
 		"effective": have + makes_total, "done": have >= need}
 
 
@@ -293,7 +295,9 @@ static func needed_for(item: String) -> Array:
 			for s: Dictionary in m["via"]:
 				if String(s["id"]) != item:
 					continue
-				var left := int(m["need"]) - int(m["have"])
+				var left := int(m["need"]) - int(m["have"]) - int(m.get("smelting", 0))
+				if left <= 0:
+					continue   # недостающее уже плавится — лом больше не нужен
 				var raw_need := int(ceil(float(left) / float(s["out"]))) * int(s["per"])
 				out.append({"project": String(pid), "need": raw_need, "have": int(s["have"]),
 					"via": String(m["id"])})

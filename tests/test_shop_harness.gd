@@ -155,10 +155,18 @@ func _test_craft_bronze() -> void:
 	var need := int(recipe["inputs"]["scrap"])
 	check("бронза плавится из металлолома 1:1 (ГДД раздел 5)", need == 1)
 
+	# С 26.10 бронза плавится в печи минуту штука (BronzeFurnace, tests/test_bronze_timer).
+	GameState.ext.erase(BronzeFurnace.KEY)
+	BronzeFurnace.override_unix = 1_800_000_000
 	GameState.inventory["scrap"] = 4
 	check("крафт прошёл", bool(ShopService.craft("bronze")["ok"]))
 	check("металлолом списан ровно по рецепту", GameState.get_item_count("scrap") == 4 - need)
-	check("бронза появилась в рюкзаке", GameState.get_item_count("bronze") == 1)
+	check("бронза не мгновенная — плавится в печи", GameState.get_item_count("bronze") == 0
+		and BronzeFurnace.queued() == 1)
+	BronzeFurnace.override_unix += BronzeFurnace.seconds_per_unit()
+	BronzeFurnace.collect()
+	check("через минуту бронза в рюкзаке", GameState.get_item_count("bronze") == 1)
+	BronzeFurnace.override_unix = -1
 
 
 ## Топливные блоки больше не делаются на верстаке (решение владельца, раунд 3:

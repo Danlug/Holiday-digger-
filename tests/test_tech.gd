@@ -92,7 +92,8 @@ func _test_data() -> void:
 	check("первая ступень (постройка) без цены ступени", levels[0]["cost"] == null)
 	for key in ["capacity_blocks", "upgrade_cost"]:
 		var n = TechData.fuel()["tanks"]["hand_drill"][key]
-		check("числа бака %s помечены proposed" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", false) == true)
+		# баки владелец утвердил на странице разбора чисел (26.10)
+		check("числа бака %s утверждены (proposed: false)" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", true) == false)
 	# владелец принял совет на странице разбора чисел (26.10): ступени костюма утверждены
 	check("ступени костюма утверждены владельцем (proposed: false)", TechData.heat()["suit_tiers"].get("proposed", true) == false)
 	check("ступени скважины помечены proposed", TechData.well()["levels"].get("proposed", false) == true)

@@ -176,21 +176,24 @@ func _test_dig_time() -> void:
 	var t0 := _dig_total(p, cell)
 	check("копка идёт", t0 > 0.0)
 
+	var h_low := _tv("hunger", "low", "dig")
+	var h_crit := _tv("hunger", "critical", "dig")
+	var s_low := _tv("stamina", "low", "dig")
 	_fresh(20.0, 100.0)
 	GameState.current_tool = "iron_pickaxe"
-	check_near("сытость 20%: клетка дольше в 1/0.85", _dig_total(p, cell), t0 / 0.85)
+	check_near("сытость 20%%: клетка дольше в 1/%.2f" % h_low, _dig_total(p, cell), t0 / h_low)
 	_fresh(5.0, 100.0)
 	GameState.current_tool = "iron_pickaxe"
-	check_near("сытость 5%: в 1/0.7", _dig_total(p, cell), t0 / 0.7)
+	check_near("сытость 5%%: в 1/%.2f" % h_crit, _dig_total(p, cell), t0 / h_crit)
 	_fresh(100.0, 20.0)
 	GameState.current_tool = "iron_pickaxe"
-	check_near("бодрость 20%: в 1/0.85", _dig_total(p, cell), t0 / 0.85)
+	check_near("бодрость 20%%: в 1/%.2f" % s_low, _dig_total(p, cell), t0 / s_low)
 	_fresh(100.0, 0.0)
 	GameState.current_tool = "iron_pickaxe"
 	check_near("бодрость 0: вдвое дольше (−50% владельца)", _dig_total(p, cell), t0 / 0.5)
 	_fresh(20.0, 20.0)
 	GameState.current_tool = "iron_pickaxe"
-	check_near("оба по 20%: штрафы множатся (0.85×0.85)", _dig_total(p, cell), t0 / (0.85 * 0.85))
+	check_near("оба по 20%%: штрафы множатся (%.2f×%.2f)" % [h_low, s_low], _dig_total(p, cell), t0 / (h_low * s_low))
 	p.queue_free()
 
 
@@ -217,9 +220,9 @@ func _test_walk_and_stagger() -> void:
 	var v0 := _walk_speed(p)
 	check("ходьба идёт", v0 > 0.0)
 	_fresh(100.0, 20.0)
-	check_near("бодрость 20%: ходьба ×0.85", _walk_speed(p) / v0, 0.85)
+	check_near("бодрость 20%%: ходьба ×%.2f" % _tv("stamina", "low", "move"), _walk_speed(p) / v0, _tv("stamina", "low", "move"))
 	_fresh(100.0, 5.0)
-	check_near("бодрость 5%: ходьба ×0.7", _walk_speed(p) / v0, 0.7)
+	check_near("бодрость 5%%: ходьба ×%.2f" % _tv("stamina", "critical", "move"), _walk_speed(p) / v0, _tv("stamina", "critical", "move"))
 	_fresh(5.0, 100.0)
 	check_near("голод ходьбу не трогает", _walk_speed(p) / v0, 1.0)
 	_fresh(100.0, 0.0)
@@ -254,9 +257,9 @@ func _test_jump() -> void:
 		vs[st] = -float(p.vy)
 	check("прыжок есть", float(vs[100.0]) > 0.0)
 	# высота прыжка ~ v²
-	check_near("бодрость 20%: высота ×0.9", pow(vs[20.0] / vs[100.0], 2.0), 0.9)
-	check_near("бодрость 5%: высота ×0.8", pow(vs[5.0] / vs[100.0], 2.0), 0.8)
-	check_near("без сил: скорость толчка — корень из 0.7", pow(vs[0.0] / vs[100.0], 2.0), 0.7)
+	check_near("бодрость 20%%: высота ×%.2f" % _tv("stamina", "low", "jump"), pow(vs[20.0] / vs[100.0], 2.0), _tv("stamina", "low", "jump"))
+	check_near("бодрость 5%%: высота ×%.2f" % _tv("stamina", "critical", "jump"), pow(vs[5.0] / vs[100.0], 2.0), _tv("stamina", "critical", "jump"))
+	check_near("без сил: высота ×%.2f" % _tv("stamina", "empty", "jump"), pow(vs[0.0] / vs[100.0], 2.0), _tv("stamina", "empty", "jump"))
 	p.queue_free()
 
 	# Настоящая физика (с зависанием в верхней точке): насколько поднимается центр героя.
@@ -280,7 +283,8 @@ func _test_jump() -> void:
 		q.queue_free()
 	print("  подъём центра: бодрый %.2f, 20%% — %.2f, без сил — %.2f клетки" % [rise[100.0], rise[20.0], rise[0.0]])
 	check("бодрый берёт уступ в две клетки", float(rise[100.0]) >= 2.0)
-	check("на 20% бодрости две клетки уже не взять — только ранцем", float(rise[20.0]) < 2.0)
+	# штраф на 25% с 26.10 — всего −5% (владелец): прыжок чуть ниже бодрого
+	check("на 20% бодрости прыжок ниже бодрого", float(rise[20.0]) < float(rise[100.0]))
 	check("без сил ступенька в одну клетку по-прежнему берётся (тупика нет)", float(rise[0.0]) >= 1.15)
 
 
@@ -292,6 +296,11 @@ func _test_flight_untouched() -> void:
 	check("бодрость и сытость 5%: множитель полёта 1", is_equal_approx(GameState.get_speed_multiplier(), 1.0))
 	_fresh(100.0, 0.0)
 	check("без сил: −50% владельца, как было", is_equal_approx(GameState.get_speed_multiplier(), 0.5))
+
+
+## Множитель штрафа из data/survival.json (числа владельца с 26.10 — тест не держит их копию).
+func _tv(bar: String, tier: String, key: String) -> float:
+	return float(Balance.unwrap(SurvivalRules.data()[bar + "_tiers"][tier][key]))
 
 
 ## Сид, у которого первый бросок (в процентах) попадает в [lo, hi).
@@ -312,22 +321,24 @@ func _test_luck() -> void:
 	var world := WorldGen.new(4242)
 	var p = _player(world)
 	var chance: float = float(Balance.get_luck_chance_percent(5)["resource"])
-	for row in [[100.0, true, "сытый: бросок в [шанс/2, шанс) — удача"],
-			[20.0, false, "сытость 20%: тот же бросок — мимо (шанс вдвое меньше)"]]:
+	var f_low := _tv("hunger", "low", "luck")
+	var f_empty := _tv("hunger", "empty", "luck")
+	for row in [[100.0, true, "сытый: бросок в [шанс×%.2f, шанс) — удача" % f_low],
+			[20.0, false, "сытость 20%%: тот же бросок — мимо (шанс ×%.2f)" % f_low]]:
 		_fresh(float(row[0]), 100.0)
 		GameState.skill_stages["luck_chance"] = 5
-		p._luck_rng = _rng_between(float(chance) * 0.5, float(chance))
+		p._luck_rng = _rng_between(float(chance) * f_low, float(chance))
 		check(String(row[2]), (p._luck_roll(true) > 1) == bool(row[1]))
 	_fresh(20.0, 100.0)
 	GameState.skill_stages["luck_chance"] = 5
-	p._luck_rng = _rng_between(0.0, float(chance) * 0.5)
-	check("сытость 20%: бросок ниже половины шанса — удача есть", p._luck_roll(true) > 1)
+	p._luck_rng = _rng_between(0.0, float(chance) * f_low)
+	check("сытость 20%: бросок ниже уменьшенного шанса — удача есть", p._luck_roll(true) > 1)
 	_fresh(0.0, 100.0)
 	GameState.skill_stages["luck_chance"] = 5
-	p._luck_rng = _rng_between(0.0, 0.01)
-	check("голод на нуле: удачи нет вовсе", p._luck_roll(true) == 1)
-	check_near("доля удачи 25% → 0.5", SurvivalRules.luck_factor(25.0), 0.5)
-	check_near("доля удачи 10% → 0.25", SurvivalRules.luck_factor(10.0), 0.25)
+	p._luck_rng = _rng_between(float(chance) * f_empty, float(chance))
+	check("голод на нуле: бросок выше шанса ×%.2f — мимо" % f_empty, p._luck_roll(true) == 1)
+	check_near("доля удачи 25%% → %.2f" % f_low, SurvivalRules.luck_factor(25.0), f_low)
+	check_near("доля удачи 10%% → %.2f" % _tv("hunger", "critical", "luck"), SurvivalRules.luck_factor(10.0), _tv("hunger", "critical", "luck"))
 	p.queue_free()
 
 
@@ -363,7 +374,9 @@ func _test_badges() -> void:
 
 	GameState.set_hunger(20.0)
 	check("сытость 20% — значок «слабее»", hb.visible and String(hb.status()["icon"]) == "st_weak")
-	check("текст — в подсказке значка", String(hb.get_meta(Tip.META, {}).get("body", "")).contains("копка −15%"))
+	var dig_pct := int(round((1.0 - _tv("hunger", "low", "dig")) * 100.0))
+	check("текст — в подсказке значка (копка −%d%%)" % dig_pct,
+		String(hb.get_meta(Tip.META, {}).get("body", "")).contains("копка −%d%%" % dig_pct))
 	check("и в подсказке самой полоски", SurvivalBadge.tip_suffix(hunger_bar).contains("Голоден"))
 	GameState.set_hunger(0.0)
 	check("голод на нуле — «здоровье тает»", String(hb.status()["icon"]) == "st_drain"
@@ -403,4 +416,6 @@ func _test_data_marked_proposed() -> void:
 	check("числа survival.json утверждены владельцем — обёртки с proposed: false (%s)" % ", ".join(bad), bad.is_empty())
 	for id in ["hunger", "stamina"]:
 		var costs: Array = Balance.get_upgrade_branch(id)["cost_points"]
-		check("%s: цены ступеней — proposed" % id, costs.all(func(c): return Balance.is_proposed(c)))
+		# цены веток владелец утвердил 26.10 (страница разбора чисел)
+		check("%s: цены ступеней утверждены (proposed: false)" % id,
+			costs.all(func(c): return typeof(c) == TYPE_DICTIONARY and c.get("proposed", true) == false))

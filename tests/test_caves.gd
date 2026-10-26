@@ -91,13 +91,13 @@ func _test_data() -> void:
 			if not m.has(key):
 				ok = false
 				print("  у ", id, " нет ", key)
-		if m.get("proposed") != true or int((m["depth"] as Array)[0]) != 1500 or int((m["depth"] as Array)[1]) >= 4000:
+		if not m.has("proposed") or int((m["depth"] as Array)[0]) != 1500 or int((m["depth"] as Array)[1]) >= 4000:
 			ok = false
 		var sh := MonsterSheet.get_sheet(String(id))
 		if sh.texture == null or not (sh.has_anim("idle") and sh.has_anim("move") and sh.has_anim("attack") and sh.has_anim("die")):
 			ok = false
 			print("  у ", id, " нет листа кадров")
-	check("у каждого стража поля, proposed, пояс 1500–3999 и лист кадров", ok)
+	check("у каждого стража поля, пометка proposed (владелец утвердил 26.10 — false), пояс 1500–3999 и лист кадров", ok)
 	check("летающий, прыгающий, ходящий и стреляющий", beh.has("flyer") and beh.has("jumper") and beh.has("crawler") and beh.has("shooter"))
 	check("стражи не в списке тоннельных монстров (спавн глубже 4000 не тронут)",
 			not CombatData.monster_ids().has("cave_bat") and CombatData.monster("cave_bat").get("behavior") == "flyer")

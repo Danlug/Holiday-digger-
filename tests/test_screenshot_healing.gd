@@ -2,8 +2,8 @@ extends Node
 ## test_screenshot_healing — не автотест, а инструмент глаз для лечения раунда 4:
 ## пузырь кровати с «здоровье +N%», пробуждение со вспышкой +HP, рюкзак с
 ## аптечкой (кнопка «Применить» и её подсказка), тост после аптечки, плитка и
-## карточка аптечки в лавке, карточка смерти со «скорой» (раунд 5: −5% монет и поездка
-## с отсчётом — death_ride, death_ride_tip, death_arrived).
+## карточка аптечки в лавке, окно смерти с платой больнице (−5% монет; все причины
+## смерти — tests/test_screenshot_death).
 ##
 ##   export XDG_DATA_HOME=$PWD/.godot/xdg
 ##   xvfb-run -a -s "-screen 0 1280x1024x24" godot --path . \
@@ -11,7 +11,7 @@ extends Node
 ##       --resolution 448x960 -- /каталог [снимок ...]
 ##
 ## Снимки: bed_tip sleep_wake backpack_medkit backpack_tip medkit_toast eat_toast
-## shop_food shop_card death_card death_card_poor death_real death_ride death_ride_tip death_arrived.
+## shop_food shop_card death_card death_card_poor death_real.
 
 var _out_dir := "/tmp/healing_shots"
 var _only: Array[String] = []
@@ -60,9 +60,6 @@ func _ready() -> void:
 	await _scene("death_card", _s_death_card)
 	await _scene("death_card_poor", _s_death_card_poor)
 	await _scene("death_real", _s_death_real)
-	await _scene("death_ride", _s_death_ride)
-	await _scene("death_ride_tip", _s_death_ride_tip)
-	await _scene("death_arrived", _s_death_arrived)
 	print("test_screenshot_healing: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -100,7 +97,7 @@ func _cleanup() -> void:
 		shop.close()
 	if _main.hud._inv_sheet.visible:
 		_main.hud.close_inventory()
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	if card.is_open():
 		card.close()
 	if GameState.house_is_indoors:
@@ -197,24 +194,24 @@ func _death_report(coins_before: int) -> Dictionary:
 	GameState.coins = coins_before
 	var fee := Healing.death_fee_for(coins_before)
 	GameState.coins -= fee
-	return DeathCard.build_report(GameState.inventory.duplicate(), 410, "fall", fee)
+	return DeathWindow.build_report(GameState.inventory.duplicate(), 410, DeathCause.make("fall", {"cells": 47}), fee)
 
 
 func _s_death_card() -> void:
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	card.open(_death_report(4280))
 	await _frames(14)
 
 
 func _s_death_card_poor() -> void:
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	card.open(_death_report(70))
 	await _frames(6)
-	Tip.show_now(card.find_child("Fee", true, false))
+	Tip.show_now(card.find_child("Hospital", true, false))
 
 
-## Настоящая смерть в игре: урон → падение героя → респавн дома → карточка
-## режиссёра «ощущений» со «скорой» (весь путь, без ручного build_report).
+## Настоящая смерть в игре: урон → респавн дома → окно смерти режиссёра
+## «ощущений» (весь путь, без ручного build_report).
 func _s_death_real() -> void:
 	StoryState.set_flag("gold_sold", true)
 	GameState.coins = 900
@@ -222,55 +219,13 @@ func _s_death_real() -> void:
 	GameState.inventory_changed.emit()
 	GameState.player_depth = 30
 	GameState.take_damage(9999.0, "fall")
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	for _i in range(40):
 		if card.is_open():
 			break
 		await _wait(0.25)
 	await _frames(10)
 	print("death_real: монет %d, карточка %s" % [GameState.coins, card.is_open()])
-
-
-## Раунд 5: смерть на 410 с джетпаком — скорая везёт, карточка с полосой поездки
-## (отсчёт на середине пути: остаток подкручен, чтобы фургон стоял не у края).
-func _die_deep() -> DeathCard:
-	StoryState.set_flag("gold_sold", true)
-	GameState.grant_gear("jetpack")
-	GameState.set_current_gear("jetpack")
-	GameState.inventory = {"iron_ore": 9, "silver": 3, "ruby": 1, "food_bar": 1}
-	GameState.inventory_changed.emit()
-	var p = _main.player
-	p.x = 16.5
-	p.y = 410.5
-	await _frames(2)
-	GameState.coins = 4280
-	GameState.take_damage(9999.0, "fall")
-	var card: DeathCard = _main.get_node("FeelDirector").card
-	for _i in range(30):
-		if DeathRide.riding() and card.is_open() and card.is_riding():
-			break
-		await _wait(0.1)
-	DeathRide._left = DeathRide.total_seconds() * 0.55
-	await _frames(8)
-	print("death_ride: поездка %.1f с, осталось %.1f, монет %d" % [DeathRide.total_seconds(), DeathRide.seconds_left(), GameState.coins])
-	return card
-
-
-func _s_death_ride() -> void:
-	await _die_deep()
-
-
-func _s_death_ride_tip() -> void:
-	var card := await _die_deep()
-	Tip.show_now(card.find_child("Ride", true, false))
-	await _frames(4)
-
-
-func _s_death_arrived() -> void:
-	await _die_deep()
-	DeathRide.skip()
-	await _frames(12)
-	print("death_arrived: жив %s, HP %.0f/%.0f" % [GameState.is_alive, GameState.hp, GameState.get_max_hp()])
 
 
 # ---------------------------------------------------------------------------

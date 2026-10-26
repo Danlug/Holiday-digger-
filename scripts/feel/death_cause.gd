@@ -81,24 +81,29 @@ static func make(source: String, info: Dictionary = {}) -> Dictionary:
 # ---------------------------------------------------------------------------
 
 ## «Убит монстром: Гротовая мышь», «Разбился при падении с высоты 42 клеток».
-static func phrase(cause: Dictionary) -> String:
+## glued — для окна: имя монстра и «42 клеток» не рвутся переносом строки.
+static func phrase(cause: Dictionary, glued: bool = false) -> String:
 	var src := String(cause.get("source", "unknown"))
 	var id := String(cause.get("id", ""))
 	match src:
 		"fall":
 			var cells := int(cause.get("cells", 0))
 			if cells > 0:
-				return text("fall_cells", "causes") % cells_text(cells)
+				return text("fall_cells", "causes") % _glue(cells_text(cells), glued)
 			return text("fall", "causes")
 		"monster", "projectile":
 			if id == "":
 				return text("projectile", "causes")
 			var key := "guard" if bool(cause.get("guard", false)) or CombatData.is_cave_monster(id) else "monster"
-			return text(key, "causes") % monster_name(id)
+			return text(key, "causes") % _glue(monster_name(id), glued)
 		"boss":
-			return text("boss", "causes") % monster_name(id)
+			return text("boss", "causes") % _glue(monster_name(id), glued)
 	var s := text(src, "causes")
 	return s if s != "" else text("unknown", "causes")
+
+
+static func _glue(s: String, on: bool) -> String:
+	return s.replace(" ", "\u00a0") if on else s
 
 
 ## Подсказка (Tip) к значку причины: как не умереть так снова.

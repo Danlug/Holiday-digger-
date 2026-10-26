@@ -212,7 +212,7 @@ func _build_cause() -> Control:
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_child(texts)
-	var phrase := MetaUiKit.label(String(_report.get("phrase", DeathCause.phrase(cause))), 11, Color.WHITE)
+	var phrase := MetaUiKit.label(_typo(DeathCause.phrase(cause, true)), 11, Color.WHITE)
 	phrase.name = "CauseText"
 	phrase.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	phrase.custom_minimum_size = Vector2(WIDTH - 16 - 4 - 34 - 6, 0)
@@ -224,8 +224,17 @@ func _build_cause() -> Control:
 		texts.add_child(d)
 	var hint := DeathCause.hint(cause)
 	if hint != "":
-		Tip.bind(slot, String(_report.get("phrase", "")), hint)
+		Tip.bind(slot, DeathCause.text("cause"), hint)
 	return v
+
+
+## Короткий предлог не остаётся в конце строки («с / высоты»): неразрывный пробел после него.
+static func _typo(s: String) -> String:
+	var re := RegEx.create_from_string("(^|\\s)(с|в|к|о|у|от|из|на|по|при|of|a) ")
+	var out := s
+	for _i in 3:   # соседние предлоги перекрываются: «при падении с высоты»
+		out = re.sub(out, "$1$2\u00a0", true)
+	return out
 
 
 func _build_lost() -> Control:
@@ -312,7 +321,8 @@ func _build_hospital() -> Control:
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(l)
-	var chip := MetaUiKit.chip(MetaUiKit.tex("coin"), ("−" + MetaUiKit.compact(fee)) if fee > 0 else "0",
+	# число целиком: плата не больше 5000, четыре цифры влезают, а «−5k» читается хуже
+	var chip := MetaUiKit.chip(MetaUiKit.tex("coin"), ("−%d" % fee) if fee > 0 else "0",
 			MetaUiKit.RED.lightened(0.45) if fee > 0 else MetaUiKit.MUTED, 14, 12)
 	chip.name = "Fee"
 	h.add_child(chip)

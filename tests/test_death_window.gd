@@ -224,7 +224,7 @@ func _test_respawn_bars() -> void:
 func _labels(n: Node) -> Array:
 	var out: Array = []
 	for l in n.find_children("*", "Label", true, false):
-		out.append(String((l as Label).text))
+		out.append(String((l as Label).text).replace("\u00a0", " "))
 	return out
 
 

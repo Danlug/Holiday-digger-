@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/test_fog_fade.gd" id="1_g"]
+
+[node name="TestFogFade" type="Node"]
+script = ExtResource("1_g")

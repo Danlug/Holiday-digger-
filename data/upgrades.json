@@ -105,7 +105,7 @@
     "per_stage": 20,
     "base": {
      "value": 100,
-     "proposed": true,
+     "proposed": false,
      "note": "базовое HP персонажа не задано в GDD ни разу; выбрано круглое число, согласованное со шкалой урона от падения (100 HP на высоте 20 клеток из GDD п.6)"
     }
    },
@@ -130,23 +130,23 @@
     "type": "percent_of_base_duration",
     "percent_per_stage": {
      "value": 20,
-     "proposed": true,
+     "proposed": false,
      "note": "раунд 5 (ГДД §7, §11): владелец — «голод и усталость влияли больше, но для этого чуть меньше условия для прокачки голода и выносливости». Было +15% (ГДД); +20% — ступень сильнее, чтобы прокачка отвечала на возросший расход (data/survival.json → drain_multiplier.stamina = 1.3): уже 2-я ступень возвращает базовое время до истощения"
     },
     "formula": "depletion_seconds(stage) = base_seconds * (1 + 0.20 * stage)",
     "note_formula": "GDD задаёт '+15% до истощения' за ступень (раунд 5 — +20%, proposed), аддитивно от базового времени истощения (см. balance.json survival)"
    },
    "cost_points": [
-    {"value": 1, "proposed": true, "note": "раунд 5: было 2,3,4…11 (65 очков) — стало 1,1,2,2,3,3,4,4,5,5 (30): «чуть меньше условия для прокачки» (ГДД §7, §11)"},
-    {"value": 1, "proposed": true},
-    {"value": 2, "proposed": true},
-    {"value": 2, "proposed": true},
-    {"value": 3, "proposed": true},
-    {"value": 3, "proposed": true},
-    {"value": 4, "proposed": true},
-    {"value": 4, "proposed": true},
-    {"value": 5, "proposed": true},
-    {"value": 5, "proposed": true}
+    {"value": 1, "proposed": false, "note": "раунд 5: было 2,3,4…11 (65 очков) — стало 1,1,2,2,3,3,4,4,5,5 (30): «чуть меньше условия для прокачки» (ГДД §7, §11)"},
+    {"value": 1, "proposed": false},
+    {"value": 2, "proposed": false},
+    {"value": 2, "proposed": false},
+    {"value": 3, "proposed": false},
+    {"value": 3, "proposed": false},
+    {"value": 4, "proposed": false},
+    {"value": 4, "proposed": false},
+    {"value": 5, "proposed": false},
+    {"value": 5, "proposed": false}
    ]
   },
   {
@@ -160,16 +160,16 @@
     "cap_note": "на 10 ступени расход = 20% от базового (не уходит в ноль/отрицательные значения). Раунд 5: −8% за ступень оставлено — сильнее нельзя без мёртвых последних ступеней (потолок −80% достигался бы раньше 10-й); ответ на возросший расход голода (×1.5, data/survival.json) — цена"
    },
    "cost_points": [
-    {"value": 1, "proposed": true, "note": "раунд 5: было 1,2,3…10 (55 очков) — стало 1,1,2,2,3,3,4,4,5,5 (30): «чуть меньше условия для прокачки» (ГДД §7, §11). Пять ступеней (−40% расхода) — 9 очков вместо 15, это примерно 6-й уровень героя"},
-    {"value": 1, "proposed": true},
-    {"value": 2, "proposed": true},
-    {"value": 2, "proposed": true},
-    {"value": 3, "proposed": true},
-    {"value": 3, "proposed": true},
-    {"value": 4, "proposed": true},
-    {"value": 4, "proposed": true},
-    {"value": 5, "proposed": true},
-    {"value": 5, "proposed": true}
+    {"value": 1, "proposed": false, "note": "раунд 5: было 1,2,3…10 (55 очков) — стало 1,1,2,2,3,3,4,4,5,5 (30): «чуть меньше условия для прокачки» (ГДД §7, §11). Пять ступеней (−40% расхода) — 9 очков вместо 15, это примерно 6-й уровень героя"},
+    {"value": 1, "proposed": false},
+    {"value": 2, "proposed": false},
+    {"value": 2, "proposed": false},
+    {"value": 3, "proposed": false},
+    {"value": 3, "proposed": false},
+    {"value": 4, "proposed": false},
+    {"value": 4, "proposed": false},
+    {"value": 5, "proposed": false},
+    {"value": 5, "proposed": false}
    ]
   },
   {
@@ -283,7 +283,7 @@
    ],
    "cost_note": {
     "value": [4, 8, 12, 16, 20],
-    "proposed": true,
+    "proposed": false,
     "note": "цены владелец не задавал — как у «Удача — шанс» (тоже 5 ступеней бонуса к добыче, не к выживанию): 60 очков за ветку"
    }
   }

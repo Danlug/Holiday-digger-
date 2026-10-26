@@ -5,27 +5,28 @@
 
  "chests": {
   "_what": "Тайники (Terraria, Spelunky, Stardew Valley): сундук вмурован в породу. Место — чистая функция от сида мира (полоса рядов → одна попытка), виден только в полном обзоре (как руда, локатора нет). Открывается, когда его клетку выкопали; добыча кладётся в рюкзак с проверкой веса, что не влезло — остаётся в открытом сундуке.",
-  "y_min": {"value": 20, "proposed": true, "note": "ниже фундамента (5) и ряда никчёмного клада (15): онбординг не тронут"},
-  "band_rows": {"value": 12, "proposed": true, "note": "одна попытка поставить сундук на полосу в 12 рядов"},
-  "chance": {"value": 0.6, "proposed": true, "note": "≈ сундук на 20 рядов: «серпантин» открывает 2–3 в час, «дайв» — до 10 (сундук виден только в радиусе ресурсов, а дайв проходит сотни рядов в час)"},
-  "tries": {"value": 4, "proposed": true, "note": "если выпала пустота, лава или несокрушимое — ещё до трёх клеток в той же полосе"},
+  "y_min": {"value": 20, "proposed": false, "note": "ниже фундамента (5) и ряда никчёмного клада (15): онбординг не тронут"},
+  "band_rows": {"value": 12, "proposed": false, "note": "одна попытка поставить сундук на полосу в 12 рядов"},
+  "chance": {"value": 0.6, "proposed": false, "note": "≈ сундук на 20 рядов: «серпантин» открывает 2–3 в час, «дайв» — до 10 (сундук виден только в радиусе ресурсов, а дайв проходит сотни рядов в час)"},
+  "tries": {"value": 4, "proposed": false, "note": "если выпала пустота, лава или несокрушимое — ещё до трёх клеток в той же полосе"},
   "exclude": ["mercury", "uranium", "peat", "coal"],
   "_exclude_note": "ртуть — только в банку (§13), уран — только в свинцовом контейнере (§Уран): сундук не должен обходить эти правила; торф и уголь — топливо, его делает станция заправки, а сундук должен радовать",
-  "unpriced_weight_price": {"value": 100, "proposed": true, "note": "материалы без цены (экзотика, всё глубже 4000) в выборе добычи весят как руда за 100"},
-  "unpriced_xp": {"value": 10, "proposed": true, "note": "опыт за штуку материала без цены"},
-  "xp_share": {"value": 0.5, "proposed": true, "note": "опыт за добычу из сундука — половина того, что дала бы копка тех же руд (копать их не пришлось), плюс бонус ступени"},
+  "max_ore_kg": {"value": 60, "proposed": false, "note": "владелец (разбор чисел, 26.10): «важно, чтобы в сундуке не было больше 60 кг руды» — столько держит рюкзак без прокачки; самоцвет золотого сундука входит в эти 60 кг, еда — нет"},
+  "unpriced_weight_price": {"value": 100, "proposed": false, "note": "материалы без цены (экзотика, всё глубже 4000) в выборе добычи весят как руда за 100"},
+  "unpriced_xp": {"value": 10, "proposed": false, "note": "опыт за штуку материала без цены"},
+  "xp_share": {"value": 0.5, "proposed": false, "note": "опыт за добычу из сундука — половина того, что дала бы копка тех же руд (копать их не пришлось), плюс бонус ступени"},
   "tiers": [
-   {"id": "wood", "y_min": 20, "weight": {"value": 70, "proposed": true}, "value_cells": {"value": 3, "proposed": true}, "items": [2, 8], "xp_bonus": {"value": 15, "proposed": true}, "food": "food_bar", "food_chance": {"value": 0.35, "proposed": true}},
-   {"id": "iron", "y_min": 120, "weight": {"value": 24, "proposed": true}, "value_cells": {"value": 10, "proposed": true}, "items": [3, 14], "xp_bonus": {"value": 40, "proposed": true}, "food": "food_bar", "food_chance": {"value": 0.5, "proposed": true}},
-   {"id": "gold", "y_min": 300, "weight": {"value": 6, "proposed": true}, "value_cells": {"value": 35, "proposed": true}, "items": [5, 24], "xp_bonus": {"value": 120, "proposed": true}, "food": "food_buldak", "food_chance": {"value": 1.0, "proposed": true}, "gem": true}
+   {"id": "wood", "y_min": 20, "weight": {"value": 70, "proposed": false}, "value_cells": {"value": 3, "proposed": false}, "items": [2, 8], "xp_bonus": {"value": 15, "proposed": false}, "food": "food_bar", "food_chance": {"value": 0.35, "proposed": false}},
+   {"id": "iron", "y_min": 120, "weight": {"value": 24, "proposed": false}, "value_cells": {"value": 10, "proposed": false}, "items": [3, 14], "xp_bonus": {"value": 40, "proposed": false}, "food": "food_bar", "food_chance": {"value": 0.5, "proposed": false}},
+   {"id": "gold", "y_min": 300, "weight": {"value": 6, "proposed": false}, "value_cells": {"value": 35, "proposed": false}, "items": [5, 24], "xp_bonus": {"value": 120, "proposed": false}, "food": "food_buldak", "food_chance": {"value": 1.0, "proposed": false}, "gem": true}
   ],
   "_tiers_note": "Ценность сундука задана в «клетках»: value_cells × средняя выручка клетки породы на этой глубине (Σ доля руды × цена, по настоящему составу), ±25%. Так сундук одинаково весом на 100 и на 2000 — момент находки, а не кошелёк: деревянный ≈ 3 клетки копки, окованный ≈ 10, золотой ≈ 35 и самоцвет (проверено tools/sim_economy.gd --mech=1, ГДД §20.1). items — сколько штук не меньше/не больше. Самоцвет золотого сундука — сверх ценности.",
   "extra_tiers": [
-   {"id": "cave", "y_min": 1500, "value_cells": {"value": 45, "proposed": true}, "value_per_1000": {"value": 25, "proposed": true, "note": "+25 клеток ценности за каждую 1000 глубже 1500: 45 на 1500, 70 на 2500, 95 на 3500 (золотой тайник — 35)"}, "items": [6, 30], "xp_bonus": {"value": 250, "proposed": true}, "food": "medkit", "food_chance": {"value": 0.6, "proposed": true, "note": "после боя со стражами — аптечка (решение владельца раунда 4: аптечка лечит)"}, "gem": true}
+   {"id": "cave", "y_min": 1500, "value_cells": {"value": 45, "proposed": false}, "value_per_1000": {"value": 25, "proposed": false, "note": "+25 клеток ценности за каждую 1000 глубже 1500: 45 на 1500, 70 на 2500, 95 на 3500 (золотой тайник — 35)"}, "items": [6, 30], "xp_bonus": {"value": 250, "proposed": false}, "food": "medkit", "food_chance": {"value": 0.6, "proposed": false, "note": "после боя со стражами — аптечка (решение владельца раунда 4: аптечка лечит)"}, "gem": true}
   ],
   "_extra_tiers_note": "Ступени, которые полосы тайников не разыгрывают (pick_tier их не видит): их назначают явно — сундук полости-фигуры в центре звезды/ромба/круга/сердца (раунд 5, scripts/combat/cave_guards.gd, data/caves.json). Ценность — те же «клетки копки», но растёт с глубиной (value_per_1000); сундук заперт, пока живы стражи, открывается касанием. Рисунок — tools/gen_cave_art.py (лист 5 кадров: закрыт · приоткрыт · с добычей · пуст · заперт).",
-  "value_spread": {"value": 0.25, "proposed": true},
-  "deep_shift_per_1000": {"value": [-3, 2, 1], "proposed": true, "note": "на каждую 1000 клеток глубины веса ступеней сдвигаются к железу и золоту (дерево не ниже 30): на 3000 — 61/30/9"},
+  "value_spread": {"value": 0.25, "proposed": false},
+  "deep_shift_per_1000": {"value": [-3, 2, 1], "proposed": false, "note": "на каждую 1000 клеток глубины веса ступеней сдвигаются к железу и золоту (дерево не ниже 30): на 3000 — 61/30/9"},
   "gems_by_depth": [
    {"y_min": 300, "id": "diamond", "count": 1},
    {"y_min": 2000, "id": "ruby", "count": 1},

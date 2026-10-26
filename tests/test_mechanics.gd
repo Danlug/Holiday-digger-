@@ -180,10 +180,12 @@ func _test_chest_loot() -> void:
 	var forbidden := 0
 	var gems := 0
 	var food := 0
+	var heaviest := 0.0
 	for i in range(200):
 		var cell := Vector2i(i % 32, 300 + i * 13)
 		for tier in ["wood", "iron", "gold"]:
 			var l := ChestLogic.roll_loot(world, SEED, cell, tier)
+			heaviest = maxf(heaviest, ChestLogic.ore_kg(l["items"]))
 			for id in (l["items"] as Dictionary).keys():
 				if ["mercury", "uranium", "peat", "coal"].has(String(id)):
 					forbidden += 1
@@ -194,6 +196,7 @@ func _test_chest_loot() -> void:
 	check("ртуть, уран, торф и уголь из сундука не выпадают", forbidden == 0)
 	check("в каждом золотом сундуке самоцвет (%d из 200)" % gems, gems >= 200)
 	check("еда в сундуках бывает (%d)" % food, food > 100)
+	check("руды в сундуке не больше 60 кг — владелец (самый тяжёлый %.1f кг)" % heaviest, heaviest <= 60.0 + 0.001)
 	# ценность — «value_cells клеток копки» (у деревянного 3, но не меньше двух штук) на любой глубине
 	for y in [60, 300, 1200, 2500]:
 		var sum := 0.0

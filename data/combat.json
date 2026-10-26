@@ -361,7 +361,7 @@
 					"max": 1
 				}
 			],
-			"proposed": true,
+			"proposed": false,
 			"stagger_chance": 0.7
 		},
 		"cave_toad": {
@@ -407,7 +407,7 @@
 					"max": 2
 				}
 			],
-			"proposed": true,
+			"proposed": false,
 			"stagger_chance": 0.5
 		},
 		"shell_beetle": {
@@ -454,7 +454,7 @@
 					"max": 1
 				}
 			],
-			"proposed": true,
+			"proposed": false,
 			"stagger_chance": 0.3
 		},
 		"acid_spitter": {
@@ -509,7 +509,7 @@
 					"max": 1
 				}
 			],
-			"proposed": true,
+			"proposed": false,
 			"stagger_chance": 0.6
 		}
 	},

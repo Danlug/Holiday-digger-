@@ -210,35 +210,51 @@ func _test_chest_loot() -> void:
 
 func _test_streak() -> void:
 	var s := StreakLogic.new()
-	var started := 0
-	var at := s.fever_at
-	check("жадность из данных: %d клеток подряд → %.0f с" % [at, s.greed_s], at == 60 and is_equal_approx(s.greed_s, 3.0))
-	for i in range(at - 1):
-		started += int(s.on_dug(40)["started"])
-	check("%d клеток — ещё не жадность" % (at - 1), started == 0 and s.count == at - 1 and not s.in_greed())
-	var r := s.on_dug(40)
-	check("%d-я клетка запускает жадность" % at, bool(r["started"]) and s.in_greed() and is_equal_approx(s.greed_left, 3.0))
-	check("сама клетка-порог не двойная", not bool(r["fever_cell"]))
-	check("клетка в жадности — двойная и серию не копит", bool(s.on_dug(40)["fever_cell"]) and s.count == 0)
-	check("пауза в жадности её не рвёт (идёт по часам)", not s.tick(2.9, false, true) and s.in_greed())
-	s.tick(0.2, true, true)
-	check("через 3 с жадность кончилась, серия с нуля", not s.in_greed() and s.count == 0)
-	check("после жадности клетка обычная", not bool(s.on_dug(40)["fever_cell"]) and s.count == 1)
-	s.reset()
-	# пауза
-	for i in range(10):
-		s.on_dug(40)
-	check("пока копает — серия не рвётся, как бы долго ни шёл удар", not s.tick(30.0, true, true) and s.count == 10)
-	check("пауза 2 с — серия жива", not s.tick(2.0, false, true) and s.count == 10)
+	var at := s.fever_s
+	check("жадность из данных: %.0f с работы → %.0f с жадности" % [at, s.greed_s],
+		is_equal_approx(at, 60.0) and is_equal_approx(s.greed_s, 3.0))
+	# шкала копится секундами копки, порог срабатывает на выкопанной клетке
 	s.on_dug(40)
-	check("клетка обнуляет паузу", s.idle == 0.0 and s.count == 11)
-	check("пауза дольше 2.5 с — серия сгорает", s.tick(2.6, false, true) and s.count == 0)
-	for i in range(at + 2):
-		s.on_dug(40)
+	s.tick(at - 0.5, true, true)
+	check("%.1f с копки — ещё не жадность (шкала %.0f%%)" % [at - 0.5, s.meter() * 100.0],
+		not s.in_greed() and s.meter() > 0.95 and s.meter() < 1.0)
+	check("клетка до порога жадность не включает", not bool(s.on_dug(40)["started"]))
+	s.tick(0.5, true, true)
+	check("шкала полна — %.0f%%" % (s.meter() * 100.0), is_equal_approx(s.meter(), 1.0) and not s.in_greed())
+	var r := s.on_dug(40)
+	check("клетка на полной шкале запускает жадность", bool(r["started"]) and s.in_greed() and is_equal_approx(s.greed_left, 3.0))
+	check("сама клетка-порог не двойная", not bool(r["fever_cell"]))
+	check("клетка в жадности — двойная и шкалу не копит", bool(s.on_dug(40)["fever_cell"]) and s.work == 0.0)
+	s.tick(1.0, true, true)
+	check("копка в жадности шкалу не копит", s.work == 0.0)
+	check("пауза в жадности её не рвёт (идёт по часам)", not s.tick(1.9, false, true) and s.in_greed())
+	check("окно в жадности её не держит (по часам)", not s.tick(0.05, false, true, true) and s.greed_left < 0.1)
+	s.tick(0.2, true, true)
+	check("через 3 с жадность кончилась, шкала с нуля", not s.in_greed() and s.work < 0.25)
+	s.reset()
+	# паузы: шаг между клетками — работа; стоит — ждёт; дальше — тает
+	s.on_dug(40)
+	s.tick(20.0, true, true)
+	check("пока копает — шкала растёт, как бы долго ни шёл удар (20 с)", is_equal_approx(s.work, 20.0))
+	s.tick(0.5, false, true)
+	check("шаг или падение в клетку до 0.6 с — тоже работа", is_equal_approx(s.work, 20.5))
+	s.tick(1.9, false, true)
+	check("пауза 2.4 с — шкала стоит", is_equal_approx(s.work, 20.5) and not s.draining())
+	s.tick(1.0, false, true)
+	check("дольше 2.5 с — шкала тает, но не сгорает разом (%.1f с)" % s.work, s.draining() and s.work > 15.0 and s.work < 20.5)
+	s.on_dug(40)
+	check("новая клетка — таяние кончилось", s.idle == 0.0 and not s.draining())
+	var w := s.work
+	check("окно или сцена (hold) — шкала замирает", not s.tick(30.0, false, true, true) and is_equal_approx(s.work, w))
+	check("долгий простой — шкала растаяла до нуля", s.tick(10.0, false, true) or s.tick(10.0, false, true))
+	check("растаявшая серия — с нуля", s.work == 0.0 and s.count == 0)
+	s.on_dug(40)
+	s.tick(at, true, true)
+	s.on_dug(40)
 	check("подъём наверх или дом рвут и жадность", s.in_greed() and s.tick(0.01, false, false) and not s.in_greed())
-	for i in range(5):
-		s.on_dug(40)
-	check("подъём наверх или дом (allowed=false) — сброс", s.tick(0.01, false, false) and s.count == 0)
+	s.on_dug(40)
+	s.tick(5.0, true, true)
+	check("подъём наверх или дом (allowed=false) — сброс", s.tick(0.01, false, false) and s.work == 0.0 and s.count == 0)
 	check("огород и обучение не считаются", s.on_dug(3)["started"] == false and s.count == 0)
 	check("шкала 0..1", s.meter() == 0.0)
 
@@ -312,7 +328,8 @@ func _test_director() -> void:
 	check("до онбординга сундук не открывается", not MechState.chest_opened(cell))
 	for i in range(60):
 		_dug(Vector2i(4, 41), "", false)
-	check("до онбординга азарт не копится", d.streak.count == 0 and not d.streak.in_fever())
+		d.step(1.0)
+	check("до онбординга азарт не копится", d.streak.count == 0 and d.streak.work == 0.0 and not d.streak.in_fever())
 	check("до онбординга пункта «Журнал» не видно",
 		MenuRegistry.entries().filter(func(e) -> bool: return e["id"] == "journal").is_empty())
 
@@ -364,12 +381,16 @@ func _test_director() -> void:
 	d.step(0.3)
 	check("рядом и есть место — остаток в рюкзаке", MechState.chest_left(cell2).is_empty() and not GameState.inventory.is_empty())
 
-	# жадность: fever_at клеток подряд, потом руда — двойная, герой ×7
+	# жадность: fever_s секунд копки, клетка — и руда двойная, герой ×7
 	GameState.inventory.clear()
 	d.streak.reset()
-	for i in range(d.streak.fever_at):
-		_dug(Vector2i(i % 32, 60), "", false)
-	check("%d клеток подряд — жадность" % d.streak.fever_at, d.streak.in_greed() and int(d.stats["fevers"]) == 1)
+	_dug(Vector2i(0, 60), "", false)
+	p.digging = {"x": 1, "y": 60, "t": 0.0, "total": 999.0, "type": TileTypes.Type.STONE}
+	for i in range(int(ceil(d.streak.fever_s / 0.5))):
+		d.step(0.5)
+	p.digging = null
+	_dug(Vector2i(1, 60), "", false)
+	check("%.0f с копки и клетка — жадность" % d.streak.fever_s, d.streak.in_greed() and int(d.stats["fevers"]) == 1)
 	check("герой узнал о жадности сразу", is_equal_approx(p.greed_mult, 7.0))
 	GameState.add_item("silver", 1)   # копка кладёт свою штуку сама (Player), режиссёр — сверху
 	_dug(Vector2i(5, 61), "silver", true)
@@ -385,7 +406,7 @@ func _test_director() -> void:
 	GameState.house_is_indoors = true
 	d.step(0.1)
 	GameState.house_is_indoors = false
-	check("зашёл домой — серия сброшена", d.streak.count == 0)
+	check("зашёл домой — серия сброшена", d.streak.count == 0 and d.streak.work == 0.0)
 
 	# мастерство: звезда, опыт, двойная добыча детерминирована
 	MechState.root()["mastery"] = {}

@@ -179,6 +179,8 @@ func _build_world_props() -> void:
 	_exterior.centered = false
 	add_child(_exterior)
 	_update_exterior_sprite()
+	# Трава перед цоколем (дом и лачуга) — поверх фасада, но под пакетом у двери.
+	add_child(FrontLawn.new())
 
 	# Пакет с едой у входной двери: виден снаружи, пока заказ не забрали.
 	_door_pack = Sprite2D.new()

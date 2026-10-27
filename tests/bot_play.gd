@@ -588,14 +588,19 @@ func _dismiss_modals() -> void:
 		hud.close_more_menu()
 	# Сцена «выгрузка на склад» на 150 (раунд 6): человек жмёт туда, куда показывает стрелка.
 	var unload := PremiumUnloadLesson.instance
-	if unload != null and is_instance_valid(unload) and unload.is_active() and unload.target_rect().has_area():
-		open.append("unload_lesson")
-		_tap(unload.target_rect().get_center())
+	var lesson_on := false
+	if unload != null and is_instance_valid(unload) and unload.is_active():
+		lesson_on = true
+		if unload.target_rect().has_area():
+			open.append("unload_lesson")
+			_tap(unload.target_rect().get_center())
 	# Обучение часам-телепорту на 200 (27.10): тоже жмёт туда, куда стрелка, и «Наверх» в карточке.
 	var tlesson := TeleportLesson.instance
-	if tlesson != null and is_instance_valid(tlesson) and tlesson.is_active() and tlesson.target_rect().has_area():
-		open.append("teleport_lesson")
-		_tap(tlesson.target_rect().get_center())
+	if tlesson != null and is_instance_valid(tlesson) and tlesson.is_active():
+		lesson_on = true
+		if tlesson.target_rect().has_area():
+			open.append("teleport_lesson")
+			_tap(tlesson.target_rect().get_center())
 	if WellReport.is_open() and is_instance_valid(hud):
 		open.append("well_report")
 		hud.close_well_report()
@@ -617,7 +622,9 @@ func _dismiss_modals() -> void:
 			win.close()
 		elif not _modal_since.has("death_window"):
 			_shot_later("death_window", 0.4)
-	if ShopUI.instance != null and ShopUI.instance.is_open() and _activity != "shop":
+	# Витрину открыл урок (выгрузка на 150, часы на 200) — её не закрываем: урок вернулся бы
+	# к кнопке магазина, бот снова открыл бы витрину, и так по кругу (бот застревал на 35 мин).
+	if ShopUI.instance != null and ShopUI.instance.is_open() and _activity != "shop" and not lesson_on:
 		open.append("shop_stray")
 		ShopUI.instance.close()
 	for k in open:

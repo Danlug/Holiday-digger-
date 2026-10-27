@@ -542,7 +542,7 @@ func get_coins_per_premium_currency() -> float:
 
 
 func get_ad_daily_limit(ad_id: String) -> int:
-	return int(balance.get("ads", {}).get("daily_limits", {}).get(ad_id, 0))
+	return int(_v(balance.get("ads", {}).get("daily_limits", {}).get(ad_id, 0)))
 
 
 # ---------------------------------------------------------------------------

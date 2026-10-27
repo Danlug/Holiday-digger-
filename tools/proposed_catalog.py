@@ -49,6 +49,8 @@ def match(pattern, rid):
 SKIP = [
 	"balance.json:tools.drill_rig.upgrade_tiers[*].speed_bonus",  # «каждый на 20% быстрее» — слова владельца
 	"quests.json:templates[*].min_tier", "quests.json:templates[*].max_tier",  # служебные рамки шаблона
+	# рамки по рекорду глубины: 1500 — слово владельца (монстры с 1500), 9950 — дно мира минус цель
+	"quests.json:templates[*].record_min", "quests.json:templates[*].record_max",
 	"combat.json:boss.hero_model**",  # модель героя для теста, не игра
 	"minerals.json:minerals[food_*].price_coins",  # у блюд под общим proposed цена 0 — цена еды живёт в balance.json
 	"minerals.json:minerals[fuel_block].recipe",  # «4 торфа = 1 блок» — ГДД §5, число владельца
@@ -485,7 +487,7 @@ def _tier_rates(m):
 
 
 def eff_quest_reward(m, row):
-	"""Весь день: 5 заданий (множители слотов) + сундук против продажи за ~40 минут игры на ступени."""
+	"""Весь день: миссии дня (сумма множителей слотов) + монеты сундука против продажи за ~40 минут игры на ступени."""
 	fnum, fmin, _, pct = _f(m)
 	v = row["value"]
 	coins = v.get("coins") if isinstance(v, dict) else None
@@ -493,14 +495,17 @@ def eff_quest_reward(m, row):
 	if not isinstance(coins, list) or not any(rates):
 		return None
 	daily = m.data.get("quests.json", {}).get("daily", {})
-	mults = sum(num(s.get("reward"), 1.0) for s in daily.get("slots", []) if isinstance(s, dict)) or 5.0
+	slots = [s for s in daily.get("slots", []) if isinstance(s, dict)]
+	mults = sum(num(s.get("reward"), 1.0) for s in slots) or 5.0
 	chest = num((daily.get("bonus_all") or {}).get("coins_x"), 0.0)
 	parts = []
 	for t, c in enumerate(coins):
 		r = rates[t] if t < len(rates) else None
 		if r and r.get("coins_per_min"):
 			parts.append("ст.%d %s" % (t, pct(c * (mults + chest) / (r["coins_per_min"] * 40.0))))
-	return ("день (5 заданий + сундук ×%s) против продажи руды за 40 минут игры на своей ступени: " % fnum(chest)) + ", ".join(parts)
+	head = "день (%d миссий, множители %s" % (len(slots), fnum(mults))
+	head += (" + сундук ×%s)" % fnum(chest)) if chest else "; сундук — доллары)"
+	return head + " против продажи руды за 40 минут игры на своей ступени: " + ", ".join(parts)
 
 
 def eff_quest_target(m, row):
@@ -968,9 +973,13 @@ def eff_pack(m, row):
 	dol = num(_unw(p.get("grants_dollars")))
 	if not usd or not dol:
 		return None
-	ads = num(m.get("balance.json", "ads", "daily_limits", "small_premium_currency"), 3)
+	ads = num(_unw(m.get("balance.json", "ads", "daily_limits", "small_premium_currency")), 5)
+	per_ad = 1
+	for a in (m.get("shop.json", "ad_rewards") or []):
+		if isinstance(a, dict) and a.get("id") == "small_premium_currency":
+			per_ad = num(a.get("dollars"), 1) or 1
 	return "%s долл. за $%s = %s монет; %s долл. за $1; столько же дают ролики «доллар» за %s сут" % (
-		fnum(dol), fnum(usd), fnum(dol * _coins_per_dollar(m)), fnum(dol / usd), fnum(dol / max(ads, 1), 1))
+		fnum(dol), fnum(usd), fnum(dol * _coins_per_dollar(m)), fnum(dol / usd), fnum(dol / max(ads * per_ad, 1), 1))
 
 
 _UNLOAD_LESSON_KEY = {"depth": "с какой глубины ждёт спокойного момента", "free_use": "первая выгрузка в сцене бесплатно",
@@ -990,7 +999,7 @@ def eff_premium_price(m, row):
 	for a in (m.get("shop.json", "ad_rewards") or []):
 		if isinstance(a, dict) and a.get("id") == "small_premium_currency":
 			per_ad = num(a.get("dollars"), 1) or 1
-	ads = num(m.get("balance.json", "ads", "daily_limits", "small_premium_currency"), 3)
+	ads = num(_unw(m.get("balance.json", "ads", "daily_limits", "small_premium_currency")), 5)
 	return "= %s монет по курсу; = %s ролик(а) «доллар» по %s (их %s в сутки)" % (
 		fnum(p * _coins_per_dollar(m)), fnum(math.ceil(p / per_ad)), fnum(per_ad), fnum(ads))
 
@@ -1207,7 +1216,7 @@ FAMILIES = [
 	F("q.daily_reward", "quests", 5, "Награда за задание дня", ["quests.json:daily.reward", "quests.json:daily.slots[*].reward", "quests.json:daily.points"],
 		"Задания дня: {key}", "монеты и опыт по ступеням / множитель слота", "зачем выполнять задания",
 		lambda m, r: eff_quest_reward(m, r) if r["segs"][-1] == "reward" and isinstance(r["value"], dict) else None,
-		rec=("оставить", "день заданий ≈ четверть–треть того, что игрок заработал бы продажей за то же время; на нижних ступенях щедрее — там «пустой» первый час")),
+		rec=("оставить", "день миссий ≈ 80% того, что игрок заработал бы продажей за те же 40 минут (владелец, 26.10); 13 миссий делят прежние 6.5 награды ступени (5 заданий + монеты сундука), сундук звёзд — доллары")),
 	F("q.targets", "quests", 4, "Цели заданий по ступеням", ["quests.json:templates[*].targets", "quests.json:templates[*].weekly_scale",
 		"quests.json:templates[*].filter_by_tier.**"], title_quest, "штук (ступени 0–5)", "сколько минут занимает задание",
 		eff_quest_target, rec=("оставить", "копка ≈ 25 минут игры на любой ступени; ступень 2 — ровно слова владельца (500 клеток, 1000 монет, 500 трат, 3 еды)")),
@@ -1215,11 +1224,14 @@ FAMILIES = [
 		"Рекорд глубины для ступени", "клетки", "когда задания становятся крупнее", None, rec=("оставить", "границы совпадают с поясами копки")),
 	F("q.chest_streak", "quests", 3, "Сундук дня, серия, замена", ["quests.json:daily.bonus_all", "quests.json:daily.streak.*", "quests.json:daily.count",
 		"quests.json:daily.reroll.*", "quests.json:daily.slots[*].pool", "quests.json:daily.slots[*].scale"],
-		"Задания дня: {key}", "", "привычка заходить каждый день", None, rec=("оставить", "как в мобильных играх: 5 заданий, сундук ×1.5, серия до +50%")),
+		"Задания дня: {key}", "", "привычка заходить каждый день", None,
+		rec=("оставить", "13 миссий, звезда за каждую, сундук на 10-й звезде — 5 долларов (всё слова владельца 27.10); "
+			"энергетик и 2 очка в сундуке, прибавка серии до +50% монетами и доллар каждый 7-й день — предложение")),
 	F("q.weekly", "quests", 3, "Недельные задания", "quests.json:weekly.**", "Неделя: {key}", "", "цель на неделю, 1 доллар", None,
-		rec=("оставить", "недельная цель = 4 дня работы; второй слот даёт 1 доллар")),
+		rec=("оставить", "недельная цель = 4 дня работы; второй слот даёт 1 доллар; третий — «посмотри рекламу 25 раз» (владелец)")),
 	F("q.login", "quests", 3, "Подарок за вход (7 дней)", "daily_rewards.json:**", "Подарок дня: {key}", "", "привычка заходить",
-		eff_login, summary=sum_rewards, rec=("оставить", "день 7 — 2000 монет и доллар; потолок 4 доллара в неделю держит повторяемые источники")),
+		eff_login, summary=sum_rewards, rec=("оставить", "день 7 — 2000 монет и доллар; потолок 4 доллара в неделю держит предложенные повторяемые источники "
+			"(подарок дня, недельное задание, доллар серии); 5 долларов сундука звёзд и ролики — числа владельца, в потолок не входят")),
 	F("q.achievements", "quests", 3, "Награды достижений", "achievements.json:achievements[*].reward",
 		"«{name}»: награда", "монеты, опыт, доллары", "разовые подарки за вехи", eff_reward_minutes, summary=sum_rewards,
 		rec=("оставить", "разовые; крупные — за глубину 1000/4000/10 000")),

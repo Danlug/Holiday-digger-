@@ -77,7 +77,11 @@ static func _depth_of(data: Dictionary) -> int:
 
 
 static func matches(q: Dictionary, ev: StringName, data: Dictionary) -> bool:
-	if String(q["event"]) != String(ev):
+	var want_ev = q["event"]
+	if want_ev is Array:
+		if not (want_ev as Array).has(String(ev)):
+			return false
+	elif String(want_ev) != String(ev):
 		return false
 	var f: Dictionary = q["filter"]
 	for k in f.keys():
@@ -116,6 +120,10 @@ static func matches(q: Dictionary, ev: StringName, data: Dictionary) -> bool:
 					return false
 			"currency":
 				if String(data.get("currency", "")) != String(want):
+					return false
+			_:
+				# Прочие поля сравниваются как есть (stored: dir "put").
+				if String(data.get(k, "")) != String(want):
 					return false
 	return true
 
@@ -174,48 +182,85 @@ static func _all_daily_claimed() -> bool:
 	return true
 
 
+## Звёзды дня: по одной за каждую забранную ежедневную миссию (владелец, 27.10).
+static func stars_today() -> int:
+	var n := 0
+	for q in daily():
+		if bool(q["claimed"]):
+			n += 1
+	return n
+
+
+## Сколько звёзд открывают сундук: 10 (владелец), но не больше миссий в наборе
+## (старый сейв с пятью заданиями доживает свой день и сундук всё равно видит).
+static func stars_needed() -> int:
+	return mini(int(QuestGen.num(_cfg("chest").get("stars"), 10)), daily().size())
+
+
 static func bonus_ready() -> bool:
-	return _all_daily_claimed() and not bool(MetaState.sub("quests")["bonus_claimed"])
+	var need := stars_needed()
+	return need > 0 and stars_today() >= need and not bool(MetaState.sub("quests")["bonus_claimed"])
 
 
-## Награда сундука дня: кратна ступени игрока, растёт с серией (её день —
-## тот, которым станет сегодняшний, если сундук открыть).
-static func bonus_reward() -> Dictionary:
-	var ds: Array = MetaState.sub("quests")["daily"]
+## Что лежит в сундуке звёзд: главная часть (5 долларов владельца, энергетик и
+## прибавка серии монетами и опытом) и «доллар серии» каждого седьмого дня —
+## он один идёт в недельный потолок повторяемых долларов. Прибавка серии считается
+## от дня, которым станет сегодняшний, если сундук открыть.
+static func _bonus_parts() -> Array:
+	var ds := daily()
 	if ds.is_empty():
-		return {}
-	var cfg: Dictionary = MetaData.quests()["daily"]
-	var b: Dictionary = cfg["bonus_all"]
-	var tier := int(ds[0]["tier"])
-	var coins: Array = cfg["reward"]["coins"]
-	var xp: Array = cfg["reward"]["xp"]
-	var n := streak_if_claimed()
-	var mult := 1.0 + float(streak_pct(n)) / 100.0
-	var out := {
-		"coins": maxi(5, int(round(float(coins[clampi(tier, 0, coins.size() - 1)]) * float(b["coins_x"]) * mult / 5.0)) * 5),
-		"xp": maxi(5, int(round(float(xp[clampi(tier, 0, xp.size() - 1)]) * float(b["xp_x"]) * mult / 5.0)) * 5),
-	}
-	var every := int(_cfg("streak").get("dollar_every", 0))
-	if every > 0 and n > 0 and n % every == 0:
-		out["dollars"] = 1
+		return [{}, {}]
+	var b := _cfg("bonus_all")
+	var main := {}
+	var dollars := int(QuestGen.num(_cfg("chest").get("dollars"), 0))
+	if dollars > 0:
+		main["dollars"] = dollars
 	var it = b.get("item")
 	if typeof(it) == TYPE_DICTIONARY:
-		out["item"] = (it as Dictionary).duplicate()
+		main["item"] = (it as Dictionary).duplicate()
+	var n := streak_if_claimed()
+	var pct := streak_pct(n)
+	if pct > 0:
+		var rw: Dictionary = MetaData.quests()["daily"]["reward"]
+		var tier := int(ds[0]["tier"])
+		var k := float(_cfg("streak").get("base_x", 1.5)) * float(pct) / 100.0
+		for key in ["coins", "xp"]:
+			var arr: Array = rw[key]
+			main[key] = maxi(5, int(round(float(arr[clampi(tier, 0, arr.size() - 1)]) * k / 5.0)) * 5)
+	var capped := {}
+	var every := int(_cfg("streak").get("dollar_every", 0))
+	if every > 0 and n > 0 and n % every == 0:
+		capped["dollars"] = 1
+	return [main, capped]
+
+
+## Награда сундука для показа: всё вместе (доллары серии — сверху пяти).
+static func bonus_reward() -> Dictionary:
+	var parts := _bonus_parts()
+	var out: Dictionary = (parts[0] as Dictionary).duplicate(true)
+	var extra := int((parts[1] as Dictionary).get("dollars", 0))
+	if extra > 0:
+		out["dollars"] = int(out.get("dollars", 0)) + extra
 	return out
 
 
 static func claim_bonus() -> Dictionary:
 	if not bonus_ready():
 		return {"ok": false}
-	var reward := bonus_reward()   # до сдвига серии: в награде уже учтён сегодняшний день
+	var parts := _bonus_parts()   # до сдвига серии: в награде уже учтён сегодняшний день
 	var st := _streak()
 	st["n"] = streak_if_claimed()
 	st["last"] = MetaState.today()
 	st["best"] = maxi(int(st.get("best", 0)), int(st["n"]))
 	MetaState.set_max("quest_streak_best", int(st["n"]))
 	MetaState.sub("quests")["bonus_claimed"] = true
-	var granted := MetaRewards.grant(reward, true)
-	var pts := int(MetaData.quests()["daily"]["bonus_all"]["points"])
+	# Пять долларов — слово владельца, недельный потолок их не режет; доллар
+	# серии — предложенный повторяемый источник, он в потолке.
+	var granted := MetaRewards.grant(parts[0], false)
+	var extra := MetaRewards.grant(parts[1], true)
+	if extra.has("dollars"):
+		granted["dollars"] = int(granted.get("dollars", 0)) + int(extra["dollars"])
+	var pts := int(_cfg("bonus_all").get("points", 0))
 	_add_points(pts)
 	MetaState.touch()
 	return {"ok": true, "reward": granted, "points": pts, "streak": int(st["n"])}
@@ -319,7 +364,7 @@ static func ad_placement_reroll() -> String:
 static func can_reroll(q: Dictionary) -> bool:
 	if String(q.get("kind", "")) != "daily" or bool(q["claimed"]) or is_done(q):
 		return false
-	return QuestGen.can_reroll(q, daily(), MetaState.sub("events"))
+	return QuestGen.can_reroll(q, daily(), MetaState.sub("events"), GameState.max_depth_reached)
 
 
 ## Замена: бесплатная, пока есть, иначе только с via_ad (ролик уже показан —

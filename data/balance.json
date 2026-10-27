@@ -673,7 +673,7 @@
    "double_income_on_sale": 3,
    "restore_stamina_hunger_in_mine": 3,
    "cancel_loot_loss_on_death": 1,
-   "small_premium_currency": 3,
+   "small_premium_currency": {"value": 5, "proposed": false, "note": "владелец (27.10): «Доллары за рекламу — 5 раз в день» (было 3; ролик даёт 5 долларов — data/shop.json → ad_rewards)"},
    "small_coins": 3,
    "remote_dump_loot_for_sale": 3
   },

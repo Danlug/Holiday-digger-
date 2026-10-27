@@ -46,6 +46,7 @@ static func watch_ad() -> bool:
 	if int(cur["used"]) >= limit():
 		return false
 	_write(int(cur["day"]), int(cur["used"]) + 1)
+	GameState.note_ad_watched(PLACEMENT)   # миссии «посмотри рекламу» (ГДД §17.2)
 	return true
 
 

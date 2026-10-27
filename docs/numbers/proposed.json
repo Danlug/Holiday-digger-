@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "3e7ac4c10320",
+  "data_fingerprint": "79d309174acf",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
@@ -11,8 +11,8 @@
   ]
  },
  "summary": {
-  "rows": 645,
-  "families": 42,
+  "rows": 647,
+  "families": 43,
   "new_unreviewed": 0,
   "flagged": 14,
   "by_theme": {
@@ -23,7 +23,7 @@
    "Бой": 210,
    "Механики: тайники, азарт и жадность, мастерство, удача": 6,
    "Монетизация и ролики": 21,
-   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 93
+   "Ощущение, звук, свет и подсказки (мелочи интерфейса)": 95
   }
  },
  "top_decisions": [
@@ -217,7 +217,7 @@
   {
    "id": "feel",
    "title": "Ощущение, звук, свет и подсказки (мелочи интерфейса)",
-   "count": 93,
+   "count": 95,
    "families": [
     "feel.camera",
     "feel.camera_kick",
@@ -226,6 +226,7 @@
     "feel.sound",
     "feel.dialogue",
     "feel.light",
+    "feel.teleport_watch",
     "feel.luck",
     "feel.actor_height"
    ],
@@ -1528,6 +1529,24 @@
    "effect": null,
    "verdict": "оставить",
    "why": "подбор по глазам",
+   "flags": []
+  },
+  {
+   "id": "feel.teleport_watch",
+   "theme": "feel",
+   "title": "Часы-телепорт: пузырь «Вниз» и поиск клетки возврата",
+   "importance": 1,
+   "rows": [
+    "teleport_watch.json:near_cells",
+    "teleport_watch.json:search_radius_cells"
+   ],
+   "count": 2,
+   "value_text": "near cells 0.75; search radius cells 12",
+   "affects": "площадка часов и возврат вниз (владелец 27.10)",
+   "reviewed": true,
+   "effect": null,
+   "verdict": "оставить",
+   "why": "0.75 — герой на плите, пузырь не спорит с бурмобилем и станцией; 12 клеток — хватает почти всегда, дальше клетка откапывается",
    "flags": []
   },
   {
@@ -13632,6 +13651,40 @@
    "unit": "",
    "note": "Свет мира (ветка world-fx, scripts/world/light_layer.gd). Числа, которых владелец не задавал, — подбор по глазам (proposed). Затемнение глубиной и факел героя — один полноэкранный шейдер; ореолы руд — аддитивные спрайты по видимым клеткам.",
    "affects": "вид глубины",
+   "effect": null,
+   "importance": 1,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "teleport_watch.json:near_cells",
+   "file": "data/teleport_watch.json",
+   "path": "near_cells",
+   "theme": "feel",
+   "family": "feel.teleport_watch",
+   "title": "Пузырь «Вниз» — на скольких клетках от центра площадки",
+   "value": 0.75,
+   "value_text": "0.75",
+   "unit": "клеток",
+   "note": "на каком расстоянии от центра площадки (клеток) над героем загорается пузырь «Вниз». 0.75 — герой на плите; шире — пузырь спорил бы с «В бурмобиль» (парковка в клетке 18, радиус 1.2 — до 19.7) и кнопкой станции (от 21.3)",
+   "affects": "площадка часов и возврат вниз (владелец 27.10)",
+   "effect": null,
+   "importance": 1,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "teleport_watch.json:search_radius_cells",
+   "file": "data/teleport_watch.json",
+   "path": "search_radius_cells",
+   "theme": "feel",
+   "family": "feel.teleport_watch",
+   "title": "Завал точки возврата: радиус поиска безопасной клетки",
+   "value": 12,
+   "value_text": "12",
+   "unit": "клеток",
+   "note": "если точку возврата завалило (обвал, землетрясение), безопасную клетку ищем кольцами до этого радиуса; не нашлась — точка откапывается",
+   "affects": "площадка часов и возврат вниз (владелец 27.10)",
    "effect": null,
    "importance": 1,
    "flags": [],

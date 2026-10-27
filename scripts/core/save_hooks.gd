@@ -5,7 +5,7 @@ extends Node
 ##
 ##  * Место героя под землёй (HeroSpot) освежается каждый кадр — до шага физики (process_priority).
 ##  * Сохранить сразу (SaveSystem.save_now): свернули/ушли на паузу (APPLICATION_PAUSED, FOCUS_OUT),
-##    закрыли окно (WM_CLOSE_REQUEST), а в браузере — страница скрыта или уходит (visibilitychange →
+##    закрыли окно (WM_CLOSE_REQUEST), «назад» на Android, а в браузере — страница скрыта или уходит (visibilitychange →
 ##    hidden, pagehide: оболочка web/shell.src.html зовёт сюда через RaskopkiShell.onLeave). Автосейв раз в
 ##    минуту этого не ловил: закрыл вкладку через 50 с после спуска — и спуска будто не было.
 ##  * Загрузка в воздухе: герой висит там, где был, пока игрок не тронет управление (или пока его не
@@ -95,6 +95,8 @@ func _notification(what: int) -> void:
 			SaveSystem.save_now("focus_out")
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			SaveSystem.save_now("close")
+		NOTIFICATION_WM_GO_BACK_REQUEST:   # Android: «назад» закрывает приложение
+			SaveSystem.save_now("back")
 
 
 ## Браузер: страница скрыта (свернули, переключили вкладку, телефон убрал браузер) или уходит. Кадров у

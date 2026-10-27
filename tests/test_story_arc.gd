@@ -228,6 +228,10 @@ func _test_depth_beats() -> void:
 	GameState.max_depth_reached = 100
 	await _check_beat_once("depth_100")
 
+	# Часы-телепорт (владелец 27.10): звонок бабушки на 200; подарок и обучение — scripts/teleport/.
+	GameState.max_depth_reached = 200
+	await _check_beat_once("teleport_watch")
+
 	GameState.max_depth_reached = 500
 	await _check_beat_once("fever_500")
 	check("лихорадка: герой поел и выспался (бодрость почти 100)", GameState.stamina >= 99.0)
@@ -254,12 +258,14 @@ func _test_catch_up() -> void:
 	StoryState.set_flag("diary_found")
 	GameState.max_depth_reached = 3000
 	await _frames(3)
-	check("catch-up: в очереди только самая глубокая из пропущенных", GameState.story_queue == ["whisper_1200"],
-		str(GameState.story_queue))
+	# Сцена-обучение (часы на 200, "lesson": true) тихо не пропускается: за ней подарок и обучение.
+	check("catch-up: в очереди обучение (200) и самая глубокая из пропущенных",
+		GameState.story_queue == ["teleport_watch", "whisper_1200"], str(GameState.story_queue))
 	check("catch-up: сотня помечена просмотренной тихо", StoryState.is_seen("depth_100"))
 	check("catch-up: лихорадка помечена просмотренной тихо", StoryState.is_seen("fever_500"))
 	check("catch-up: тихие сцены story_beat не шлют", not beats_seen.has("depth_100") and not beats_seen.has("fever_500"))
 	check("catch-up: до 3900 предупреждение не звали", not StoryState.is_seen("abyss_warning"))
+	check("catch-up: обучение играет первым", await _play_and_skip("teleport_watch"))
 	await _play_and_skip("whisper_1200")
 	await _frames(2)
 	GameState.max_depth_reached = 10000

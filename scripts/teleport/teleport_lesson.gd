@@ -101,13 +101,15 @@ func _safe_now() -> bool:
 	return true
 
 
+## Сцена идёт или вот-вот начнётся. Очередь сама по себе не мешает: сцена «только на
+## поверхности» (звонок про могилу) ждёт там, а обучение нужно именно на глубине.
 func _story_busy() -> bool:
-	if not GameState.story_queue.is_empty():
-		return true
 	var d := get_tree().root.find_child("StoryDirector", true, false)
 	if d == null:
-		return false
+		return not GameState.story_queue.is_empty()
 	if bool(d.get("_playing")):
+		return true
+	if d.has_method("_next_playable") and String(d.call("_next_playable")) != "":
 		return true
 	var ad = d.get("auto_dig")
 	if ad != null and bool(ad.get("running")):

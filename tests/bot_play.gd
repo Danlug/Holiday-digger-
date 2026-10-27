@@ -2563,6 +2563,18 @@ func _do_quests() -> void:
 			"spent", "bought":
 				await _order_and_take_food(false)
 				T.event(_sim, "quest_do", "покупка ради задания", false)
+			"ad_watched":
+				# «Посмотри рекламу 5 / 25 раз» (владелец, 27.10): ролики лавки, как игрок, —
+				# сначала доллары, потом монеты; лимиты роликов — сутки UTC.
+				var need := int(q["target"]) - int(q["progress"])
+				for ad_id in ["small_premium_currency", "small_coins"]:
+					while need > 0 and ShopService.ad_uses_left(ad_id) > 0:
+						if not bool(ShopService.claim_ad(ad_id)["ok"]):
+							break
+						need -= 1
+						T.event(_sim, "quest_do", "ролик ради задания: %s" % ad_id, false)
+	# Закрытое только что — забрать сразу (и звёзды, и сундук на десятой), а не в следующий заход.
+	_claim_meta()
 
 
 ## Коллекционер заглядывает в музей, журнал и дневник (открыть и закрыть, как игрок).
@@ -2604,8 +2616,10 @@ func _claim_meta() -> void:
 			T.event(_sim, "quest_claim", "%s +%d" % [String(q.get("id", "")), GameState.coins - before])
 			T.mark("first_quest_claim", _sim)
 	if _has_static(qe, "bonus_ready") and bool(qe.call("bonus_ready")):
+		var d0 := GameState.dollars
 		qe.call("claim_bonus")
-		T.event(_sim, "quest_bonus", "бонус дня")
+		T.event(_sim, "quest_bonus", "сундук звёзд: +%d $" % (GameState.dollars - d0))
+		T.mark("first_star_chest", _sim)
 
 
 static func _has_static(s: Script, method: String) -> bool:

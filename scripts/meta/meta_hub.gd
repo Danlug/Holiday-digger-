@@ -330,7 +330,8 @@ func _quest_card(q: Dictionary) -> Control:
 		g.modulate = Color(0.55, 0.55, 0.55)
 	holder.add_child(g)
 	if claimed:
-		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 18)
+		# Забранная миссия дня — её звезда (как в окне заданий), недельная — галочка.
+		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("star" if String(q["kind"]) == "daily" else "check"), 18)
 		ck.position = Vector2(20, 20)
 		holder.add_child(ck)
 	h.add_child(holder)
@@ -346,7 +347,15 @@ func _quest_card(q: Dictionary) -> Control:
 	bar.text = "%s/%s" % [MetaUiKit.compact(mini(int(q["progress"]), target)), MetaUiKit.compact(target)]
 	bar.fill_color = MetaUiKit.GREEN if done else MetaUiKit.GOLD
 	mid.add_child(bar)
-	mid.add_child(MetaUiKit.reward_row(q["reward"], 12, 9))
+	# Награда с долларом (недельное) рядом с «Забрать» и «×2» не влезает в ширину
+	# экрана: ряд значков обрезается справа, а не раздвигает плитку за край
+	# (полностью она — в подсказке).
+	var rr_box := ScrollContainer.new()
+	rr_box.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	rr_box.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rr_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rr_box.add_child(MetaUiKit.reward_row(q["reward"], 12, 9))
+	mid.add_child(rr_box)
 	h.add_child(mid)
 
 	var qid := String(q["id"])

@@ -234,6 +234,18 @@ func _header() -> Control:
 	Tip.bind(tm, "Новые задания", "Набор дня обновляется в полночь по твоим часам. Невзятые награды сгорают.")
 	h.add_child(tm)
 
+	# Звёзды дня числом: до сундука — «из 10», потом — «из 13».
+	var stars := QuestEngine.stars_today()
+	var need := QuestEngine.stars_needed()
+	if need > 0:
+		var past := stars >= need or bool(MetaState.sub("quests")["bonus_claimed"])
+		var sc := MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [stars, QuestEngine.daily().size() if past else need],
+			MetaUiKit.GOLD_LIGHT if past else Color.WHITE, 13, 11)
+		sc.name = "StarsCount"
+		sc.mouse_filter = Control.MOUSE_FILTER_PASS
+		Tip.bind(sc, "Звёзды дня", "Звезда — за каждую забранную миссию. %d звёзд открывают сундук." % need)
+		h.add_child(sc)
+
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -405,6 +417,7 @@ func _stars_row() -> Control:
 	var sb := MetaUiKit.box(Color8(0x2E, 0x26, 0x12) if ready else MetaUiKit.SLOT,
 		MetaUiKit.GOLD if ready else MetaUiKit.GOLD.darkened(0.45), 2, 5)
 	sb.set_content_margin_all(3)
+	sb.content_margin_right = 6
 	card.add_theme_stylebox_override("panel", sb)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 4)
@@ -451,18 +464,10 @@ func _stars_row() -> Control:
 			done_unclaimed += 1
 	_track.done = done_unclaimed
 	mid.add_child(_track)
-	var low := HBoxContainer.new()
-	low.add_theme_constant_override("separation", 4)
-	low.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var reward := QuestEngine.bonus_reward()
-	var rr := MetaUiKit.reward_row(reward, 12, 9)
-	rr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	low.add_child(rr)
-	var shown := stars if (taken or stars >= need) else mini(stars, need)
-	var of := QuestEngine.daily().size() if (taken or stars >= need) else need
-	low.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [shown, of],
-		MetaUiKit.GOLD_LIGHT if stars >= need else MetaUiKit.MUTED, 11, 9))
-	mid.add_child(low)
+	var rr := MetaUiKit.reward_row(reward, 11, 9)
+	rr.add_theme_constant_override("separation", 3)
+	mid.add_child(rr)
 	h.add_child(mid)
 
 	var n := QuestEngine.streak_if_claimed()

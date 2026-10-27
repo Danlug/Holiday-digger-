@@ -107,8 +107,10 @@ func _init() -> void:
 	_plus.pressed.connect(func() -> void: _step(1))
 	srow.add_child(_plus)
 
+	# Края ряда совпадают с рядом ползунка: крестик прижат влево, как «−»,
+	# галочка растягивается до правого края, как «+» (на широком телефоне
+	# aspect=expand даёт лишнюю ширину — по центру она оставляла дыру справа).
 	var btns := HBoxContainer.new()
-	btns.alignment = BoxContainer.ALIGNMENT_CENTER
 	btns.add_theme_constant_override("separation", 6)
 	col.add_child(btns)
 	var cancel := HouseArt.button("red", ShopArt.tex("glyph_cross"), Vector2(42, 32), 18.0)
@@ -127,6 +129,9 @@ func _init() -> void:
 	_max_btn.pressed.connect(func() -> void: _slider.value = _max)
 	btns.add_child(_max_btn)
 	_ok = HouseArt.button("green", ShopArt.tex("glyph_check"), Vector2(80, 32), 20.0)
+	_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Глиф стоит по координатам под 80 px — держим его в центре растянутой кнопки.
+	_ok.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	_ok.pressed.connect(_on_ok)
 	btns.add_child(_ok)
 

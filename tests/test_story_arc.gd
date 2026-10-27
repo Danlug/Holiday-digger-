@@ -153,13 +153,16 @@ func _test_scene_data() -> void:
 			"grandma_returns", "whisper_1200", "abyss_warning", "bottom_near", "ending", "credits"]:
 		check("%s: сцена арки помечена arc" % id, bool(StoryData.scene(id).get("arc", false)))
 	var depths: Array = StoryData.depth_scenes()
-	var expected := ["depth_100", "fever_500", "whisper_1200", "abyss_warning", "bottom_near"]
+	# teleport_watch (200) — обучение часам-телепорту (владелец 27.10, scripts/teleport/).
+	var expected := ["depth_100", "teleport_watch", "fever_500", "whisper_1200", "abyss_warning", "bottom_near"]
 	var got: Array = []
+	var thresholds: Array = []
 	for e in depths:
 		got.append(String(e.id))
+		thresholds.append(int(e.depth))
 	check("сцены глубины отсортированы по порогу", got == expected, str(got))
-	check("пороги глубины из ГДД: 100/500/1200/3900/9700",
-		[int(depths[0].depth), int(depths[1].depth), int(depths[2].depth), int(depths[3].depth), int(depths[4].depth)] == [100, 500, 1200, 3900, 9700])
+	check("пороги глубины из ГДД: 100/200/500/1200/3900/9700",
+		thresholds == [100, 200, 500, 1200, 3900, 9700], str(thresholds))
 
 
 func _test_grave_call_and_diary_first() -> void:

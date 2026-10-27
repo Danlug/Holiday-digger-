@@ -1572,10 +1572,11 @@ func _furnace_tick() -> void:
 
 
 ## Часы-телепорт: единственный товар, который трогает не GameState, а героя.
+## Куда переносят и как вернуться вниз — TeleportWatch (scripts/teleport/).
 func _teleport_home() -> void:
 	_resolve_refs()
 	if _player != null and is_instance_valid(_player) and _player.has_method("teleport_home"):
-		_player.teleport_home()
+		TeleportWatch.use(_player)
 
 
 # ---------------------------------------------------------------------------

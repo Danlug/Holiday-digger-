@@ -308,6 +308,27 @@
 			]
 		},
 		{
+			"id": "teleport_watch",
+			"title": "teleport_watch.title",
+			"_comment": "Часы-телепорт (владелец 27.10): на 200 сюжет ведёт в премиум-лавку к часам и дарит одно применение. Сама сцена — звонок бабушки; подарок и обучение «тень + стрелка» — scripts/teleport/teleport_lesson.gd по story_beat этой сцены (пропуск сцены подарок не отнимает). lesson: при перелёте через несколько порогов глубины сцена не помечается просмотренной тихо, а играет перед более глубокой.",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"music": "mus_story",
+			"depth": 200,
+			"lesson": true,
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "narr", "text": "teleport_watch.n1"},
+				{"t": "say", "who": "boy", "text": "teleport_watch.s1"},
+				{"t": "sfx", "id": "phone"},
+				{"t": "say", "who": "grandma_rich", "text": "teleport_watch.g1"},
+				{"t": "say", "who": "boy", "text": "teleport_watch.s2"},
+				{"t": "say", "who": "grandma_rich", "text": "teleport_watch.g2"}
+			],
+			"effects": []
+		},
+		{
 			"id": "credits",
 			"title": "credits.title",
 			"arc": true,

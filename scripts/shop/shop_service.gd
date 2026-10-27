@@ -657,6 +657,13 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 		if Balance.get_mineral_weight(item) * count > _free_weight():
 			return {"ok": false, "message": "Рюкзак не выдержит — разгрузись", "effect": ""}
 
+	# Подарок обучения на 200 (scripts/teleport/): часы без списания долларов, пока подарок есть.
+	if good_id == TeleportWatch.GOOD_ID and TeleportWatch.take_free():
+		var free_message := apply_effect(g)
+		_emit_bought(good_id, currency, false)
+		SaveSystem.save_game()
+		return {"ok": true, "message": free_message, "effect": String(g.get("effect", "")), "remote": false, "free": true}
+
 	var lack := "монет" if currency == "coins" else "долларов"
 	if not _can_afford(currency, price):
 		return {"ok": false, "message": "Не хватает " + lack, "effect": ""}

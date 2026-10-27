@@ -88,7 +88,8 @@ func _test_coalesce() -> void:
 	SaveSystem.save_at_frame_end("a")
 	SaveSystem.save_at_frame_end("b")
 	check("две просьбы за кадр — одна запись, причина первой", SaveSystem._pending_reason == "a")
-	SaveSystem._pending_reason = ""   # без мира запись и так не пошла бы; очередь не тащим дальше
+	SaveSystem.delete_save()
+	check("«Сброс» отменяет запись, заказанную на конец кадра", SaveSystem._pending_reason == "")
 
 
 func _test_death_written() -> void:

@@ -26,6 +26,8 @@ static func has_save() -> bool:
 
 
 static func delete_save() -> void:
+	# Запись, заказанная на конец кадра до «Сброса», записала бы старый мир поверх сброшенного.
+	_pending_reason = ""
 	# Копия тоже: после «Сброса» из неё поднялась бы стёртая игра.
 	var dir := DirAccess.open("user://")
 	if dir == null:
@@ -401,7 +403,7 @@ static var _pending_reason: String = ""
 static func _flush_pending() -> void:
 	var reason := _pending_reason
 	_pending_reason = ""
-	if GameState.world_ref != null:
+	if not reason.is_empty() and GameState.world_ref != null:   # пусто — отменена delete_save()
 		save_now(reason)
 
 

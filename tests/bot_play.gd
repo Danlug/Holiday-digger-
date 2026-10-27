@@ -2620,6 +2620,14 @@ func _claim_meta() -> void:
 		qe.call("claim_bonus")
 		T.event(_sim, "quest_bonus", "сундук звёзд: +%d $" % (GameState.dollars - d0))
 		T.mark("first_star_chest", _sim)
+	# Стрик новичка: засчитанные дни — забрать награду (тот же код, что кнопка на экране стрика).
+	var ns = load("res://scripts/meta/newbie_streak.gd")
+	if ns != null and _has_static(ns, "claim_all"):
+		var before_ns := GameState.coins
+		var days := int(ns.call("claim_all"))
+		if days > 0:
+			T.event(_sim, "newbie_day", "дней %d, +%d, всего выполнено %d" % [days, GameState.coins - before_ns, int(ns.call("done_count"))])
+			T.mark("first_newbie_day", _sim)
 
 
 static func _has_static(s: Script, method: String) -> bool:

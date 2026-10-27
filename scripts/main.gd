@@ -166,6 +166,7 @@ func _ready() -> void:
 	add_child(story)
 	# --- конец блока сюжета ---
 	MetaService.attach(self)  # мета-слой: ежедневная награда, задания, достижения, дорога трофеев
+	NewbieStreakService.attach(self)  # стрик новичка: 30 дней своих миссий, пропуск за доллары, подарок за все 30 (scripts/meta/newbie_streak*.gd)
 	HintDirector.attach(self)  # подсказки «знакомство с системами»: кольцо, палец, метки «new» (scripts/hints/)
 
 	# --- бой глубже 4000: монстры, удар, снаряжение, рейдбосс на дне (ветка combat) ---

@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_drill_rig_dig_time_quarter_of_obsidian_pickaxe()
 	_test_shovel_cannot_dig_stone()
 	_test_tutorial_gold_does_not_stun()
+	_test_shovel_on_foundation_sends_to_workshop()
 	_test_gear_unlock_by_depth()
 	_test_exhaustion_penalty()
 	_test_sky_ceiling()
@@ -490,6 +491,52 @@ func _test_tutorial_gold_does_not_stun() -> void:
 	GameState.owned_tools = saved_tools
 	GameState.current_tool = "shovel"
 	GameState.story_seen.erase("workshop")
+	player.hold_down = false
+	player.stun_until_msec = 0.0
+
+
+## Лопата о фундамент: ни кирки в руках, ни стана — только слова. Раньше первый
+## удар сам выдавал ржавую кирку (tool_auto_switched("rusty_pickaxe")); теперь её
+## снимают со стены в мастерской (HouseSystem.take_starting_pickaxe), а игрок
+## узнаёт об этом из тоста, который сюжет вешает на dig_refused_by_story.
+func _test_shovel_on_foundation_sends_to_workshop() -> void:
+	var x := 23   # правее лестницы: гейт «только правее лестницы» не мешает
+	var fy := world.foundation_y()
+	for y in range(1, fy):
+		world.dig_cell(x, y)
+	check("фундамент под расчищенной колонкой на месте",
+		world.get_tile(x, fy) == TileTypes.Type.FOUNDATION)
+
+	GameState.current_tool = "shovel"
+	GameState.owned_tools = ["shovel"]
+	GameState.story_seen.erase("workshop")
+	player.x = float(x) + 0.5
+	player.y = float(fy) - player.HH - 0.01
+	player.vx = 0.0; player.vy = 0.0
+	player.on_ground = true
+	player.hold_dx = 0; player.hold_up = false; player.hold_down = true
+	player.digging = null
+	player.stun_until_msec = 0.0
+
+	var refusals: Array[String] = []
+	var switched: Array[String] = []
+	var on_refused := func(reason: String) -> void: refusals.append(reason)
+	var on_switched := func(tool_id: String) -> void: switched.append(tool_id)
+	player.dig_refused_by_story.connect(on_refused)
+	player.tool_auto_switched.connect(on_switched)
+
+	_tick(3)
+
+	check("лопата о фундамент: копка не началась", player.digging == null)
+	check("лопата о фундамент: объяснение «нужна кирка»", refusals.has("foundation_needs_pickaxe"))
+	check("лопата о фундамент: стана нет", player.stun_until_msec <= Time.get_ticks_msec())
+	check("лопата о фундамент: инструмент не сменился сам",
+		GameState.current_tool == "shovel" and switched.is_empty())
+	check("лопата о фундамент: кирка не выдана", not GameState.owned_tools.has("rusty_pickaxe"))
+	check("лопата о фундамент: фундамент цел", world.get_tile(x, fy) == TileTypes.Type.FOUNDATION)
+
+	player.dig_refused_by_story.disconnect(on_refused)
+	player.tool_auto_switched.disconnect(on_switched)
 	player.hold_down = false
 	player.stun_until_msec = 0.0
 

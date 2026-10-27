@@ -179,7 +179,6 @@ var coasting: bool = false
 var _fly_arm_at_msec: float = 0.0
 
 var rusty_pickaxe_cracked: bool = false
-var _seen_foundation: bool = false
 var _announced_backpack: bool = false
 var _announced_jetpack: bool = false
 var _announced_rig: bool = false

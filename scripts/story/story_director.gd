@@ -162,8 +162,6 @@ func _connect_signals() -> void:
 			player.dig_finished.connect(_on_dig_finished)
 		if player.has_signal("dig_started"):
 			player.dig_started.connect(_on_dig_started)
-		if player.has_signal("tool_auto_switched"):
-			player.tool_auto_switched.connect(_on_tool_auto_switched)
 	# Полный сброс прогресса (кнопка "Сброс" в нижней полосе) виден отсюда
 	# только по одному признаку: максимальная глубина откатилась к нулю — в
 	# обычной игре она умеет только расти. Свои сигналы GameState не отдаёт, а
@@ -834,19 +832,6 @@ func _on_dig_finished(_x: int, _y: int, type: int, _mineral_id: String, _was_loo
 ## киркой, так что момент точный.
 func _on_dig_started(_x: int, _y: int, _type: int) -> void:
 	pass
-
-
-## Кирка сейчас выдаётся игроком автоматически при первом ударе лопатой о
-## фундамент — это заглушка, оставшаяся от времён без сюжета. Перехватываем:
-## инструмент возвращаем, сцену мастерской играем, и кирку выдаёт уже она
-## (эффект tool). Так момент выдачи один и тот же и при просмотре, и при
-## пропуске, и после выхода из игры посреди ролика.
-func _on_tool_auto_switched(tool_id: String) -> void:
-	if tool_id != "rusty_pickaxe" or StoryState.is_seen("workshop"):
-		return
-	GameState.set_current_tool("shovel")
-	StoryState.enqueue("workshop")
-	_play_next_if_idle()
 
 
 func _on_max_depth_changed(depth: int) -> void:

@@ -48,6 +48,17 @@ static func speed_mult() -> float:
 	return maxf(1.0, MechData.num("greed", "speed_mult", 7.0))
 
 
+## Падение в жадности (владелец 27.10): каждые столько клеток полёта вниз — миг
+## остановки (Player._greed_fall_tick): разбиться нельзя, мгновенно спуститься тоже.
+static func fall_stop_cells() -> float:
+	return maxf(1.0, MechData.num("greed", "fall_stop_cells", 3.0))
+
+
+## Сколько реальных секунд длится остановка.
+static func fall_stop_seconds() -> float:
+	return maxf(0.0, MechData.num("greed", "fall_stop_s", 0.18))
+
+
 ## «С первого удара»: клетка разбивается в тот миг, когда кирка впервые бьёт по
 ## породе — через полпериода удара инструмента (так стоят звук и кадр удара:
 ## JuiceDirector). Кирка — 0.19 с, бурмобиль — 0.06 с.

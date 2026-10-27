@@ -8,7 +8,8 @@ extends Node
 ##  * камера: наезд на тяжёлом ударе и на жёстком приземлении;
 ##  * глубина: вехи каждые 10 / 100 / 1000 клеток (опыт за них давали молча);
 ##  * смерть: окно смерти (DeathWindow) после респавна — причина, потерянный рюкзак,
-##    плата больнице (ГДД §7).
+##    плата больнице (ГДД §7);
+##  * урон: тряска, наезд камеры и краснота экрана (HurtJuice).
 ## Пары к JuiceDirector («Звук и сок»): тот отвечает за звук и частицы, этот — за
 ## вес событий. Подписки на сигналы, чужой код не правится.
 
@@ -18,6 +19,7 @@ const COL_RARE := Color("6FE0D8")
 
 var player: Node = null
 var card: DeathWindow = null
+var hurt: HurtJuice = null
 
 var _pick_item: String = ""
 var _pick_frame: int = -1
@@ -44,6 +46,9 @@ func _ready() -> void:
 	card = DeathWindow.new()
 	card.name = "DeathWindow"
 	add_child(card)
+	hurt = HurtJuice.new()   # урон: тряска, наезд и краснота (владелец 27.10)
+	hurt.name = "HurtJuice"
+	add_child(hurt)
 	_prev_depth = GameState.max_depth_reached
 	_connect()
 

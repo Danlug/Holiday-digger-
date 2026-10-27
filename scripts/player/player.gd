@@ -216,6 +216,14 @@ var frozen: bool = false       # true во время сцены смерти/к
 ## Режим жадности (ГДД §20.1, scripts/mechanics/): MechDirector ставит множитель на
 ## время режима. Больше 1 — клетка копается с первого удара, ход/полёт/падение быстрее.
 var greed_mult: float = 1.0
+## Падение в жадности (владелец 27.10, ГДД §20.1): урона нет, а каждые
+## GreedRules.fall_stop_cells() клеток полёта вниз герой на миг «зацепляется» —
+## тоннель не убьёт, но и мгновенным лифтом вниз жадность не станет.
+signal greed_fall_stopped
+var _greed_hang_left: float = 0.0   # сколько ещё висеть (реальные секунды кадра)
+var _greed_fall_dist: float = 0.0   # клеток пролетел вниз с верхней точки или прошлой остановки
+var _greed_air: bool = false        # в этом полёте была жадность: урон — только за высоту после её конца
+var _greed_top_y: float = 0.5       # верхняя точка полёта после конца жадности
 
 # --- Отклик управления и копки (ветка aaa-feel; числа — data/feel.json) ---
 # Койот-время: прыжок можно нажать на пару кадров позже схода с уступа. Буфер:
@@ -676,6 +684,8 @@ func physics_tick(dt: float) -> void:
 		_hitstop_left -= dt
 		vx = 0.0
 		return
+	if _greed_hang_left > 0.0 and not _greed_hang(dt):
+		return
 	_feel_tick(dt)
 
 	var now := Time.get_ticks_msec()
@@ -684,11 +694,14 @@ func physics_tick(dt: float) -> void:
 	else:
 		_apply_intent(dt)
 
-	# Жадность ×N — N обычных шагов движения за кадр: та же траектория (и тот же
-	# урон от падения), только быстрее; столкновения проверяются на каждом шаге.
+	# Жадность ×N — N обычных шагов движения за кадр: та же траектория, только
+	# быстрее; столкновения проверяются на каждом шаге. Остановка падения —
+	# _greed_fall_tick, урона от падения в жадности нет — _land.
 	for _greed_step in maxi(1, roundi(greed_mult)):
 		_move_x(dt)
 		_move_y(dt)
+		if _greed_fall_tick(dt):
+			break
 
 	# Счётчик кадров идёт ВСЕГДА. Пока он тикал только при копке и ходьбе,
 	# покой, падение и полёт стояли на первом кадре и выглядели статикой.
@@ -933,6 +946,13 @@ func _move_y(dt: float) -> void:
 ## оба множителя 1.0, когда is_in_rig() ложь.
 func _land() -> void:
 	var v := vy
+	if greed_mult > 1.0:
+		return   # владелец 27.10: в жадности падение не ранит
+	if _greed_air:
+		# падение началось в жадности, а кончилось после неё: ранит только высота
+		# ниже точки конца жадности (или вершины, если потом взлетал) — скорость,
+		# набранная в жадности, не в счёт
+		v = minf(v, sqrt(2.0 * G * maxf(0.0, y - _greed_top_y)))
 	var dmg_mult := 1.0
 	var height_mult := 1.0
 	if is_in_rig():
@@ -946,6 +966,49 @@ func _land() -> void:
 	var cells := maxf(y - _air_top_y, v * v / (2.0 * G))
 	GameState.take_damage(dmg, "fall", {"cells": int(round(cells))})
 	fell.emit(dmg, v)
+
+
+## Шаг падения в жадности (зовётся после каждого из greed_mult шагов движения).
+## Отрезок копится от верхней точки — уступа, вершины прыжка, прошлой остановки;
+## под тягой ранца, на подъёме и на земле отсчёт идёт заново, поэтому подъём и
+## торможение ранцем, прыжок и копка вниз по клетке не останавливаются. Копим
+## пройденное за шаг (vy·dt — в свободном падении это ровно сдвиг _move_y), а не
+## разницу с запомненной точкой: героя, поставленного в воздух мимо физики (сцена,
+## телепорт, сейв), старая точка не остановит.
+## true — герой только что «зацепился»: остаток шагов кадра пропускается.
+func _greed_fall_tick(dt: float) -> bool:
+	if on_ground:
+		_greed_air = false
+	elif greed_mult > 1.0:
+		_greed_air = true
+		_greed_top_y = y
+	elif _greed_air:
+		_greed_top_y = minf(_greed_top_y, y)
+	if greed_mult <= 1.0 or on_ground or thrust != "" or vy <= 0.0 or GameState.debug_fly_300:
+		_greed_fall_dist = 0.0
+		return false
+	_greed_fall_dist += vy * dt
+	if _greed_fall_dist < GreedRules.fall_stop_cells():
+		return false
+	_greed_fall_dist = 0.0
+	_greed_hang_left = GreedRules.fall_stop_seconds()
+	vx = 0.0
+	vy = 0.0
+	greed_fall_stopped.emit()
+	return true
+
+
+## Кадр остановки: герой висит там, где «зацепился» (в пустой клетке — в породу он
+## не попадает). false — висит, кадр физики на этом кончается; true — отпустило
+## или игрок включает ранец: тягу остановка не держит.
+func _greed_hang(dt: float) -> bool:
+	if hold_up and has_backpack():
+		_greed_hang_left = 0.0
+		return true
+	_greed_hang_left -= dt
+	vx = 0.0
+	vy = 0.0
+	return false
 
 
 # ---------------------------------------------------------------------------
@@ -1310,10 +1373,13 @@ func _finish_dig() -> void:
 		if weight > free_kg:
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, 0)
 		else:
+			if lucky > 1:
+				LuckJuice.arm(mineral_id)   # подбор этой находки звучит громче и всплывает крупнее (владелец 27.10)
 			GameState.add_item(mineral_id, 1)
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, price)
 			if lucky > 1:
 				var extra := GameState.add_item(mineral_id, lucky - 1)
+				LuckJuice.disarm()
 				if extra > 0:
 					_lucky_find(d, mineral_id, extra + 1)
 
@@ -1347,12 +1413,13 @@ func _luck_roll(loot: bool) -> int:
 
 func _lucky_find(d: Dictionary, mineral_id: String, mult: int) -> void:
 	var pos := Vector2(d.x * 32.0 + 16.0, d.y * 32.0 + 16.0)
-	Fx.float_text(pos + Vector2(0, -20), "×%d" % mult, LUCK_COLOR)
-	if not mineral_id.is_empty():
-		# Удача на земле случается часто (до 10% клеток) — ей хватит цифры, без звука.
-		Fx.burst("pickup_glint", pos, 0.9)
-		Sfx.play("pickup_rare")
-		Haptics.tap()
+	# Отклик удачи (владелец 27.10): «×N» на 20% крупнее, у руды — вспышка, толчок и наезд
+	# камеры (LuckJuice). Звук удачи — сам подбор, громче на 50% (JuiceDirector); удача на
+	# земле случается часто (до 10% клеток) — ей хватит крупной цифры.
+	# крупные «+N» над головой и «×N» над клеткой не слипаются: подпись чуть в сторону клетки
+	var side := signf(pos.x - x * 32.0)
+	Fx.float_text(pos + Vector2(5.0 * side, -20), "×%d" % mult, LUCK_COLOR, LuckJuice.icon_scale())
+	LuckJuice.moment(pos, mineral_id)
 	GameState.emit_event(&"lucky_find", {"cell": Vector2i(d.x, d.y), "mineral": mineral_id, "mult": mult})
 
 

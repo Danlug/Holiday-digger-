@@ -104,6 +104,24 @@
 			]
 		},
 		{
+			"id": "unload_150",
+			"title": "unload_150.title",
+			"_comment": "Раунд 6: объяснение премиум-выгрузки на склад. Глубины у сцены нет — её запускает урок scripts/guidance/premium_unload_lesson.gd после нажатия по плитке выгрузки (затемнение и стрелка на 150).",
+			"arc": true,
+			"world": true,
+			"world_exit": "actor",
+			"beats": [
+				{"t": "world_actor", "actor": "boy", "pose": "idle", "camera": true},
+				{"t": "sfx", "id": "phone"},
+				{"t": "say", "who": "grandma_rich", "text": "unload_150.g1"},
+				{"t": "item", "icon": "res://art/ui/shop/item_premium_unload.png", "name": "item.premium_unload", "text": "unload_150.item_text"},
+				{"t": "say", "who": "boy", "text": "unload_150.s1"},
+				{"t": "say", "who": "grandma_rich", "text": "unload_150.g2"},
+				{"t": "card", "text": "unload_150.card_rules", "sec": 4.5}
+			],
+			"effects": []
+		},
+		{
 			"id": "fever_500",
 			"title": "fever_500.title",
 			"arc": true,

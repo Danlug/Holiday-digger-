@@ -411,7 +411,8 @@ func _test_director() -> void:
 	# --- сигналы GameState ---
 	rec.clear()
 	GameState.hp_changed.emit(88.0, 100.0)
-	check("hp вниз → hurt и красная вспышка", rec.has_play("hurt") and rec.flashes == 1)
+	# краснота, тряска и наезд урона с 27.10 — HurtJuice (tests/test_hurt_juice.gd), не общая вспышка
+	check("hp вниз → hurt, без общей вспышки и тряски", rec.has_play("hurt") and rec.flashes == 0 and rec.shakes == 0)
 	rec.clear()
 	GameState.hp_changed.emit(87.9, 100.0)
 	check("капля голода не вызывает hurt на каждый кадр", not rec.has_play("hurt"))
@@ -637,7 +638,9 @@ func _test_integration() -> void:
 	var played1: int = sfx.stats["played"]
 	sfx._last_ms.clear()
 	GameState.take_damage(20.0, "test")
-	check("настоящий урон: звук и красная вспышка", sfx.stats["played"] > played1 and fx._flash.color.a > 0.0)
+	# краснота урона с 27.10 — HurtJuice (scripts/feel/), а не общая вспышка Fx
+	var hurt: HurtJuice = main.get_node("FeelDirector").hurt
+	check("настоящий урон: звук и краснота экрана", sfx.stats["played"] > played1 and hurt.alpha() > 0.0)
 	GameState.heal(100.0)
 	await get_tree().create_timer(0.7).timeout
 	check("музыка по контексту включилась сама (%s)" % sfx.current_music(), sfx.current_music() != "")

@@ -333,15 +333,15 @@ func _test_death_window() -> void:
 	await get_tree().process_frame
 
 
-## Экономика лечения: смерть лечит не лучше аптечки, аптечка не отменяет таблетку.
+## Экономика лечения: смерть лечит не лучше аптечки, аптечка не отменяет сон.
 func _test_economy_ordering() -> void:
 	var medkit := ShopCatalog.good_price(ShopCatalog.good("medkit", "coins"), "coins")
 	# владелец (разбор чисел, 26.10): «только хп полное» — смерть лечит до 100%, её цена — рюкзак
 	# и плата больнице; аптечка остаётся лечением без потери рюкзака и без дороги вниз заново
 	check("после смерти HP полное (решение владельца)", is_equal_approx(Healing.respawn_hp_percent(), 100.0))
-	var pill := ShopCatalog.good("full_restore_pill", "dollars")
-	check("таблетка по-прежнему полное восстановление трёх полосок", String(pill.get("effect", "")) == "full_restore")
-	check("аптечка лечит не всё (таблетка не лишняя)", Healing.medkit_hp_percent() < 100)
+	# Раунд 6: таблетка восстановления снята с продажи, её место — выгрузка на склад.
+	check("таблетки за доллары больше нет", ShopCatalog.good("full_restore_pill", "dollars").is_empty())
+	check("аптечка лечит не всё (сон и еда не лишние)", Healing.medkit_hp_percent() < 100)
 	var steak_coins := HouseConfig.food_price_coins("food_steak")
 	check("аптечка лечит дешевле еды за процент HP", float(medkit) / Healing.medkit_hp_percent()
 		< float(steak_coins) / Healing.food_hp_percent("food_steak"))

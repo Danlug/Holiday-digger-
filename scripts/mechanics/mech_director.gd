@@ -80,6 +80,7 @@ func _build() -> void:
 	var meter_layer := CanvasLayer.new()
 	meter_layer.name = "StreakLayer"
 	meter_layer.layer = UiLayers.HUD_WIDGETS   # рядом с HUD и значками техники, ниже шторок и экранов
+	meter_layer.add_to_group(UiLayers.WIDGETS_GROUP)
 	add_child(meter_layer)
 	meter = StreakMeter.new()
 	meter.name = "StreakMeter"

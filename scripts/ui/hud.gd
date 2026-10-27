@@ -282,11 +282,17 @@ func _build_windows_layer() -> void:
 	_windows_stage.offset_bottom = -STRIP_H
 	_windows_root.add_child(_windows_stage)
 	visibility_changed.connect(_sync_windows_layer)
+	_sync_windows_layer.call_deferred()   # слои виджетов main.gd заводит позже HUD
 
 
 func _sync_windows_layer() -> void:
+	var shown := is_visible_in_tree()
 	if _windows_layer != null:
-		_windows_layer.visible = is_visible_in_tree()
+		_windows_layer.visible = shown
+	# Виджеты со своим слоем (трекер проекта, бак и термометр, шкала азарта) — тоже:
+	# иначе в сюжетном диалоге HUD исчезал, а трекер бура висел над сценой один.
+	for n: Node in get_tree().get_nodes_in_group(UiLayers.WIDGETS_GROUP):
+		(n as CanvasLayer).visible = shown
 
 
 ## Левый верхний угол: портрет героя (кнопка «Герой», уровень и опыт под ним)

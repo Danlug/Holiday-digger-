@@ -41,6 +41,7 @@ func _ready() -> void:
 	var layer := CanvasLayer.new()
 	layer.name = "ProjectTrackerLayer"
 	layer.layer = UiLayers.HUD_WIDGETS   # рядом с HUD и шкалой азарта, ниже шторок и экранов
+	layer.add_to_group(UiLayers.WIDGETS_GROUP)
 	add_child(layer)
 	tracker = ProjectTracker.new()
 	tracker.name = "ProjectTracker"

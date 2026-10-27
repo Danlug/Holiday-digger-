@@ -261,6 +261,21 @@ func _check_visibility_follows_hud() -> void:
 		hidden_ok and hud._windows_layer.visible and hud._inv_sheet.is_visible_in_tree())
 	hud.close_inventory()
 	await _frames(2)
+	# Виджеты со своим слоем — так же: в сюжетном диалоге (StoryDirector._take_control прячет
+	# HUD) трекер бура висел над сценой один, без остального HUD (владелец 27.10).
+	var layers := get_tree().get_nodes_in_group(UiLayers.WIDGETS_GROUP)
+	var names := layers.map(func(l: Node) -> String: return String(l.name))
+	check("слои HUD-виджетов в группе (трекер, бак, азарт): %s" % ", ".join(names),
+		names.has("ProjectTrackerLayer") and names.has("TechHudLayer") and names.has("StreakLayer"))
+	var tr_shown := tracker.is_visible_in_tree()
+	hud.visible = false
+	await _frames(1)
+	var gone := layers.all(func(l: Node) -> bool: return not (l as CanvasLayer).visible) 		and not tracker.is_visible_in_tree()
+	hud.visible = true
+	await _frames(1)
+	check("HUD спрятан (диалог сюжета, дом) — трекер бура и другие виджеты прячутся, показан — возвращаются",
+		tr_shown and gone and layers.all(func(l: Node) -> bool: return (l as CanvasLayer).visible)
+		and tracker.is_visible_in_tree())
 
 
 ## Контроль: окна HUD на слое HUD (как было до 26.10) — трекер снова над рюкзаком, и обе

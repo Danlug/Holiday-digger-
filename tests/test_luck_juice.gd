@@ -123,8 +123,8 @@ func _dig(lucky: bool, want_loot: bool = true, want_type: int = -1) -> void:
 func _test_normal_find() -> void:
 	_fresh()
 	_dig(false)
-	var pick := rec.last("play")
-	check("обычная находка: звук подбора обычной громкости", not pick.is_empty() and float(pick[3]) == 0.0)
+	var picks := rec.all("play").filter(func(c: Array) -> bool: return String(c[1]).begins_with("pickup"))
+	check("обычная находка: звук подбора обычной громкости", picks.size() == 1 and float(picks[0][3]) == 0.0)
 	var st := rec.last("float_stack")
 	check("обычная находка: «+1» обычного размера", not st.is_empty() and float(st[6]) == 1.0)
 	check("обычная находка: нет «×N»", rec.count("float_text") == 0)

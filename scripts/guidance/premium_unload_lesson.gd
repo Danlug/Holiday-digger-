@@ -189,7 +189,9 @@ func _tile() -> ShopTile:
 	if ui == null or not ui.is_open():
 		return null
 	var t = ui._tiles.get(TILE_KEY)
-	return t as ShopTile if t is ShopTile and is_instance_valid(t) and (t as ShopTile).is_visible_in_tree() else null
+	if t == null or not is_instance_valid(t) or not (t is ShopTile):   # витрина пересобирает плитки
+		return null
+	return t as ShopTile if (t as ShopTile).is_visible_in_tree() else null
 
 
 # ---------------------------------------------------------------------------

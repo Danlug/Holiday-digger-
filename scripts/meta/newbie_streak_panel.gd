@@ -1,13 +1,13 @@
 class_name NewbieStreakPanel
 extends CanvasLayer
 ## Экран стрика новичка: календарь из 30 плиток-дней (6 × 5), под ним — карточка
-## выбранного дня (миссии с полосками, награда, «Забрать» или «Вернуть за 50 $»)
-## и в самом низу — закрытая карточка крупного подарка за все 30 дней («скоро»).
+## выбранного дня (награда, «Забрать» или «Вернуть за 50 $») и в самом низу —
+## закрытая карточка крупного подарка за все 30 дней («скоро»). Миссий нет:
+## день отмечается за вход (NewbieStreak.refresh).
 ##
-## Плитки: сегодня — золотая рамка и кольцо прогресса; выполнен — галочка (или
-## подарок, пока награда не забрана); пропущен — красноватая с долларом;
-## закрыт — номер и замок. Названия миссий и описания — только в Tip (правило
-## владельца): у миссии — по короткому тапу, у плиток — долгим нажатием.
+## Плитки: сегодня — золотая рамка; отмечен — галочка (или подарок, пока
+## награда не забрана); пропущен — красноватая с долларом; закрыт — номер и
+## замок. Описания — только в Tip (правило владельца), у плиток — долгим нажатием.
 ## Окно пересобирается целиком при каждом изменении: состояние живёт в
 ## GameState.ext, а не в узлах.
 
@@ -16,10 +16,8 @@ signal closed
 const CARD_W := 212.0
 const COLS := 6
 const TILE := Vector2(30, 32)
-const ROW_H := 20.0
-const GLYPH := 18.0
-## Карточка дня одной высоты (5 миссий и кнопка) — календарь не прыгает при выборе другого дня.
-const DETAIL_H := 166.0
+## Карточка дня одной высоты (строка дня и кнопка) — календарь не прыгает при выборе другого дня.
+const DETAIL_H := 72.0
 
 const BG_TODAY := Color8(0x2E, 0x26, 0x12)
 const BG_DONE := Color8(0x1B, 0x2A, 0x1C)
@@ -295,13 +293,7 @@ func _tile(n: int) -> Control:
 		NewbieStreak.St.LOCKED:
 			num_col = MetaUiKit.DIM
 
-	if st == NewbieStreak.St.TODAY:
-		var ring := MetaRing.new()
-		ring.size = Vector2(24, 24)
-		ring.position = Vector2(3, 4)
-		ring.ring_color = MetaUiKit.GREEN if NewbieStreak.missions_complete(n) else MetaUiKit.GOLD
-		ring.value = NewbieStreak.fraction(n)
-		b.add_child(ring)
+	if st == NewbieStreak.St.TODAY:   # миг до отметки (она — в ближайшую секунду): крупный номер
 		var big := _num_label(n, 11, num_col)
 		big.position = Vector2(0, 8)
 		big.size = Vector2(TILE.x, 14)
@@ -420,10 +412,6 @@ func _detail(n: int) -> Control:
 		v.add_child(_locked_body(n))
 		return card
 
-	var ms := NewbieStreak.missions(n)
-	for i in range(ms.size()):
-		v.add_child(_mission_row(n, i))
-
 	if NewbieStreak.can_claim(n):
 		v.add_child(_claim_button(n))
 	elif st == NewbieStreak.St.MISSED:
@@ -446,57 +434,6 @@ func _locked_body(n: int) -> Control:
 	Tip.bind(cl, NewbieStreak.text("locked"), NewbieStreak.text("locked_body") % NewbieStreak.days_until(n))
 	h.add_child(cl)
 	return h
-
-
-func _mission_row(n: int, i: int) -> Control:
-	var m: Dictionary = NewbieStreak.missions(n)[i]
-	var target := NewbieStreak.target_of(m)
-	var prog := NewbieStreak.progress(n, i)
-	var done := prog >= target
-	var faded := NewbieStreak.status(n) == NewbieStreak.St.MISSED
-	var row := HBoxContainer.new()
-	row.name = "Mission%d" % i
-	row.custom_minimum_size = Vector2(0, ROW_H)
-	row.add_theme_constant_override("separation", 4)
-	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	var g := MetaUiKit.icon_rect(glyph(String(m.get("glyph", "dig"))), GLYPH)
-	if faded:
-		g.modulate = Color(0.6, 0.6, 0.6)
-	row.add_child(g)
-	var bar := MetaBar.new()
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.custom_minimum_size = Vector2(40, 13)
-	bar.font_size = 9
-	bar.frac = float(prog) / float(target)
-	bar.text = "%s/%s" % [MetaUiKit.compact(prog), MetaUiKit.compact(target)]
-	bar.fill_color = MetaUiKit.GREEN if done else (MetaUiKit.MUTED if faded else MetaUiKit.GOLD)
-	row.add_child(bar)
-	var mark := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 14)
-	if not done:
-		mark.modulate = Color(1, 1, 1, 0)   # место держим: полоски одной длины
-	row.add_child(mark)
-	var body := NewbieStreak.mission_desc(m)
-	if not done and not faded:
-		body = ((body + "\n") if body != "" else "") + NewbieStreak.text("left") % (target - prog)
-	Tip.bind_tap(row, NewbieStreak.mission_title(m), body, NewbieStreak.text("mission_done") if done else "")
-	return row
-
-
-## Значок миссии: имя значка мета-слоя, «item:<id>» — значок предмета витрины,
-## «res://…» — готовая картинка, «storage»/«fever» — общие значки склада и азарта.
-static func glyph(name: String) -> Texture2D:
-	if name.begins_with("res://"):
-		return load(name) if ResourceLoader.exists(name) else MetaUiKit.tex("gift")
-	if name.begins_with("item:"):
-		var t := ShopArt.tex("item_" + name.substr(5))
-		return t if t != null else MetaUiKit.tex("nugget")
-	match name:
-		"storage":
-			return ShopArt.tex("glyph_storage")
-		"fever":
-			return glyph("res://art/mechanics/fever.png")
-	return MetaUiKit.tex(name)
 
 
 func _reward_row(r: Dictionary) -> HBoxContainer:

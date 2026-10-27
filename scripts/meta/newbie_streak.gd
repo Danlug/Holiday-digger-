@@ -1,28 +1,27 @@
 class_name NewbieStreak
 extends RefCounted
-## Стрик новичка (владелец 27.10): 30 дней, у каждого свой заранее заданный
-## набор миссий (data/newbie_streak.json). Чистая логика над GameState.ext —
-## без узлов, поэтому проверяется автотестом на подставных часах и событиях.
+## Стрик новичка (владелец 27.10): 30 дней ежедневной отметки за вход — «это не
+## миссии, а просто отметка за ежедневный вход». Награды дней — data/newbie_streak.json.
+## Чистая логика над GameState.ext — без узлов, поэтому проверяется автотестом
+## на подставных часах.
 ##
 ## Календарь. День 1 — местные сутки, в которые мета-слой включился (конец
 ## онбординга); у сейва, где мета-слой уже был включён, — сутки первого запуска
-## с этой версией. День N открыт в N-е сутки и только в них: выполнять можно
-## лишь «сегодняшний» день, прошедший невыполненный — пропущен (его можно
+## с этой версией. День N открыт в N-е сутки и только в них: отметить можно
+## лишь «сегодняшний» день, прошедший неотмеченный — пропущен (его можно
 ## вернуть за доллары, в любой момент, и после 30-х суток тоже — иначе крупный
 ## подарок сгорал бы навсегда), будущие закрыты. «Сегодня» — MetaState.today():
 ## местная полночь, как у заданий дня, и не идёт назад — перевод часов назад и
 ## смена пояса на запад не открывают вчерашний день заново.
 ##
-## Миссия — счётчик события шины за сутки своего дня (event/filter/sum — тот же
-## разбор, что у шаблонов заданий, QuestEngine.matches) или состояние игры
-## (check: рекорд глубины, уровень, артефакты, инструмент, скважина — если уже
-## есть, миссия выполнена сразу). День засчитывается в момент, когда выполнены
-## все его миссии, — награду можно забрать и позже, день от этого не сгорает.
+## Отметка: игра открыта (мета-слой включён) в сутки дня — день засчитан сразу,
+## делать ничего не надо (refresh, его зовёт узел раз в секунду). Награду можно
+## забрать и позже, день от этого не сгорает.
 ##
 ## Схема GameState.ext["newbie_streak"]:
 ##   v      — версия схемы
 ##   start  — местные сутки дня 1 (-1 — ещё не начался)
-##   days   — {"N": {p: [прогресс по миссиям], done, how: "missions"|"bought", at: сутки, claimed}}
+##   days   — {"N": {done, how: "visit"|"bought" (у старых сейвов — "missions"), at: сутки, claimed}}
 ##   grand  — крупный подарок забран (заглушка: пока не выдаётся)
 
 const KEY := "newbie_streak"
@@ -45,11 +44,6 @@ static func data() -> Dictionary:
 			var parsed = JSON.parse_string(f.get_as_text())
 			if typeof(parsed) == TYPE_DICTIONARY:
 				_data = parsed
-		# QuestEngine.matches читает filter у каждой миссии-события — пустой заводим один раз здесь.
-		for d in _data.get("days", []):
-			for m in (d as Dictionary).get("missions", []):
-				if (m as Dictionary).has("event") and not (m as Dictionary).has("filter"):
-					m["filter"] = {}
 		if _data.is_empty():
 			push_error("NewbieStreak: не удалось прочитать %s" % DATA_PATH)
 	return _data
@@ -70,10 +64,6 @@ static func day_def(n: int) -> Dictionary:
 	return days[n - 1]
 
 
-static func missions(n: int) -> Array:
-	return day_def(n).get("missions", [])
-
-
 static func reward(n: int) -> Dictionary:
 	return MetaRewards.normalize(day_def(n).get("reward", {}))
 
@@ -85,19 +75,6 @@ static func text(key: String) -> String:
 	if table.has(key):
 		return String(table[key])
 	return String(texts.get("ru", {}).get(key, key))
-
-
-static func _lang_field(d: Dictionary, base: String) -> String:
-	var own := "%s_%s" % [base, String(Settings.language)]
-	return String(d.get(own, d.get(base + "_ru", "")))
-
-
-static func mission_title(m: Dictionary) -> String:
-	return _lang_field(m, "name").replace("{n}", str(int(m.get("target", 1))))
-
-
-static func mission_desc(m: Dictionary) -> String:
-	return _lang_field(m, "desc")
 
 
 ## «300 монет · 120 опыта · Энергетик ×1» — для подсказки.
@@ -166,14 +143,8 @@ static func rec(n: int) -> Dictionary:
 	var k := str(n)
 	var r = days.get(k)
 	if typeof(r) != TYPE_DICTIONARY:
-		r = {"p": [], "done": false, "claimed": false}
+		r = {"done": false, "claimed": false}
 		days[k] = r
-	var p = r.get("p")
-	if typeof(p) != TYPE_ARRAY:
-		p = []
-		r["p"] = p
-	while (p as Array).size() < missions(n).size():
-		(p as Array).append(0)
 	return r
 
 
@@ -229,129 +200,20 @@ static func days_until(n: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Миссии
+# Отметка за вход
 # ---------------------------------------------------------------------------
 
-static func is_check(m: Dictionary) -> bool:
-	return String(m.get("check", "")) != ""
-
-
-static func target_of(m: Dictionary) -> int:
-	return maxi(1, int(m.get("target", 1)))
-
-
-## Состояние игры для миссии-проверки (рекорд, уровень…).
-static func check_value(m: Dictionary) -> int:
-	match String(m.get("check", "")):
-		"depth":
-			return GameState.max_depth_reached
-		"level":
-			return GameState.level
-		"artifacts":
-			return GameState.collected_artifacts.size()
-		"tool":
-			return 1 if GameState.owned_tools.has(String(m.get("item", ""))) else 0
-		"well":
-			return GameState.well_level
-	return 0
-
-
-## Прогресс миссии i дня n (не больше цели). У сегодняшнего дня проверки
-## смотрят на игру вживую; у засчитанного — всё выполнено; у прочих — что
-## накопилось в свои сутки.
-static func progress(n: int, i: int) -> int:
-	var ms := missions(n)
-	if i < 0 or i >= ms.size():
-		return 0
-	var m: Dictionary = ms[i]
-	var t := target_of(m)
-	if is_done(n):
-		return t
-	if is_check(m):
-		return mini(check_value(m), t) if status(n) == St.TODAY else 0
-	var p: Array = _peek(n).get("p", [])
-	return mini(int(p[i]) if i < p.size() else 0, t)
-
-
-static func mission_done(n: int, i: int) -> bool:
-	return progress(n, i) >= target_of(missions(n)[i])
-
-
-static func missions_complete(n: int) -> bool:
-	var ms := missions(n)
-	if ms.is_empty():
-		return false
-	for i in range(ms.size()):
-		if not mission_done(n, i):
-			return false
-	return true
-
-
-## Доля дня для кольца плитки: среднее по миссиям.
-static func fraction(n: int) -> float:
-	var ms := missions(n)
-	if ms.is_empty():
-		return 0.0
-	var sum := 0.0
-	for i in range(ms.size()):
-		sum += float(progress(n, i)) / float(target_of(ms[i]))
-	return sum / float(ms.size())
-
-
-static func _matches(m: Dictionary, ev: StringName, d: Dictionary) -> bool:
-	if not QuestEngine.matches(m, ev, d):
-		return false
-	# Ключи фильтра сверх разбора заданий дня.
-	var f: Dictionary = m.get("filter", {})
-	if f.has("dir") and String(d.get("dir", "")) != String(f["dir"]):
-		return false
-	return true
-
-
-static func _amount(m: Dictionary, d: Dictionary) -> int:
-	var s := String(m.get("sum", ""))
-	return 1 if s == "" else maxi(0, int(d.get(s, 1)))
-
-
-## Событие шины (или сигнал GameState, сведённый в событие). Двигает только
-## сегодняшний день. Возвращает номер дня, засчитанного именно сейчас, или 0.
-static func on_event(ev: StringName, d: Dictionary) -> int:
-	ensure_started()
-	var n := today_n()
-	if n == 0 or is_done(n):
-		return 0
-	var ms := missions(n)
-	var r := {}
-	for i in range(ms.size()):
-		var m: Dictionary = ms[i]
-		if is_check(m) or not m.has("event") or not _matches(m, ev, d):
-			continue
-		if r.is_empty():
-			r = rec(n)
-		var p: Array = r["p"]
-		p[i] = mini(target_of(m), int(p[i]) + _amount(m, d))
-	return _complete_if_ready(n)
-
-
-## Проверки (рекорд, уровень…) могли выполниться без события стрика: зовётся
-## по таймеру и при открытии экрана. Возвращает номер засчитанного сейчас дня или 0.
+## Отметить сегодняшний день, если ещё не отмечен. Зовётся узлом раз в секунду —
+## так отмечается и первый вход за сутки, и полночь посреди игры. Возвращает
+## номер дня, отмеченного именно сейчас, или 0.
 static func refresh() -> int:
 	ensure_started()
 	var n := today_n()
 	if n == 0 or is_done(n):
 		return 0
-	return _complete_if_ready(n)
-
-
-static func _complete_if_ready(n: int) -> int:
-	if not missions_complete(n):
-		return 0
 	var r := rec(n)
-	var ms := missions(n)
-	for i in range(ms.size()):
-		r["p"][i] = target_of(ms[i])   # снимок: проверки дальше не пересчитываются
 	r["done"] = true
-	r["how"] = "missions"
+	r["how"] = "visit"
 	r["at"] = MetaState.today()
 	return n
 
@@ -395,7 +257,7 @@ static func can_restore(n: int) -> bool:
 	return status(n) == St.MISSED and GameState.dollars >= restore_price()
 
 
-## Вернуть пропущенный день за доллары: засчитывается целиком, без миссий, и
+## Вернуть пропущенный день за доллары: отмечается и
 ## сразу выдаёт награду дня. Сейв пишется сразу — это покупка за доллары.
 static func restore(n: int) -> Dictionary:
 	if status(n) != St.MISSED:

@@ -1,11 +1,12 @@
 class_name NewbieStreakService
 extends Node
-## Узел стрика новичка: слушает шину событий и сигналы GameState, кормит ими
-## NewbieStreak (логика), держит экран и пункт меню «•••». Подключается одной
-## строкой в main.gd: NewbieStreakService.attach(self).
+## Узел стрика новичка: раз в секунду отмечает сегодняшний день
+## (NewbieStreak.refresh — отметка за вход), держит экран и пункт меню «•••».
+## Подключается одной строкой в main.gd: NewbieStreakService.attach(self).
 ##
 ## Тостов нет и бейджа в меню нет (заказ 27.10: поведение тостов и счётчика
-## «•••» не меняем) — засчитанный день виден на экране стрика.
+## «•••» не меняем) — отмеченный день виден кнопкой стрика на главном экране
+## (NewbieStreakButton, под кнопкой ежедневных миссий) и на экране стрика.
 
 const POLL_SEC := 1.0
 
@@ -13,7 +14,7 @@ static var instance: NewbieStreakService = null
 
 var panel: NewbieStreakPanel = null
 
-var _acc: float = 0.0
+var _acc: float = POLL_SEC   # первая проверка — в первом кадре: вход отмечается сразу, а не через секунду
 var _locked: bool = false
 var _was_frozen: bool = false
 var _hud_input_was_on: bool = true
@@ -34,10 +35,6 @@ func _ready() -> void:
 	panel.name = "NewbieStreakPanel"
 	add_child(panel)
 	panel.closed.connect(_on_closed)
-	GameState.game_event.connect(_on_bus)
-	GameState.max_depth_changed.connect(_on_max_depth)
-	GameState.leveled_up.connect(_on_leveled_up)
-	GameState.artifact_collected.connect(_on_artifact)
 	_register_menu()
 
 
@@ -55,29 +52,8 @@ func _process(delta: float) -> void:
 		_done(NewbieStreak.refresh())
 
 
-func _on_bus(id: StringName, data: Dictionary) -> void:
-	_apply(id, data)
-
-
-func _on_max_depth(depth: int) -> void:
-	_apply(&"max_depth_changed", {"depth": depth})
-
-
-func _on_leveled_up(level: int, _points: int) -> void:
-	_apply(&"leveled_up", {"level": level})
-
-
-func _on_artifact(id: String) -> void:
-	_apply(&"artifact_collected", {"id": id})
-
-
-func _apply(id: StringName, data: Dictionary) -> void:
-	if MetaState.is_unlocked():
-		_done(NewbieStreak.on_event(id, data))
-
-
-## День засчитан (n > 0): в сейв в конце кадра — иначе закрытая до автосейва
-## игра, открытая уже завтра, потеряла бы выполненный день.
+## День отмечен (n > 0): в сейв в конце кадра — иначе закрытая до автосейва
+## игра, открытая уже завтра, потеряла бы отметку.
 func _done(n: int) -> void:
 	if n <= 0:
 		return

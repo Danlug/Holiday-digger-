@@ -268,6 +268,7 @@ func _widgets() -> Dictionary:
 	_add(out, "бодрость", hud._stamina_bar)
 	_add(out, "задание", hud._quest_button)
 	_add(out, "задания дня", main.find_child("DailyTasksButton", true, false) as Control)
+	_add(out, "стрик новичка", main.find_child("NewbieStreakButton", true, false) as Control)
 	_add(out, "азарт", main.find_child("StreakMeter", true, false) as Control)
 	_add(out, "монеты", hud._coins_pill)
 	_add(out, "доллары", hud._dollars_pill)

@@ -1,7 +1,7 @@
 extends Node
 ## test_screenshot_newbie — не автотест, а инструмент: поднимает настоящую main-сцену
-## и снимает экран стрика новичка: пункт в меню «•••», первые дни (сегодня — день 3),
-## подсказка миссии, пропущенный день с кнопкой «Вернуть за 50 $» (хватает и не хватает
+## и снимает стрик новичка: кнопку на главном экране под ежедневными миссиями, пункт в
+## меню «•••», первые дни (сегодня — день 3, отмечен входом), пропущенный день с кнопкой «Вернуть за 50 $» (хватает и не хватает
 ## долларов), закрытый день, конец месяца с карточкой подарка, английский язык.
 ##
 ##   XDG_DATA_HOME=$PWD/.godot/xdg xvfb-run -a -s "-screen 0 1280x1024x24" godot --path . \
@@ -51,11 +51,10 @@ func _ready() -> void:
 	NewbieStreak.state()["start"] = BASE_DAY - 2
 	_finish_day(1, true)
 	_finish_day(2, false)
-	var r3 := NewbieStreak.rec(3)
-	r3["p"][0] = 12   # камни 12/20
-	r3["p"][1] = 15   # железо 15/15
-	r3["p"][2] = 1    # еда 1/2
-	await _wait(0.3)
+	await _wait(1.3)   # узел стрика отмечает сегодняшний вход (опрос раз в секунду)
+
+	# 0. Главный экран: кнопка стрика под кнопкой ежедневных миссий.
+	await _shot("00_main_screen")
 
 	# 1. Меню «•••» с пунктом стрика.
 	main.hud.call("_toggle_more_menu")
@@ -68,12 +67,6 @@ func _ready() -> void:
 	svc.open()
 	await _wait(0.7)
 	await _shot("02_first_days")
-	# Подсказка миссии по тапу.
-	var row := svc.panel._box.find_child("Mission0", true, false) as Control
-	Tip.tap_toggle(row)
-	await _wait(0.25)
-	await _shot("03_mission_tip")
-	Tip.hide_all()
 	# День 2 — выполнен, награда ждёт.
 	svc.panel.select(2)
 	await _wait(0.3)
@@ -89,9 +82,6 @@ func _ready() -> void:
 	NewbieStreak.state()["start"] = BASE_DAY - 8
 	for n in [3, 5, 7, 8]:
 		_finish_day(n, true)
-	var r9 := NewbieStreak.rec(9)
-	r9["p"][1] = 1
-	r9["p"][2] = 260
 	svc.open()
 	await _wait(0.5)
 	svc.panel.select(6)
@@ -144,11 +134,8 @@ func _ready() -> void:
 
 func _finish_day(n: int, claimed: bool) -> void:
 	var r := NewbieStreak.rec(n)
-	var ms := NewbieStreak.missions(n)
-	for i in range(ms.size()):
-		r["p"][i] = NewbieStreak.target_of(ms[i])
 	r["done"] = true
-	r["how"] = "missions"
+	r["how"] = "visit"
 	r["claimed"] = claimed
 
 

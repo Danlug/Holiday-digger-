@@ -333,6 +333,7 @@ func _build_gauges(parent: Control) -> void:
 
 	_build_quest_button(box)
 	_anchors["tasks"] = DailyTasksButton.mount(box).button   # ежедневные задания (ветка daily-tasks, scripts/meta/); до онбординга скрыта
+	_anchors["newbie"] = NewbieStreakButton.mount(box).button   # стрик новичка 30 дней — под ежедневными миссиями (владелец 27.10)
 
 
 func _make_gauge(parent: Control, color: Color, icon_name: String, anchor_id: String) -> HudBar:

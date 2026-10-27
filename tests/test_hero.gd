@@ -319,7 +319,7 @@ func _test_find_records_depth() -> void:
 	add_child(finder)
 	finder.setup(null, null)
 	var artifact: Dictionary = Balance.get_artifacts_in_branch(1)[2]
-	var cell: Vector2i = ArtifactSpawn.candidate_cells(artifact, GameState.world_seed)[0]
+	var cell: Vector2i = ArtifactSpawn.cell_of(artifact, GameState.world_seed, GameState.world_ref)
 	var id := finder.claim_at(cell.x, cell.y)
 	check_eq("находка выдана", id, String(artifact["id"]))
 	check_eq("глубина находки = строка клетки", HeroData.find_depth(id), cell.y)

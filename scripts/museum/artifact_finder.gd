@@ -14,8 +14,16 @@ extends Node
 
 signal artifact_found(artifact_id: String)
 
+## Как близко герой должен подойти к артефакту, лежащему в пустой клетке (её
+## вырвал обвал или землетрясение — копать там нечего), чтобы подобрать его.
+## Тот же радиус касания, что у сундука полости (data/caves.json → chest.touch_radius).
+const TOUCH_RADIUS := 1.15
+
+var layer: ArtifactLayer = null
+
 var _hud: Node = null
 var _player: Node = null
+var _touch_left := 0.0
 
 
 func setup(player: Node, hud: Node) -> void:
@@ -25,6 +33,25 @@ func setup(player: Node, hud: Node) -> void:
 		player.dig_finished.connect(_on_dig_finished)
 	if not GameState.branch_completed.is_connected(_on_branch_completed):
 		GameState.branch_completed.connect(_on_branch_completed)
+	_attach_layer(player)
+
+
+## Артефакты в породе рисует ArtifactLayer в ViewRoot (родитель героя) сразу над
+## тайлами мира — как сундуки: свет глубины и тени ложатся на него как на породу.
+func _attach_layer(player: Node) -> void:
+	if layer != null or player == null or player.get_parent() == null:
+		return
+	var view_root := player.get_parent()
+	layer = ArtifactLayer.new()
+	layer.name = "ArtifactLayer"
+	layer.player = player
+	layer.world = player.get("world")
+	var host := view_root.get_parent()
+	layer.fog = host.get("fog") if host != null else null
+	view_root.add_child(layer)
+	var wv := view_root.get_node_or_null("WorldView")
+	if wv != null:
+		view_root.move_child(layer, wv.get_index() + 1)
 
 
 ## Проверка клетки без раскопки — нужна витрине и тестам.
@@ -32,7 +59,27 @@ func artifact_at(x: int, y: int) -> String:
 	return ArtifactSpawn.artifact_id_at(
 		x, y, GameState.world_seed,
 		Balance.artifacts.get("artifacts", []),
-		GameState.collected_artifacts)
+		GameState.collected_artifacts, GameState.world_ref)
+
+
+## Артефакт в пустой клетке подбирается касанием: проверка 5 раз в секунду.
+func _process(delta: float) -> void:
+	_touch_left -= delta
+	if _touch_left > 0.0:
+		return
+	_touch_left = 0.2
+	var world := GameState.world_ref
+	if _player == null or world == null or not ("x" in _player) or world.era == "grandpa":
+		return   # во флешбэке деда копает дед — находки внука не трогаем
+	var hero := Vector2(float(_player.x), float(_player.y))
+	for a: Dictionary in Balance.artifacts.get("artifacts", []):
+		if GameState.collected_artifacts.has(String(a.get("id", ""))):
+			continue
+		var c := ArtifactSpawn.cell_of(a, GameState.world_seed, world)
+		if absf(float(c.y) - hero.y) > 3.0 or world.get_tile(c.x, c.y) != TileTypes.Type.EMPTY:
+			continue
+		if hero.distance_to(Vector2(c.x + 0.5, c.y + 0.5)) <= TOUCH_RADIUS:
+			claim_at(c.x, c.y)
 
 
 ## Выдать находку из клетки (x, y), если она там есть. Возвращает id найденного

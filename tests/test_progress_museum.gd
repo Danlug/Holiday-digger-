@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_point_is_spent_only_once()
 	_test_costs_follow_gdd()
 	_test_artifact_cells_are_in_their_depth_band()
+	_test_artifact_drawn_and_dug_in_world()
 	_test_artifact_is_found_and_goes_to_museum()
 	_test_branch_completion()
 	_test_museum_panel_shows_all_slots()
@@ -152,28 +153,35 @@ func _test_costs_follow_gdd() -> void:
 # Артефакты
 # ---------------------------------------------------------------------------
 
-## Каждый артефакт лежит в своей полосе глубин и внутри мира по ширине.
+## Каждый артефакт — одна настоящая клетка в своей полосе глубин, в породе,
+## которую можно выкопать, и в верхнем окне полосы (темп прежней лотереи).
 func _test_artifact_cells_are_in_their_depth_band() -> void:
 	print("--- Клетки артефактов в своей полосе ---")
 	var artifacts: Array = Balance.artifacts.get("artifacts", [])
 	check_eq("артефактов ровно 25 (5 веток × 5)", artifacts.size(), 25)
 
-	var all_in_band := true
-	var all_in_width := true
-	var all_have_cells := true
-	for a in artifacts:
-		var band := ArtifactSpawn.depth_range(a)
-		var cells := ArtifactSpawn.candidate_cells(a, 4242)
-		if cells.is_empty():
-			all_have_cells = false
-		for cell: Vector2i in cells:
-			if cell.y < band.x or cell.y > band.y:
-				all_in_band = false
-			if cell.x < 0 or cell.x >= ArtifactSpawn.WORLD_WIDTH:
-				all_in_width = false
-	check("у каждого артефакта есть хотя бы одна клетка", all_have_cells)
-	check("все клетки внутри своей полосы глубин", all_in_band)
-	check("все клетки внутри ширины мира 0..31", all_in_width)
+	var all_in_window := true
+	var all_diggable := true
+	var all_unique := true
+	for seed_value in [4242, 777, 90001]:
+		var w := WorldGen.new(seed_value)
+		var seen := {}
+		for a in artifacts:
+			var band := ArtifactSpawn.depth_range(a)
+			var cell := ArtifactSpawn.cell_of(a, seed_value, w)
+			if cell.y < band.x or cell.y >= band.x + ArtifactSpawn.window_rows(a) or cell.y > band.y \
+					or cell.x < 0 or cell.x >= ArtifactSpawn.WORLD_WIDTH:
+				all_in_window = false
+			var t := w.get_tile(cell.x, cell.y)
+			if t == TileTypes.Type.EMPTY or t == TileTypes.Type.LAVA or t == TileTypes.Type.REINFORCED:
+				all_diggable = false
+				print("  непригодная клетка %s у %s (сид %d): тайл %d" % [cell, a.id, seed_value, t])
+			if seen.has(cell):
+				all_unique = false
+			seen[cell] = true
+	check("каждая клетка — в своей полосе и в её верхнем окне", all_in_window)
+	check("в сгенерированном мире клетка артефакта — копаемая порода", all_diggable)
+	check("два артефакта не делят одну клетку", all_unique)
 
 	# Полосы глубин веток совпадают с таблицей ГДД раздела 10.
 	var antiquity := Balance.get_artifacts_in_branch(1)
@@ -182,29 +190,75 @@ func _test_artifact_cells_are_in_their_depth_band() -> void:
 	check_eq("последний артефакт легенд на 3850–4100",
 		ArtifactSpawn.depth_range(legends[4]), Vector2i(3850, 4100))
 
-	# Скриптовая находка онбординга лежит во всём ряду 15 — её нельзя пропустить.
-	check_eq("Никчёмный клад занимает весь ряд 15",
-		ArtifactSpawn.candidate_cells(antiquity[0], 4242).size(), ArtifactSpawn.WORLD_WIDTH)
+	# Никчёмный клад — в ряду 15 у тоннеля: спускающийся игрок видит его в обзоре.
+	var dud := ArtifactSpawn.cell_of(antiquity[0], 4242, world)
+	check_eq("никчёмный клад в ряду 15", dud.y, 15)
+	check("никчёмный клад у тоннеля, не в его стенах (x=%d)" % dud.x, [14, 15, 19, 20].has(dud.x))
 
-	# Один и тот же сид — те же клетки, разный сид — другие.
-	var same_a := ArtifactSpawn.candidate_cells(antiquity[2], 4242)
-	var same_b := ArtifactSpawn.candidate_cells(antiquity[2], 4242)
-	var other := ArtifactSpawn.candidate_cells(antiquity[2], 777)
+	# Один и тот же сид — та же клетка, разный сид — другая.
+	var same_a := ArtifactSpawn.cell_of(antiquity[2], 4242, world)
+	var same_b := ArtifactSpawn.cell_of(antiquity[2], 4242, WorldGen.new(4242))
+	var moved := 0
+	for a in artifacts:
+		if ArtifactSpawn.cell_of(a, 4242, world) != ArtifactSpawn.cell_of(a, 777, WorldGen.new(777)):
+			moved += 1
 	check("позиции детерминированы от сида", same_a == same_b)
-	check("другой сид — другие позиции", same_a != other)
+	check("другой сид — другие позиции (%d из 25)" % moved, moved >= 20)
 
-	# Редкость растёт с эпохой: на одну клетку раскопок в полосе ветки 5
-	# приходится заметно меньше шансов, чем в полосе ветки 1.
-	var chance_b1 := _find_chance_per_cell(antiquity[2])
-	var chance_b5 := _find_chance_per_cell(legends[2])
-	check("артефакты легенд реже античных (%.5f против %.5f)" % [chance_b5, chance_b1],
-		chance_b5 < chance_b1)
+	# Темп: окно ветки 5 глубже ветки 1 (реже и глубже, ГДД §10).
+	check("окно легенд шире античного (%d против %d рядов)" % [ArtifactSpawn.window_rows(legends[2]), ArtifactSpawn.window_rows(antiquity[2])],
+		ArtifactSpawn.window_rows(legends[2]) > ArtifactSpawn.window_rows(antiquity[2]))
 
 
-func _find_chance_per_cell(artifact: Dictionary) -> float:
-	var band := ArtifactSpawn.depth_range(artifact)
-	var cells := float((band.y - band.x + 1) * ArtifactSpawn.WORLD_WIDTH)
-	return float(ArtifactSpawn.candidate_count(artifact)) / cells
+## Артефакт виден в земле, когда туман открыл клетку, и выкапывается один раз.
+func _test_artifact_drawn_and_dug_in_world() -> void:
+	print("--- Артефакт в породе: виден и выкапывается ---")
+	GameState.reset_progress()
+	var a: Dictionary = Balance.get_artifact("mysticism_1")
+	var cell := ArtifactSpawn.cell_of(a, GameState.world_seed, world)
+	var fog := FogOfWar.new()
+	var layer := ArtifactLayer.new()
+	layer.world = world
+	layer.fog = fog
+	layer.player = player
+	add_child(layer)
+	player.x = float(cell.x) + 0.5
+	player.y = float(cell.y) - 3.5
+	layer.collect()
+	check("в чёрном тумане артефакт не рисуется", layer.entries().is_empty())
+	fog.reveal_around_cell(cell.x, cell.y, 2, 0)
+	layer.collect()
+	check("в сером тумане виден силуэт", layer.entries().size() == 1 and not layer.entries()[0]["full"])
+	fog.reveal_around_cell(cell.x, cell.y, 2, 1)
+	layer.collect()
+	check("в полном обзоре виден целиком", layer.entries().size() == 1 and layer.entries()[0]["full"])
+	check_eq("рисуется именно он", String(layer.entries()[0]["id"]) if layer.entries().size() > 0 else "", "mysticism_1")
+	check("вид в породе собран из иконки", ArtifactArt.ground_texture_for("mysticism_1") != null)
+
+	# Настоящая раскопка: мир теряет клетку, игрок шлёт dig_finished, находка одна.
+	var finder := ArtifactFinder.new()
+	add_child(finder)
+	finder.setup(player, null)
+	world.dig_cell(cell.x, cell.y)
+	player.dig_finished.emit(cell.x, cell.y, TileTypes.Type.DIRT, "", false, 0)
+	check("выкопанный артефакт в музее", GameState.collected_artifacts.has("mysticism_1"))
+	player.dig_finished.emit(cell.x, cell.y, TileTypes.Type.DIRT, "", false, 0)
+	check_eq("второй раз не выдаётся", GameState.collected_artifacts.count("mysticism_1"), 1)
+	layer.collect()
+	check("собранный больше не рисуется", layer.entries().is_empty())
+
+	# Пустая клетка (её вырвал обвал): предмет лежит в ней и подбирается касанием.
+	var b: Dictionary = Balance.get_artifact("occult_1")
+	var bc := ArtifactSpawn.cell_of(b, GameState.world_seed, world)
+	world.dig_cell(bc.x, bc.y)
+	player.x = float(bc.x) + 0.5
+	player.y = float(bc.y) + 0.5
+	finder._touch_left = 0.0
+	finder._process(0.0)
+	check("артефакт в пустой клетке подобран касанием", GameState.collected_artifacts.has("occult_1"))
+	finder.queue_free()
+	layer.queue_free()
+
 
 
 ## Артефакт находится при раскопке своей клетки и попадает в музей
@@ -219,7 +273,7 @@ func _test_artifact_is_found_and_goes_to_museum() -> void:
 
 	var artifact: Dictionary = Balance.get_artifacts_in_branch(1)[1]  # Религиозный свиток
 	var id := String(artifact["id"])
-	var cell: Vector2i = ArtifactSpawn.candidate_cells(artifact, GameState.world_seed)[0]
+	var cell: Vector2i = ArtifactSpawn.cell_of(artifact, GameState.world_seed, GameState.world_ref)
 
 	check_eq("в клетке артефакта лежит именно он", finder.artifact_at(cell.x, cell.y), id)
 	check_eq("в соседней клетке артефакта нет",
@@ -240,7 +294,7 @@ func _test_artifact_is_found_and_goes_to_museum() -> void:
 	# Так связка проверяется ровно в том виде, в каком она работает в игре.
 	var artifact2: Dictionary = Balance.get_artifacts_in_branch(1)[2]
 	var id2 := String(artifact2["id"])
-	var cell2: Vector2i = ArtifactSpawn.candidate_cells(artifact2, GameState.world_seed)[0]
+	var cell2: Vector2i = ArtifactSpawn.cell_of(artifact2, GameState.world_seed, GameState.world_ref)
 	finder.setup(player, null)
 	player.dig_finished.emit(cell2.x, cell2.y, TileTypes.Type.DIRT, "earth", false, 0)
 	check("находка приходит по сигналу игрока dig_finished",

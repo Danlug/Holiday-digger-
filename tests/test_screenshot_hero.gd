@@ -122,7 +122,7 @@ func _ready() -> void:
 		GameState.collected_artifacts.clear()
 		GameState.completed_branches.clear()
 		var artifact := Balance.get_artifact("antiquity_2")
-		var cell: Vector2i = ArtifactSpawn.candidate_cells(artifact, GameState.world_seed)[0]
+		var cell: Vector2i = ArtifactSpawn.cell_of(artifact, GameState.world_seed, GameState.world_ref)
 		_screen.finder.claim_at(cell.x, cell.y)
 		await get_tree().create_timer(0.6).timeout
 		await _shot("first_find_card")

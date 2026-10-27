@@ -259,6 +259,9 @@ func _run() -> void:
 		for f in ["intro_seen", "dud_treasure_found", "autodig_done", "workshop_seen", "gold_taken", "foundation_broken",
 				"bars_introduced", "death_seen", "backpack_owned", "robert_seen", "hatch_built", "gold_sold", "food_ordered"]:
 			StoryState.set_flag(f)
+		# никчёмный клад выдаёт сцена dud_treasure; раньше бот добирал его рядом 15
+		# (там он лежал во всех 32 клетках), теперь клад — одна клетка у тоннеля
+		GameState.collect_artifact("antiquity_1")
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await _frames_n(4)

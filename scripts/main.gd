@@ -97,9 +97,9 @@ func _ready() -> void:
 	ambient_fx.fog = fog
 	ambient_fx.player = player
 	view_root.add_child(ambient_fx)
-	# Образования не вырывают воздух из клеток-кандидатов артефактов: артефакт
-	# выдаётся при раскопке клетки, а в каверне копать нечего.
-	world.set_protect_cell(_is_artifact_candidate)
+	# Образования не вырывают воздух из клеток артефактов: артефакт лежит в
+	# породе и выдаётся при раскопке клетки, а в каверне копать нечего.
+	world.set_protect_cell(_is_artifact_cell)
 	collapse_fx = CollapseFx.new()
 	collapse_fx.name = "CollapseFx"
 	view_root.add_child(collapse_fx)
@@ -193,15 +193,13 @@ func _ready() -> void:
 var _artifact_cells: Dictionary = {}
 
 
-## Клетка — кандидат на артефакт (ArtifactSpawn) при текущем сиде. Множество
-## строится один раз, из тех же функций, что и сама раскладка артефактов.
-func _is_artifact_candidate(x: int, y: int) -> bool:
+## В клетке лежит артефакт (ArtifactSpawn) при текущем сиде. Множество строится
+## один раз, из той же функции, что и сама раскладка артефактов.
+func _is_artifact_cell(x: int, y: int) -> bool:
 	if _artifact_cells.is_empty():
 		for a in Balance.artifacts.get("artifacts", []):
-			if ArtifactSpawn.is_scripted_row(a):
-				continue
-			for c: Vector2i in ArtifactSpawn.candidate_cells(a, GameState.world_seed):
-				_artifact_cells[c.y * WorldGen.WIDTH + c.x] = true
+			var c := ArtifactSpawn.cell_of(a, GameState.world_seed, world)
+			_artifact_cells[c.y * WorldGen.WIDTH + c.x] = true
 		_artifact_cells[-1] = false
 	return _artifact_cells.has(y * WorldGen.WIDTH + x)
 

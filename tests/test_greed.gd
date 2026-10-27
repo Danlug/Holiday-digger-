@@ -348,34 +348,46 @@ func _test_director() -> void:
 		d.step(DT)
 	var dug := int(round(p.y - y0))
 	check("за секунду жадности вниз прокопано %d клеток (обычно земля киркой — 1.8 с/кл.)" % dug, dug >= 3)
-	# долгое падение ×7 на 30 к/с: за кадр герой проходит до 7 клеток — туман по пути
-	# открывает режиссёр (main.gd открывает только вокруг конечной точки, как здесь)
+	# долгий подъём ×7 на топовом джетпаке на 30 к/с: за кадр герой проходит больше
+	# обзора — туман по пути открывает режиссёр (main.gd открывает только вокруг
+	# конечной точки, как здесь). До 27.10 это проверялось падением; теперь оно в
+	# жадности останавливается каждые 3 клетки (tests/test_greed_fall) и за кадр
+	# проходит меньше обзора.
 	p.set_intent(0, false, false)
 	p.digging = null
+	GameState.grant_gear("jetpack_top")
+	GameState.set_current_gear("jetpack_top")
 	p.x = 20.5
-	p.y = float(FLOOR_Y) - 80.0
+	p.y = float(FLOOR_Y) - 20.0
 	p.vy = 0.0
 	p.on_ground = false
-	d.step(0.033)
-	GameState.debug_invincible = true   # 80 клеток убили бы героя, а смерть гасит жадность — здесь проверяется туман
+	# пара кадров в воздухе без ввода: койот-окно после копки гаснет, иначе «вверх»
+	# стал бы прыжком, а тяга после прыжка взводится по настоящим часам
+	for i in range(4):
+		p.physics_tick(0.033)
+		d.step(0.033)
 	var tr := GameState.get_vision_terrain_radius()
 	var rr := GameState.get_vision_resource_radius()
 	var max_step := 0.0
-	for i in range(120):
+	var y_start: float = p.y
+	p.set_intent(0, true, false)
+	for i in range(90):
 		var y_before: float = p.y
 		p.physics_tick(0.033)
-		max_step = maxf(max_step, p.y - y_before)
+		max_step = maxf(max_step, y_before - p.y)
 		host.fog.reveal_around(p.x, p.y, tr, rr)
 		d.step(0.033)
-		if p.on_ground:
+		if p.y < float(FLOOR_Y) - 100.0:
 			break
-	GameState.debug_invincible = false
+	p.set_intent(0, false, false)
 	var dark := 0
-	for yy in range(FLOOR_Y - 78, FLOOR_Y - 1):
+	for yy in range(int(ceil(p.y)) + 1, int(floor(y_start))):
 		if host.fog.get_state(20, yy) == FogOfWar.State.BLACK:
 			dark += 1
-	check("падение ×7 (до %.1f кл. за кадр) не оставляет тёмных клеток на пути: %d" % [max_step, dark],
-		max_step > 2.0 * float(tr) and dark == 0)
+	check("подъём ×7 (до %.1f кл. за кадр, %.0f кл.) не оставляет тёмных клеток на пути: %d" % [max_step, y_start - p.y, dark],
+		max_step > 2.0 * float(tr) and y_start - p.y > 60.0 and dark == 0)
+	GameState.current_gear = ""
+	GameState.owned_gear.clear()
 	var ended := [false]
 	d.fever_ended.connect(func() -> void: ended[0] = true)
 	for i in range(int(5.0 / DT)):

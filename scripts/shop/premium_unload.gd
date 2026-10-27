@@ -29,20 +29,12 @@ const LEGACY_PILL_DOLLARS := 25   # последняя цена таблетки
 static var _last: Dictionary = {}
 
 
-## Припас — то, что остаётся с героем: без еды, аптечки и топлива копать дальше нельзя.
-## Еда и лекарства узнаются по category в data/minerals.json (food / medical), топливо — по id.
-static func is_supply(id: String) -> bool:
-	if id == "fuel_block" or HouseConfig.is_food(id) or Healing.is_medkit(id):
-		return true
-	return ["food", "medical"].has(String(Balance.get_mineral(id).get("category", "")))
-
-
-## Что улетит: {id: штук}.
+## Что улетит: {id: штук}. То же правило, что у «Переложить всё» (HouseStorage.is_haul).
 static func movable() -> Dictionary:
 	var out: Dictionary = {}
 	for id in GameState.inventory.keys():
 		var n := int(GameState.inventory[id])
-		if n > 0 and not is_supply(String(id)):
+		if n > 0 and HouseStorage.is_haul(String(id)):
 			out[String(id)] = n
 	return out
 

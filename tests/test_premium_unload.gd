@@ -109,8 +109,8 @@ func _test_unload_service() -> void:
 	GameState.inventory = {"iron_ore": 30, "gold": 5, "food_soup": 2, "medkit": 1, "fuel_block": 3, "energy_bar": 1}
 	GameState.house_storage = {"iron_ore": 10}
 	var tools_before: Array = GameState.owned_tools.duplicate()
-	check("припасы не считаются добычей", PremiumUnload.is_supply("food_soup") and PremiumUnload.is_supply("medkit")
-		and PremiumUnload.is_supply("fuel_block") and PremiumUnload.is_supply("energy_bar") and not PremiumUnload.is_supply("gold"))
+	check("припасы не считаются добычей", HouseStorage.is_supply("food_soup") and HouseStorage.is_supply("medkit")
+		and HouseStorage.is_supply("fuel_block") and HouseStorage.is_supply("energy_bar") and not HouseStorage.is_supply("gold"))
 	check("улетит 35 штук", PremiumUnload.movable_count() == 35)
 	var offer := _premium_offer()
 	check("плитка доступна, на карточке «рюкзак ×35 → склад»", String(offer.get("state", "")) == "available"

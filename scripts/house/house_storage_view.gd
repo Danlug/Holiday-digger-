@@ -383,7 +383,7 @@ func _update_actions(accessible: bool, rows: Array) -> void:
 				can_take = true
 				break
 	_take_ok = accessible and can_take
-	_put_ok = accessible and not GameState.inventory.is_empty()
+	_put_ok = accessible and GameState.inventory.keys().any(func(id) -> bool: return HouseStorage.is_haul(String(id)))
 
 	var take_extra := reason
 	if accessible and rows.is_empty():

@@ -574,6 +574,22 @@ func shake(strength: float = 4.0, duration: float = 0.2) -> void:
 	_shake_t = 0.0
 
 
+## Тряска, которая СКЛАДЫВАЕТСЯ с остатком текущей (CameraKick: урон и удача
+## подряд трясут сильнее, а не перетирают друг друга), не выше cap пикселей.
+func shake_add(strength: float, duration: float = 0.2, cap: float = 8.0) -> void:
+	if Settings.reduce_motion or strength <= 0.0:
+		return
+	var left := 0.0
+	var left_t := 0.0
+	if _shake_amp > 0.0 and _shake_t < _shake_dur:
+		var k := 1.0 - _shake_t / _shake_dur
+		left = _shake_amp * k * k
+		left_t = _shake_dur - _shake_t
+	_shake_amp = minf(left + strength, maxf(cap, strength))
+	_shake_dur = maxf(maxf(duration, 0.02), left_t)
+	_shake_t = 0.0
+
+
 func is_shaking() -> bool:
 	return _shake_amp > 0.0 and _shake_t < _shake_dur
 

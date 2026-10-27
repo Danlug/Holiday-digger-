@@ -973,12 +973,26 @@ def eff_pack(m, row):
 		fnum(dol), fnum(usd), fnum(dol * _coins_per_dollar(m)), fnum(dol / usd), fnum(dol / max(ads, 1), 1))
 
 
+_UNLOAD_LESSON_KEY = {"depth": "с какой глубины ждёт спокойного момента", "free_use": "первая выгрузка в сцене бесплатно",
+	"calm_wait_seconds": "ждать, пока герой не копает, не дольше, с"}
+
+
+def title_unload_lesson(m, row):
+	return "Сцена «выгрузка на склад»: " + _UNLOAD_LESSON_KEY.get(row["segs"][-1], row["key_ru"])
+
+
 def eff_premium_price(m, row):
 	fnum, _, _, _ = _f(m)
 	p = num(row["value"])
 	if p is None:
 		return None
-	return "= %s монет по курсу; = %s ролик(а) «доллар» (их 3 в сутки)" % (fnum(p * _coins_per_dollar(m)), fnum(p))
+	per_ad = 1
+	for a in (m.get("shop.json", "ad_rewards") or []):
+		if isinstance(a, dict) and a.get("id") == "small_premium_currency":
+			per_ad = num(a.get("dollars"), 1) or 1
+	ads = num(m.get("balance.json", "ads", "daily_limits", "small_premium_currency"), 3)
+	return "= %s монет по курсу; = %s ролик(а) «доллар» по %s (их %s в сутки)" % (
+		fnum(p * _coins_per_dollar(m)), fnum(math.ceil(p / per_ad)), fnum(per_ad), fnum(ads))
 
 
 def eff_sub_currency(m, row):
@@ -1332,8 +1346,13 @@ FAMILIES = [
 		rec=("отложить", "Премиум+ за $14.90 в месяц даёт 150 долл., а пачка за $4.99 — 550: подписка как источник валюты невыгодна втрое")),
 	F("mon.premium_goods", "monetization", 4, "Цены вещей за доллары", ["balance.json:food.items[energy_bar].price_dollars",
 		"shop.json:goods_dollars.extra[*].price_dollars"], "{name}: цена", "долл.", "что можно купить на доллары из роликов",
-		eff_premium_price, rec=("оставить", "батончик 1, часы 3, таблетка 5 — = 1–5 роликов «доллар»; заметка батончика «1 доллар = 100 монет» устарела (курс 1000)"),
+		eff_premium_price, rec=("оставить", "батончик 5, часы 15, выгрузка на склад 25 (раунд 6, на месте таблетки) — = 1–5 роликов «доллар» по 5; "
+			"выгрузка дороже часов: спасает и рюкзак, и место в шахте; заметка батончика «1 доллар = 100 монет» устарела (курс 1000)"),
 		flags=lambda m, r: ["заметка устарела: «1 доллар = 100 монет», курс владельца — 1000"] if "energy_bar" in r["id"] else []),
+	F("mon.unload_lesson", "monetization", 3, "Сцена «выгрузка на склад» на 150", "shop.json:goods_dollars.extra[premium_unload].lesson.*",
+		title_unload_lesson, "", "когда игрок узнаёт про выгрузку и пробует её; на 200 — обучение часам", None,
+		rec=("решить", "владелец сцену заказал (пояс 150–200), а бесплатного раза не просил: бесплатный первый раз даёт увидеть «улетело домой» "
+			"тем, у кого на 150 нет 25 долларов; free_use: false — сцена только показывает кнопку и объясняет")),
 	F("mon.cosmetic", "monetization", 2, "Косметика и удобства за доллары", ["monetization.json:cosmetic_catalog**", "monetization.json:convenience_catalog**"],
 		"{name}: цена", "долл.", "пока не продаётся в витрине", eff_premium_price, rec=("отложить", "в витрине этих товаров нет (ГДД §15)")),
 	F("mon.ads", "monetization", 3, "Лимиты роликов «×2» и замены", ["quests.json:ad_double.*", "tech.json:well.ad_double.*"],

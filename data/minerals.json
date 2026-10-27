@@ -390,12 +390,13 @@
 			"density": {
 				"type": "parabola",
 				"depth_min": 1000,
-				"peak_depth": 1300,
+				"peak_depth": 1636,
 				"peak_percent": 38.0,
 				"fall_width": 1500,
 				"tail_percent": 28.5,
 				"proposed": false,
-				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
+				"note": "владелец (27.10): с 1000 растёт с нуля, к 1100 — 11%; пик 38% сдвинут 1300 → 1636; дальше спад к вечному хвосту tail_percent",
+				"rise": "zero"
 			},
 			"weight_kg": {
 				"value": 1.0,

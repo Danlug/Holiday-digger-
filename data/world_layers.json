@@ -351,10 +351,11 @@
 			"tile": "COAL",
 			"curve": "parabola",
 			"y_min": 1000,
-			"peak_y": 1300,
+			"peak_y": 1636,
 			"peak": 0.38,
 			"fall_width": 1500,
-			"tail": 0.285
+			"tail": 0.285,
+			"rise": "zero"
 		},
 		{
 			"id": "scrap",

@@ -657,6 +657,10 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 		if Balance.get_mineral_weight(item) * count > _free_weight():
 			return {"ok": false, "message": "Рюкзак не выдержит — разгрузись", "effect": ""}
 
+	# Выгрузка на склад (раунд 6): пустой рюкзак — деньги не берём.
+	if String(g.get("effect", "")) == PremiumUnload.EFFECT and not PremiumUnload.can_unload():
+		return {"ok": false, "message": "Отправлять нечего: в рюкзаке только припасы", "effect": ""}
+
 	var lack := "монет" if currency == "coins" else "долларов"
 	if not _can_afford(currency, price):
 		return {"ok": false, "message": "Не хватает " + lack, "effect": ""}
@@ -670,7 +674,10 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 	var message := apply_effect(g)
 	_emit_bought(good_id, currency, bool(gate["needs_ad"]))
 	SaveSystem.save_game()
-	return {"ok": true, "message": message, "effect": effect, "remote": bool(gate["needs_ad"])}
+	var out := {"ok": true, "message": message, "effect": effect, "remote": bool(gate["needs_ad"])}
+	if effect == PremiumUnload.EFFECT:
+		out["unload"] = PremiumUnload.last_result()   # что улетело — витрине для «домой»
+	return out
 
 
 ## Эффект расходника применяется сразу при покупке, а не кладётся в
@@ -697,11 +704,9 @@ static func apply_effect(g: Dictionary) -> String:
 			if hp > 0:
 				parts.append("+%d%% здоровья" % hp)
 			return "%s: %s" % [name_ru, ", ".join(parts)]
-		"full_restore":
-			GameState.heal(GameState.get_max_hp())
-			GameState.set_stamina(100.0)
-			GameState.set_hunger(100.0)
-			return "Все три полоски на максимуме."
+		"premium_unload":
+			var r := PremiumUnload.unload()
+			return "На складе: +%d шт." % int(r["count"])
 		"teleport_home":
 			return "Часы сработали — ты дома."
 		"grant_item":

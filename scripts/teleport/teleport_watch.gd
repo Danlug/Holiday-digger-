@@ -123,8 +123,13 @@ static func _store(s: Dictionary) -> void:
 	GameState.ext_set(KEY, s)
 
 
+## Каждый кадр (огонёк, пузырь) — без копии состояния.
 static func has_return() -> bool:
-	return not (state()["ret"] as Dictionary).is_empty()
+	var raw = GameState.ext_get(KEY, null)
+	if typeof(raw) != TYPE_DICTIONARY:
+		return false
+	var ret = (raw as Dictionary).get("ret", null)
+	return typeof(ret) == TYPE_DICTIONARY and (ret as Dictionary).has("x") and (ret as Dictionary).has("y")
 
 
 ## Точка возврата в клетках (центр героя) или (-1, -1).
@@ -381,4 +386,6 @@ func _process(dt: float) -> void:
 	var cells: Vector2i = hud.get_view_cells()
 	var cam := CameraRig.for_overlay(player.x, player.y, float(cells.x), float(cells.y), SKY_HEIGHT)
 	var head := Vector2(player.x - cam.x, player.y - cam.y - 1.0) * TILE
+	# Пузырь левее головы: прямо над ней горит огонёк площадки — пузырь его не закрывает.
+	head.x -= HouseBubble.W * 0.5 + 6.0
 	_button.position = head - Vector2(_button.custom_minimum_size.x / 2.0, _button.custom_minimum_size.y + 4.0)

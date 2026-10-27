@@ -12,15 +12,16 @@ extends Node2D
 ## Появляется за 0,5 с, гаснет за 0,9 с.
 
 const TILE := 32
-## Линия ног героя на траве (мировые px): там же стоят станция и декор огорода — середина клетки травы.
-const FEET_Y := 16.0
+## Линия ног героя на траве (мировые px): верх первой земляной клетки (как SURFACE_Y у LightLayer).
+const FEET_Y := 32.0
 const PAD_TEX := "res://art/teleport/pad.png"
 const RUNE_TEX := "res://art/teleport/pad_rune.png"
 const ORB_TEX := "res://art/teleport/orb.png"
 const MOTE_TEX := "res://art/teleport/mote.png"
 const GLOW_TEX := "res://art/fx/glow_soft.png"
-## Крышка плиты: строка картинки, на которую встают ноги (дальше вниз — обод в землю).
-const PAD_TOP_ROW := 6.0
+## Строка картинки на линии ног — середина крышки-эллипса: герой стоит посреди диска,
+## ближняя половина крышки и обод уходят ниже его ног, на землю.
+const PAD_TOP_ROW := 5.0
 const ORB_RISE := 58.0       # центр огонька над линией ног: над головой героя
 const GREEN := Color(0.30, 1.0, 0.58)
 const FADE_IN := 0.5
@@ -121,9 +122,9 @@ func _draw_glow() -> void:
 	var oc := orb_center() + Vector2(0.0, _bob())
 	var pc := pad_center()
 	# Ореол огонька: размер и яркость дышат вместе.
-	var r := 15.0 + 3.0 * b
+	var r := 16.0 + 4.0 * b
 	_glow.draw_texture_rect(_glow_tex, Rect2(oc - Vector2(r, r), Vector2(r, r) * 2.0), false,
-		Color(GREEN.r, GREEN.g, GREEN.b, (0.30 + 0.16 * b) * k))
+		Color(GREEN.r, GREEN.g, GREEN.b, (0.38 + 0.18 * b) * k))
 	# Луч от огонька к платформе — тонкий и тусклый, по нему стекает энергия.
 	var top := oc.y + 5.0
 	var bottom := pc.y - 2.0
@@ -136,8 +137,8 @@ func _draw_glow() -> void:
 		_glow.draw_rect(Rect2(round(oc.x), y0, 1.0, y1 - y0 + 0.5), Color(GREEN.r, GREEN.g, GREEN.b, fade))
 	# Свечение на крышке платформы и паз — в противофазе с ядром.
 	var pb := 1.0 - b
-	_glow.draw_texture_rect(_glow_tex, Rect2(pc + Vector2(-26.0, -7.0), Vector2(52.0, 12.0)), false,
-		Color(GREEN.r, GREEN.g, GREEN.b, (0.16 + 0.22 * pb) * k))
+	_glow.draw_texture_rect(_glow_tex, Rect2(pc + Vector2(-24.0, -6.0), Vector2(48.0, 10.0)), false,
+		Color(GREEN.r * 0.6, GREEN.g, GREEN.b * 0.5, (0.10 + 0.16 * pb) * k))
 	if _rune != null:
 		var s := _rune.get_size()
 		_glow.draw_texture(_rune, (pc - Vector2(s.x * 0.5, PAD_TOP_ROW)).round(),

@@ -187,13 +187,20 @@ func steps() -> Array:
 	]
 
 
-## Кнопка лавки на HUD — по узлу (HUD хранит её в _shop_btn), а не по координатам:
-## верх HUD двигают другие ветки.
+## Кнопка лавки на HUD — по узлу, а не по координатам: верх HUD двигают другие ветки.
+## HUD хранит её в _shop_btn; переименуют поле — найдём кнопку по заголовку её подсказки.
 func _shop_button() -> Control:
 	var hud = watch.hud if watch != null else null
 	if hud == null or not is_instance_valid(hud):
 		return null
-	return hud.get("_shop_btn") as Control
+	var b = hud.get("_shop_btn")
+	if b is Control and is_instance_valid(b):
+		return b
+	for n in (hud as Node).find_children("*", "BaseButton", true, false):
+		var meta = n.get_meta(Tip.META, {})
+		if typeof(meta) == TYPE_DICTIONARY and String(meta.get("title", "")) == "Магазин":
+			return n as Control
+	return null
 
 
 func _shop_on_premium() -> bool:

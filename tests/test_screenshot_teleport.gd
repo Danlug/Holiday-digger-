@@ -13,6 +13,7 @@ extends Node
 var _out_dir := "/tmp/teleport_shots"
 var _only: Array[String] = []
 var _main: Node2D
+var _tw: TeleportWatch
 
 
 func _ready() -> void:
@@ -51,8 +52,13 @@ func _ready() -> void:
 			meta.popup.close()
 	GameState.game_clock_hours = 10.0
 
+	_tw = TeleportWatch.find(get_tree())
 	if _want("yard"):
 		await _shoot_yard()
+	if _want("glow"):
+		await _shoot_glow()
+	if _want("lesson"):
+		await _shoot_lesson()
 	print("test_screenshot_teleport: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -80,10 +86,86 @@ func _place(x: float, y: float) -> void:
 	p.vy = 0.0
 
 
+func _wait(sec: float) -> void:
+	var until := Time.get_ticks_msec() + int(sec * 1000.0)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+
+
+func _spot(x: int, y: int) -> void:
+	_main.world.dig_cell(x, y)
+	_main.world.dig_cell(x, y - 1)
+
+
+## Площадка без огонька: герой стоит на ней (возврата нет).
 func _shoot_yard() -> void:
-	_place(19.5, 0.5)
-	await _frames(30)
-	_shot("yard_19")
-	_place(20.5, 0.5)
-	await _frames(30)
-	_shot("yard_20")
+	TeleportWatch.clear_return()
+	_place(TeleportWatch.pad_x(), 0.5)
+	await _wait(1.0)
+	_shot("yard_pad")
+
+
+## Часы с глубины 150: герой на площадке, огонёк и пузырь «Вниз»; потом герой отходит
+## к станции — огонёк без героя, 4 кадра анимации.
+func _shoot_glow() -> void:
+	_spot(24, 150)
+	_place(24.5, 150.5)
+	await _wait(0.6)
+	TeleportWatch.use(_main.player)
+	await _wait(1.2)
+	_shot("glow_hero")
+	_place(TeleportWatch.pad_x() + 2.2, 0.5)
+	await _wait(1.0)
+	for i in 4:
+		_shot("glow_%d" % i)
+		await _wait(0.55)
+	TeleportWatch.clear_return()
+	await _wait(0.5)
+	_shot("glow_fading")
+	await _wait(1.0)
+
+
+func _click(pos: Vector2) -> void:
+	for pressed in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = pressed
+		ev.position = pos
+		ev.global_position = pos
+		get_viewport().push_input(ev, true)
+		await _frames(2)
+
+
+## Обучение на 200: а) кнопка лавки, б) плитка часов, в) объяснение, г) после переноса.
+func _shoot_lesson() -> void:
+	GameState.dollars = 3
+	GameState.dollars_changed.emit(3)
+	_spot(23, 200)
+	_place(23.5, 200.5)
+	GameState.max_depth_reached = 200
+	await _wait(0.8)
+	var s := TeleportWatch.state()
+	s["lesson"] = ""
+	GameState.ext_set(TeleportWatch.KEY, s)
+	_tw.lesson.begin()
+	var guard := 0
+	while not FocusTour.is_any_running() and guard < 600:
+		guard += 1
+		await _frames(1)
+	await _wait(0.6)
+	_shot("lesson_a_shop_button")
+	var tour: FocusTour = _tw.lesson.tour
+	var btn: Control = _main.hud.get("_shop_btn")
+	await _click(btn.get_global_rect().get_center())
+	await _wait(0.8)
+	_shot("lesson_b_watch_tile")
+	var tile := FocusTour._shop_tile("good:dollars:" + TeleportWatch.GOOD_ID)
+	if tile != null:
+		await _click(tile.get_global_rect().get_center())
+	await _wait(0.6)
+	_shot("lesson_c_card")
+	var cb := tour.card_button() if is_instance_valid(tour) else null
+	if cb != null:
+		await _click(cb.get_global_rect().get_center())
+	await _wait(1.2)
+	_shot("lesson_d_after")

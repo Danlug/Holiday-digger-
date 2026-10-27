@@ -42,7 +42,7 @@ signal step_changed(index: int, id: String)
 signal finished(skipped: bool)
 
 const GROUP := &"focus_tour"
-const LAYER := 45   # над витриной (20), дневником (30) и подсказками (40); под окнами меты (92+) и катсценой (100)
+const LAYER := UiLayers.FOCUS   # над витриной (20), дневником (30) и подсказками (40); под окнами меты (92+) и катсценой (100)
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
 const GOLD_LIGHT := Color8(0xF2, 0xD9, 0x9B)
 const ARROW_PX := 24.0       # стрелка подсказок (art/hints/arrow.png) вдвое крупнее: это обязательный шаг
@@ -431,6 +431,8 @@ func passes_through(pos: Vector2) -> bool:
 # ---------------------------------------------------------------------------
 
 func _open_card(def: Dictionary) -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var w := minf(vp.x - 24.0, 210.0)
 	_card = Control.new()
 	_card.name = "Card"
 	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -463,7 +465,7 @@ func _open_card(def: Dictionary) -> void:
 		frame.add_theme_stylebox_override("panel", ProgressUiKit.box(Color(0.06, 0.05, 0.08), GOLD, ProgressUiKit.R_TILE, 2))
 		var ic := TextureRect.new()
 		ic.texture = icon_tex
-		ic.custom_minimum_size = Vector2(40, 40)
+		ic.custom_minimum_size = Vector2(32, 32)
 		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		ic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -473,13 +475,16 @@ func _open_card(def: Dictionary) -> void:
 	var title := ShopArt.label(String(def.get("title", "")), 13, GOLD_LIGHT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.clip_text = true
 	head.add_child(title)
 
 	var body := ShopArt.label(String(def.get("text", "")), 11, ProgressUiKit.TEXT, Color(0.05, 0.04, 0.08), 2)
 	body.name = "Text"
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(150, 0)
+	# Ширина переноса задаётся явно: без неё метка с переносом считает себя узкой и
+	# высокой, и окно вытягивается на весь экран.
+	body.custom_minimum_size = Vector2(w - 20.0, 0)
 	col.add_child(body)
 
 	var btn_row := HBoxContainer.new()
@@ -490,8 +495,6 @@ func _open_card(def: Dictionary) -> void:
 	btn.pressed.connect(_on_card_button)
 	btn_row.add_child(btn)
 
-	var vp := get_viewport().get_visible_rect().size
-	var w := minf(vp.x - 24.0, 210.0)
 	panel.custom_minimum_size = Vector2(w, 0)
 	panel.reset_size()
 	var ps := panel.get_combined_minimum_size()

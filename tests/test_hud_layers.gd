@@ -18,7 +18,8 @@ const SEED := 4242
 
 ## Слои HUD и «над миром» (мир < они ≤ UiLayers.HUD_TOP). "HUD" — безымянный слой самого HUD (main.gd).
 const WIDGET_LAYERS := ["HUD", "HeatHaze", "ProjectTrackerLayer", "StreakLayer", "TechHudLayer", "CombatHud",
-	"DoorGuide", "TechHotspot", "GraveHotspot", "OutdoorHotspot", "RigHotspot", "House", "DeliveryBadge"]
+	"DoorGuide", "TechHotspot", "GraveHotspot", "OutdoorHotspot", "RigHotspot", "House", "DeliveryBadge",
+	"TeleportHotspot"]
 ## Слои окон (≥ UiLayers.HUD_WINDOWS).
 const WINDOW_LAYERS := ["HudWindows", "HouseStorageView", "ShopUI", "DiaryUI", "HousePrompt", "EquipmentLayer",
 	"JournalScreen", "MetaHub", "DeathWindow", "ProjectsScreen", "DailyTasksPanel", "DailyPopup", "TechLayer",

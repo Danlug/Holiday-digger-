@@ -22,6 +22,7 @@ func _ready() -> void:
 	print("=== test_purchase_rules ===")
 	_test_places()
 	_test_door_is_unlimited()
+	_test_tiers_in_order()
 	_test_underground_three_ads()
 	_test_underground_does_not_waste_ads()
 	_test_underground_food_order()
@@ -134,6 +135,44 @@ func _test_door_is_unlimited() -> void:
 	check("ни одна не помечена «за ролик»", not results.any(func(r): return bool(r.get("remote", false))))
 	check("лимит роликов у двери не тронут", ShopRemote.left_today() == 3 and ShopRemote.used_today() == 0)
 	check("кирки и ранцы получены", GameState.owned_tools.has("titanium_pickaxe") and GameState.has_gear("backpack_plus"))
+
+
+## Владелец, 27.10: «Все апгрейды только по порядку. Нельзя перескочить кирку
+## или рюкзак». Денег хватает на всё — держит только предыдущая ступень.
+func _test_tiers_in_order() -> void:
+	_fresh()
+	_place("door")
+	var coins := GameState.coins
+	var skip := ShopService.buy_tool("titanium_pickaxe")
+	check("титан без железной кирки не купить", not bool(skip["ok"]) and not GameState.owned_tools.has("titanium_pickaxe"))
+	check("отказ называет нужную ступень", String(skip["message"]).to_lower().contains("железн"))
+	var gskip := ShopService.buy_gear("backpack_plus")
+	check("улучшенный ранец без ранца не купить", not bool(gskip["ok"]) and not GameState.has_gear("backpack_plus"))
+	check("джетпак без улучшенного ранца не купить", not bool(ShopService.buy_gear("jetpack")["ok"]))
+	check("отказы монет не тронули", GameState.coins == coins)
+
+	var titan: Dictionary = _find(ShopItems.tool_offers(), "tool:titanium_pickaxe")
+	check("плитка титана заперта, причина в подсказке", String(titan.get("state", "")) == "locked"
+		and String(titan.get("extra", "")).to_lower().contains("железн"))
+	check("плитка железа продаётся", String(_find(ShopItems.tool_offers(), "tool:iron_pickaxe").get("state", "")) == "available")
+	check("плитка улучшенного ранца заперта", String(_find(ShopItems.gear_offers(), "gear:backpack_plus").get("state", "")) == "locked")
+	check("плитка первого ранца продаётся", String(_find(ShopItems.gear_offers(), "gear:backpack").get("state", "")) == "available")
+
+	check("железо купилось", bool(ShopService.buy_tool("iron_pickaxe")["ok"]))
+	check("после железа титан купился", bool(ShopService.buy_tool("titanium_pickaxe")["ok"]))
+	check("платина следующая — плитка продаётся",
+		String(_find(ShopItems.tool_offers(), "tool:platinum_pickaxe").get("state", "")) == "available")
+	check("алмаз через ступень — заперт", String(_find(ShopItems.tool_offers(), "tool:diamond_pickaxe").get("state", "")) == "locked")
+	check("ранец, затем улучшенный — по порядку можно",
+		bool(ShopService.buy_gear("backpack")["ok"]) and bool(ShopService.buy_gear("backpack_plus")["ok"]))
+
+	# Старый сейв с перескоком (титан без железа): железо всё ещё продаётся,
+	# а платина — следующая за титаном, её не запираем.
+	_fresh()
+	_place("door")
+	GameState.grant_tool("titanium_pickaxe")
+	check("старый сейв: платина за титаном покупается", bool(ShopService.buy_tool("platinum_pickaxe")["ok"]))
+	check("старый сейв: железо докупить можно", bool(ShopService.buy_tool("iron_pickaxe")["ok"]))
 
 
 func _test_underground_three_ads() -> void:
@@ -647,11 +686,11 @@ func _test_ui_flow() -> void:
 	# Новые сутки: открытая витрина обновляет бейджи сама.
 	_place("underground")
 	ui.open(ShopUI.TAB_PICKS)
-	var before: ShopTile = ui._tiles["tool:platinum_pickaxe"]
+	var before: ShopTile = ui._tiles["tool:titanium_pickaxe"]
 	check("до сброса плитка заперта (роликов нет)", String(before.offer["state"]) == "away")
 	MetaClock.override_unix = (D0 + 1) * DAY + 5
 	GameState.daily_reset.emit()
-	var after: ShopTile = ui._tiles["tool:platinum_pickaxe"]
+	var after: ShopTile = ui._tiles["tool:titanium_pickaxe"]
 	check("после daily_reset плитка снова 3/3", String(after.offer.get("count_text", "")) == "3/3")
 	ui.close()
 	ui.queue_free()

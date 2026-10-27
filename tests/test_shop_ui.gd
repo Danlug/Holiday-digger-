@@ -150,19 +150,26 @@ func _test_tile_states() -> void:
 	GameState.coins = 600
 	check("железная кирка за 500 при 600 монетах доступна",
 		String(_offer("picks", "tool:iron_pickaxe")["state"]) == "available")
-	check("титановая за 1500 при 600 монетах — не хватает денег",
-		String(_offer("picks", "tool:titanium_pickaxe")["state"]) == "poor")
+	check("титановая без железной заперта — ступени по порядку",
+		String(_offer("picks", "tool:titanium_pickaxe")["state"]) == "locked")
 	check("ржавая кирка (цена 0) помечена как «лежит в мастерской»",
 		String(_offer("picks", "tool:rusty_pickaxe")["state"]) in ["owned", "locked"])
 	GameState.grant_tool("iron_pickaxe")
 	var owned := _offer("picks", "tool:iron_pickaxe")
 	check("купленная кирка — состояние owned с галочкой",
 		String(owned["state"]) == "owned" and String(owned["corner"]) == "check")
+	check("титановая за 1500 при 600 монетах — не хватает денег",
+		String(_offer("picks", "tool:titanium_pickaxe")["state"]) == "poor")
 	check("цена не хватает — бейдж красный",
-		(_offer("picks", "tool:platinum_pickaxe")["pill"]["color"] as Color).r > 0.9
-		and (_offer("picks", "tool:platinum_pickaxe")["pill"]["color"] as Color).g < 0.5)
+		(_offer("picks", "tool:titanium_pickaxe")["pill"]["color"] as Color).r > 0.9
+		and (_offer("picks", "tool:titanium_pickaxe")["pill"]["color"] as Color).g < 0.5)
+	GameState.grant_tool("titanium_pickaxe")
+	GameState.grant_tool("platinum_pickaxe")
 	check("в подсказке полная цена, а не сокращённая",
 		String(_offer("picks", "tool:diamond_pickaxe")["extra"]).contains("20 000"))
+	check("через ступень — заперта, причина в подсказке",
+		String(_offer("picks", "tool:obsidian_pickaxe")["state"]) == "locked"
+		and String(_offer("picks", "tool:obsidian_pickaxe")["extra"]).begins_with("Сначала"))
 	check("бурмобиль до глубины 1000 заперт",
 		String(_offer("tech", "recipe:drill_rig")["state"]) == "locked")
 	GameState.max_depth_reached = 1500
@@ -177,7 +184,9 @@ func _test_tile_states() -> void:
 	GameState.house_is_indoors = true
 	GameState.debug_free_shop = true
 	check("при debug_free_shop даже дорогая кирка доступна",
-		String(_offer("picks", "tool:obsidian_pickaxe")["state"]) == "available")
+		String(_offer("picks", "tool:diamond_pickaxe")["state"]) == "available")
+	check("но «бесплатно» порядок ступеней не отменяет",
+		String(_offer("picks", "tool:obsidian_pickaxe")["state"]) == "locked")
 	GameState.debug_free_shop = false
 
 

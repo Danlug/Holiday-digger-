@@ -199,6 +199,8 @@ static func tool_offers() -> Array:
 		elif price <= 0:
 			# Ржавая кирка не продаётся: она лежит в мастерской среди удочек и лопат.
 			_locked(o, "Не продаётся: лежит в мастерской", {"icon": ShopArt.tex("glyph_house")})
+		elif ShopService.missing_prev_tier(id) != "":
+			_tier_locked(o, id, price)
 		else:
 			_priced(o, COINS, price)
 		out.append(o)
@@ -225,11 +227,20 @@ static func gear_offers() -> Array:
 			"to": "×" + ShopCatalog.mult_text(fly)}
 		if GameState.has_gear(id):
 			_owned(o)
+		elif ShopService.missing_prev_tier(id) != "":
+			_tier_locked(o, id, price)
 		else:
 			_priced(o, COINS, price)
 		out.append(o)
 	_flag_new(out)
 	return out
+
+
+## Ступень выше следующей (владелец, 27.10: «нельзя перескочить кирку или
+## рюкзак»): замок и серая цена, как у ступеней бура, причина — в Tip.
+static func _tier_locked(o: Dictionary, id: String, price: int) -> void:
+	_locked(o, ShopService.prev_tier_reason(ShopService.missing_prev_tier(id)),
+		{"icon": ShopArt.ui("icon_coin"), "text": ShopArt.compact(price), "color": Color(0.7, 0.7, 0.75)})
 
 
 ## Ступени апгрейда бурмобиля: покупаются строго по порядку.

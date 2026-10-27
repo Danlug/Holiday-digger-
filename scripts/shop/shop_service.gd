@@ -505,7 +505,41 @@ static func _machine_built(machine_id: String) -> bool:
 # «Больше не нужно ресурсы собирать для крафта» — шесть кирок и четыре ранца
 # берутся за монеты в магазине у входной двери. Рецептов у них нет вовсе, и
 # ворот по глубине тоже: воротами прогресса стал ценник.
+#
+# Владелец, 27.10: «Все апгрейды только по порядку. Нельзя перескочить кирку
+# или рюкзак». Без этого правила золото обучения (1000 монет) сразу шло на
+# титан мимо железа, и ценник переставал быть лесенкой. Ступень продаётся,
+# только когда предыдущая в линейке уже есть — тот же принцип, что у бура
+# (buy_drill_upgrade).
 # ---------------------------------------------------------------------------
+
+## Предыдущая ступень той же линейки (кирки — по полю line, ранцы — gear),
+## которой у игрока ещё нет; "" — ступень можно брать. Проверяется ровно
+## соседняя ступень, а не «все ниже»: сейв, где перескок уже случился (титан
+## без железа), не запирает следующую за титаном, а железо остаётся купить.
+## Бесплатная ржавая кирка считается своей (GameState.owns_tool), поэтому
+## железная — первая в продаже.
+static func missing_prev_tier(id: String) -> String:
+	var is_gear := not Balance.get_gear(id).is_empty()
+	var line: Array = Balance.get_gear_ids() if is_gear else []
+	if not is_gear:
+		var tool_line := String(Balance.get_tool(id).get("line", ""))
+		if tool_line != "":
+			line = Balance.get_tools_in_line(tool_line)
+	var i := line.find(id)
+	if i <= 0:
+		return ""
+	var prev := String(line[i - 1])
+	var have := GameState.has_gear(prev) if is_gear else GameState.owns_tool(prev)
+	return "" if have else prev
+
+
+## Отказ «сначала предыдущая ступень» для покупки и подсказки плитки.
+static func prev_tier_reason(prev: String) -> String:
+	var name_ru := Balance.get_gear_name_ru(prev) if not Balance.get_gear(prev).is_empty() \
+			else Balance.get_tool_name_ru(prev)
+	return "Сначала %s: ступени — по порядку" % name_ru.to_lower()
+
 
 ## Покупка ступени инструмента за монеты. Отказывает всему, у чего в цене
 ## есть материалы: такое собирается на верстаке, а не покупается, и продать
@@ -520,6 +554,9 @@ static func buy_tool(tool_id: String) -> Dictionary:
 		return {"ok": false, "message": "Уже есть"}
 	if Balance.tool_needs_materials(tool_id):
 		return {"ok": false, "message": "Это собирается на верстаке, а не покупается"}
+	var prev := missing_prev_tier(tool_id)
+	if prev != "":
+		return {"ok": false, "message": prev_tier_reason(prev)}
 	# Под землёй кирку теперь можно купить за ролик, а бурмобиль там бросить
 	# нельзя (решение владельца) — иначе покупка чужой кирки прямо в шахте тихо
 	# ссаживала бы героя с машины мимо единственной точки проверки
@@ -556,6 +593,9 @@ static func buy_gear(gear_id: String) -> Dictionary:
 		return {"ok": false, "message": String(gate["reason"])}
 	if GameState.has_gear(gear_id):
 		return {"ok": false, "message": "Уже есть"}
+	var prev := missing_prev_tier(gear_id)
+	if prev != "":
+		return {"ok": false, "message": prev_tier_reason(prev)}
 	var price := Balance.get_gear_cost_coins(gear_id)
 	if price <= 0:
 		return {"ok": false, "message": "Это не продаётся"}

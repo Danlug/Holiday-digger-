@@ -493,6 +493,7 @@ func _test_gear_prices_and_multipliers() -> void:
 ## Покупка снимает РОВНО цену — ни монетой больше.
 func _test_buy_pickaxe_spends_exact_coins() -> void:
 	_fresh_at_door()
+	GameState.grant_tool("iron_pickaxe")   # ступени по порядку: титан — после железа
 	var price := Balance.get_tool_cost_coins("titanium_pickaxe")
 	GameState.coins = price - 1
 	check("без монет титановая кирка не покупается",
@@ -525,7 +526,7 @@ func _test_buy_pickaxe_spends_exact_coins() -> void:
 ## огород, там покупки закрыты (правило места); покупка идёт у двери, дома.
 func _test_buy_tool_cannot_dismount_rig_underground() -> void:
 	_fresh_at_door()
-	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.owned_tools = ["shovel", "iron_pickaxe", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.house_is_indoors = false
 	GameState.player_depth = 50  # под землёй
@@ -549,7 +550,7 @@ func _test_buy_tool_cannot_dismount_rig_underground() -> void:
 
 	# Дома под тем же кодом глубины — тоже можно (house_is_indoors снимает запрет).
 	_fresh_at_door()
-	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.owned_tools = ["shovel", "iron_pickaxe", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.house_is_indoors = true
 	GameState.player_depth = 50
@@ -572,9 +573,10 @@ func _test_buy_gear_spends_exact_coins() -> void:
 	check("купленный ранец сразу надет", GameState.current_gear == "backpack")
 
 	# Ступень получше надевается сама; ступень похуже — нет, иначе покупка
-	# запасного ранца пересаживала бы игрока с джетпака на пропеллеры.
-	GameState.coins = Balance.get_gear_cost_coins("jetpack")
-	check("джетпак куплен", bool(ShopService.buy_gear("jetpack")["ok"]))
+	# запасного ранца пересаживала бы игрока с джетпака на пропеллеры. Купить
+	# джетпак раньше улучшенного ранца нельзя (ступени по порядку), поэтому он
+	# выдаётся напрямую — как в старом сейве, где перескок уже случился.
+	GameState.grant_gear("jetpack")
 	check("джетпак надет сам — он быстрее", GameState.current_gear == "jetpack")
 	GameState.coins = Balance.get_gear_cost_coins("backpack_plus")
 	check("улучшенный ранец куплен", bool(ShopService.buy_gear("backpack_plus")["ok"]))

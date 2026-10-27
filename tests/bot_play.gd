@@ -2183,7 +2183,9 @@ func _purchase_targets() -> Array:
 	var cur_speed := Balance.get_tool_speed_multiplier(GameState.current_tool)
 	var picks: Array = []
 	for tool_id in Balance.get_tools_in_line("pickaxe"):
-		if GameState.owns_tool(tool_id) or Balance.tool_needs_materials(tool_id):
+		# Ступени только по порядку (владелец, 27.10): в списке — лишь следующая за своей,
+		# иначе режим "best" целился бы в титан мимо железа и раз за разом получал отказ.
+		if GameState.owns_tool(tool_id) or Balance.tool_needs_materials(tool_id) 				or ShopService.missing_prev_tier(tool_id) != "":
 			continue
 		var price := Balance.get_tool_cost_coins(tool_id)
 		if price <= 0 or Balance.get_tool_speed_multiplier(tool_id) <= cur_speed:
@@ -2192,7 +2194,7 @@ func _purchase_targets() -> Array:
 	# ранцы
 	var gears: Array = []
 	for gear_id in Balance.get_gear_ids():
-		if GameState.has_gear(gear_id):
+		if GameState.has_gear(gear_id) or ShopService.missing_prev_tier(gear_id) != "":
 			continue
 		if Balance.get_gear_fly_multiplier(gear_id) <= Balance.get_gear_fly_multiplier(GameState.current_gear):
 			continue

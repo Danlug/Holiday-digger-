@@ -443,12 +443,12 @@ func _tick_magnet(dt: float) -> void:
 # Всплывающий текст / иконки
 # ---------------------------------------------------------------------------
 
-func float_text(world_pos: Vector2, text: String, color: Color = Color.WHITE) -> void:
-	_popup(world_pos, null, text, color)
+func float_text(world_pos: Vector2, text: String, color: Color = Color.WHITE, size: float = 1.0) -> void:
+	_popup(world_pos, null, text, color, size)
 
 
-func float_icon(world_pos: Vector2, icon: Texture2D, text: String = "", color: Color = Color.WHITE) -> void:
-	_popup(world_pos, icon, text, color)
+func float_icon(world_pos: Vector2, icon: Texture2D, text: String = "", color: Color = Color.WHITE, size: float = 1.0) -> void:
+	_popup(world_pos, icon, text, color, size)
 
 
 func active_popups() -> int:
@@ -473,7 +473,8 @@ func _make_popup() -> Node2D:
 	return root
 
 
-func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color) -> Node2D:
+## size — масштаб всплывашки целиком (значок и надпись): удачная находка — 1.2 (LuckJuice).
+func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color, size: float = 1.0) -> Node2D:
 	if icon == null and text.is_empty():
 		return null
 	var root: Node2D
@@ -513,12 +514,13 @@ func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color) -> Node2D
 
 	root.position = pos
 	root.modulate = Color(1, 1, 1, 1)
-	root.scale = Vector2(1.5, 1.5)
+	root.scale = Vector2.ONE * (1.5 * size)
+	root.set_meta("size", size)
 	root.visible = true
 	var tw := create_tween().set_parallel(true)
 	_popup_tween[root] = tw
 	tw.tween_property(root, "position:y", pos.y - POPUP_RISE, 0.95).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(root, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(root, "scale", Vector2.ONE * size, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(root, "modulate:a", 0.0, 0.4).set_delay(0.55)
 	tw.chain().tween_callback(_recycle_popup.bind(root))
 	return root
@@ -528,7 +530,7 @@ func _popup(pos: Vector2, icon: Texture2D, text: String, color: Color) -> Node2D
 ## складывается в одно всплывающее число, которое «подпрыгивает» при каждой
 ## добавке, а не в стопку одинаковых «+1». Возвращает накопленное число.
 func float_stack(key: String, pos: Vector2, icon: Texture2D, add: int, color: Color = Color.WHITE,
-		window_s: float = 0.75) -> int:
+		window_s: float = 0.75, size: float = 1.0) -> int:
 	var now := Time.get_ticks_msec()
 	var total := add
 	var base := pos
@@ -540,12 +542,14 @@ func float_stack(key: String, pos: Vector2, icon: Texture2D, add: int, color: Co
 				and (old_root.get_node("Text") as Label).text == "+%d" % int(e["count"]):
 			total += int(e["count"])
 			base = e["base"]
+			# удачное «+N» не съёживается от обычной добавки следом
+			size = maxf(size, float(e.get("size", 1.0)))
 			var old_tw: Tween = _popup_tween.get(old_root)
 			if old_tw != null and old_tw.is_valid():
 				old_tw.kill()
 			_recycle_popup(old_root)
-	var root := _popup(base, icon, "+%d" % total, color)
-	_stack[key] = {"root": root, "count": total, "until": now + int(window_s * 1000.0), "base": base}
+	var root := _popup(base, icon, "+%d" % total, color, size)
+	_stack[key] = {"root": root, "count": total, "until": now + int(window_s * 1000.0), "base": base, "size": size}
 	return total
 
 

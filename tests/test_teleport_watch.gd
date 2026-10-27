@@ -356,7 +356,8 @@ func _test_story_and_lesson() -> void:
 		and TeleportWatch.return_point().distance_to(from) < 0.01)
 	check("обучение закончено, лавка закрыта, герой свободен", not FocusTour.is_any_running()
 		and not ShopUI.instance.is_open() and not p.frozen and main.hud.is_processing_input())
-	check("тень после конца касаний не ловит", not shield._has_point(Vector2(10, 10)))
+	# Тень тает 0,18 с; под нагрузкой она уже может быть удалена — тогда тем более не ловит.
+	check("тень после конца касаний не ловит", not is_instance_valid(shield) or not shield._has_point(Vector2(10, 10)))
 	await _frames(30)
 	check("тень ушла со сцены", not is_instance_valid(tour) or not tour.is_inside_tree())
 	check("пузырь «Вниз» мигает после урока", tw.button().visible and String(tw.button().get("_state")) == "forced")

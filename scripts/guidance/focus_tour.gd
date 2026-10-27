@@ -662,20 +662,16 @@ class _Shield extends Control:
 			return false
 		return not tour.passes_through(point + global_position)
 
+	## Касание пальцем приходит дважды: само касание и мышь, которую из него делает движок
+	## (emulate_mouse_from_touch). Действуем по мыши, касание просто гасим — иначе шаг «catch»
+	## засчитался бы два раза подряд.
 	func _gui_input(event: InputEvent) -> void:
-		var press := false
-		var pos := Vector2.ZERO
-		if event is InputEventMouseButton:
-			var mb := event as InputEventMouseButton
-			press = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
-			pos = mb.global_position
-		elif event is InputEventScreenTouch:
-			var st := event as InputEventScreenTouch
-			press = st.pressed
-			pos = st.position
 		accept_event()
-		if press and tour != null:
-			tour._on_shield_tap(pos)
+		if not (event is InputEventMouseButton):
+			return
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and tour != null:
+			tour._on_shield_tap(mb.global_position)
 
 	func _draw() -> void:
 		if tour == null:

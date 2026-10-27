@@ -11,7 +11,16 @@ extends Node
 ##  * Загрузка в воздухе: герой висит там, где был, пока игрок не тронет управление (или пока его не
 ##    сдвинет кто-то другой: сцена, телепорт, дом). Сама загрузка не роняет его и не бьёт падением.
 
+## Запись «встал на новом месте»: браузер могут убить и без единого события (телефон выгрузил свёрнутый
+## браузер вместе с вкладкой, закрыли окно целиком, сбой), и тогда спасает только уже лежащая запись.
+## Герой стоит на клетке, которой нет в последнем сейве, — пишем, но не чаще раза в STEP_GAP_S: большой сейв
+## пишется десятки миллисекунд, а пока герой копает без остановки, рывков быть не должно.
+const SETTLE_S := 1.0      # ПРЕДЛОЖЕНО: сколько простоять на новом месте до записи
+const STEP_GAP_S := 10.0   # ПРЕДЛОЖЕНО: не чаще раза в столько секунд
+
 var player: Node2D = null
+var _settle := 0.0
+var _since_step := STEP_GAP_S
 var _hover := false
 var _hover_at := Vector2.ZERO
 var _js_leave = null   # JavaScriptObject колбэка: без ссылки его соберёт сборщик и страница позовёт пустоту
@@ -45,12 +54,25 @@ func is_hovering() -> bool:
 	return _hover
 
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
 	if player == null or not is_instance_valid(player):
 		return
 	if _hover:
 		_tick_hover()
 	HeroSpot.track(player)
+	_tick_step_save(dt)
+
+
+func _tick_step_save(dt: float) -> void:
+	_since_step += dt
+	# стоит (или висит) сам, не копает; в доме — тоже «встал»: место стёрто, и запуск должен быть у дома
+	var still: bool = GameState.house_is_indoors or (GameState.is_alive and not bool(player.frozen)
+		and player.digging == null and absf(float(player.vx)) < 0.01 and absf(float(player.vy)) < 0.5)
+	_settle = _settle + dt if still and HeroSpot.written_differs() else 0.0
+	if _settle >= SETTLE_S and _since_step >= STEP_GAP_S:
+		_settle = 0.0
+		_since_step = 0.0
+		SaveSystem.save_now("settled")
 
 
 func _tick_hover() -> void:

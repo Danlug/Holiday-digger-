@@ -11,9 +11,10 @@ extends Node
 ##  5. Поверхность, дом, онбординг, отложенное землетрясение → как раньше, у дома.
 ##  6. Запись при закрытии: пауза/сворачивание/закрытие окна пишут место сразу, без автосейва;
 ##     сцена (frozen) место не переписывает, сейв мёртвого места не несёт.
+##  7. Запись «встал на новом месте» (браузер убит без событий): через секунду простоя, не чаще раза в 10 с.
 ##
 ## Режим для веб-проверки (tools/smoke_save_position.js): `-- --seed-out КАТАЛОГ` кладёт туда save.json и
-## story.json героя в шахте (онбординг пройден) и выходит.
+## story.json героя над шахтой в 6 клеток (онбординг пройден) и выходит.
 
 var failures := 0
 var total := 0
@@ -142,6 +143,7 @@ func _ready() -> void:
 	await _test_rig()
 	await _test_home_cases()
 	await _test_close_hooks()
+	await _test_step_save()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -414,6 +416,7 @@ func _saved_spot_on_disk() -> Vector2i:
 func _test_close_hooks() -> void:
 	var m := await _fresh()
 	var hooks := m.get_node("SaveHooks") as SaveHooks
+	hooks._since_step = -1.0e9   # запись «встал на новом месте» здесь не нужна: проверяем сами события
 	var p = m.player
 	SaveSystem.save_game()   # «автосейв» у дома
 	check("подготовка: на диске места нет", _saved_spot_on_disk() == Vector2i(-1, -1))
@@ -456,6 +459,36 @@ func _test_close_hooks() -> void:
 	await _frames(2)
 
 
+## Браузер убили без единого события (телефон выгрузил свёрнутый браузер, закрыли окно целиком): спасает
+## запись «встал на новом месте» — через SETTLE_S простоя, не чаще раза в STEP_GAP_S.
+func _test_step_save() -> void:
+	var m := await _fresh()
+	var hooks := m.get_node("SaveHooks") as SaveHooks
+	var p = m.player
+	SaveSystem.save_game()
+	var a := _shaft(m.world, 40, 0)
+	_stand(p, a)
+	await _wait(SaveHooks.SETTLE_S + 0.4)
+	check("встал на новом месте: запись сама, без автосейва и событий", _saved_spot_on_disk() == a, str(_saved_spot_on_disk()))
+	var b := _shaft(m.world, 50, 0)
+	_stand(p, b)
+	await _wait(SaveHooks.SETTLE_S + 0.4)
+	check("второй раз подряд — не раньше чем через STEP_GAP_S", _saved_spot_on_disk() == a, str(_saved_spot_on_disk()))
+	hooks._since_step = SaveHooks.STEP_GAP_S
+	await _wait(SaveHooks.SETTLE_S + 0.4)
+	check("через STEP_GAP_S — пишет новое место", _saved_spot_on_disk() == b, str(_saved_spot_on_disk()))
+	# Копает без остановки — записей нет (рывков посреди копки не будет).
+	hooks._since_step = SaveHooks.STEP_GAP_S
+	var c := _shaft(m.world, 60, 0)
+	_stand(p, c)
+	p.digging = {"x": c.x, "y": c.y + 1, "t": 0.0, "total": 1.0e9, "type": TileTypes.Type.STONE}
+	await _wait(SaveHooks.SETTLE_S + 0.4)
+	check("пока копает — не пишет", _saved_spot_on_disk() == b, str(_saved_spot_on_disk()))
+	p.digging = null
+	m.free()
+	await _frames(2)
+
+
 # ---------------------------------------------------------------------------
 # Веб-проверка: заготовка сейва «в шахте, онбординг пройден»
 # ---------------------------------------------------------------------------
@@ -465,12 +498,13 @@ func _seed_out(dir: String) -> void:
 	GameState.grant_tool("rusty_pickaxe")
 	GameState.set_current_tool("rusty_pickaxe")
 	GameState.coins = 500
-	var c := _shaft(m.world, 20, 0)
-	_stand(m.player, c)
-	await _frames(3)
+	# Герой висит над шахтой в 6 клеток (загрузка его не роняет); «вниз» в браузере — и он внизу.
+	var bottom := _shaft(m.world, 20, 6)
+	var c := Vector2i(bottom.x, bottom.y - 6)
+	_put_in_air(m.player, c.x, c.y)
 	SaveSystem.save_game()
 	DirAccess.make_dir_recursive_absolute(dir)
 	for f in ["save.json", "story.json"]:
 		DirAccess.copy_absolute(ProjectSettings.globalize_path("user://" + f), dir.path_join(f))
-	print("seed: герой %s, онбординг пройден → %s" % [c, dir])
+	print("seed: герой %s над шахтой до %d, онбординг пройден → %s" % [c, bottom.y, dir])
 	m.free()

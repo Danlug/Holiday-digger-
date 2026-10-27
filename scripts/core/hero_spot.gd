@@ -20,11 +20,19 @@ const HERO_HH := 1.0 / 3.0   # полувысота героя — как player
 enum { NONE, STANDING, HOVER }
 
 static var _player: WeakRef = null
+## Место, ушедшее в последнюю запись ({} — без места): SaveHooks пишет «по шагу», когда текущее с ним разошлось.
+static var _written: Dictionary = {}
 
 
 ## SaveHooks представляет героя: sync_now() из SaveSystem берёт место прямо в момент записи.
 static func bind(player: Node) -> void:
 	_player = weakref(player) if player != null else null
+	_written = _current().duplicate()   # только что загружено — оно и записано
+
+
+static func _current() -> Dictionary:
+	var spot = GameState.ext.get(EXT_KEY)
+	return spot if typeof(spot) == TYPE_DICTIONARY else {}
 
 
 static func _bound() -> Node:
@@ -72,6 +80,13 @@ static func sync_now() -> void:
 		track(p)
 	elif not GameState.is_alive:
 		GameState.ext.erase(EXT_KEY)
+	_written = _current().duplicate()
+
+
+## Место героя разошлось с записанным в последний сейв (сменилась клетка или место стёрто/появилось).
+static func written_differs() -> bool:
+	var now := _current()
+	return int(now.get("x", -1)) != int(_written.get("x", -1)) or int(now.get("y", -1)) != int(_written.get("y", -1))
 
 
 static func saved_cell() -> Vector2i:
@@ -151,7 +166,7 @@ static func restore(player, world, loaded_dead: bool) -> int:
 	player.on_ground = standing
 	player.digging = null
 	player.thrust = ""
-	var facing := int(GameState.ext.get(EXT_KEY, {}).get("facing", 1))
+	var facing := int(_current().get("facing", 1))
 	player.facing = -1 if facing < 0 else 1
 	player.set("_air_top_y", player.y)   # высота падения для окна смерти — от этой точки, а не от дома
 	GameState.player_depth = cell.y

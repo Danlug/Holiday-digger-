@@ -511,10 +511,9 @@ func _on_hp(hp: float, max_hp: float) -> void:
 func _hurt(dmg: float, max_hp: float, k: float) -> void:
 	var share := clampf(dmg / maxf(max_hp, 1.0), 0.0, 1.0)
 	Sfx.play("hurt", 1.0, linear_to_db(clampf(0.55 + share * 2.0, 0.55, 1.0) * k))
-	Fx.flash(Color(0.85, 0.08, 0.1, clampf(0.18 + share * 1.2, 0.18, 0.5) * k), 0.25)
+	# краснота экрана, тряска и наезд камеры — HurtJuice (scripts/feel/, владелец 27.10)
 	if k >= 1.0:
 		Haptics.thud()
-		Fx.shake(clampf(1.5 + share * 8.0, 1.5, 5.0), 0.18)
 		if player != null:
 			Fx.float_text(_head(), "-%d" % int(round(dmg)), COL_DMG)
 

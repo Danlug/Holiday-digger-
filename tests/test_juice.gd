@@ -411,7 +411,8 @@ func _test_director() -> void:
 	# --- сигналы GameState ---
 	rec.clear()
 	GameState.hp_changed.emit(88.0, 100.0)
-	check("hp вниз → hurt и красная вспышка", rec.has_play("hurt") and rec.flashes == 1)
+	# краснота, тряска и наезд урона с 27.10 — HurtJuice (tests/test_hurt_juice.gd), не общая вспышка
+	check("hp вниз → hurt, без общей вспышки и тряски", rec.has_play("hurt") and rec.flashes == 0 and rec.shakes == 0)
 	rec.clear()
 	GameState.hp_changed.emit(87.9, 100.0)
 	check("капля голода не вызывает hurt на каждый кадр", not rec.has_play("hurt"))

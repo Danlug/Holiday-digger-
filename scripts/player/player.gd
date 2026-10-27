@@ -221,7 +221,7 @@ var greed_mult: float = 1.0
 ## тоннель не убьёт, но и мгновенным лифтом вниз жадность не станет.
 signal greed_fall_stopped
 var _greed_hang_left: float = 0.0   # сколько ещё висеть (реальные секунды кадра)
-var _greed_fall_from: float = NAN   # y, с которого идёт текущий отрезок падения (NAN — ещё не мерили)
+var _greed_fall_dist: float = 0.0   # клеток пролетел вниз с верхней точки или прошлой остановки
 var _greed_air: bool = false        # в этом полёте была жадность: урон — только за высоту после её конца
 var _greed_top_y: float = 0.5       # верхняя точка полёта после конца жадности
 
@@ -700,7 +700,7 @@ func physics_tick(dt: float) -> void:
 	for _greed_step in maxi(1, roundi(greed_mult)):
 		_move_x(dt)
 		_move_y(dt)
-		if _greed_fall_tick():
+		if _greed_fall_tick(dt):
 			break
 
 	# Счётчик кадров идёт ВСЕГДА. Пока он тикал только при копке и ходьбе,
@@ -969,11 +969,14 @@ func _land() -> void:
 
 
 ## Шаг падения в жадности (зовётся после каждого из greed_mult шагов движения).
-## Отрезок меряется от верхней точки — уступа, вершины прыжка, прошлой остановки;
+## Отрезок копится от верхней точки — уступа, вершины прыжка, прошлой остановки;
 ## под тягой ранца, на подъёме и на земле отсчёт идёт заново, поэтому подъём и
-## торможение ранцем, прыжок и копка вниз по клетке не останавливаются.
+## торможение ранцем, прыжок и копка вниз по клетке не останавливаются. Копим
+## пройденное за шаг (vy·dt — в свободном падении это ровно сдвиг _move_y), а не
+## разницу с запомненной точкой: героя, поставленного в воздух мимо физики (сцена,
+## телепорт, сейв), старая точка не остановит.
 ## true — герой только что «зацепился»: остаток шагов кадра пропускается.
-func _greed_fall_tick() -> bool:
+func _greed_fall_tick(dt: float) -> bool:
 	if on_ground:
 		_greed_air = false
 	elif greed_mult > 1.0:
@@ -981,16 +984,13 @@ func _greed_fall_tick() -> bool:
 		_greed_top_y = y
 	elif _greed_air:
 		_greed_top_y = minf(_greed_top_y, y)
-	if greed_mult <= 1.0 or on_ground or thrust != "" or vy <= 0.0 or GameState.debug_fly_300 \
-			or is_nan(_greed_fall_from):
-		_greed_fall_from = y
+	if greed_mult <= 1.0 or on_ground or thrust != "" or vy <= 0.0 or GameState.debug_fly_300:
+		_greed_fall_dist = 0.0
 		return false
-	# не выше вершины этого полёта: героя поставили в воздух мимо физики (сцена,
-	# телепорт, тест) — отсчёт от того места, а не от прошлого отрезка
-	_greed_fall_from = maxf(_greed_fall_from, _air_top_y)
-	if y - _greed_fall_from < GreedRules.fall_stop_cells():
+	_greed_fall_dist += vy * dt
+	if _greed_fall_dist < GreedRules.fall_stop_cells():
 		return false
-	_greed_fall_from = y
+	_greed_fall_dist = 0.0
 	_greed_hang_left = GreedRules.fall_stop_seconds()
 	vx = 0.0
 	vy = 0.0

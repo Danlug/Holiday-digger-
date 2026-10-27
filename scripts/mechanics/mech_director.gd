@@ -339,8 +339,10 @@ func _on_greed_fall_stop() -> void:
 	if player == null or not is_instance_valid(player):
 		return
 	var feet := Vector2(float(player.x) * 32.0, (float(player.y) + 0.33) * 32.0)
-	Fx.burst("poof", feet, 0.45)
-	Fx.burst("spark", feet, 0.4, COL_GOLD)
+	# пыль в обе стороны — подошвы чиркнули по стенкам шахты, искра — цвет жадности
+	Fx.burst("land_dust_l", feet + Vector2(-4, 0), 0.6)
+	Fx.burst("land_dust_r", feet + Vector2(4, 0), 0.6)
+	Fx.burst("spark", feet, 0.8, COL_GOLD)
 	Sfx.play("step_stone", 1.25, -7.0)
 
 

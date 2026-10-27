@@ -254,6 +254,12 @@ func _test_short_drops() -> void:
 		p.physics_tick(DT)
 		landed = landed or (p.on_ground and i > 2)
 	check("прыжок в жадности (2.2 кл. вверх и вниз) — без остановки", landed and _stops == 0)
+	# поставили в воздух мимо физики (сцена, телепорт, сейв): прошлая стоянка не в счёт
+	p.y = float(FLOOR_Y) - 20.0
+	p.vy = 0.0
+	p.on_ground = false
+	_steps(p, 2)
+	check("героя переставили на 20 кл. выше — первой остановки сразу нет", _stops == 0 and p.vy > 0.0)
 	p.queue_free()
 
 
@@ -262,11 +268,15 @@ func _steps(p, n: int, dt: float = DT) -> void:
 		p.physics_tick(dt)
 
 
-## Копка вниз — не падение: герой встаёт на каждую клетку, отсчёт с нуля.
-func _test_dig_down() -> void:
+## Копка вниз — не падение: герой встаёт на каждую клетку, отсчёт с нуля. Бур и
+## бурмобиль не ограничены (решение, ГДД §20.1) — меряем, что они медленнее тоннеля.
+func _dig_down(tool_id: String) -> Dictionary:
 	var a := Arena.new()
-	a.fill(10, FLOOR_Y - 20, 20, FLOOR_Y + 20, TileTypes.Type.DIRT)
+	a.fill(10, FLOOR_Y - 20, 20, FLOOR_Y + 40, TileTypes.Type.DIRT)
 	var p = _player(a)
+	GameState.grant_tool(tool_id)
+	GameState.current_tool = tool_id
+	FuelTank.set_fuel(tool_id, 50.0)
 	p.x = 15.5
 	p.y = float(FLOOR_Y - 21) + 1.0 - 1.0 / 3.0 - 0.001
 	p.on_ground = true
@@ -277,11 +287,23 @@ func _test_dig_down() -> void:
 	p.set_intent(0, false, true)
 	_steps(p, 240)
 	p.set_intent(0, false, false)
-	check("копка вниз в жадности: %.0f клеток за 4 с, остановок нет, урона нет" % (p.y - y0),
-		p.y - y0 > 8.0 and _stops == 0 and GameState.hp == hp0)
+	var out := {"cells": p.y - y0, "stops": _stops, "hurt": GameState.hp < hp0}
 	p.digging = null
+	GameState.current_tool = "iron_pickaxe"
 	_heal()
 	p.queue_free()
+	return out
+
+
+func _test_dig_down() -> void:
+	var line := ""
+	var ok := true
+	for t in ["iron_pickaxe", "hand_drill", "drill_rig"]:
+		var r := _dig_down(t)
+		line += " %s %.1f кл./с;" % [t, float(r["cells"]) / 4.0]
+		ok = ok and float(r["cells"]) > 8.0 and int(r["stops"]) == 0 and not bool(r["hurt"]) \
+			and float(r["cells"]) / 4.0 < 10.0
+	check("копка вниз в жадности без остановок и урона, медленнее тоннеля (10 кл./с):%s" % line, ok)
 
 
 func _test_jetpack() -> void:

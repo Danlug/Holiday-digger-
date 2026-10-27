@@ -110,7 +110,8 @@ static func _has_floor(world, x: int, y: int) -> bool:
 
 
 ## Ближайшая к c пустая клетка (сама c, если пуста). Порода, лава и любые тайлы не годятся — герой
-## никогда не встаёт внутрь клетки. Из равных по расстоянию — с полом под ногами. (-1,-1) — рядом нет.
+## никогда не встаёт внутрь клетки. Из равных по расстоянию — с полом под ногами, и пол не лава.
+## (-1,-1) — рядом нет.
 static func find_safe_cell(world, c: Vector2i) -> Vector2i:
 	if _is_free(world, c.x, c.y):
 		return c
@@ -122,7 +123,9 @@ static func find_safe_cell(world, c: Vector2i) -> Vector2i:
 			var y := c.y + dy
 			if not _is_free(world, x, y):
 				continue
-			var cost := float(dx * dx + dy * dy) + (0.0 if _has_floor(world, x, y) else 0.5)
+			var under: int = world.get_tile(x, y + 1)
+			var good_floor := under != TileTypes.Type.EMPTY and under != TileTypes.Type.LAVA
+			var cost := float(dx * dx + dy * dy) + (0.0 if good_floor else 0.5)
 			if cost < best_cost:
 				best_cost = cost
 				best = Vector2i(x, y)

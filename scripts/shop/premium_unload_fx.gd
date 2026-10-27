@@ -10,7 +10,11 @@ extends CanvasLayer
 ## удаляет. «Меньше движения» — домик с «×N» просто стоит и гаснет.
 
 const LAYER := 61          # над витриной (20), подсказками (40) и летящими монетами Fx (59)
-const HOUSE := 30.0
+const HOUSE := 28.0
+const PLATE := Vector2(52, 52)
+## Плашка — в середине экрана, ниже двух рядов плиток витрины за доллары: сверху
+## её закрывали бы тосты достижений и баннеры вех (они выше по слоям).
+const PLATE_Y := 0.52
 const ICON := 16.0
 const MAX_ICONS := 7
 const FLY := 0.46
@@ -22,6 +26,7 @@ const GOLD := Color8(0xE0, 0xA9, 0x3B)
 
 var count: int = 0
 var _root: Control
+var _plate: Panel
 var _house: TextureRect
 var _label: Label
 var _landed: int = 0
@@ -43,19 +48,32 @@ func _init() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_root)
-	_house = ShopArt.rect(ShopArt.tex("glyph_house"), Vector2.ZERO, Vector2(HOUSE, HOUSE))
-	_house.pivot_offset = Vector2(HOUSE, HOUSE) * 0.5
-	_root.add_child(_house)
-	_label = ShopArt.label("", 14, GOLD)
+	# Домик и «×N» на своей тёмной плашке: поверх плиток витрины и поверх шахты читаются одинаково.
+	_plate = Panel.new()
+	_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plate.size = PLATE
+	_plate.pivot_offset = PLATE * 0.5
+	_plate.add_theme_stylebox_override("panel", ProgressUiKit.popup_box(GOLD, Color(0.071, 0.055, 0.043, 0.94), 0))
+	_root.add_child(_plate)
+	_house = ShopArt.rect(ShopArt.tex("glyph_house"), Vector2((PLATE.x - HOUSE) * 0.5, 5.0), Vector2(HOUSE, HOUSE))
+	_house.pivot_offset = Vector2(HOUSE * 0.5, HOUSE)
+	_plate.add_child(_house)
+	_label = ShopArt.label("", 13, GOLD)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.size = Vector2(80, 18)
+	_label.position = Vector2(0, HOUSE + 4.0)
+	_label.size = Vector2(PLATE.x, 16)
 	_label.visible = false
-	_root.add_child(_label)
+	_plate.add_child(_label)
 
 
+## Куда летят значки: середина домика на плашке.
 func house_center() -> Vector2:
+	return _plate_pos() + Vector2(PLATE.x * 0.5, 5.0 + HOUSE * 0.5)
+
+
+func _plate_pos() -> Vector2:
 	var vp := _root.get_viewport_rect().size if _root.is_inside_tree() else Vector2(224, 480)
-	return Vector2(vp.x * 0.5, 92.0)
+	return Vector2((vp.x - PLATE.x) * 0.5, roundf(vp.y * PLATE_Y))
 
 
 func run(from: Vector2, moved: Dictionary) -> void:
@@ -66,17 +84,16 @@ func run(from: Vector2, moved: Dictionary) -> void:
 	ids.sort_custom(func(a, b): return int(moved[a]) > int(moved[b]))
 	_icons = mini(ids.size(), MAX_ICONS)
 	var hc := house_center()
-	_house.position = hc - _house.size * 0.5
-	_label.position = Vector2(hc.x - _label.size.x * 0.5, hc.y + HOUSE * 0.5 + 1.0)
+	_plate.position = _plate_pos()
 	_label.text = "×%d" % count
 	Sfx.play("fly_start")
 	if Settings.reduce_motion or not is_inside_tree():
 		_label.visible = true
 		_finish(0.9)
 		return
-	_house.scale = Vector2.ZERO
+	_plate.scale = Vector2.ZERO
 	var tw := create_tween()
-	tw.tween_property(_house, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_plate, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	for i in _icons:
 		_fly(UiIcons.item(String(ids[i])), from, hc, 0.2 + STAGGER * i)
 	if _icons == 0:

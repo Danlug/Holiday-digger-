@@ -249,7 +249,9 @@ func _on_target() -> void:
 			ShopUI.open_premium()
 			step = Step.TILE
 			_scrolled = false
-			spotlight.point_at(_tile_rect)
+			# Цена на плитке может быть красной (на 150 долларов обычно мало) — подарок у стрелки
+			# говорит, что этот раз бесплатный.
+			spotlight.point_at(_tile_rect, ShopArt.tex("glyph_gift") if free_use() else null)
 		Step.TILE:
 			_press_tile()
 

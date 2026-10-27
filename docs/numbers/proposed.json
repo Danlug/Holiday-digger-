@@ -3,7 +3,7 @@
  "generated_by": "tools/proposed_numbers.py",
  "how_to_refresh": "python3 tools/proposed_numbers.py   (без Godot: --no-sims)",
  "sources": {
-  "data_fingerprint": "f6094de2239b",
+  "data_fingerprint": "7736a8d60e21",
   "notes": [
    "итоги симуляторов из docs/numbers/sims.json (данные с тех пор менялись — перезапустить без --no-sims)",
    "итоги ботов: 10 прогонов, 111 игровых часов, сборка 20261024-1824 (docs/numbers/bot_anchors.json)",
@@ -11,13 +11,13 @@
   ]
  },
  "summary": {
-  "rows": 647,
-  "families": 43,
+  "rows": 677,
+  "families": 44,
   "new_unreviewed": 0,
   "flagged": 14,
   "by_theme": {
    "Прокачка и уровни": 9,
-   "Задания и награды": 189,
+   "Задания и награды": 219,
    "Артефакты и музей": 56,
    "Техника и топливо": 61,
    "Бой": 210,
@@ -52,6 +52,12 @@
    "verdict": "оставить"
   },
   {
+   "family": "q.newbie",
+   "decide": "Стрик новичка: миссии и награды 30 дней: 30 дней и 50 $ за пропуск — ваши числа; миссии — сценарий агента: продай, поешь, поспи, глубина 50 → глубина 300·500·800, ручной бур на 24-й день, скважина на 29-й; награда дня 100→2000 монет («суть не в бонусе за день»). Подходит ли темп и что станет крупным подарком за все 30 дней?",
+   "now": "30 чисел",
+   "verdict": "решить"
+  },
+  {
    "family": "cmb.reach",
    "decide": "Где начинается бой: ни один бот за 12 игровых часов не дошёл до 4000. Теперь с 1500 есть полости со стражами (п.2 владельца), но бот проверил их только стартом прямо в полости — когда игрок встретит первого стража, покажет следующий ночной прогон?",
    "now": "12 чисел",
@@ -80,12 +86,6 @@
    "decide": "Сундук дня, серия, замена: как в мобильных играх: 5 заданий, сундук ×1.5, серия до +50%?",
    "now": "18 чисел",
    "verdict": "оставить"
-  },
-  {
-   "family": "q.weekly",
-   "decide": "Недельные задания: недельная цель = 4 дня работы; второй слот даёт 1 доллар?",
-   "now": "5 чисел",
-   "verdict": "оставить"
   }
  ],
  "themes": [
@@ -106,9 +106,10 @@
   {
    "id": "quests",
    "title": "Задания и награды",
-   "count": 189,
+   "count": 219,
    "families": [
     "q.targets",
+    "q.newbie",
     "q.tiers",
     "q.chest_streak",
     "q.weekly",
@@ -311,6 +312,52 @@
    "effect": "«Выкопай N клеток»: цели по ступеням 0–5 — ≈ ст.0 23 мин, ст.1 26 мин, ст.2 26 мин, ст.3 25 мин, ст.4 27 мин, ст.5 26 мин игры (темп sim_daily); ступень 2 — ориентир владельца",
    "verdict": "оставить",
    "why": "копка ≈ 25 минут игры на любой ступени; ступень 2 — ровно слова владельца (500 клеток, 1000 монет, 500 трат, 3 еды)",
+   "flags": []
+  },
+  {
+   "id": "q.newbie",
+   "theme": "quests",
+   "title": "Стрик новичка: миссии и награды 30 дней",
+   "importance": 4,
+   "rows": [
+    "newbie_streak.json:days[1]",
+    "newbie_streak.json:days[2]",
+    "newbie_streak.json:days[3]",
+    "newbie_streak.json:days[4]",
+    "newbie_streak.json:days[5]",
+    "newbie_streak.json:days[6]",
+    "newbie_streak.json:days[7]",
+    "newbie_streak.json:days[8]",
+    "newbie_streak.json:days[9]",
+    "newbie_streak.json:days[10]",
+    "newbie_streak.json:days[11]",
+    "newbie_streak.json:days[12]",
+    "newbie_streak.json:days[13]",
+    "newbie_streak.json:days[14]",
+    "newbie_streak.json:days[15]",
+    "newbie_streak.json:days[16]",
+    "newbie_streak.json:days[17]",
+    "newbie_streak.json:days[18]",
+    "newbie_streak.json:days[19]",
+    "newbie_streak.json:days[20]",
+    "newbie_streak.json:days[21]",
+    "newbie_streak.json:days[22]",
+    "newbie_streak.json:days[23]",
+    "newbie_streak.json:days[24]",
+    "newbie_streak.json:days[25]",
+    "newbie_streak.json:days[26]",
+    "newbie_streak.json:days[27]",
+    "newbie_streak.json:days[28]",
+    "newbie_streak.json:days[29]",
+    "newbie_streak.json:days[30]"
+   ],
+   "count": 30,
+   "value_text": "30 чисел",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "reviewed": true,
+   "effect": "за все 30 дней: 23 450 монет и 11 410 опыта (крупный подарок — отдельно, пока заглушка)",
+   "verdict": "решить",
+   "why": "30 дней и 50 $ за пропуск — ваши числа; миссии — сценарий агента: продай, поешь, поспи, глубина 50 → глубина 300·500·800, ручной бур на 24-й день, скважина на 29-й; награда дня 100→2000 монет («суть не в бонусе за день»). Подходит ли темп и что станет крупным подарком за все 30 дней",
    "flags": []
   },
   {
@@ -2514,6 +2561,1931 @@
    "note": "Мета-слой: ежедневные и недельные задания (ГДД §17.1–17.2). Числа — предложение агента (proposed), КРОМЕ четырёх ориентиров владельца для средней ступени (2: рекорд глубины 80–249): «прокопай 500 любых клеток», «продай на 1000 монет», «потрать 500 монет», «поешь 3 раза» — они помечены owner в owner_anchor. Набор дня строит scripts/meta/quest_gen.gd детерминированно от (местные сутки, сид мира, ступень игрока). Массивы targets — цель ДНЯ по ступеням tier_by_max_depth; недельная цель = targets × weekly_scale шаблона (по умолчанию weekly.default_scale) × scale слота. event — id шины GameState.game_event либо сигнал GameState (max_depth_changed, leveled_up). sum: пусто — +1 за событие, иначе складывается поле data[sum]. filter: mineral/item (строка или список), loot (bool), kind (dirt|stone|ore), currency, depth_min/depth_max; filter_by_tier — то же по ступеням. mode:delta у max_depth_changed — прогресс от рекорда глубины на момент выдачи. requires_seen: шаблон берётся, только когда это событие хоть раз было на шине (невыполнимое задание хуже отсутствующего). Темп, от которого посчитаны цели, — tools/sim_daily.gd (клеток в минуту и монет за клетку по поясам глубины).",
    "affects": "сколько минут занимает задание",
    "effect": null,
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[10]",
+   "file": "data/newbie_streak.json",
+   "path": "days[10]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 10",
+   "value": {
+    "day": 10,
+    "reward": {
+     "coins": 600,
+     "xp": 250,
+     "item": {
+      "id": "medkit",
+      "count": 1
+     }
+    },
+    "missions": [
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 200,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "gold",
+      "event": "picked",
+      "filter": {
+       "item": "gold"
+      },
+      "sum": "count",
+      "target": 5,
+      "glyph": "item:gold",
+      "name_ru": "Добудь золото: {n}",
+      "name_en": "Mine gold: {n}"
+     },
+     {
+      "id": "spend",
+      "event": "spent",
+      "filter": {
+       "currency": "coins"
+      },
+      "sum": "amount",
+      "target": 1000,
+      "glyph": "spend",
+      "name_ru": "Потрать {n} монет",
+      "name_en": "Spend {n} coins"
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 4,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} задания дня",
+      "name_en": "Complete {n} daily tasks"
+     }
+    ]
+   },
+   "value_text": "Спустись на глубину 200; Добудь золото: 5; Потрать 1000 монет; Выполни 4 задания дня → 600 монет, 250 опыта, Аптечка ×1",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 5 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[11]",
+   "file": "data/newbie_streak.json",
+   "path": "days[11]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 11",
+   "value": {
+    "day": 11,
+    "reward": {
+     "coins": 500,
+     "xp": 250
+    },
+    "missions": [
+     {
+      "id": "mastery",
+      "event": "mastery_star",
+      "target": 1,
+      "glyph": "star",
+      "name_ru": "Получи звезду мастерства",
+      "name_en": "Earn a mastery star",
+      "desc_ru": "Звёзды мастерства дают породы, которые копаешь снова и снова (журнал).",
+      "desc_en": "Mastery stars come from digging the same rock again and again (journal)."
+     },
+     {
+      "id": "stone",
+      "event": "dug",
+      "filter": {
+       "kind": "stone"
+      },
+      "target": 60,
+      "glyph": "stone",
+      "name_ru": "Расколи {n} камней",
+      "name_en": "Break {n} stones"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 3,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     },
+     {
+      "id": "level",
+      "check": "level",
+      "target": 11,
+      "glyph": "up",
+      "name_ru": "Достигни {n} уровня",
+      "name_en": "Reach level {n}"
+     }
+    ]
+   },
+   "value_text": "Получи звезду мастерства; Расколи 60 камней; Поешь 3 раза; Достигни 11 уровня → 500 монет, 250 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 4 мин продажи руды в первый час игры или 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[12]",
+   "file": "data/newbie_streak.json",
+   "path": "days[12]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 12",
+   "value": {
+    "day": 12,
+    "reward": {
+     "coins": 550,
+     "xp": 280
+    },
+    "missions": [
+     {
+      "id": "greed",
+      "event": "fever_started",
+      "target": 3,
+      "glyph": "fever",
+      "name_ru": "Войди в жадность {n} раза",
+      "name_en": "Trigger greed mode {n} times"
+     },
+     {
+      "id": "deep",
+      "event": "dug",
+      "filter": {
+       "depth_min": 200
+      },
+      "target": 80,
+      "glyph": "depth",
+      "name_ru": "Выкопай {n} клеток глубже 200",
+      "name_en": "Dig {n} tiles below depth 200"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 1500,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Войди в жадность 3 раза; Выкопай 80 клеток глубже 200; Продай на 1500 монет; Выспись дома → 550 монет, 280 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 5 мин продажи руды в первый час игры или 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[13]",
+   "file": "data/newbie_streak.json",
+   "path": "days[13]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 13",
+   "value": {
+    "day": 13,
+    "reward": {
+     "coins": 600,
+     "xp": 300
+    },
+    "missions": [
+     {
+      "id": "copper",
+      "event": "picked",
+      "filter": {
+       "item": "copper"
+      },
+      "sum": "count",
+      "target": 20,
+      "glyph": "item:copper",
+      "name_ru": "Добудь медь: {n}",
+      "name_en": "Mine copper: {n}"
+     },
+     {
+      "id": "bronze",
+      "event": "crafted",
+      "filter": {
+       "item": "bronze"
+      },
+      "sum": "count",
+      "target": 15,
+      "glyph": "item:bronze",
+      "name_ru": "Выплавь бронзу: {n}",
+      "name_en": "Smelt bronze: {n}"
+     },
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 2,
+      "glyph": "chest",
+      "name_ru": "Открой тайники: {n}",
+      "name_en": "Open {n} hidden chests"
+     },
+     {
+      "id": "ore",
+      "event": "dug",
+      "filter": {
+       "loot": true
+      },
+      "target": 80,
+      "glyph": "nugget",
+      "name_ru": "Добудь {n} руды",
+      "name_en": "Mine {n} ore tiles"
+     }
+    ]
+   },
+   "value_text": "Добудь медь: 20; Выплавь бронзу: 15; Открой тайники: 2; Добудь 80 руды → 600 монет, 300 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 5 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[14]",
+   "file": "data/newbie_streak.json",
+   "path": "days[14]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 14",
+   "value": {
+    "day": 14,
+    "reward": {
+     "coins": 900,
+     "xp": 400,
+     "item": {
+      "id": "energy_bar",
+      "count": 3
+     }
+    },
+    "missions": [
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 300,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 600,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 5,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} заданий дня",
+      "name_en": "Complete {n} daily tasks"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 2000,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     }
+    ]
+   },
+   "value_text": "Спустись на глубину 300; Выкопай 600 клеток; Выполни 5 заданий дня; Продай на 2000 монет → 900 монет, 400 опыта, Энергетический батончик ×3",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 8 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[15]",
+   "file": "data/newbie_streak.json",
+   "path": "days[15]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 15",
+   "value": {
+    "day": 15,
+    "reward": {
+     "coins": 700,
+     "xp": 350
+    },
+    "missions": [
+     {
+      "id": "art",
+      "check": "artifacts",
+      "target": 5,
+      "glyph": "vase",
+      "name_ru": "Найди артефактов: {n}",
+      "name_en": "Find {n} artifacts",
+      "desc_ru": "Считаются все найденные артефакты, не только сегодняшние.",
+      "desc_en": "Every artifact found so far counts."
+     },
+     {
+      "id": "gold",
+      "event": "picked",
+      "filter": {
+       "item": "gold"
+      },
+      "sum": "count",
+      "target": 15,
+      "glyph": "item:gold",
+      "name_ru": "Добудь золото: {n}",
+      "name_en": "Mine gold: {n}"
+     },
+     {
+      "id": "spend",
+      "event": "spent",
+      "filter": {
+       "currency": "coins"
+      },
+      "sum": "amount",
+      "target": 2500,
+      "glyph": "spend",
+      "name_ru": "Потрать {n} монет",
+      "name_en": "Spend {n} coins"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 3,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     }
+    ]
+   },
+   "value_text": "Найди артефактов: 5; Добудь золото: 15; Потрать 2500 монет; Поешь 3 раза → 700 монет, 350 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 6 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[16]",
+   "file": "data/newbie_streak.json",
+   "path": "days[16]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 16",
+   "value": {
+    "day": 16,
+    "reward": {
+     "coins": 750,
+     "xp": 380
+    },
+    "missions": [
+     {
+      "id": "greed",
+      "event": "fever_started",
+      "target": 5,
+      "glyph": "fever",
+      "name_ru": "Войди в жадность {n} раз",
+      "name_en": "Trigger greed mode {n} times"
+     },
+     {
+      "id": "deep",
+      "event": "dug",
+      "filter": {
+       "depth_min": 300
+      },
+      "target": 100,
+      "glyph": "depth",
+      "name_ru": "Выкопай {n} клеток глубже 300",
+      "name_en": "Dig {n} tiles below depth 300"
+     },
+     {
+      "id": "mastery",
+      "event": "mastery_star",
+      "target": 2,
+      "glyph": "star",
+      "name_ru": "Получи звёзды мастерства: {n}",
+      "name_en": "Earn {n} mastery stars"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Войди в жадность 5 раз; Выкопай 100 клеток глубже 300; Получи звёзды мастерства: 2; Выспись дома → 750 монет, 380 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 6 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[17]",
+   "file": "data/newbie_streak.json",
+   "path": "days[17]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 17",
+   "value": {
+    "day": 17,
+    "reward": {
+     "coins": 800,
+     "xp": 400
+    },
+    "missions": [
+     {
+      "id": "alu",
+      "event": "picked",
+      "filter": {
+       "item": "aluminium"
+      },
+      "sum": "count",
+      "target": 20,
+      "glyph": "item:aluminium",
+      "name_ru": "Добудь алюминий: {n}",
+      "name_en": "Mine aluminium: {n}"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 3000,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 3,
+      "glyph": "chest",
+      "name_ru": "Открой тайники: {n}",
+      "name_en": "Open {n} hidden chests"
+     },
+     {
+      "id": "store",
+      "event": "stored",
+      "filter": {
+       "dir": "put"
+      },
+      "sum": "count",
+      "target": 50,
+      "glyph": "storage",
+      "name_ru": "Положи на склад {n} вещей",
+      "name_en": "Put {n} items into storage"
+     }
+    ]
+   },
+   "value_text": "Добудь алюминий: 20; Продай на 3000 монет; Открой тайники: 3; Положи на склад 50 вещей → 800 монет, 400 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 7 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[18]",
+   "file": "data/newbie_streak.json",
+   "path": "days[18]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 18",
+   "value": {
+    "day": 18,
+    "reward": {
+     "coins": 850,
+     "xp": 420,
+     "item": {
+      "id": "medkit",
+      "count": 1
+     }
+    },
+    "missions": [
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 400,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "diamond",
+      "event": "picked",
+      "filter": {
+       "item": "diamond"
+      },
+      "sum": "count",
+      "target": 1,
+      "glyph": "item:diamond",
+      "name_ru": "Добудь алмаз",
+      "name_en": "Mine a diamond"
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 5,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} заданий дня",
+      "name_en": "Complete {n} daily tasks"
+     },
+     {
+      "id": "level",
+      "check": "level",
+      "target": 14,
+      "glyph": "up",
+      "name_ru": "Достигни {n} уровня",
+      "name_en": "Reach level {n}"
+     }
+    ]
+   },
+   "value_text": "Спустись на глубину 400; Добудь алмаз; Выполни 5 заданий дня; Достигни 14 уровня → 850 монет, 420 опыта, Аптечка ×1",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 7 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[19]",
+   "file": "data/newbie_streak.json",
+   "path": "days[19]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 19",
+   "value": {
+    "day": 19,
+    "reward": {
+     "coins": 900,
+     "xp": 450
+    },
+    "missions": [
+     {
+      "id": "lucky",
+      "event": "lucky_find",
+      "target": 3,
+      "glyph": "clover",
+      "name_ru": "Поймай удачу {n} раза",
+      "name_en": "Get lucky {n} times",
+      "desc_ru": "Удача выпадает, когда в прокачке куплена «Удача — шанс».",
+      "desc_en": "Luck needs the «Luck — chance» skill."
+     },
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 800,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     },
+     {
+      "id": "bronze",
+      "event": "crafted",
+      "filter": {
+       "item": "bronze"
+      },
+      "sum": "count",
+      "target": 30,
+      "glyph": "item:bronze",
+      "name_ru": "Выплавь бронзу: {n}",
+      "name_en": "Smelt bronze: {n}"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Поймай удачу 3 раза; Выкопай 800 клеток; Выплавь бронзу: 30; Выспись дома → 900 монет, 450 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 8 мин продажи руды в первый час игры или 2 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[1]",
+   "file": "data/newbie_streak.json",
+   "path": "days[1]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 1",
+   "value": {
+    "day": 1,
+    "reward": {
+     "coins": 100,
+     "xp": 40
+    },
+    "missions": [
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "count",
+      "target": 5,
+      "glyph": "bag",
+      "name_ru": "Продай {n} вещей в мастерской",
+      "name_en": "Sell {n} items at the workshop"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 1,
+      "glyph": "eat",
+      "name_ru": "Поешь",
+      "name_en": "Have a meal"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     },
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 50,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     }
+    ]
+   },
+   "value_text": "Продай 5 вещей в мастерской; Поешь; Выспись дома; Спустись на глубину 50 → 100 монет, 40 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ < 1 мин продажи руды в первый час игры или < 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[20]",
+   "file": "data/newbie_streak.json",
+   "path": "days[20]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 20",
+   "value": {
+    "day": 20,
+    "reward": {
+     "coins": 950,
+     "xp": 480
+    },
+    "missions": [
+     {
+      "id": "silver",
+      "event": "picked",
+      "filter": {
+       "item": "silver"
+      },
+      "sum": "count",
+      "target": 50,
+      "glyph": "item:silver",
+      "name_ru": "Добудь серебро для бура: {n}",
+      "name_en": "Mine silver for the drill: {n}"
+     },
+     {
+      "id": "iron",
+      "event": "picked",
+      "filter": {
+       "item": "iron_ore"
+      },
+      "sum": "count",
+      "target": 150,
+      "glyph": "item:iron_ore",
+      "name_ru": "Добудь железо для бура: {n}",
+      "name_en": "Mine iron ore for the drill: {n}"
+     },
+     {
+      "id": "ore",
+      "event": "dug",
+      "filter": {
+       "loot": true
+      },
+      "target": 150,
+      "glyph": "nugget",
+      "name_ru": "Добудь {n} руды",
+      "name_en": "Mine {n} ore tiles"
+     }
+    ]
+   },
+   "value_text": "Добудь серебро для бура: 50; Добудь железо для бура: 150; Добудь 150 руды → 950 монет, 480 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 8 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[21]",
+   "file": "data/newbie_streak.json",
+   "path": "days[21]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 21",
+   "value": {
+    "day": 21,
+    "reward": {
+     "coins": 1200,
+     "xp": 600,
+     "item": {
+      "id": "energy_bar",
+      "count": 3
+     }
+    },
+    "missions": [
+     {
+      "id": "art",
+      "check": "artifacts",
+      "target": 7,
+      "glyph": "vase",
+      "name_ru": "Найди артефактов: {n}",
+      "name_en": "Find {n} artifacts",
+      "desc_ru": "Считаются все найденные артефакты, не только сегодняшние.",
+      "desc_en": "Every artifact found so far counts."
+     },
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 500,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 5000,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "greed",
+      "event": "fever_started",
+      "target": 5,
+      "glyph": "fever",
+      "name_ru": "Войди в жадность {n} раз",
+      "name_en": "Trigger greed mode {n} times"
+     }
+    ]
+   },
+   "value_text": "Найди артефактов: 7; Спустись на глубину 500; Продай на 5000 монет; Войди в жадность 5 раз → 1200 монет, 600 опыта, Энергетический батончик ×3",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 10 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[22]",
+   "file": "data/newbie_streak.json",
+   "path": "days[22]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 22",
+   "value": {
+    "day": 22,
+    "reward": {
+     "coins": 1000,
+     "xp": 500
+    },
+    "missions": [
+     {
+      "id": "deep",
+      "event": "dug",
+      "filter": {
+       "depth_min": 500
+      },
+      "target": 100,
+      "glyph": "depth",
+      "name_ru": "Выкопай {n} клеток глубже 500",
+      "name_en": "Dig {n} tiles below depth 500"
+     },
+     {
+      "id": "diamond",
+      "event": "picked",
+      "filter": {
+       "item": "diamond"
+      },
+      "sum": "count",
+      "target": 3,
+      "glyph": "item:diamond",
+      "name_ru": "Добудь алмазы: {n}",
+      "name_en": "Mine {n} diamonds"
+     },
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 3,
+      "glyph": "chest",
+      "name_ru": "Открой тайники: {n}",
+      "name_en": "Open {n} hidden chests"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 3,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     }
+    ]
+   },
+   "value_text": "Выкопай 100 клеток глубже 500; Добудь алмазы: 3; Открой тайники: 3; Поешь 3 раза → 1000 монет, 500 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 9 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[23]",
+   "file": "data/newbie_streak.json",
+   "path": "days[23]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 23",
+   "value": {
+    "day": 23,
+    "reward": {
+     "coins": 1050,
+     "xp": 520
+    },
+    "missions": [
+     {
+      "id": "bronze",
+      "event": "crafted",
+      "filter": {
+       "item": "bronze"
+      },
+      "sum": "count",
+      "target": 40,
+      "glyph": "item:bronze",
+      "name_ru": "Выплавь бронзу для бура: {n}",
+      "name_en": "Smelt bronze for the drill: {n}"
+     },
+     {
+      "id": "nickel",
+      "event": "picked",
+      "filter": {
+       "item": "nickel"
+      },
+      "sum": "count",
+      "target": 10,
+      "glyph": "item:nickel",
+      "name_ru": "Добудь никель: {n}",
+      "name_en": "Mine nickel: {n}"
+     },
+     {
+      "id": "spend",
+      "event": "spent",
+      "filter": {
+       "currency": "coins"
+      },
+      "sum": "amount",
+      "target": 5000,
+      "glyph": "spend",
+      "name_ru": "Потрать {n} монет",
+      "name_en": "Spend {n} coins"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Выплавь бронзу для бура: 40; Добудь никель: 10; Потрать 5000 монет; Выспись дома → 1050 монет, 520 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 9 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[24]",
+   "file": "data/newbie_streak.json",
+   "path": "days[24]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 24",
+   "value": {
+    "day": 24,
+    "reward": {
+     "coins": 1100,
+     "xp": 550
+    },
+    "missions": [
+     {
+      "id": "drill",
+      "check": "tool",
+      "item": "hand_drill",
+      "target": 1,
+      "glyph": "res://art/items/hand_drill.png",
+      "name_ru": "Собери ручной бур",
+      "name_en": "Build the hand drill",
+      "desc_ru": "Бур собирается на верстаке в мастерской: железо, бронза, серебро и монеты (экран «Проекты»).",
+      "desc_en": "Build it at the workshop bench: iron, bronze, silver and coins (see Projects)."
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 5,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} заданий дня",
+      "name_en": "Complete {n} daily tasks"
+     },
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 1000,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     }
+    ]
+   },
+   "value_text": "Собери ручной бур; Выполни 5 заданий дня; Выкопай 1000 клеток → 1100 монет, 550 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 9 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[25]",
+   "file": "data/newbie_streak.json",
+   "path": "days[25]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 25",
+   "value": {
+    "day": 25,
+    "reward": {
+     "coins": 1150,
+     "xp": 580
+    },
+    "missions": [
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 600,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "mastery",
+      "event": "mastery_star",
+      "target": 3,
+      "glyph": "star",
+      "name_ru": "Получи звёзды мастерства: {n}",
+      "name_en": "Earn {n} mastery stars"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 8000,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "greed",
+      "event": "fever_started",
+      "target": 7,
+      "glyph": "fever",
+      "name_ru": "Войди в жадность {n} раз",
+      "name_en": "Trigger greed mode {n} times"
+     }
+    ]
+   },
+   "value_text": "Спустись на глубину 600; Получи звёзды мастерства: 3; Продай на 8000 монет; Войди в жадность 7 раз → 1150 монет, 580 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 10 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[26]",
+   "file": "data/newbie_streak.json",
+   "path": "days[26]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 26",
+   "value": {
+    "day": 26,
+    "reward": {
+     "coins": 1200,
+     "xp": 600
+    },
+    "missions": [
+     {
+      "id": "refuel",
+      "event": "refueled",
+      "target": 1,
+      "glyph": "fuel",
+      "name_ru": "Заправь бур",
+      "name_en": "Refuel the drill",
+      "desc_ru": "Топливные блоки делают из торфа на заправочной станции.",
+      "desc_en": "Fuel blocks are made from peat at the fuel station."
+     },
+     {
+      "id": "lucky",
+      "event": "lucky_find",
+      "target": 5,
+      "glyph": "clover",
+      "name_ru": "Поймай удачу {n} раз",
+      "name_en": "Get lucky {n} times"
+     },
+     {
+      "id": "ore",
+      "event": "dug",
+      "filter": {
+       "loot": true
+      },
+      "target": 200,
+      "glyph": "nugget",
+      "name_ru": "Добудь {n} руды",
+      "name_en": "Mine {n} ore tiles"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 3,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     }
+    ]
+   },
+   "value_text": "Заправь бур; Поймай удачу 5 раз; Добудь 200 руды; Поешь 3 раза → 1200 монет, 600 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 10 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[27]",
+   "file": "data/newbie_streak.json",
+   "path": "days[27]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 27",
+   "value": {
+    "day": 27,
+    "reward": {
+     "coins": 1250,
+     "xp": 620
+    },
+    "missions": [
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 700,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "gold",
+      "event": "picked",
+      "filter": {
+       "item": "gold"
+      },
+      "sum": "count",
+      "target": 40,
+      "glyph": "item:gold",
+      "name_ru": "Добудь золото: {n}",
+      "name_en": "Mine gold: {n}"
+     },
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 4,
+      "glyph": "chest",
+      "name_ru": "Открой тайники: {n}",
+      "name_en": "Open {n} hidden chests"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Спустись на глубину 700; Добудь золото: 40; Открой тайники: 4; Выспись дома → 1250 монет, 620 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 11 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[28]",
+   "file": "data/newbie_streak.json",
+   "path": "days[28]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 28",
+   "value": {
+    "day": 28,
+    "reward": {
+     "coins": 1300,
+     "xp": 650,
+     "item": {
+      "id": "medkit",
+      "count": 2
+     }
+    },
+    "missions": [
+     {
+      "id": "art",
+      "check": "artifacts",
+      "target": 10,
+      "glyph": "vase",
+      "name_ru": "Найди артефактов: {n}",
+      "name_en": "Find {n} artifacts",
+      "desc_ru": "Считаются все найденные артефакты, не только сегодняшние.",
+      "desc_en": "Every artifact found so far counts."
+     },
+     {
+      "id": "deep",
+      "event": "dug",
+      "filter": {
+       "depth_min": 700
+      },
+      "target": 150,
+      "glyph": "depth",
+      "name_ru": "Выкопай {n} клеток глубже 700",
+      "name_en": "Dig {n} tiles below depth 700"
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 5,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} заданий дня",
+      "name_en": "Complete {n} daily tasks"
+     },
+     {
+      "id": "level",
+      "check": "level",
+      "target": 18,
+      "glyph": "up",
+      "name_ru": "Достигни {n} уровня",
+      "name_en": "Reach level {n}"
+     }
+    ]
+   },
+   "value_text": "Найди артефактов: 10; Выкопай 150 клеток глубже 700; Выполни 5 заданий дня; Достигни 18 уровня → 1300 монет, 650 опыта, Аптечка ×2",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 11 мин продажи руды в первый час игры или 3 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[29]",
+   "file": "data/newbie_streak.json",
+   "path": "days[29]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 29",
+   "value": {
+    "day": 29,
+    "reward": {
+     "coins": 1400,
+     "xp": 700
+    },
+    "missions": [
+     {
+      "id": "well",
+      "check": "well",
+      "target": 1,
+      "glyph": "item:well",
+      "name_ru": "Построй буровую скважину",
+      "name_en": "Build the drilling well",
+      "desc_ru": "Скважина собирается на верстаке и копает сама, пока тебя нет.",
+      "desc_en": "The well is built at the workshop bench and digs while you are away."
+     },
+     {
+      "id": "spend",
+      "event": "spent",
+      "filter": {
+       "currency": "coins"
+      },
+      "sum": "amount",
+      "target": 8000,
+      "glyph": "spend",
+      "name_ru": "Потрать {n} монет",
+      "name_en": "Spend {n} coins"
+     },
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 1200,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Построй буровую скважину; Потрать 8000 монет; Выкопай 1200 клеток; Выспись дома → 1400 монет, 700 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 12 мин продажи руды в первый час игры или 4 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[2]",
+   "file": "data/newbie_streak.json",
+   "path": "days[2]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 2",
+   "value": {
+    "day": 2,
+    "reward": {
+     "coins": 150,
+     "xp": 60
+    },
+    "missions": [
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 150,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 150,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "buy",
+      "event": "bought",
+      "target": 1,
+      "glyph": "cart",
+      "name_ru": "Купи что-нибудь в лавке",
+      "name_en": "Buy something at the shop"
+     },
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 75,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     }
+    ]
+   },
+   "value_text": "Выкопай 150 клеток; Продай на 150 монет; Купи что-нибудь в лавке; Спустись на глубину 75 → 150 монет, 60 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 1 мин продажи руды в первый час игры или < 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[30]",
+   "file": "data/newbie_streak.json",
+   "path": "days[30]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 30",
+   "value": {
+    "day": 30,
+    "reward": {
+     "coins": 2000,
+     "xp": 1000,
+     "item": {
+      "id": "energy_bar",
+      "count": 5
+     }
+    },
+    "missions": [
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 800,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     },
+     {
+      "id": "greed",
+      "event": "fever_started",
+      "target": 10,
+      "glyph": "fever",
+      "name_ru": "Войди в жадность {n} раз",
+      "name_en": "Trigger greed mode {n} times"
+     },
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 5,
+      "glyph": "chest",
+      "name_ru": "Открой тайники: {n}",
+      "name_en": "Open {n} hidden chests"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 12000,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 5,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} заданий дня",
+      "name_en": "Complete {n} daily tasks"
+     }
+    ]
+   },
+   "value_text": "Спустись на глубину 800; Войди в жадность 10 раз; Открой тайники: 5; Продай на 12 000 монет; Выполни 5 заданий дня → 2000 монет, 1000 опыта, Энергетический батончик ×5",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 17 мин продажи руды в первый час игры или 5 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[3]",
+   "file": "data/newbie_streak.json",
+   "path": "days[3]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 3",
+   "value": {
+    "day": 3,
+    "reward": {
+     "coins": 200,
+     "xp": 80
+    },
+    "missions": [
+     {
+      "id": "stone",
+      "event": "dug",
+      "filter": {
+       "kind": "stone"
+      },
+      "target": 20,
+      "glyph": "stone",
+      "name_ru": "Расколи {n} камней",
+      "name_en": "Break {n} stones"
+     },
+     {
+      "id": "iron",
+      "event": "picked",
+      "filter": {
+       "item": "iron_ore"
+      },
+      "sum": "count",
+      "target": 15,
+      "glyph": "item:iron_ore",
+      "name_ru": "Добудь железо: {n}",
+      "name_en": "Mine iron ore: {n}"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 2,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     },
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 100,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     }
+    ]
+   },
+   "value_text": "Расколи 20 камней; Добудь железо: 15; Поешь 2 раза; Спустись на глубину 100 → 200 монет, 80 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 2 мин продажи руды в первый час игры или < 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[4]",
+   "file": "data/newbie_streak.json",
+   "path": "days[4]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 4",
+   "value": {
+    "day": 4,
+    "reward": {
+     "coins": 250,
+     "xp": 100
+    },
+    "missions": [
+     {
+      "id": "ore",
+      "event": "dug",
+      "filter": {
+       "loot": true
+      },
+      "target": 25,
+      "glyph": "nugget",
+      "name_ru": "Добудь {n} руды",
+      "name_en": "Mine {n} ore tiles"
+     },
+     {
+      "id": "spend",
+      "event": "spent",
+      "filter": {
+       "currency": "coins"
+      },
+      "sum": "amount",
+      "target": 300,
+      "glyph": "spend",
+      "name_ru": "Потрать {n} монет",
+      "name_en": "Spend {n} coins"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     },
+     {
+      "id": "art",
+      "check": "artifacts",
+      "target": 1,
+      "glyph": "vase",
+      "name_ru": "Найди артефакт для музея",
+      "name_en": "Find an artifact for the museum",
+      "desc_ru": "Считаются все найденные артефакты, не только сегодняшние.",
+      "desc_en": "Every artifact found so far counts."
+     }
+    ]
+   },
+   "value_text": "Добудь 25 руды; Потрать 300 монет; Выспись дома; Найди артефакт для музея → 250 монет, 100 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 2 мин продажи руды в первый час игры или < 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[5]",
+   "file": "data/newbie_streak.json",
+   "path": "days[5]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 5",
+   "value": {
+    "day": 5,
+    "reward": {
+     "coins": 300,
+     "xp": 120,
+     "item": {
+      "id": "energy_drink",
+      "count": 1
+     }
+    },
+    "missions": [
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 400,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "bronze",
+      "event": "crafted",
+      "filter": {
+       "item": "bronze"
+      },
+      "sum": "count",
+      "target": 5,
+      "glyph": "item:bronze",
+      "name_ru": "Выплавь бронзу: {n}",
+      "name_en": "Smelt bronze: {n}",
+      "desc_ru": "Металлолом плавится в печи мастерской. Бронза засчитывается, когда её забирают из печи.",
+      "desc_en": "Scrap melts in the workshop furnace. Bronze counts when you collect it."
+     },
+     {
+      "id": "lead",
+      "event": "picked",
+      "filter": {
+       "item": "lead"
+      },
+      "sum": "count",
+      "target": 10,
+      "glyph": "item:lead",
+      "name_ru": "Добудь свинец: {n}",
+      "name_en": "Mine lead: {n}"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 2,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     }
+    ]
+   },
+   "value_text": "Продай на 400 монет; Выплавь бронзу: 5; Добудь свинец: 10; Поешь 2 раза → 300 монет, 120 опыта, Энергетик ×1",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 3 мин продажи руды в первый час игры или < 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[6]",
+   "file": "data/newbie_streak.json",
+   "path": "days[6]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 6",
+   "value": {
+    "day": 6,
+    "reward": {
+     "coins": 350,
+     "xp": 150
+    },
+    "missions": [
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 1,
+      "glyph": "chest",
+      "name_ru": "Открой тайник",
+      "name_en": "Open a hidden chest",
+      "desc_ru": "Тайники вмурованы в породу глубже 20 — смотри по сторонам.",
+      "desc_en": "Chests hide in the rock below depth 20 — look around."
+     },
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 300,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     },
+     {
+      "id": "level",
+      "check": "level",
+      "target": 8,
+      "glyph": "up",
+      "name_ru": "Достигни {n} уровня",
+      "name_en": "Reach level {n}"
+     },
+     {
+      "id": "store",
+      "event": "stored",
+      "filter": {
+       "dir": "put"
+      },
+      "sum": "count",
+      "target": 10,
+      "glyph": "storage",
+      "name_ru": "Положи на склад {n} вещей",
+      "name_en": "Put {n} items into storage"
+     }
+    ]
+   },
+   "value_text": "Открой тайник; Выкопай 300 клеток; Достигни 8 уровня; Положи на склад 10 вещей → 350 монет, 150 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 3 мин продажи руды в первый час игры или < 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[7]",
+   "file": "data/newbie_streak.json",
+   "path": "days[7]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 7",
+   "value": {
+    "day": 7,
+    "reward": {
+     "coins": 500,
+     "xp": 200,
+     "item": {
+      "id": "energy_bar",
+      "count": 2
+     }
+    },
+    "missions": [
+     {
+      "id": "greed",
+      "event": "fever_started",
+      "target": 1,
+      "glyph": "fever",
+      "name_ru": "Войди в жадность",
+      "name_en": "Trigger greed mode",
+      "desc_ru": "Копай без остановки — шкала азарта заполнится.",
+      "desc_en": "Keep digging without stopping until the thrill bar fills."
+     },
+     {
+      "id": "deep",
+      "event": "dug",
+      "filter": {
+       "depth_min": 100
+      },
+      "target": 50,
+      "glyph": "depth",
+      "name_ru": "Выкопай {n} клеток глубже 100",
+      "name_en": "Dig {n} tiles below depth 100"
+     },
+     {
+      "id": "quests",
+      "event": "quest_done",
+      "filter": {
+       "kind": "daily"
+      },
+      "target": 3,
+      "glyph": "clipboard",
+      "name_ru": "Выполни {n} задания дня",
+      "name_en": "Complete {n} daily tasks"
+     },
+     {
+      "id": "depth",
+      "check": "depth",
+      "target": 150,
+      "glyph": "depth",
+      "name_ru": "Спустись на глубину {n}",
+      "name_en": "Reach depth {n}"
+     }
+    ]
+   },
+   "value_text": "Войди в жадность; Выкопай 50 клеток глубже 100; Выполни 3 задания дня; Спустись на глубину 150 → 500 монет, 200 опыта, Энергетический батончик ×2",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 4 мин продажи руды в первый час игры или 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[8]",
+   "file": "data/newbie_streak.json",
+   "path": "days[8]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 8",
+   "value": {
+    "day": 8,
+    "reward": {
+     "coins": 400,
+     "xp": 180
+    },
+    "missions": [
+     {
+      "id": "silver",
+      "event": "picked",
+      "filter": {
+       "item": "silver"
+      },
+      "sum": "count",
+      "target": 15,
+      "glyph": "item:silver",
+      "name_ru": "Добудь серебро: {n}",
+      "name_en": "Mine silver: {n}"
+     },
+     {
+      "id": "sell",
+      "event": "sold",
+      "sum": "coins",
+      "target": 800,
+      "glyph": "coins",
+      "name_ru": "Продай на {n} монет",
+      "name_en": "Sell for {n} coins"
+     },
+     {
+      "id": "store",
+      "event": "stored",
+      "filter": {
+       "dir": "put"
+      },
+      "sum": "count",
+      "target": 20,
+      "glyph": "storage",
+      "name_ru": "Положи на склад {n} вещей",
+      "name_en": "Put {n} items into storage"
+     },
+     {
+      "id": "sleep",
+      "event": "slept",
+      "target": 1,
+      "glyph": "sleep",
+      "name_ru": "Выспись дома",
+      "name_en": "Sleep at home"
+     }
+    ]
+   },
+   "value_text": "Добудь серебро: 15; Продай на 800 монет; Положи на склад 20 вещей; Выспись дома → 400 монет, 180 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 3 мин продажи руды в первый час игры или 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
+   "importance": 4,
+   "flags": [],
+   "reviewed": true
+  },
+  {
+   "id": "newbie_streak.json:days[9]",
+   "file": "data/newbie_streak.json",
+   "path": "days[9]",
+   "theme": "quests",
+   "family": "q.newbie",
+   "title": "Стрик новичка, день 9",
+   "value": {
+    "day": 9,
+    "reward": {
+     "coins": 450,
+     "xp": 200
+    },
+    "missions": [
+     {
+      "id": "art",
+      "check": "artifacts",
+      "target": 3,
+      "glyph": "vase",
+      "name_ru": "Найди артефактов: {n}",
+      "name_en": "Find {n} artifacts",
+      "desc_ru": "Считаются все найденные артефакты, не только сегодняшние.",
+      "desc_en": "Every artifact found so far counts."
+     },
+     {
+      "id": "chest",
+      "event": "chest_opened",
+      "target": 2,
+      "glyph": "chest",
+      "name_ru": "Открой тайники: {n}",
+      "name_en": "Open {n} hidden chests"
+     },
+     {
+      "id": "dig",
+      "event": "dug",
+      "target": 400,
+      "glyph": "dig",
+      "name_ru": "Выкопай {n} клеток",
+      "name_en": "Dig {n} tiles"
+     },
+     {
+      "id": "eat",
+      "event": "ate",
+      "target": 2,
+      "glyph": "eat",
+      "name_ru": "Поешь {n} раза",
+      "name_en": "Eat {n} times"
+     }
+    ]
+   },
+   "value_text": "Найди артефактов: 3; Открой тайники: 2; Выкопай 400 клеток; Поешь 2 раза → 450 монет, 200 опыта",
+   "unit": "миссии → награда дня",
+   "note": "Стрик новичка (владелец 27.10): 30 дней, у каждого дня свой заранее заданный набор миссий; день засчитывается, когда выполнены все его миссии; пропущенный день возвращается за доллары; за все 30 дней — крупный подарок (пока заглушка). Код — scripts/meta/newbie_streak*.gd, ГДД §17.3. Миссия — либо счётчик события шины за сутки этого дня (event + filter + sum, как шаблоны data/quests.json и QuestEngine.matches; dir — сверх их фильтров), либо состояние игры (check: depth — рекорд глубины, level — уровень, artifacts — найдено артефактов, tool — есть инструмент item, well — ступень скважины). Состав миссий и награды дней — предложение агента; 30 дней и 50 долларов — слова владельца.",
+   "affects": "что новичок делает каждый из 30 дней и сколько получает",
+   "effect": "≈ 4 мин продажи руды в первый час игры или 1 мин игры по среднему доходу за 10 ч (боты: 6987 и 22 378 монет/ч)",
    "importance": 4,
    "flags": [],
    "reviewed": true

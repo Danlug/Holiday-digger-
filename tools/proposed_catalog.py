@@ -72,6 +72,7 @@ BUNDLE = [
 	"world_layers.json:formations.kinds.*", "world_layers.json:formations.treasure", "world_layers.json:formations.gems",
 	"world_layers.json:formations.ruin_loot",
 	"tech.json:heat.lava.field",
+	"newbie_streak.json:days[*]",  # день стрика новичка — одна строка: миссии и награда
 ]
 SPLIT = []
 
@@ -115,7 +116,7 @@ FILE_THEME = {
 	"achievements.json": "quests", "daily_rewards.json": "quests", "artifacts.json": "artifacts", "tech.json": "tech",
 	"combat.json": "combat", "mechanics.json": "mechanics", "monetization.json": "monetization", "shop.json": "economy",
 	"feel.json": "feel", "juice.json": "feel", "hints.json": "feel", "dialogue.json": "feel", "fx_light.json": "feel",
-	"guidance.json": "feel", "story.json": "progression",
+	"guidance.json": "feel", "story.json": "progression", "newbie_streak.json": "quests",
 }
 KEYWORD_THEME = [
 	(r"monster|combat|cave|polost|guard|chest_guard|enemy|boss", "combat"),
@@ -1094,6 +1095,53 @@ def title_quest(m, row):
 	return "«%s»: %s" % (name, human_key_short(row))
 
 
+# --- стрик новичка (data/newbie_streak.json) ---
+
+def title_newbie_day(m, row):
+	return "Стрик новичка, день %s" % row["segs"][-1].strip("[]")
+
+
+def v_newbie_day(m, row):
+	fnum, _, _, _ = _f(m)
+	v = row["value"]
+	if not isinstance(v, dict):
+		return None
+	ms = []
+	for x in v.get("missions") or []:
+		if isinstance(x, dict):
+			ms.append(str(x.get("name_ru") or x.get("id") or "?").replace("{n}", fnum(x.get("target", 1))))
+	r = v.get("reward") or {}
+	rw = []
+	if num(r.get("coins")):
+		rw.append("%s монет" % fnum(r["coins"]))
+	if num(r.get("xp")):
+		rw.append("%s опыта" % fnum(r["xp"]))
+	it = r.get("item")
+	if isinstance(it, dict) and it.get("id"):
+		rw.append("%s ×%s" % (m.name(it["id"]), fnum(it.get("count", 1))))
+	return "%s → %s" % ("; ".join(ms) or "—", ", ".join(rw) or "без награды")
+
+
+def eff_newbie_day(m, row):
+	v = row["value"]
+	if not isinstance(v, dict) or not isinstance(v.get("reward"), dict):
+		return None
+	return eff_reward_minutes(m, {"value": v["reward"]})
+
+
+def sum_newbie(m, rows):
+	fnum, _, _, _ = _f(m)
+	coins = xp = 0.0
+	for r in rows:
+		v = r["value"]
+		if isinstance(v, dict) and isinstance(v.get("reward"), dict):
+			coins += num(v["reward"].get("coins"), 0)
+			xp += num(v["reward"].get("xp"), 0)
+	if not coins:
+		return None
+	return "за все 30 дней: %s монет и %s опыта (крупный подарок — отдельно, пока заглушка)" % (fnum(coins), fnum(xp))
+
+
 def human_key_short(row):
 	return {"targets": "цели по ступеням 0–5", "weekly_scale": "множитель недели", "depth_min": "глубина по ступеням"}.get(
 		row["segs"][-1], row["segs"][-1])
@@ -1230,6 +1278,13 @@ FAMILIES = [
 	F("q.road", "quests", 2, "Дорога трофеев", ["achievements.json:road**", "achievements.json:points_by_tier"],
 		"Дорога трофеев: {key}", "очки / награда", "длинная цель из очков достижений и заданий", eff_reward_minutes, summary=sum_rewards,
 		rec=("оставить", "14 ступеней, 7 долларов за всю дорогу")),
+
+	F("q.newbie", "quests", 4, "Стрик новичка: миссии и награды 30 дней", "newbie_streak.json:days[*]",
+		title_newbie_day, "миссии → награда дня", "что новичок делает каждый из 30 дней и сколько получает",
+		eff_newbie_day, summary=sum_newbie, vtext=v_newbie_day,
+		rec=("решить", "30 дней и 50 $ за пропуск — ваши числа; миссии — сценарий агента: продай, поешь, поспи, глубина 50 → "
+			"глубина 300·500·800, ручной бур на 24-й день, скважина на 29-й; награда дня 100→2000 монет («суть не в бонусе "
+			"за день»). Подходит ли темп и что станет крупным подарком за все 30 дней")),
 
 	# ---------------- Артефакты ----------------
 	F("art.find_coins", "artifacts", 5, "Монеты за находку артефакта", "artifacts.json:artifacts[*].find_bonus.coins",

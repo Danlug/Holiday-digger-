@@ -232,6 +232,9 @@ func die(cause: Dictionary = {}) -> void:
 	inventory_changed.emit()
 	Healing.charge_death_fee()
 	died.emit()
+	# Смерть — в сейв в этом же кадре, а не автосейвом раз в минуту: вкладка, закрытая следом,
+	# поднимала прошлый сейв с рюкзаком и без платы (владелец, 27.10).
+	SaveSystem.save_at_frame_end("death")
 
 
 ## Респавн дома: восстанавливает полоски выживания. Позицию героя и анимацию
@@ -437,6 +440,7 @@ func add_dollars(amount: int) -> void:
 		return
 	dollars += amount
 	dollars_changed.emit(dollars)
+	SaveSystem.save_at_frame_end("dollars")   # доллары — купленная валюта: откат закрытием вкладки нечестен
 
 
 func spend_dollars(amount: int) -> bool:
@@ -449,6 +453,7 @@ func spend_dollars(amount: int) -> bool:
 	dollars -= amount
 	dollars_changed.emit(dollars)
 	emit_event(&"spent", {"currency": "dollars", "amount": amount})
+	SaveSystem.save_at_frame_end("dollars")   # покупка за доллары — в сейв в этом же кадре
 	return true
 
 

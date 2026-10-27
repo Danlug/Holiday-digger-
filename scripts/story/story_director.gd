@@ -406,6 +406,10 @@ func _on_cutscene_finished(id: String) -> void:
 	# признана показанной.
 	_apply_effects(StoryData.effects(id))
 	StoryState.mark_seen(id)
+	# «Просмотрено» пишется в story.json сразу — награда сцены (кирка, ранец, монеты) обязана
+	# попасть в save.json тем же кадром: иначе закрытая до автосейва вкладка её теряет навсегда.
+	if not StoryData.effects(id).is_empty():
+		SaveSystem.save_at_frame_end("story")
 	_playing = false
 	_after_scene(id)
 	# Шина событий: ветка заданий и достижений считает сюжетные вехи, а звуковая

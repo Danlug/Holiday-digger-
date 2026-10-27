@@ -361,6 +361,70 @@ static func save_game() -> bool:
 	return true
 
 
+## Записать сейв и сразу отправить его в постоянное хранилище — для событий, откат которых
+## выгоден игроку или съедает купленное: смерть (плата больнице, рюкзак), покупки за доллары.
+## Вне веба это просто save_game(): файл на диске уже постоянный. В вебе user:// — память
+## страницы, а в IndexedDB движок переносит её сам только в начале следующего кадра; в скрытой
+## вкладке кадров нет вовсе, и закрытая до переноса вкладка запись теряет. reason виден в
+## RaskopkiShell.lastSave (оболочка и веб-проверка tools/web_death_save.js).
+static func save_now(reason: String = "") -> bool:
+	var ok := save_game()
+	flush_to_storage(reason)
+	return ok
+
+
+## save_now в конце текущего кадра, одна запись на кадр, сколько бы событий ни попросило:
+## смерть и респавн почти всегда в одном кадре, и одна запись ловит уже воскресшего дома героя
+## с платой и пустым рюкзаком. Для вкладки это всё ещё «сразу»: кадр движка в вебе — одна задача
+## JS, посреди неё вкладку не закрыть. Без мира (GameState без main.tscn) не пишет: такой сейв
+## затёр бы диффы мира (то же правило, что в MetaService.persist).
+static func save_at_frame_end(reason: String) -> void:
+	if not _pending_reason.is_empty():
+		return
+	_pending_reason = reason
+	_flush_pending.call_deferred()
+
+
+static var _pending_reason: String = ""
+
+
+static func _flush_pending() -> void:
+	var reason := _pending_reason
+	_pending_reason = ""
+	if GameState.world_ref != null:
+		save_now(reason)
+
+
+## Веб: перенос user:// в IndexedDB прямо сейчас (не ждать кадра). Публичного вызова у Godot 4.4
+## для этого нет; JavaScriptBridge.eval без глобального контекста выполняется внутри модуля
+## движка, где видны emscripten-овские FS и IDBFS, — зовём IDBFS.syncfs по точкам монтирования
+## (штатный путь движка GodotFS.sync этот же, но он стережёт флаг «уже синхронизирую» и шумит
+## в консоль). Возвращает число запущенных переносов: 0 — не веб или хранилища нет.
+static func flush_to_storage(reason: String = "") -> int:
+	if not OS.has_feature("web"):
+		return 0
+	var n = JavaScriptBridge.eval(_FLUSH_JS.replace("__REASON__", JSON.stringify(reason)), false)
+	return int(n) if typeof(n) == TYPE_INT or typeof(n) == TYPE_FLOAT else 0
+
+
+const _FLUSH_JS := """(function (reason) {
+	try {
+		if (typeof FS === 'undefined' || typeof IDBFS === 'undefined' || typeof GodotFS === 'undefined' || !GodotFS._idbfs) { return 0; }
+		var mounts = FS.getMounts(FS.root.mount).filter(function (m) { return m.type === IDBFS; });
+		var mark = { reason: reason, at: Date.now(), synced: 0, error: '' };
+		if (window.RaskopkiShell) { window.RaskopkiShell.lastSave = mark; }
+		var left = mounts.length;
+		mounts.forEach(function (m) {
+			IDBFS.syncfs(m, false, function (err) {
+				if (err) { mark.error = String((err && err.message) || err); }
+				if (--left === 0) { mark.synced = Date.now(); }
+			});
+		});
+		return mounts.length;
+	} catch (e) { return -1; }
+})(__REASON__)"""
+
+
 ## Дёшево: файл начинается с «{» и кончается «}» (обрыв записи так не выглядит).
 static func _looks_complete(path: String) -> bool:
 	var f := FileAccess.open(path, FileAccess.READ)

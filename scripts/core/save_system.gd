@@ -38,6 +38,7 @@ static func delete_save() -> void:
 ## Собирает состояние GameState в plain-Dictionary, готовый к JSON.stringify.
 static func _serialize() -> Dictionary:
 	var gs := GameState
+	HeroSpot.sync_now()   # место героя под землёй — в ext на момент записи (scripts/core/hero_spot.gd)
 	return {
 		"version": SCHEMA_VERSION,
 		"saved_at_utc": Time.get_datetime_string_from_system(true),
@@ -97,9 +98,9 @@ static func _serialize() -> Dictionary:
 		# Робертом люк, стадия обучения, оплаченная и ещё не забранная
 		# доставка. Без этого перезапуск игры возвращает люк в непостроенное
 		# состояние и съедает оплаченный заказ.
-		# house_is_indoors намеренно НЕ сохраняется: позиция героя между
-		# сессиями и так не сохраняется (см. main.gd:_position_from_save_or_start),
-		# и запуск игры внутри дома разошёлся бы с координатами в огороде.
+		# house_is_indoors намеренно НЕ сохраняется: место героя пишется только
+		# под землёй (HeroSpot, ext["hero_spot"]), из дома запуск идёт у дома
+		# (main.gd:_position_from_save_or_start) — внутри дома он разошёлся бы с огородом.
 		"house": {
 			"room": gs.house_room,
 			"food_at_door": gs.house_food_at_door,
@@ -359,6 +360,38 @@ static func save_game() -> bool:
 		push_error("SaveSystem: не удалось подменить %s" % SAVE_PATH)
 		return false
 	return true
+
+
+static var _now_frame := -1
+
+
+## Сохранить и синхронизировать сейчас: закрытие страницы, пауза, сворачивание (SaveHooks), смерть.
+## reason — для журнала. Повтор в том же кадре не пишет второй раз (скрытие и уход страницы приходят
+## подряд, у скрытой вкладки кадров нет). В вебе файл сразу уходит в IndexedDB (_persist_web).
+static func save_now(reason: String = "") -> bool:
+	var frame := Engine.get_process_frames()
+	if frame == _now_frame:
+		return true
+	_now_frame = frame
+	var ok := save_game()
+	if ok and OS.has_feature("web"):
+		_persist_web()
+	if not ok:
+		push_warning("SaveSystem: запись «%s» не удалась" % reason)
+	return ok
+
+
+## Движок переносит user:// в IndexedDB сам, но в начале СЛЕДУЮЩЕГО кадра после записи, а у скрытой
+## вкладки кадров нет: сейв, записанный при уходе со страницы, жил бы только в памяти, и телефон,
+## выгрузивший вкладку, унёс бы его с собой. Поэтому отдаём текст оболочке (web/shell.src.html,
+## RaskopkiShell.persistFile): она кладёт его в ту же базу тем же форматом, что и движок.
+static func _persist_web() -> void:
+	var shell = JavaScriptBridge.get_interface("RaskopkiShell")
+	if shell == null or shell.persistFile == null:
+		return
+	for path in [SAVE_PATH, "user://story.json"]:
+		if FileAccess.file_exists(path):
+			shell.persistFile(ProjectSettings.globalize_path(path), FileAccess.get_file_as_string(path))
 
 
 ## Дёшево: файл начинается с «{» и кончается «}» (обрыв записи так не выглядит).

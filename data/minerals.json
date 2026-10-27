@@ -254,7 +254,11 @@
 			"sellable": true,
 			"depth_min": 150,
 			"depth_max": null,
-			"weight_kg": 0.5,
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": false,
+				"note": "владелец (27.10): вес 1.0 кг — было 0.5"
+			},
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -279,7 +283,7 @@
 			"id": "gold",
 			"name_ru": "Золото",
 			"category": "ore",
-			"price_coins": 100,
+			"price_coins": {"value": 200, "proposed": false, "note": "владелец (27.10): 200 монет — было 100"},
 			"depth_min": 100,
 			"depth_max": null,
 			"density": {
@@ -292,7 +296,11 @@
 				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": 3.0,
+			"weight_kg": {
+				"value": 2.0,
+				"proposed": false,
+				"note": "владелец (27.10): вес 2.0 кг — было 3.0"
+			},
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -389,7 +397,11 @@
 				"proposed": false,
 				"note": "до depth_min нет вовсе; рост к peak_depth; спад к вечному хвосту tail_percent"
 			},
-			"weight_kg": 3.0,
+			"weight_kg": {
+				"value": 1.0,
+				"proposed": false,
+				"note": "владелец (27.10): вес 1.0 кг — было 3.0"
+			},
 			"max_stack": 99,
 			"tool_required": "pickaxe",
 			"hazard": [],
@@ -420,9 +432,9 @@
 				"rise": "zero"
 			},
 			"weight_kg": {
-				"value": 2.8,
+				"value": 1.0,
 				"proposed": false,
-				"note": "вес не задан в GDD"
+				"note": "владелец (27.10): вес 1.0 кг — было 2.8"
 			},
 			"max_stack": 99,
 			"tool_required": "hand_drill",

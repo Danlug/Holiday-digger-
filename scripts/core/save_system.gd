@@ -337,7 +337,16 @@ static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	return data
 
 
+## Запись сейва. В вебе — сразу и в IndexedDB (flush_to_storage): штатный перенос движка не
+## успевает за закрытой вкладкой, а пишут сюда и автосейв, и магазин, и техника.
 static func save_game() -> bool:
+	var ok := _write()
+	if ok:
+		flush_to_storage("")
+	return ok
+
+
+static func _write() -> bool:
 	var data := _serialize()
 	var json_text := JSON.stringify(data, "\t")
 	var f := FileAccess.open(TMP_PATH, FileAccess.WRITE)
@@ -361,15 +370,16 @@ static func save_game() -> bool:
 	return true
 
 
-## Записать сейв и сразу отправить его в постоянное хранилище — для событий, откат которых
-## выгоден игроку или съедает купленное: смерть (плата больнице, рюкзак), покупки за доллары.
-## Вне веба это просто save_game(): файл на диске уже постоянный. В вебе user:// — память
-## страницы, а в IndexedDB движок переносит её сам только в начале следующего кадра; в скрытой
-## вкладке кадров нет вовсе, и закрытая до переноса вкладка запись теряет. reason виден в
-## RaskopkiShell.lastSave (оболочка и веб-проверка tools/web_death_save.js).
+## «Сохранить и синхронизировать сейчас» с меткой причины — для событий, откат которых выгоден
+## игроку или съедает купленное: смерть (плата больнице, рюкзак), доллары, награда сцены, закрытие
+## вкладки. Пишет и отправляет в постоянное хранилище в этой же задаче JS: вне веба файл на диске и
+## так постоянный; в вебе user:// — память страницы, и без переноса закрытая вкладка запись теряет.
+## Причина видна в RaskopkiShell.lastSave и строкой «[raskopki] save: …» в консоли
+## (веб-проверка tools/web_death_save.js).
 static func save_now(reason: String = "") -> bool:
-	var ok := save_game()
-	flush_to_storage(reason)
+	var ok := _write()
+	if ok:
+		flush_to_storage(reason)
 	return ok
 
 
@@ -395,34 +405,149 @@ static func _flush_pending() -> void:
 		save_now(reason)
 
 
-## Веб: перенос user:// в IndexedDB прямо сейчас (не ждать кадра). Публичного вызова у Godot 4.4
-## для этого нет; JavaScriptBridge.eval без глобального контекста выполняется внутри модуля
-## движка, где видны emscripten-овские FS и IDBFS, — зовём IDBFS.syncfs по точкам монтирования
-## (штатный путь движка GodotFS.sync этот же, но он стережёт флаг «уже синхронизирую» и шумит
-## в консоль). Возвращает число запущенных переносов: 0 — не веб или хранилища нет.
+## Веб: сейв и сюжет — в IndexedDB прямо сейчас, этой же задачей JS. Штатно движок (Godot 4.4)
+## переносит user:// сам, но кадром позже и через IDBFS.syncfs, который сначала обходит курсором
+## ВСЕ записи хранилища — по задаче цикла событий на запись, между кадрами. Замер на веб-сборке
+## (tools/web_death_save.js): вкладка, закрытая и через 2,5 с после смерти, теряла её. Поэтому здесь
+## файлы кладутся в базу IDBFS напрямую одной транзакцией с commit() — дальше её дописывает процесс
+## хранилища браузера, главный поток страницы уже не нужен (тот же замер: хватает 60 мс). Публичного
+## вызова у Godot нет:
+## JavaScriptBridge.eval без глобального контекста выполняется внутри модуля движка, где видны
+## emscripten-овские FS и IDBFS. Возвращает число записей в транзакции (0 — не веб/нет хранилища).
 static func flush_to_storage(reason: String = "") -> int:
 	if not OS.has_feature("web"):
 		return 0
-	var n = JavaScriptBridge.eval(_FLUSH_JS.replace("__REASON__", JSON.stringify(reason)), false)
+	var paths: Array = []
+	for p in [SAVE_PATH, BACKUP_PATH, StoryState.PATH]:
+		paths.append(ProjectSettings.globalize_path(p))
+	var js := _FLUSH_JS.replace("__REASON__", JSON.stringify(reason)).replace("__PATHS__", JSON.stringify(paths))
+	var n = JavaScriptBridge.eval(js, false)
 	return int(n) if typeof(n) == TYPE_INT or typeof(n) == TYPE_FLOAT else 0
 
 
-const _FLUSH_JS := """(function (reason) {
+## Запись — в формате IDBFS (loadLocalEntry: {timestamp, mode, contents}) вместе с каталогами-предками:
+## при следующем запуске движок сверит её со своей памятью как свою. Без кэшированной базы
+## (не должно быть: её открыл ещё старт движка) — обычный IDBFS.syncfs.
+const _FLUSH_JS := """(function (reason, paths) {
 	try {
 		if (typeof FS === 'undefined' || typeof IDBFS === 'undefined' || typeof GodotFS === 'undefined' || !GodotFS._idbfs) { return 0; }
-		var mounts = FS.getMounts(FS.root.mount).filter(function (m) { return m.type === IDBFS; });
-		var mark = { reason: reason, at: Date.now(), synced: 0, error: '' };
+		var mark = { reason: reason, at: Date.now(), synced: 0, error: '', entries: 0, engineSyncing: !!GodotFS._syncing };
 		if (window.RaskopkiShell) { window.RaskopkiShell.lastSave = mark; }
-		var left = mounts.length;
-		mounts.forEach(function (m) {
-			IDBFS.syncfs(m, false, function (err) {
-				if (err) { mark.error = String((err && err.message) || err); }
-				if (--left === 0) { mark.synced = Date.now(); }
+		var done = function () {
+			mark.synced = Date.now();
+			if (reason) { console.info('[raskopki] saved: ' + reason + ' +' + (mark.synced - mark.at) + ' ms'); }
+		};
+		var fail = function (e) {
+			mark.error = String((e && e.target && e.target.error) || (e && e.message) || e || 'abort');
+			console.warn('[raskopki] save failed: ' + reason + ': ' + mark.error);
+		};
+		FS.getMounts(FS.root.mount).forEach(function (m) {
+			if (m.type !== IDBFS) { return; }
+			var mine = paths.filter(function (p) { return p.indexOf(m.mountpoint + '/') === 0; });
+			if (!mine.length) { return; }
+			var db = IDBFS.dbs[m.mountpoint];
+			if (!db) { IDBFS.syncfs(m, false, function (err) { if (err) { fail(err); } done(); }); return; }
+			var keys = {};
+			mine.forEach(function (p) {
+				for (var d = p; d.length > m.mountpoint.length; d = d.slice(0, d.lastIndexOf('/'))) { keys[d] = true; }
 			});
+			var tx = db.transaction([IDBFS.DB_STORE_NAME], 'readwrite');
+			var st = tx.objectStore(IDBFS.DB_STORE_NAME);
+			var known = IDBFS.__raskopki && IDBFS.__raskopki.cache[m.mountpoint];
+			Object.keys(keys).sort().forEach(function (p) {
+				IDBFS.loadLocalEntry(p, function (err, entry) {
+					if (err) { return; }
+					st.put(entry, p);
+					mark.entries++;
+					if (known) { known.entries[p] = { timestamp: entry.timestamp }; }
+				});
+			});
+			tx.oncomplete = done;
+			tx.onerror = tx.onabort = function (e) {
+				if (IDBFS.__raskopki) { delete IDBFS.__raskopki.cache[m.mountpoint]; }
+				fail(e);
+			};
+			if (tx.commit) { tx.commit(); }
 		});
-		return mounts.length;
+		if (reason) { console.info('[raskopki] save: ' + reason + ', entries ' + mark.entries + (mark.engineSyncing ? ', engine sync in flight' : '')); }
+		return mark.entries;
 	} catch (e) { return -1; }
-})(__REASON__)"""
+})(__REASON__, __PATHS__)"""
+
+
+## Веб, один раз на старте: штатный перенос движка (IDBFS.syncfs) — быстрый. Медленен он из-за
+## двух мест emscripten: getRemoteSet обходит курсором ВСЕ записи базы (задача цикла событий на
+## каждую, между кадрами — секунды под нагрузкой), а reconcile не зовёт commit(), и транзакция
+## ждёт, пока главный поток разошлёт ответы на каждую запись. Всё это время база заперта, и
+## запись смерти (flush_to_storage) стояла за ней в очереди: замер — убитый через 300 мс браузер
+## терял смерть, когда на миг смерти шёл перенос движка. Здесь: содержимое базы обходится один раз
+## (сейчас, на старте) и дальше помнится — его меняют только наши же транзакции; reconcile кладёт
+## разницу одной транзакцией с commit(). Ошибка транзакции сбрасывает память — следующий перенос
+## снова обойдёт базу. Сюда не попадает загрузка (populate) — она прошла до первого GDScript.
+static func install_web_sync() -> int:
+	if not OS.has_feature("web"):
+		return 0
+	var n = JavaScriptBridge.eval(_FAST_IDB_JS, false)
+	return int(n) if typeof(n) == TYPE_INT or typeof(n) == TYPE_FLOAT else 0
+
+
+const _FAST_IDB_JS := """(function () {
+	try {
+		if (typeof FS === 'undefined' || typeof IDBFS === 'undefined' || typeof GodotFS === 'undefined' || !GodotFS._idbfs) { return 0; }
+		if (IDBFS.__raskopki) { return 2; }
+		var walk = IDBFS.getRemoteSet, rec = IDBFS.reconcile;
+		var cache = {}, waiting = {};
+		IDBFS.__raskopki = { cache: cache };
+		IDBFS.getRemoteSet = function (mount, callback) {
+			var mp = mount.mountpoint;
+			if (cache[mp]) { return callback(null, cache[mp]); }
+			if (waiting[mp]) { waiting[mp].push(callback); return; }
+			waiting[mp] = [callback];
+			walk(mount, function (err, remote) {
+				var cbs = waiting[mp];
+				delete waiting[mp];
+				if (!err && remote) { cache[mp] = remote; }
+				cbs.forEach(function (cb) { cb(err, remote); });
+			});
+		};
+		IDBFS.reconcile = function (src, dst, callback) {
+			var mp = null;
+			Object.keys(cache).forEach(function (k) { if (cache[k] === dst) { mp = k; } });
+			if (src.type !== 'local' || mp === null) { return rec(src, dst, callback); }
+			var create = [], remove = [];
+			Object.keys(src.entries).forEach(function (key) {
+				var e2 = dst.entries[key];
+				if (!e2 || src.entries[key].timestamp.getTime() != e2.timestamp.getTime()) { create.push(key); }
+			});
+			Object.keys(dst.entries).forEach(function (key) { if (!src.entries[key]) { remove.push(key); } });
+			if (!create.length && !remove.length) { return callback(null); }
+			var finished = false;
+			var finish = function (err) { if (!finished) { finished = true; callback(err); } };
+			var tx, store;
+			try {
+				tx = dst.db.transaction([IDBFS.DB_STORE_NAME], 'readwrite');
+				store = tx.objectStore(IDBFS.DB_STORE_NAME);
+			} catch (e) { delete cache[mp]; return finish(e); }
+			create.sort().forEach(function (path) {
+				IDBFS.loadLocalEntry(path, function (err, entry) {
+					if (err) { return; }
+					store.put(entry, path);
+					dst.entries[path] = { timestamp: entry.timestamp };
+				});
+			});
+			remove.sort().reverse().forEach(function (path) { store.delete(path); delete dst.entries[path]; });
+			tx.oncomplete = function () { finish(null); };
+			tx.onerror = tx.onabort = function (e) {
+				delete cache[mp];
+				if (e && e.preventDefault) { e.preventDefault(); }
+				finish((e && e.target && e.target.error) || new Error('IDB transaction aborted'));
+			};
+			if (tx.commit) { tx.commit(); }
+		};
+		FS.getMounts(FS.root.mount).forEach(function (m) { if (m.type === IDBFS) { IDBFS.getRemoteSet(m, function () {}); } });
+		return 1;
+	} catch (e) { return -1; }
+})()"""
 
 
 ## Дёшево: файл начинается с «{» и кончается «}» (обрыв записи так не выглядит).
@@ -452,6 +577,7 @@ static func _read_dict(path: String):
 
 
 static func load_game() -> bool:
+	install_web_sync()   # до первой записи: GameState._ready и main._ready оба зовут load_game
 	if not has_save():
 		return false
 	var parsed = _read_dict(SAVE_PATH)

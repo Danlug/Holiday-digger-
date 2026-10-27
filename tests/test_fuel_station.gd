@@ -72,6 +72,12 @@ func _test_ratios() -> void:
 		FuelRefinery.per_block("coal") == int(Balance.unwrap(fc["coal_per_fuel_block"])))
 	check("сырьё станции — торф и уголь, торф первым", FuelRefinery.inputs() == ["peat", "coal"])
 	check("другое сырьё не перегоняется", not FuelRefinery.is_input("iron_ore") and FuelRefinery.max_blocks("iron_ore") == 0)
+	# Торф 0.25 кг (владелец, 27.10) — блок обязан остаться легче своих четырёх торфин и двух углей,
+	# иначе перегонка делает рюкзак тяжелее, а сырьё выгоднее носить как есть.
+	var block_kg := Balance.get_mineral_weight("fuel_block")
+	check("блок легче сырья: 4 торфа и 2 угля по весу из minerals.json",
+		block_kg < FuelRefinery.per_block("peat") * Balance.get_mineral_weight("peat")
+		and block_kg < FuelRefinery.per_block("coal") * Balance.get_mineral_weight("coal"))
 
 
 func _test_refine_from_pack() -> void:

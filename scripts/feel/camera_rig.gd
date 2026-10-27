@@ -30,6 +30,7 @@ var _lead_x: float = 0.0
 var _lead_y: float = 0.0
 var _punch: float = 0.0                # текущая «добавка» к масштабу, 0..punch_max
 var _punch_age: float = 1.0e9
+var _legacy: float = 0.0               # текущая добавка старого Feel.punch (без CameraKick)
 
 
 ## Классическая жёсткая камера (прежняя формула main._camera()) для героя в
@@ -52,6 +53,7 @@ static func reset_static() -> void:
 	current = Vector2.ZERO
 	valid = false
 	Feel.pending_punch = 0.0
+	CameraKick.reset()
 
 
 func reset() -> void:
@@ -60,6 +62,7 @@ func reset() -> void:
 	_lead_y = 0.0
 	_punch = 0.0
 	_punch_age = 1.0e9
+	_legacy = 0.0
 	zoom = 1.0
 
 
@@ -118,21 +121,23 @@ func step(p, vw: float, vh: float, sky_height: int, dt: float) -> Vector2:
 		var fx := 1.0 - exp(-dt / maxf(Feel.num("camera.follow_tau_x_s", 0.10), 0.001))
 		var fy := 1.0 - exp(-dt / maxf(Feel.num("camera.follow_tau_y_s", 0.07), 0.001))
 		pos = Vector2(lerpf(pos.x, target.x, fx), lerpf(pos.y, target.y, fy))
-	_tick_punch(dt, rigid)
+	_tick_punch(dt, rigid, p if p is Object else null)
 	current = pos
 	valid = true
 	return pos
 
 
-func _tick_punch(dt: float, rigid: bool) -> void:
+func _tick_punch(dt: float, rigid: bool, p: Object = null) -> void:
+	CameraKick.tick(dt, p)
 	if rigid:
 		_punch = 0.0
+		_legacy = 0.0
 		zoom = 1.0
 		Feel.pending_punch = 0.0
 		return
 	if Feel.pending_punch > 0.0:
 		# новый наезд добавляется к тому, что ещё не затухло, но не выше потолка
-		_punch = minf((zoom - 1.0) + Feel.pending_punch, Feel.num("camera.punch_max", 0.07))
+		_punch = minf(_legacy + Feel.pending_punch, Feel.num("camera.punch_max", 0.07))
 		_punch_age = 0.0
 		Feel.pending_punch = 0.0
 	if _punch > 0.0:
@@ -140,12 +145,14 @@ func _tick_punch(dt: float, rigid: bool) -> void:
 		var d := maxf(Feel.num("camera.punch_decay_s", 0.34), 0.05)
 		var k := clampf(1.0 - _punch_age / d, 0.0, 1.0)
 		# быстро наезжаем, плавно возвращаемся (квадратичное затухание)
-		zoom = 1.0 + _punch * k * k
+		_legacy = _punch * k * k
 		if k <= 0.0:
 			_punch = 0.0
-			zoom = 1.0
+			_legacy = 0.0
 	else:
-		zoom = 1.0
+		_legacy = 0.0
+	# толчки CameraKick (урон, удача) складываются со старым коротким наездом
+	zoom = 1.0 + minf(_legacy + CameraKick.zoom_extra(), CameraKick.max_total())
 
 
 ## Положение и масштаб `view_root` для камеры `cam` (клетки), масштаба `z` и

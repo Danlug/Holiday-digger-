@@ -40,6 +40,7 @@ static func delete_save() -> void:
 ## Собирает состояние GameState в plain-Dictionary, готовый к JSON.stringify.
 static func _serialize() -> Dictionary:
 	var gs := GameState
+	HeroSpot.sync_now()   # место героя под землёй — в ext на момент записи (scripts/core/hero_spot.gd)
 	return {
 		"version": SCHEMA_VERSION,
 		"saved_at_utc": Time.get_datetime_string_from_system(true),
@@ -99,9 +100,9 @@ static func _serialize() -> Dictionary:
 		# Робертом люк, стадия обучения, оплаченная и ещё не забранная
 		# доставка. Без этого перезапуск игры возвращает люк в непостроенное
 		# состояние и съедает оплаченный заказ.
-		# house_is_indoors намеренно НЕ сохраняется: позиция героя между
-		# сессиями и так не сохраняется (см. main.gd:_position_from_save_or_start),
-		# и запуск игры внутри дома разошёлся бы с координатами в огороде.
+		# house_is_indoors намеренно НЕ сохраняется: место героя пишется только
+		# под землёй (HeroSpot, ext["hero_spot"]), из дома запуск идёт у дома
+		# (main.gd:_position_from_save_or_start) — внутри дома он разошёлся бы с огородом.
 		"house": {
 			"room": gs.house_room,
 			"food_at_door": gs.house_food_at_door,
@@ -339,16 +340,7 @@ static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	return data
 
 
-## Запись сейва. В вебе — сразу и в IndexedDB (flush_to_storage): штатный перенос движка не
-## успевает за закрытой вкладкой, а пишут сюда и автосейв, и магазин, и техника.
 static func save_game() -> bool:
-	var ok := _write()
-	if ok:
-		flush_to_storage("")
-	return ok
-
-
-static func _write() -> bool:
 	var data := _serialize()
 	var json_text := JSON.stringify(data, "\t")
 	var f := FileAccess.open(TMP_PATH, FileAccess.WRITE)
@@ -372,16 +364,23 @@ static func _write() -> bool:
 	return true
 
 
-## «Сохранить и синхронизировать сейчас» с меткой причины — для событий, откат которых выгоден
-## игроку или съедает купленное: смерть (плата больнице, рюкзак), доллары, награда сцены, закрытие
-## вкладки. Пишет и отправляет в постоянное хранилище в этой же задаче JS: вне веба файл на диске и
-## так постоянный; в вебе user:// — память страницы, и без переноса закрытая вкладка запись теряет.
-## Причина видна в RaskopkiShell.lastSave и строкой «[raskopki] save: …» в консоли
-## (веб-проверка tools/web_death_save.js).
+static var _now_frame := -1
+
+
+## Сохранить и синхронизировать сейчас: закрытие страницы, пауза, сворачивание (SaveHooks), смерть,
+## доллары, награда сцены. reason — для журнала. Повтор в том же кадре не пишет второй раз (скрытие и
+## уход страницы приходят подряд, у скрытой вкладки кадров нет). В вебе файл сразу уходит в IndexedDB
+## (_persist_web) — штатный перенос движка опоздал бы на кадр, а у скрытой вкладки кадров нет.
 static func save_now(reason: String = "") -> bool:
-	var ok := _write()
-	if ok:
-		flush_to_storage(reason)
+	var frame := Engine.get_process_frames()
+	if frame == _now_frame:
+		return true
+	_now_frame = frame
+	var ok := save_game()
+	if ok and OS.has_feature("web"):
+		_persist_web(reason)
+	if not ok:
+		push_warning("SaveSystem: запись «%s» не удалась" % reason)
 	return ok
 
 
@@ -403,83 +402,35 @@ static var _pending_reason: String = ""
 static func _flush_pending() -> void:
 	var reason := _pending_reason
 	_pending_reason = ""
-	if not reason.is_empty() and GameState.world_ref != null:   # пусто — отменена delete_save()
-		save_now(reason)
+	if reason.is_empty() or GameState.world_ref == null:   # пусто — отменена delete_save()
+		return
+	_now_frame = -1   # запись раньше в этом кадре (SaveHooks «встал») была ДО смерти — пишем заново
+	save_now(reason)
 
 
-## Веб: сейв, его копия и story.json — в IndexedDB прямо сейчас, этой же задачей JS, одной
-## транзакцией с commit(): дальше её дописывает процесс хранилища браузера, главный поток страницы
-## не нужен. Штатный перенос движка — кадром позже, а в скрытой вкладке кадров нет; замер
-## (tools/web_death_save.js): вкладка, закрытая и через 2,5 с после смерти, теряла её. Публичного
-## вызова у Godot нет: JavaScriptBridge.eval без глобального контекста выполняется внутри модуля
-## движка, где видны emscripten-овские FS и IDBFS. Возвращает число записей (0 — не веб).
-static func flush_to_storage(reason: String = "") -> int:
-	if not OS.has_feature("web"):
-		return 0
-	var paths: Array = []
-	for p in [SAVE_PATH, BACKUP_PATH, StoryState.PATH]:
-		paths.append(ProjectSettings.globalize_path(p))
-	var js := _FLUSH_JS.replace("__REASON__", JSON.stringify(reason)).replace("__PATHS__", JSON.stringify(paths))
-	var n = JavaScriptBridge.eval(js, false)
-	return int(n) if typeof(n) == TYPE_INT or typeof(n) == TYPE_FLOAT else 0
-
-
-## Формат IDBFS (loadLocalEntry) вместе с каталогами-предками: при следующем запуске движок поднимет
-## запись как свою. Нет открытой базы (не бывает: её открыл старт движка) — обычный IDBFS.syncfs.
-const _FLUSH_JS := """(function (reason, paths) {
-	try {
-		if (typeof FS === 'undefined' || typeof IDBFS === 'undefined' || typeof GodotFS === 'undefined' || !GodotFS._idbfs) { return 0; }
-		var mark = { reason: reason, at: Date.now(), synced: 0, error: '', entries: 0, engineSyncing: !!GodotFS._syncing };
-		if (window.RaskopkiShell) { window.RaskopkiShell.lastSave = mark; }
-		var done = function () {
-			mark.synced = Date.now();
-			if (reason) { console.info('[raskopki] saved: ' + reason + ' +' + (mark.synced - mark.at) + ' ms'); }
-		};
-		var fail = function (e) {
-			mark.error = String((e && e.target && e.target.error) || (e && e.message) || e || 'abort');
-			console.warn('[raskopki] save failed: ' + reason + ': ' + mark.error);
-		};
-		FS.getMounts(FS.root.mount).forEach(function (m) {
-			if (m.type !== IDBFS) { return; }
-			var mine = paths.filter(function (p) { return p.indexOf(m.mountpoint + '/') === 0; });
-			if (!mine.length) { return; }
-			var db = IDBFS.dbs[m.mountpoint];
-			if (!db) { IDBFS.syncfs(m, false, function (err) { if (err) { fail(err); } done(); }); return; }
-			var keys = {};
-			mine.forEach(function (p) {
-				for (var d = p; d.length > m.mountpoint.length; d = d.slice(0, d.lastIndexOf('/'))) { keys[d] = true; }
-			});
-			var tx = db.transaction([IDBFS.DB_STORE_NAME], 'readwrite');
-			var st = tx.objectStore(IDBFS.DB_STORE_NAME);
-			var known = IDBFS.__raskopki && IDBFS.__raskopki.cache[m.mountpoint];
-			Object.keys(keys).sort().forEach(function (p) {
-				IDBFS.loadLocalEntry(p, function (err, entry) {
-					if (err) { return; }
-					st.put(entry, p);
-					mark.entries++;
-					if (known) { known.entries[p] = { timestamp: entry.timestamp }; }
-				});
-			});
-			tx.oncomplete = done;
-			tx.onerror = tx.onabort = function (e) {
-				if (IDBFS.__raskopki) { delete IDBFS.__raskopki.cache[m.mountpoint]; }
-				fail(e);
-			};
-			if (tx.commit) { tx.commit(); }
-		});
-		if (reason) { console.info('[raskopki] save: ' + reason + ', entries ' + mark.entries + (mark.engineSyncing ? ', engine sync in flight' : '')); }
-		return mark.entries;
-	} catch (e) { return -1; }
-})(__REASON__, __PATHS__)"""
+## Движок переносит user:// в IndexedDB сам, но в начале СЛЕДУЮЩЕГО кадра после записи, а у скрытой
+## вкладки кадров нет: сейв, записанный при уходе со страницы, жил бы только в памяти, и телефон,
+## выгрузивший вкладку, унёс бы его с собой. Поэтому отдаём текст оболочке (web/shell.src.html,
+## RaskopkiShell.persistFile): она кладёт его в ту же базу тем же форматом, что и движок. Строка
+## «[raskopki] save: …» в консоли — для веб-проверок (tools/web_death_save.js).
+static func _persist_web(reason: String = "") -> void:
+	var shell = JavaScriptBridge.get_interface("RaskopkiShell")
+	if shell == null or shell.persistFile == null:
+		return
+	for path in [SAVE_PATH, "user://story.json"]:
+		if FileAccess.file_exists(path):
+			shell.persistFile(ProjectSettings.globalize_path(path), FileAccess.get_file_as_string(path))
+	print("[raskopki] save: %s" % reason)
 
 
 ## Веб, один раз на старте: ускоряет штатный перенос движка. В emscripten он обходит курсором ВСЕ
 ## записи базы (по задаче цикла событий на каждую, между кадрами — секунды под нагрузкой) и не зовёт
 ## commit(), так что транзакция ждёт главный поток на каждый ответ — и всё это время база заперта:
-## запись смерти стояла за ней, и убитый через 300 мс браузер терял смерть (2 из 3 прогонов).
-## Теперь база обходится один раз (сейчас) и помнится — меняют её только наши транзакции; разница
-## кладётся одной транзакцией с commit(). Ошибка транзакции стирает память — следующий перенос
-## обойдёт базу заново. Загрузку (populate) это не трогает: она прошла до первого GDScript.
+## запись смерти (save_now → persistFile оболочки) стояла за ней, и убитый через 300 мс браузер
+## терял смерть (2 из 3 прогонов, tools/web_death_save.js). Теперь база обходится один раз (сейчас) и
+## помнится, разница кладётся одной транзакцией с commit(). Кроме переноса, в базу пишет только
+## persistFile — те же файлы, что перенос и так перепишет по времени правки. Ошибка транзакции
+## стирает память — следующий перенос обойдёт базу заново. Загрузку (populate) это не трогает.
 static func install_web_sync() -> int:
 	if not OS.has_feature("web"):
 		return 0

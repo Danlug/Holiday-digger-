@@ -83,7 +83,6 @@ func _close(m: Node2D) -> void:
 # ---------------------------------------------------------------------------
 
 func _test_coalesce() -> void:
-	check("вне веба переноса в IndexedDB нет (flush_to_storage → 0)", SaveSystem.flush_to_storage("test") == 0)
 	check("вне веба перенос движка не трогаем (install_web_sync → 0)", SaveSystem.install_web_sync() == 0)
 	SaveSystem.save_at_frame_end("a")
 	SaveSystem.save_at_frame_end("b")
@@ -192,4 +191,15 @@ func _test_dollars_and_story() -> void:
 	var gear: Array = _file().get("economy", {}).get("owned_gear", [])
 	check("награда сцены (ранец) — в save.json тем же кадром, что «просмотрено» в story.json",
 		d != null and gear.has("backpack") and StoryState.is_seen("backpack"), str(gear))
+
+	# запись раньше в том же кадре (SaveHooks: «встал на новом месте», уход страницы) не глотает смерть:
+	# save_now пишет не чаще раза в кадр, а смерть случилась после той записи
+	GameState.coins = 1000
+	GameState.inventory = {"silver": 2}
+	SaveSystem.save_now("settled")
+	GameState.take_damage(1e6, "fall")
+	await _frames(1)
+	var f2 := _file()
+	check("смерть после save_now того же кадра всё равно в файле", (f2.get("inventory", {}) as Dictionary).is_empty()
+		and _coins(f2) == GameState.coins and Healing.last_death_fee == 50, "монет в файле %d, рюкзак %s" % [_coins(f2), str(f2.get("inventory"))])
 	await _close(main)

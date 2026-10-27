@@ -462,6 +462,8 @@ static func _good_offer(g: Dictionary, currency: String) -> Dictionary:
 	if depth > GameState.max_depth_reached:
 		_locked(o, "Откроется на глубине %d" % depth, {"icon": ShopArt.tex("glyph_depth"),
 			"text": ShopArt.compact(depth), "color": Color.WHITE})
+	if id == TeleportWatch.GOOD_ID and TeleportWatch.free_uses() > 0:
+		TeleportWatch.mark_free_offer(o)   # подарок обучения на 200: «0 $» и бант (scripts/teleport/)
 	return o
 
 

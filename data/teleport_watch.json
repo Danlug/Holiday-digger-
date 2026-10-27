@@ -1,0 +1,51 @@
+{
+	"_comment": "Часы-телепорт: площадка у тоннеля, возврат под землю, обучение на глубине 200 (ГДД §15.3, код scripts/teleport/, тест tests/test_teleport_watch). Слова владельца (27.10) — в ГДД. Числа без proposed — от владельца; остальные — подбор, ждут его глаз. Место площадки — WorldGen.TELEPORT_PAD_X (геометрия мира живёт в коде, как станция и скважина).",
+	"near_cells": {
+		"value": 0.75,
+		"proposed": true,
+		"note": "на каком расстоянии от центра площадки (клеток) над героем загорается пузырь «Вниз». 0.75 — герой на плите; шире — пузырь спорил бы с «В бурмобиль» (парковка в клетке 18, радиус 1.2 — до 19.7) и кнопкой станции (от 21.3)"
+	},
+	"search_radius_cells": {
+		"value": 12,
+		"proposed": true,
+		"note": "если точку возврата завалило (обвал, землетрясение), безопасную клетку ищем кольцами до этого радиуса; не нашлась — точка откапывается"
+	},
+	"lesson_depth": {
+		"value": 200,
+		"proposed": false,
+		"note": "владелец: «Когда он докапывает до 200, запускается сюжет…». Сама сцена — data/story_arc.json → teleport_watch (depth 200), число там же; здесь — для ГДД и теста"
+	},
+	"lesson_free_uses": {
+		"value": 1,
+		"proposed": false,
+		"note": "владелец: «сюжетно даёт воспользоваться часами бесплатно 1 раз»"
+	},
+	"texts": {
+		"ru": {
+			"down_title": "Вниз",
+			"down_tip": "Вернуться туда, откуда перенесли часы. Один раз.",
+			"step_shop": "Лавка",
+			"step_watch": "Часы",
+			"card_title": "Часы-телепорт",
+			"card_text": "Часы телепорта возвращают тебя с любой глубины на поверхность. Потом ты можешь один раз вернуться на исходную точку под землю.",
+			"card_go": "Наверх",
+			"card_ok": "Понятно",
+			"free_tip": "Первый раз — бесплатно: подарок бабушки",
+			"skipped_toast": "Часы-телепорт в лавке за доллары: первый раз бесплатно",
+			"no_spot": "Точку завалило — вниз пока нельзя"
+		},
+		"en": {
+			"down_title": "Down",
+			"down_tip": "Go back to where the watch picked you up. Once.",
+			"step_shop": "Shop",
+			"step_watch": "Watch",
+			"card_title": "Teleport watch",
+			"card_text": "The teleport watch brings you back to the surface from any depth. Afterwards you can return to your starting point underground once.",
+			"card_go": "Go up",
+			"card_ok": "Got it",
+			"free_tip": "First use is free: a gift from Grandma",
+			"skipped_toast": "Teleport watch is in the dollar shop: first use is free",
+			"no_spot": "The spot is buried — can't go down yet"
+		}
+	}
+}

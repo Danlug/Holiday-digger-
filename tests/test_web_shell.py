@@ -132,6 +132,15 @@ def test_mobile_contract(html):
 		check(label, needle in html)
 
 
+def test_leave_save(html):
+	# Закрыл вкладку под землёй — открыл там же (scripts/core/save_hooks.gd): у скрытой вкладки нет кадров,
+	# и движок сам не успел бы перенести сейв в IndexedDB.
+	check("уход со страницы зовёт игру: visibilitychange → hidden и pagehide → onLeave",
+		"shell.onLeave" in html and "'pagehide'" in html and "visibilityState === 'hidden'" in html)
+	check("сейв ложится в базу IDBFS движка сразу (persistFile → /userfs, FILE_DATA, папки над файлом)",
+		"shell.persistFile" in html and "'/userfs'" in html and "'FILE_DATA'" in html and "mode: 16895" in html)
+
+
 def test_manifest_and_icons():
 	m = json.loads((ROOT / "web" / "pwa" / "manifest.webmanifest").read_text(encoding="utf-8"))
 	check("manifest: name и short_name", m.get("name") == "Раскопки на каникулах" and bool(m.get("short_name")))
@@ -181,6 +190,7 @@ if __name__ == "__main__":
 	test_stamp(html)
 	test_no_external_and_no_sw(html)
 	test_mobile_contract(html)
+	test_leave_save(html)
 	test_manifest_and_icons()
 	test_preset()
 	test_font()

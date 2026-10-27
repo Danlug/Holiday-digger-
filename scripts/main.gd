@@ -117,8 +117,10 @@ func _ready() -> void:
 	hud.set_player(player)
 
 	var loaded_dead := not GameState.is_alive   # до респавна: умерший встаёт дома, а не там, где упал
-	if not GameState.is_alive:
-		Healing.respawn_after_death()
+	# Сейв мёртвым (вкладку закрыли в кадр смерти, до записи респавна) — тот же респавн, что
+	# в игре: дома, верхний слой зарос. Плату и рюкзак die() уже записал в этот сейв.
+	if loaded_dead:
+		_handle_death()
 
 	_restore_top_soil_if_needed()
 	var spot := _position_from_save_or_start(loaded_dead)
@@ -326,6 +328,8 @@ func _handle_death() -> void:
 	fog.reset_rect(x0, y0, x1 - x0, y1 - y0)
 	player.teleport_home()
 	Healing.respawn_after_death()
+	# Респавн — в ту же запись, что смерть (один сейв на кадр): файл помнит героя дома, а не мёртвым там, где он упал.
+	SaveSystem.save_at_frame_end("respawn")
 
 
 func _on_collapse_tick() -> void:

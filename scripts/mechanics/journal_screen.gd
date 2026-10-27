@@ -211,6 +211,9 @@ func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
 func _build_ores() -> Control:
 	var grid := GridContainer.new()
 	grid.columns = COLS
+	# ScrollContainer растягивает ребёнка только с флагом EXPAND, иначе тот остаётся
+	# минимальной ширины у левого края; при aspect=expand экран шире 224 — справа дыра.
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 3)
 	grid.add_theme_constant_override("v_separation", 4)
 	for id in MasteryLogic.kinds():
@@ -219,6 +222,7 @@ func _build_ores() -> Control:
 		t.fresh = MechState.mastery_count(t.item) > 0 \
 			and MechState.stars_seen(t.item) < maxi(1, MechState.stars_granted(t.item))
 		t.custom_minimum_size = Vector2(TILE_W, TILE_H)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # колонки делят ширину поровну, плитка рисуется по центру
 		grid.add_child(t)
 		_bind_tile_tip(t, String(id))
 	return grid
@@ -252,7 +256,7 @@ func _depth_of(id: String) -> int:
 func _build_chests() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
-	v.custom_minimum_size = Vector2(212, 0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # строки во всю ширину (см. _build_ores)
 	var rows := [
 		[Mechanics.tex("chest_wood_icon"), str(MechState.opened_count("wood")), "Деревянный сундук",
 			"Лежит в породе с глубины 20. Несколько руд этой глубины, иногда еда."],

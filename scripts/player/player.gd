@@ -1373,10 +1373,13 @@ func _finish_dig() -> void:
 		if weight > free_kg:
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, 0)
 		else:
+			if lucky > 1:
+				LuckJuice.arm(mineral_id)   # подбор этой находки звучит громче и всплывает крупнее (владелец 27.10)
 			GameState.add_item(mineral_id, 1)
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, price)
 			if lucky > 1:
 				var extra := GameState.add_item(mineral_id, lucky - 1)
+				LuckJuice.disarm()
 				if extra > 0:
 					_lucky_find(d, mineral_id, extra + 1)
 
@@ -1410,12 +1413,13 @@ func _luck_roll(loot: bool) -> int:
 
 func _lucky_find(d: Dictionary, mineral_id: String, mult: int) -> void:
 	var pos := Vector2(d.x * 32.0 + 16.0, d.y * 32.0 + 16.0)
-	Fx.float_text(pos + Vector2(0, -20), "×%d" % mult, LUCK_COLOR)
-	if not mineral_id.is_empty():
-		# Удача на земле случается часто (до 10% клеток) — ей хватит цифры, без звука.
-		Fx.burst("pickup_glint", pos, 0.9)
-		Sfx.play("pickup_rare")
-		Haptics.tap()
+	# Отклик удачи (владелец 27.10): «×N» на 20% крупнее, у руды — вспышка, толчок и наезд
+	# камеры (LuckJuice). Звук удачи — сам подбор, громче на 50% (JuiceDirector); удача на
+	# земле случается часто (до 10% клеток) — ей хватит крупной цифры.
+	# крупные «+N» над головой и «×N» над клеткой не слипаются: подпись чуть в сторону клетки
+	var side := signf(pos.x - x * 32.0)
+	Fx.float_text(pos + Vector2(5.0 * side, -20), "×%d" % mult, LUCK_COLOR, LuckJuice.icon_scale())
+	LuckJuice.moment(pos, mineral_id)
 	GameState.emit_event(&"lucky_find", {"cell": Vector2i(d.x, d.y), "mineral": mineral_id, "mult": mult})
 
 

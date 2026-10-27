@@ -5,11 +5,12 @@ extends Node
 ##  3. огонёк горит только пока возврат доступен, гаснет плавно;
 ##  4. «Вниз» — ровно один раз, на сохранённую точку; завалило — ближайшая безопасная клетка;
 ##  5. смерть гасит возврат; новое применение под землёй — новая точка, на поверхности — старая;
-##  6. сюжет на 200 срабатывает один раз; обучение: тень пропускает касание только в цель
-##     (кнопка лавки → плитка часов → карточка), лавку закрыли — шаг назад; «Наверх» переносит
-##     бесплатно (доллары целы); тень после конца не ловит касаний и уходит;
+##  6. сюжет на 200 срабатывает один раз; обучение на общем GuideSpotlight: затемнение пропускает
+##     касание только в цель (кнопка лавки → плитка часов → карточка), касание пальцем — один шаг,
+##     лавку закрыли — шаг назад; «Наверх» переносит бесплатно (доллары целы); после конца
+##     затемнение снято;
 ##  7. пропуск — подарок остаётся: плитка «0 $», покупка не тратит доллары, второй раз — платно;
-##  8. сейв/загрузка состояния; слои (тень над лавкой, под Tip и катсценой).
+##  8. сейв/загрузка состояния; слои (затемнение над лавкой, под Tip и катсценой).
 ##
 ## Запуск: godot --headless --path . res://tests/test_teleport_watch.tscn
 
@@ -278,6 +279,22 @@ func _click(pos: Vector2) -> void:
 		await _frames(1)
 
 
+## Касание пальцем: движок шлёт и само касание, и мышь из него — в одном кадре.
+func _finger(pos: Vector2) -> void:
+	for pressed in [true, false]:
+		var t := InputEventScreenTouch.new()
+		t.pressed = pressed
+		t.position = pos
+		get_viewport().push_input(t, true)
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = pressed
+		ev.position = pos
+		ev.global_position = pos
+		get_viewport().push_input(ev, true)
+		await _frames(1)
+
+
 func _test_story_and_lesson() -> void:
 	var dollars_before := 7
 	GameState.dollars = dollars_before
@@ -300,53 +317,53 @@ func _test_story_and_lesson() -> void:
 	story.cutscene.skip()
 	await _frames(3)
 	check("сцена отмечена и подарок выдан", StoryState.is_seen(TeleportLesson.SCENE_ID) and TeleportWatch.free_uses() == 1)
+	var lesson: TeleportLesson = tw.lesson
+	var sp: GuideSpotlight = lesson.spotlight
 	guard = 0
-	while not FocusTour.is_any_running() and guard < 60:
+	while not lesson.is_active() and guard < 60:
 		guard += 1
 		await _frames(1)
-	var tour: FocusTour = tw.lesson.tour
-	check("обучение началось в спокойный момент", tour != null and tour.is_running() and tour.current_id() == "open_shop",
-		"кадров %d" % guard)
+	check("обучение началось в спокойный момент (общий GuideSpotlight)", lesson.is_active()
+		and lesson.current_step() == "open_shop" and sp.visible and GuideSpotlight.any_active(), "кадров %d" % guard)
 	check("на время обучения герой стоит, ввод мира выключен", p.frozen and not main.hud.is_processing_input())
 	check("сюжет не начинает сцену поверх обучения", story._modal_open())
 	await _frames(3)
 	var shop_btn: Control = main.hud.get("_shop_btn")
 	var inv_btn: Control = main.hud.get("_inv_button")
-	var shield: Control = tour.get_node("Shield")
-	check("а) тень пропускает касание в кнопку лавки",
-		not shield._has_point(shop_btn.get_global_rect().get_center()))
-	check("а) тень ловит касание мимо цели (рюкзак)",
-		shield._has_point(inv_btn.get_global_rect().get_center()))
-	check("а) стрелка видна и смотрит на кнопку лавки", tour.get_node("Shield/Arrow").visible
-		and tour.hole().encloses(shop_btn.get_global_rect()))
+	check("а) затемнение пропускает касание в кнопку лавки", sp.lets_through(shop_btn.get_global_rect().get_center()))
+	check("а) затемнение ловит касание мимо цели (рюкзак)", not sp.lets_through(inv_btn.get_global_rect().get_center()))
+	check("а) стрелка видна, окно — кнопка лавки", sp._arrow.visible and sp.hole().encloses(shop_btn.get_global_rect()))
 	await _click(inv_btn.get_global_rect().get_center())
 	check("а) нажатие мимо цели ничего не открыло", not main.hud._inv_sheet.visible and not ShopUI.instance.is_open())
-	await _click(shop_btn.get_global_rect().get_center())
+	# Палец: касание и мышь из него приходят в цель в одном кадре — шаг один, а не два.
+	await _finger(shop_btn.get_global_rect().get_center())
 	await _frames(3)
-	check("а) нажатие в цель открыло премиум-лавку", ShopUI.instance.is_open()
+	check("а) касание пальцем в цель открыло премиум-лавку", ShopUI.instance.is_open()
 		and String(ShopUI.instance.get("_tab")) == ShopUI.SCREEN_PREMIUM)
-	check("б) шаг — плитка часов", tour.current_id() == "watch_tile")
+	check("б) шаг — плитка часов (одно касание — один шаг)", lesson.current_step() == "watch_tile")
 	await _frames(2)
-	var tile: Control = FocusTour._shop_tile("good:dollars:" + TeleportWatch.GOOD_ID)
-	check("б) плитка часов найдена по ключу и в дырке тени", tile != null and tour.hole().encloses(tile.get_global_rect()))
-	# Закрыли лавку (Esc) — шаг назад, тень не пропала.
+	var tile: Control = lesson._tile()
+	check("б) плитка часов найдена по ключу и в окне затемнения", tile != null and sp.hole().encloses(tile.get_global_rect()))
+	# Закрыли лавку (Esc) — шаг назад, затемнение не пропало.
 	ShopUI.instance.close()
 	await _frames(2)
-	check("б) лавку закрыли — шаг назад к кнопке лавки", tour.is_running() and tour.current_id() == "open_shop")
+	check("б) лавку закрыли — шаг назад к кнопке лавки", lesson.is_active() and lesson.current_step() == "open_shop"
+		and sp.hole().encloses(shop_btn.get_global_rect()))
 	await _click(shop_btn.get_global_rect().get_center())
 	await _frames(3)
-	tile = FocusTour._shop_tile("good:dollars:" + TeleportWatch.GOOD_ID)
-	check("б) снова в лавке на плитке часов", tour.current_id() == "watch_tile" and tile != null)
+	tile = lesson._tile()
+	check("б) снова в лавке на плитке часов", lesson.current_step() == "watch_tile" and tile != null)
 	var tabs: Control = ShopUI.instance.get("_nav")
-	check("б) вкладки лавки под тенью не нажимаются",
-		tabs != null and shield._has_point(tabs.get_global_rect().get_center()))
+	check("б) вкладки лавки под затемнением не нажимаются",
+		tabs != null and not sp.lets_through(tabs.get_global_rect().get_center()))
 	await _click(tile.get_global_rect().get_center())
 	await _frames(2)
-	check("в) нажатие на часы — объяснение, а не окно покупки", tour.current_id() == "explain"
+	check("в) нажатие на часы — объяснение, а не окно покупки", lesson.current_step() == "explain"
 		and ShopUI.instance.get("_card") == null)
-	check("в) текст объяснения — слова владельца", tour.card_text() == TeleportWatch.text("card_text"))
-	var btn := tour.card_button()
-	check("в) у карточки одна кнопка «Наверх»", btn != null)
+	check("в) текст объяснения — слова владельца", sp.card_text() == TeleportWatch.text("card_text"))
+	var btn := sp.card_button()
+	check("в) у карточки одна кнопка «Наверх», мимо неё не нажимается", btn != null
+		and sp.lets_through(btn.get_global_rect().get_center()) and not sp.lets_through(tile.get_global_rect().get_center()))
 	var from := Vector2(p.x, p.y)
 	await _click(btn.get_global_rect().get_center())
 	await _frames(4)
@@ -354,12 +371,11 @@ func _test_story_and_lesson() -> void:
 	check("г) подарок израсходован", TeleportWatch.free_uses() == 0)
 	check("г) герой на площадке, точка возврата — 200", is_equal_approx(p.x, TeleportWatch.pad_x()) and p.y < 1.0
 		and TeleportWatch.return_point().distance_to(from) < 0.01)
-	check("обучение закончено, лавка закрыта, герой свободен", not FocusTour.is_any_running()
+	check("обучение закончено, лавка закрыта, герой свободен", not lesson.is_active() and not GuideSpotlight.any_active()
 		and not ShopUI.instance.is_open() and not p.frozen and main.hud.is_processing_input())
-	# Тень тает 0,18 с; под нагрузкой она уже может быть удалена — тогда тем более не ловит.
-	check("тень после конца касаний не ловит", not is_instance_valid(shield) or not shield._has_point(Vector2(10, 10)))
-	await _frames(30)
-	check("тень ушла со сцены", not is_instance_valid(tour) or not tour.is_inside_tree())
+	check("затемнение после конца снято и ничего не держит", not sp.visible and sp.lets_through(Vector2(10, 10))
+		and sp.card_button() == null)
+	await _frames(3)
 	check("пузырь «Вниз» мигает после урока", tw.button().visible and String(tw.button().get("_state")) == "forced")
 	check("обучение отмечено пройденным", TeleportWatch.lesson_state() == "done")
 	# Один раз за игру: глубже 200 снова — ни сцены, ни подарка.
@@ -387,15 +403,18 @@ func _test_skip_keeps_gift() -> void:
 	await _settle(8)
 	tw.lesson.begin()
 	var guard := 0
-	while not FocusTour.is_any_running() and guard < 600:
+	while not tw.lesson.is_active() and guard < 600:
 		guard += 1
 		await _frames(1)
-	var tour: FocusTour = tw.lesson.tour
-	check("пропуск: обучение шло", tour != null and tour.is_running(), "кадров %d" % guard)
-	tour.skip()
+	check("пропуск: обучение шло", tw.lesson.is_active(), "кадров %d" % guard)
+	await _click(main.hud.get("_shop_btn").get_global_rect().get_center())
+	await _frames(3)
+	check("пропуск: в лавке на плитке часов", ShopUI.instance.is_open() and tw.lesson.current_step() == "watch_tile")
+	tw.lesson.spotlight._skip.confirmed.emit()   # ⏭: долгое нажатие или двойной тап
 	await _frames(2)
 	check("пропуск: подарок остался, обучение пройдено", TeleportWatch.free_uses() == 1 and TeleportWatch.lesson_state() == "done")
-	check("пропуск: управление вернулось", not p.frozen and main.hud.is_processing_input() and not FocusTour.is_any_running())
+	check("пропуск: затемнение снято, лавка закрыта, управление вернулось", not p.frozen and main.hud.is_processing_input()
+		and not GuideSpotlight.any_active() and not ShopUI.instance.is_open())
 	var offer := {}
 	for o in ShopItems.offers_flat("premium"):
 		if String(o["ref"]) == TeleportWatch.GOOD_ID:
@@ -432,13 +451,14 @@ func _test_save_load() -> void:
 	check("прерванное обучение после загрузки не повторяется (подарок на месте)",
 		TeleportWatch.lesson_state() == "done" and TeleportWatch.free_uses() == 1)
 	l.queue_free()
+	TeleportLesson.instance = tw.lesson
 	GameState.ext_set(TeleportWatch.KEY, {"ret": "мусор", "free": "x", "lesson": 5})
 	var s := TeleportWatch.state()
 	check("мусор в сейве не роняет часы", not TeleportWatch.has_return() and int(s["free"]) == 0)
 
 
 func _test_layers() -> void:
-	check("тень обучения над лавкой (20) и подсказками (40)", FocusTour.LAYER > 40)
-	check("тень под окнами меты (92+), катсценой (100) и Tip (128)", FocusTour.LAYER < 92)
+	check("затемнение урока над лавкой (20) и подсказками (40)", GuideSpotlight.LAYER > 40)
+	check("затемнение урока под окнами меты (92+), катсценой (100) и Tip (128)", GuideSpotlight.LAYER < 92)
 	var hot: CanvasLayer = tw.get_node("TeleportHotspot")
 	check("пузырь «Вниз» в полосе HUD-виджетов, как «Зайти»", hot.layer >= UiLayers.HUD and hot.layer <= UiLayers.HUD_TOP)

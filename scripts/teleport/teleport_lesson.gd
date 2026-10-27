@@ -7,30 +7,50 @@ extends Node
 ##
 ## Ход: сюжетная сцена teleport_watch (data/story_arc.json, depth 200: звонок бабушки —
 ## «первый раз за мой счёт») → событие story_beat → подарок (бесплатное применение
-## часов) ложится сразу, обучение ждёт безопасного момента и ведёт FocusTour:
-##   а) тень везде, кроме кнопки лавки на HUD, стрелка на неё;
-##   б) в лавке тень везде, кроме плитки часов, стрелка на неё (лавку закрыли — назад к а);
-##   в) карточка-объяснение; кнопка «Наверх» тратит подарок и переносит героя на площадку
-##      (на поверхности — «Понятно», подарок остаётся на плитке часов).
+## часов) ложится сразу, обучение ждёт безопасного момента и ведёт тем же спотлайтом,
+## что и выгрузка на 150 (GuideSpotlight: один механизм затемнения на игру):
+##   а) затемнено всё, кроме кнопки лавки на HUD, стрелка на неё (у стрелки — значок часов);
+##   б) в лавке затемнено всё, кроме плитки часов, стрелка и бант подарка
+##      (лавку закрыли «назад» — снова к а);
+##   в) карточка-объяснение со словами владельца; кнопка «Наверх» тратит подарок и
+##      переносит героя на площадку (на поверхности — «Понятно», подарок остаётся на плитке).
+## Нажатие по цели урок забирает себе (pass_through выключен): плитка часов не открывает
+## окно покупки, бесплатный раз не становится покупкой.
 ## Пропуск (⏭ сцены или обучения) подарок не отнимает: плитка часов показывает «0 $» с
-## подарком, пока им не воспользуются. Закрыли игру посреди обучения — после загрузки
-## оно не повторяется (герой всё равно дома), подарок на месте.
+## бантом, пока им не воспользуются. Закрыли игру посреди шагов — после загрузки обучение
+## не повторяется (герой всё равно дома), подарок на месте.
 ##
-## Безопасный момент — как у сюжетных сцен, но строже (обучение замораживает героя): жив,
-## не в доме, на земле, без тяги и перехода в бурмобиль, нет окон и сцен, нет боя рядом.
+## Безопасный момент строже сюжетных сцен (урок замораживает героя): жив, не в доме, на
+## земле, без тяги и перехода в бурмобиль, нет окон, сцен и урока выгрузки, нет боя рядом;
+## копающему без передышки — не дольше DIG_WAIT_MS.
 
 const SCENE_ID := "teleport_watch"
-const SHOP_TILE := "shop:good:dollars:teleport_watch"
+const TILE_KEY := "good:dollars:" + TeleportWatch.GOOD_ID
 const DIG_WAIT_MS := 4000   # копает без передышки дольше — обучение снимает копку само
 const COMBAT_NEAR := 10.0   # монстр ближе стольких клеток — это бой
 
+enum Step { IDLE, WAIT, SHOP, TILE, CARD }
+const STEP_IDS := {Step.SHOP: "open_shop", Step.TILE: "watch_tile", Step.CARD: "explain"}
+
+static var instance: TeleportLesson = null
+
 var watch: TeleportWatch = null
-var tour: FocusTour = null
-var _pending: bool = false
+var spotlight: GuideSpotlight
+var step: int = Step.IDLE
 var _dig_since: int = -1
+var _scrolled: bool = false
+var _was_frozen: bool = false
+var _hud_input_was: bool = true
 
 
 func _ready() -> void:
+	instance = self
+	spotlight = GuideSpotlight.new()
+	spotlight.name = "TeleportSpotlight"
+	add_child(spotlight)
+	spotlight.target_pressed.connect(_on_target)
+	spotlight.card_pressed.connect(_on_card)
+	spotlight.skipped.connect(skip)
 	GameState.game_event.connect(_on_game_event)
 	# Прерванное обучение (игру закрыли посреди шагов) не возобновляем: после загрузки
 	# герой дома, переносить некого. Подарок остался на плитке.
@@ -38,8 +58,26 @@ func _ready() -> void:
 		TeleportWatch.set_lesson_state("done")
 
 
+func _exit_tree() -> void:
+	if instance == self:
+		instance = null
+
+
+## Шаги а–в идут (герой стоит, тень на экране).
 func is_active() -> bool:
-	return _pending or (tour != null and is_instance_valid(tour) and tour.is_running())
+	return step == Step.SHOP or step == Step.TILE or step == Step.CARD
+
+
+func current_step() -> String:
+	return String(STEP_IDS.get(step, ""))
+
+
+## Куда нажать сейчас (бот и тест жмут в середину): окно цели или кнопка карточки.
+func target_rect() -> Rect2:
+	if step == Step.CARD:
+		var b := spotlight.card_button()
+		return b.get_global_rect() if b != null else Rect2()
+	return spotlight.hole() if is_active() else Rect2()
 
 
 func _on_game_event(id: StringName, data: Dictionary) -> void:
@@ -54,39 +92,42 @@ func begin() -> void:
 	TeleportWatch.grant_free(int(TeleportWatch.num("lesson_free_uses", 1)))
 	TeleportWatch.set_lesson_state("running")
 	SaveSystem.save_game()
-	_pending = true
+	step = Step.WAIT
 	_dig_since = -1
 
 
 func _process(_dt: float) -> void:
-	if tour != null and is_instance_valid(tour) and tour.is_running() \
-			and (not GameState.is_alive or GameState.max_depth_reached == 0):
-		# Смерть (лава, жара) или «Сброс» посреди шагов: тень не должна пережить игру.
-		tour.stop()
-		return
-	if not _pending:
-		return
-	if not GameState.is_alive:
-		# Смерть до начала: обучать некого, подарок остаётся.
-		_pending = false
-		TeleportWatch.set_lesson_state("done")
-		return
-	if _safe_now():
-		_pending = false
-		_start_tour()
+	match step:
+		Step.WAIT:
+			if not GameState.is_alive:
+				# Смерть до начала: обучать некого, подарок остаётся.
+				_set_done()
+				step = Step.IDLE
+			elif _safe_now():
+				_start()
+		Step.SHOP, Step.TILE, Step.CARD:
+			_tick_running()
 
 
 # ---------------------------------------------------------------------------
 # Безопасный момент
 # ---------------------------------------------------------------------------
 
+func _player():
+	return watch.player if watch != null else null
+
+
+func _hud():
+	return watch.hud if watch != null else null
+
+
 func _safe_now() -> bool:
-	var p = watch.player if watch != null else null
-	if p == null or not is_instance_valid(p):
+	var p = _player()
+	if p == null or not is_instance_valid(p) or _shop_button() == null:
 		return false
 	if GameState.house_is_indoors or GameState.era == "grandpa" or bool(p.get("frozen")):
 		return false
-	if FocusTour.is_any_running() or _story_busy() or _window_open() or _in_combat(p):
+	if GuideSpotlight.any_active() or _unload_lesson_busy() or _story_busy() or _window_open() or _in_combat(p):
 		return false
 	if not bool(p.get("on_ground")) or absf(float(p.get("vy"))) > 0.5:
 		return false
@@ -99,6 +140,11 @@ func _safe_now() -> bool:
 		return now - _dig_since >= DIG_WAIT_MS
 	_dig_since = -1
 	return true
+
+
+func _unload_lesson_busy() -> bool:
+	var u := PremiumUnloadLesson.instance
+	return u != null and is_instance_valid(u) and int(u.step) != PremiumUnloadLesson.Step.IDLE
 
 
 ## Сцена идёт или вот-вот начнётся. Очередь сама по себе не мешает: сцена «только на
@@ -129,7 +175,7 @@ func _window_open() -> bool:
 	if ms != null and is_instance_valid(ms):
 		if (ms.hub != null and ms.hub.is_open()) or (ms.popup != null and ms.popup.is_open()):
 			return true
-	var hud = watch.hud if watch != null else null
+	var hud = _hud()
 	if hud != null and is_instance_valid(hud):
 		if not hud.visible or not hud.is_processing_input():
 			return true
@@ -156,63 +202,107 @@ func _in_combat(p) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Шаги
+# Цели
 # ---------------------------------------------------------------------------
-
-func _start_tour() -> void:
-	var host: Node = watch.get_parent() if watch != null else get_parent()
-	tour = FocusTour.begin(host, steps(), {"skippable": true})
-	tour.finished.connect(_on_tour_finished)
-
-
-func steps() -> Array:
-	return [
-		{
-			"id": "open_shop",
-			"target": _shop_button,
-			"label": TeleportWatch.text("step_shop"),
-			"icon": ShopArt.ui("icon_dollar"),
-			"until": func() -> bool: return _shop_on_premium(),
-		},
-		{
-			"id": "watch_tile",
-			"target": SHOP_TILE,
-			"tap": "catch",
-			"label": TeleportWatch.text("step_watch"),
-			"back": func() -> bool: return not _shop_on_premium(),
-		},
-		{
-			"id": "explain",
-			"card": _card_def(),
-			"on_tap": _on_card_pressed,
-		},
-	]
-
 
 ## Кнопка лавки на HUD — по узлу, а не по координатам: верх HUD двигают другие ветки.
 ## HUD хранит её в _shop_btn; переименуют поле — найдём кнопку по заголовку её подсказки.
 func _shop_button() -> Control:
-	var hud = watch.hud if watch != null else null
+	var hud = _hud()
 	if hud == null or not is_instance_valid(hud):
 		return null
 	var b = hud.get("_shop_btn")
-	if b is Control and is_instance_valid(b):
-		return b
-	for n in (hud as Node).find_children("*", "BaseButton", true, false):
-		var meta = n.get_meta(Tip.META, {})
-		if typeof(meta) == TYPE_DICTIONARY and String(meta.get("title", "")) == "Магазин":
-			return n as Control
-	return null
+	if not (b is Control and is_instance_valid(b)):
+		b = null
+		for n in (hud as Node).find_children("*", "BaseButton", true, false):
+			var meta = n.get_meta(Tip.META, {})
+			if typeof(meta) == TYPE_DICTIONARY and String(meta.get("title", "")) == "Магазин":
+				b = n
+				break
+	return b as Control if b != null and (b as Control).is_visible_in_tree() else null
 
 
-func _shop_on_premium() -> bool:
-	var shop := ShopUI.instance
-	return shop != null and shop.is_open() and String(shop.get("_tab")) == ShopUI.SCREEN_PREMIUM
+func _shop_rect() -> Rect2:
+	var b := _shop_button()
+	return b.get_global_rect() if b != null else Rect2()
+
+
+func _tile() -> Control:
+	var ui := ShopUI.instance
+	if ui == null or not ui.is_open():
+		return null
+	var tiles = ui.get("_tiles")
+	var t = (tiles as Dictionary).get(TILE_KEY, null) if typeof(tiles) == TYPE_DICTIONARY else null
+	if t == null or not is_instance_valid(t):   # витрина пересобирает плитки
+		return null
+	return t as Control if (t as Control).is_visible_in_tree() else null
+
+
+func _tile_rect() -> Rect2:
+	var t := _tile()
+	if t == null:
+		return Rect2()
+	if not _scrolled:
+		_scrolled = true
+		var sc = ShopUI.instance.get("_scroll")
+		if sc is ScrollContainer:
+			(sc as ScrollContainer).ensure_control_visible(t)
+	return t.get_global_rect()
 
 
 func _hero_underground() -> bool:
-	var p = watch.player if watch != null else null
+	var p = _player()
 	return p != null and is_instance_valid(p) and int(floor(float(p.get("y")))) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Шаги
+# ---------------------------------------------------------------------------
+
+func _start() -> void:
+	var p = _player()
+	var hud = _hud()
+	_was_frozen = bool(p.get("frozen"))
+	p.set("frozen", true)
+	p.set("digging", null)
+	if p.has_method("release_control"):
+		p.call("release_control")
+	_hud_input_was = hud.is_processing_input()
+	hud.set_process_input(false)   # джойстик слушает _input мимо фильтров Control
+	if hud.has_method("close_inventory"):
+		hud.close_inventory()
+	Sfx.play("ui_open")
+	_to_shop_step()
+
+
+func _to_shop_step() -> void:
+	step = Step.SHOP
+	spotlight.point_at(_shop_rect, ShopArt.item_icon(TeleportWatch.GOOD_ID))
+
+
+## Пока идут шаги: умер, попал в дом, «Сброс» — снять; лавку закрыли «назад» — к кнопке лавки.
+func _tick_running() -> void:
+	if not GameState.is_alive or GameState.house_is_indoors or GameState.max_depth_reached == 0:
+		skip()
+		return
+	if step == Step.TILE and (ShopUI.instance == null or not ShopUI.instance.is_open()):
+		_to_shop_step()
+
+
+func _on_target() -> void:
+	match step:
+		Step.SHOP:
+			Sfx.play("ui_tap")
+			Haptics.tap()
+			ShopUI.open_premium()
+			step = Step.TILE
+			_scrolled = false
+			spotlight.point_at(_tile_rect, ShopArt.tex("glyph_gift"))
+		Step.TILE:
+			Sfx.play("ui_tap")
+			Haptics.tap()
+			step = Step.CARD
+			spotlight.show_card(_card_def())
 
 
 func _card_def() -> Dictionary:
@@ -226,21 +316,44 @@ func _card_def() -> Dictionary:
 	}
 
 
-## «Наверх»: сначала снять обучение и закрыть лавку (управление возвращается как было),
-## потом перенос — герой уже свободен и стоит на площадке.
-func _on_card_pressed() -> void:
+## «Наверх»: снять обучение и закрыть лавку (управление возвращается как было), потом
+## перенос — герой уже свободен и встаёт на площадку.
+func _on_card() -> void:
+	if step != Step.CARD:
+		return
 	var go := _hero_underground()
-	if tour != null and is_instance_valid(tour):
-		tour.complete()
-	if ShopUI.instance != null and ShopUI.instance.is_open():
-		ShopUI.instance.close()
-	if go and watch != null and TeleportWatch.use_free(watch.player):
+	_set_done()
+	_close_and_release()
+	if go and watch != null and TeleportWatch.use_free(_player()):
 		watch.pulse_button()
 
 
-func _on_tour_finished(skipped: bool) -> void:
+## ⏭ (или урок сорвался: смерть, дом, сброс) — обучение пройдено, подарок остаётся на плитке.
+func skip() -> void:
+	if not is_active():
+		return
+	_set_done()
+	_close_and_release()
+	var hud = _hud()
+	if TeleportWatch.free_uses() > 0 and GameState.is_alive and hud != null and hud.has_method("toast"):
+		hud.toast(TeleportWatch.text("skipped_toast"), 3.4)
+
+
+func _set_done() -> void:
 	TeleportWatch.set_lesson_state("done")
 	SaveSystem.save_game()
-	if skipped and TeleportWatch.free_uses() > 0 and watch != null and watch.hud != null \
-			and watch.hud.has_method("toast"):
-		watch.hud.toast(TeleportWatch.text("skipped_toast"), 3.4)
+
+
+## Сначала лавка: закрываясь, она возвращает «как было при открытии» (заморожено уроком),
+## и только потом урок возвращает своё «как было до урока».
+func _close_and_release() -> void:
+	spotlight.clear()
+	step = Step.IDLE
+	if ShopUI.instance != null and ShopUI.instance.is_open():
+		ShopUI.instance.close()
+	var p = _player()
+	if p != null and is_instance_valid(p):
+		p.set("frozen", _was_frozen or GameState.house_is_indoors)
+	var hud = _hud()
+	if hud != null and is_instance_valid(hud):
+		hud.set_process_input(_hud_input_was)

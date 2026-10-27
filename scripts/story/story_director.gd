@@ -360,7 +360,7 @@ func _player_underground() -> bool:
 func _play_next_if_idle() -> void:
 	if _playing or _resetting or cutscene == null:
 		return
-	if FocusTour.is_any_running():   # обучение «тень + стрелка» (scripts/guidance/focus_tour.gd): сцена подождёт
+	if GuideSpotlight.any_active():   # урок «затемнение + стрелка» (scripts/guidance/guide_spotlight.gd): сцена подождёт
 		return
 	if auto_dig != null and auto_dig.running and not auto_dig.paused:
 		return
@@ -588,7 +588,7 @@ func _modal_open() -> bool:
 		return true
 	if DeathWindow.is_open_any():   # сцена подождёт, пока игрок прочтёт окно смерти
 		return true
-	if FocusTour.is_any_running():   # идёт обучение «тень + стрелка»
+	if GuideSpotlight.any_active():   # идёт урок «затемнение + стрелка»
 		return true
 	return hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open()
 

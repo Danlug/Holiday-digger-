@@ -148,24 +148,19 @@ func _shoot_lesson() -> void:
 	s["lesson"] = ""
 	GameState.ext_set(TeleportWatch.KEY, s)
 	_tw.lesson.begin()
+	var lesson: TeleportLesson = _tw.lesson
 	var guard := 0
-	while not FocusTour.is_any_running() and guard < 600:
+	while not lesson.is_active() and guard < 600:
 		guard += 1
 		await _frames(1)
 	await _wait(0.6)
 	_shot("lesson_a_shop_button")
-	var tour: FocusTour = _tw.lesson.tour
-	var btn: Control = _main.hud.get("_shop_btn")
-	await _click(btn.get_global_rect().get_center())
+	await _click(lesson.target_rect().get_center())
 	await _wait(0.8)
 	_shot("lesson_b_watch_tile")
-	var tile := FocusTour._shop_tile("good:dollars:" + TeleportWatch.GOOD_ID)
-	if tile != null:
-		await _click(tile.get_global_rect().get_center())
+	await _click(lesson.target_rect().get_center())
 	await _wait(0.6)
 	_shot("lesson_c_card")
-	var cb := tour.card_button() if is_instance_valid(tour) else null
-	if cb != null:
-		await _click(cb.get_global_rect().get_center())
+	await _click(lesson.target_rect().get_center())
 	await _wait(1.2)
 	_shot("lesson_d_after")

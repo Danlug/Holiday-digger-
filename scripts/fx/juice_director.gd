@@ -431,12 +431,15 @@ func _item_icon(item: String) -> Texture2D:
 
 func _on_picked(item: String, count: int) -> void:
 	var rare := _is_rare(item)
-	Sfx.play("pickup_rare" if rare else "pickup")
+	# удачная находка (владелец 27.10, LuckJuice): тот же звук громче, «+N» крупнее
+	var lucky := LuckJuice.is_armed(item)
+	Sfx.play("pickup_rare" if rare else "pickup", 1.0, LuckJuice.sound_db() if lucky else 0.0)
 	if player == null:
 		return
 	var at := _head() + Vector2(randf_range(-7.0, 7.0), randf_range(-4.0, 2.0))
 	# подряд добытое одно и то же сливается в одно «+N» (aaa-feel); старые заглушки Fx метода не знают
-	Fx.float_stack(item, at, _item_icon(item), count, COL_RARE if rare else COL_ITEM, Feel.num("loot.stack_window_s", 0.75))
+	Fx.float_stack(item, at, _item_icon(item), count, COL_RARE if rare else COL_ITEM, Feel.num("loot.stack_window_s", 0.75),
+			LuckJuice.icon_scale() if lucky else 1.0)
 	Fx.burst("pickup_glint", at, 1.0 if rare else 0.6)
 	if rare:
 		Fx.burst("spark", at, 1.0)

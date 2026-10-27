@@ -54,6 +54,7 @@ func _ready() -> void:
 	_holder.mouse_filter = Control.MOUSE_FILTER_STOP
 	_holder.visible = false
 	add_child(_holder)
+	HudAnchors.join_left_column(_holder, 2)
 
 	var body := HouseArt.nine("tile_body", 5, Color(1, 1, 1, 0.92), Vector2(48, 48))
 	body.position = Vector2(2, 0)
@@ -122,6 +123,7 @@ func _enter_transit() -> void:
 	_ring.tint = Color(1.0, 0.85, 0.35)
 	_holder.modulate.a = 1.0
 	_holder.visible = true
+	_place()
 	if _shake != null:
 		_shake.kill()
 	_icon.rotation = 0.0
@@ -168,6 +170,7 @@ func _enter_done() -> void:
 func _process(delta: float) -> void:
 	if _holder == null or _state == "idle":
 		return
+	_place()
 	_state_t += delta
 	match _state:
 		"transit":
@@ -194,6 +197,13 @@ func _process(delta: float) -> void:
 					_finish()
 				else:
 					_enter_transit()
+
+
+## Под левым столбиком HUD (портрет, задания дня, бак бура и термометр), а не на жёстком
+## POS.y — там он накрывал бак бура (ветка hud-top 27.10). HUD скрыт (дом) — прежнее место.
+func _place() -> void:
+	_holder.position = Vector2(POS.x,
+		HudAnchors.left_column_bottom(2, POS.y - HudAnchors.COLUMN_GAP) + HudAnchors.COLUMN_GAP)
 
 
 func _finish() -> void:

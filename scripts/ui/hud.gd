@@ -54,6 +54,7 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
+const HUD_MARGIN := 8.0   # поле верхних кластеров от края; сверху к нему прибавляется вырез телефона
 const PILL_W := 78.0    # ширина таблеток кошелька (монеты, доллары, вес)
 const GAUGE_W := 62.0   # ширина полоски: правее остаётся место кошельку
 var _xp_bar: HudBar
@@ -297,10 +298,11 @@ func _build_gauges(parent: Control) -> void:
 	var box := VBoxContainer.new()
 	box.name = "Gauges"
 	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Герой» внутри
-	box.position = Vector2(8, 8)
+	box.position = Vector2(HUD_MARGIN, HUD_MARGIN)
 	box.add_theme_constant_override("separation", 4)
 	parent.add_child(box)
 	_gauges_box = box
+	HudAnchors.join_left_column(box, 0)   # бак бура и курьер встают под ним
 
 	var top := HBoxContainer.new()
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -312,7 +314,8 @@ func _build_gauges(parent: Control) -> void:
 	var bars := VBoxContainer.new()
 	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bars.add_theme_constant_override("separation", 3)
-	bars.alignment = BoxContainer.ALIGNMENT_CENTER
+	# От верха, как портрет и монеты справа: столбик героя с часами выше трёх полосок.
+	bars.alignment = BoxContainer.ALIGNMENT_BEGIN
 	top.add_child(bars)
 
 	_hp_bar = _make_gauge(bars, Color8(0xD9, 0x4F, 0x4A), "hp", "hp")
@@ -344,7 +347,13 @@ func _build_hero_button(parent: Control) -> void:
 	col.add_theme_constant_override("separation", 3)
 	parent.add_child(col)
 
-	_hero_button = UiBtn.icon_button(UiIcons.tex("hero"), Vector2(36, 36), UiBtn.Kind.NORMAL, 32)
+	# Лицо героя, а не значок «мальчик в каске» (владелец 27.10) — HudPortrait под бейджами.
+	# 38 — прежний фактический размер: значок 32 с полями плитки растягивал кнопку 36 до 38.
+	_hero_button = UiBtn.icon_button(null, Vector2(38, 38), UiBtn.Kind.NORMAL, 32)
+	var face := HudPortrait.new()
+	face.name = "Portrait"
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hero_button.add_child(face)
 	_hero_button.pressed.connect(func():
 		if Tip.swallowed():
 			return
@@ -395,6 +404,40 @@ func _build_hero_button(parent: Control) -> void:
 	_xp_bar.bar_h = 4.0
 	_xp_bar.bar_width = 36.0
 	col.add_child(_xp_bar)
+	_build_clock(col)
+
+
+## Часы — под портретом (владелец 27.10: «часы убери с правого верхнего угла под его
+## иконку»): там пустовало место рядом с полоской бодрости, а кошелёк справа теперь
+## начинается от верха экрана. Зачем они вообще (решение владельца, отчёт агента про
+## «время не течёт во дворе»): DayCycle.hour и раньше тикал на поверхности, но нигде не
+## показывался. Источник — /root/DayCycle, тот же, что у домашних часов (house_view.gd);
+## «День N» — в подсказке.
+func _build_clock(parent: Control) -> void:
+	var clock := HBoxContainer.new()
+	clock.name = "Clock"
+	clock.mouse_filter = Control.MOUSE_FILTER_PASS
+	clock.alignment = BoxContainer.ALIGNMENT_CENTER
+	clock.add_theme_constant_override("separation", 2)
+	parent.add_child(clock)
+	var clock_icon := TextureRect.new()
+	clock_icon.texture = UiIcons.tex("clock")
+	clock_icon.custom_minimum_size = Vector2(12, 12)
+	clock_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	clock_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	clock_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	clock_icon.modulate = Color(1, 1, 1, 0.75)
+	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock.add_child(clock_icon)
+	_clock_label = Label.new()
+	_clock_label.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
+	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	_clock_label.add_theme_constant_override("outline_size", 2)
+	_clock_label.add_theme_font_size_override("font_size", 9)
+	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock.add_child(_clock_label)
+	_clock_box = clock
+	_anchors["clock"] = clock
 
 
 ## Кнопка задания под героем (решение владельца). Баннер задания висел на
@@ -415,7 +458,9 @@ func _build_quest_button(parent: Control) -> void:
 	parent.add_child(row)
 
 
-## Кошелёк справа сверху: часы, монеты, доллары, вес рюкзака и витрина.
+## Кошелёк справа сверху: монеты, доллары, вес рюкзака и витрина — от верха
+## экрана (часы переехали под портрет, владелец 27.10; верх — HUD_MARGIN под
+## вырезом телефона, см. _update_layout).
 ## Плашки-«таблетки» с иконкой и числом с накруткой; точные суммы и названия —
 ## в подсказках. Вес — полоска, которая краснеет и пульсирует на перегрузе.
 func _build_purse(parent: Control) -> void:
@@ -424,38 +469,10 @@ func _build_purse(parent: Control) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Магазин» внутри
 	box.anchor_left = 1.0; box.anchor_right = 1.0
 	box.offset_left = -110; box.offset_right = -8
-	box.offset_top = 8
+	box.offset_top = HUD_MARGIN
 	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
 	_purse_box = box
-
-	# Часы (решение владельца, отчёт агента про "время не течёт во дворе"):
-	# DayCycle.hour и раньше честно тикал на поверхности, но нигде не
-	# показывался — без часов игрок не мог заметить, что время вообще идёт.
-	# Источник — /root/DayCycle, тот же, что у домашних часов (house_view.gd);
-	# слово «День N» — в подсказке.
-	var clock := HBoxContainer.new()
-	clock.mouse_filter = Control.MOUSE_FILTER_PASS
-	clock.size_flags_horizontal = Control.SIZE_SHRINK_END
-	clock.add_theme_constant_override("separation", 3)
-	box.add_child(clock)
-	var clock_icon := TextureRect.new()
-	clock_icon.texture = UiIcons.tex("clock")
-	clock_icon.custom_minimum_size = Vector2(12, 12)
-	clock_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	clock_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	clock_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	clock_icon.modulate = Color(1, 1, 1, 0.75)
-	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	clock.add_child(clock_icon)
-	_clock_label = Label.new()
-	_clock_label.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
-	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	_clock_label.add_theme_constant_override("outline_size", 2)
-	_clock_label.add_theme_font_size_override("font_size", 9)
-	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	clock.add_child(_clock_label)
-	_clock_box = clock
 
 	_coins_pill = _make_pill(box, "coin", Color8(0xE0, 0xA9, 0x3B), "coins")
 	_dollars_pill = _make_pill(box, "dollar", Color8(0x7F, 0xB8, 0x6B), "dollars")
@@ -1237,6 +1254,14 @@ func _place_objective() -> void:
 	if _gauges_box != null and _gauges_box.visible:
 		top = maxf(top, _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0)
 	_objective_panel.offset_top = top
+	# Бак бура, термометр и курьер стоят в левом столбике под портретом и рисуются своими
+	# слоями ВЫШЕ HUD: баннер, заходивший под них, терял начало строки — он встаёт правее.
+	var left := HUD_MARGIN
+	for n in get_tree().get_nodes_in_group(HudAnchors.LEFT_COLUMN) if is_inside_tree() else []:
+		var c := n as Control
+		if c != null and c.is_visible_in_tree() and int(c.get_meta(&"hud_column_rank", 0)) >= 1:
+			left = maxf(left, c.get_global_rect().end.x + 4.0)
+	_objective_panel.offset_left = left
 
 
 ## Ставит текст задания. Зовётся каждый кадр, поэтому разворачивает баннер
@@ -1384,7 +1409,11 @@ func _update_layout() -> void:
 	size = vp
 	_windows_root.position = Vector2.ZERO
 	_windows_root.size = vp
-	stick_r = maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
+	# Портрет и кошелёк — под вырезом телефона (остальное верхнее держится за них).
+	var safe_top := HudSafeArea.top(get_viewport())
+	_gauges_box.position.y = HUD_MARGIN + safe_top
+	_purse_box.offset_top = HUD_MARGIN + safe_top
+	stick_r =maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
 	knob_r = stick_r * 0.39
 	stage_rect = Rect2(0, 0, vp.x, vp.y - STRIP_H)
 	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
@@ -1417,6 +1446,8 @@ func _process(_dt: float) -> void:
 	if _objective_panel != null and _objective_panel.visible \
 			and Time.get_ticks_msec() > _objective_hide_at_msec:
 		_objective_panel.visible = false
+	if _objective_panel != null and _objective_panel.visible:
+		_place_objective()   # столбики над баннером растут без сигнала (кнопка заданий дня, курьер)
 	if player != null:
 		_stick.queue_redraw()
 		_knob.queue_redraw()
@@ -1681,7 +1712,11 @@ func _update_depth() -> void:
 	var screen_y: float = (player.y - current_cam.y) * TILE
 	var h := _depth_box.size.y
 	# Плашка на две клетки выше героя: на его уровне она закрывала монстров, подходящих справа.
-	_depth_box.position.y = clampf(screen_y - h * 0.5 - 2.0 * TILE, 116.0, stage_rect.size.y - h)
+	# Выше — не под кошелёк: его низ (раньше жёсткие 116 под столбиком с часами).
+	var top := _purse_box.position.y + _purse_box.size.y + 6.0
+	if _objective_panel != null and _objective_panel.visible:   # не под баннером задания (6 с)
+		top = maxf(top, _objective_panel.position.y + _objective_panel.size.y + 4.0)
+	_depth_box.position.y = clampf(screen_y - h * 0.5 - 2.0 * TILE, top, stage_rect.size.y - h)
 
 
 # ---------------------------------------------------------------------------

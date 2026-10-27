@@ -696,6 +696,8 @@ var ext: Dictionary = {}
 ##   slept          {hours: float, stamina: int, skipped: bool} — сон дома (ветка house)
 ##   food_ordered   {id: String, free: bool} / food_delivered {id: String} — заказ еды и приезд курьера
 ##   stored         {item: String, count: int, dir: String} — dir "put" на склад / "take" в рюкзак
+##                  (remote: true — выгрузка на склад издалека, scripts/shop/premium_unload.gd)
+##   premium_unload {count: int, weight: float, free: bool} — выгрузка на склад за доллары (free — первый раз в уроке)
 ##   chest_opened   {cell: Vector2i, tier: String, items: Dictionary, xp: int} — открыт тайник (scripts/mechanics)
 ##   fever_started  {seconds: float, stage: int} / fever_ended {} — жадность азарта: N секунд копка с первого удара, ход ×7, руда вдвое
 ##   mastery_star   {item: String, star: int, xp: int} — звезда мастерства породы

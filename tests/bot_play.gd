@@ -586,6 +586,11 @@ func _dismiss_modals() -> void:
 	if hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open():
 		open.append("more_menu")
 		hud.close_more_menu()
+	# Сцена «выгрузка на склад» на 150 (раунд 6): человек жмёт туда, куда показывает стрелка.
+	var unload := PremiumUnloadLesson.instance
+	if unload != null and is_instance_valid(unload) and unload.is_active() and unload.target_rect().has_area():
+		open.append("unload_lesson")
+		_tap(unload.target_rect().get_center())
 	if WellReport.is_open() and is_instance_valid(hud):
 		open.append("well_report")
 		hud.close_well_report()
@@ -1394,8 +1399,8 @@ func _should_return() -> String:
 	return ""
 
 
-## Чем дома поднять HP: с раунда 4 лечат сон и еда, аптечка продаётся за монеты, таблетка за
-## доллары — полное восстановление (ГДД §7 «Лечение»). Сон есть всегда — лечиться есть чем.
+## Чем дома поднять HP: с раунда 4 лечат сон и еда, аптечка продаётся за монеты (ГДД §7
+## «Лечение»; таблетку за доллары сняли в раунде 6). Сон есть всегда — лечиться есть чем.
 func _can_heal() -> bool:
 	return true
 
@@ -2429,13 +2434,8 @@ func _heal_at_home() -> void:
 				if GameState.hp <= before:
 					T.finding("P1", "medkit", "аптечка применена, а HP не выросло (%.0f → %.0f)" % [before, GameState.hp], _sim)
 				return
-		var r := ShopService.buy("full_restore_pill", "dollars")
-		if bool(r.get("ok", false)):
-			T.event(_sim, "heal", "таблетка: HP %.0f → %.0f" % [before, GameState.hp])
-			T.purchases.append({"t": snappedf(_sim, 0.1), "id": "full_restore_pill", "kind": "good", "price": 0, "dollars": true})
-			return
-	T.finding("P2", "no_heal", "HP %.0f/%.0f после сна, а лечиться нечем: на аптечку нет монет (%d), на таблетку — долларов (%d)" % [
-		GameState.hp, GameState.get_max_hp(), GameState.coins, GameState.dollars], _sim, {}, "no_heal")
+	T.finding("P2", "no_heal", "HP %.0f/%.0f после сна, а лечиться нечем: на аптечку нет монет (%d)" % [
+		GameState.hp, GameState.get_max_hp(), GameState.coins], _sim, {}, "no_heal")
 
 
 ## Порядок веток навыков стратегии: только существующие в data/upgrades.json, остальные — в конце

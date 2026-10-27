@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ch8koyt18kq"
-path="res://.godot/imported/item_full_restore_pill.png-4b115f4daabeac9ac66dd523449ff547.ctex"
+uid="uid://bci844kwvab6v"
+path="res://.godot/imported/item_premium_unload.png-6034cb9de386351abff221812b4db67d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/ui/shop/item_full_restore_pill.png"
-dest_files=["res://.godot/imported/item_full_restore_pill.png-4b115f4daabeac9ac66dd523449ff547.ctex"]
+source_file="res://art/ui/shop/item_premium_unload.png"
+dest_files=["res://.godot/imported/item_premium_unload.png-6034cb9de386351abff221812b4db67d.ctex"]
 
 [params]
 

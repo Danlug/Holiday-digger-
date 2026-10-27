@@ -267,8 +267,8 @@ func _test_outside_door_denied() -> void:
 ## землёй при пустом лимите: без ролика, счётчик «N/3» не тронут.
 func _test_dollars_anywhere() -> void:
 	var ids: Array = ShopCatalog.goods_dollars().map(func(g): return String(g["id"]))
-	check("товары за доллары: батончик, часы, таблетка",
-		ids.has("energy_bar") and ids.has("teleport_watch") and ids.has("full_restore_pill"))
+	check("товары за доллары: батончик, часы, выгрузка на склад (таблетки нет — раунд 6)",
+		ids.has("energy_bar") and ids.has("teleport_watch") and ids.has("premium_unload") and not ids.has("full_restore_pill"))
 	var bought: Array = []
 	var on_event := func(id: StringName, data: Dictionary) -> void:
 		if id == &"bought":
@@ -281,6 +281,7 @@ func _test_dollars_anywhere() -> void:
 			for i in ShopRemote.limit():
 				ShopRemote.watch_ad()
 		var used := ShopRemote.used_today()
+		GameState.add_item("iron_ore", 2)   # выгрузке на склад есть что отправить (раунд 6)
 		var g := ShopService.can_buy({"kind": "good", "currency": "dollars"})
 		check("%s: за доллары можно, без ролика" % place,
 			bool(g["ok"]) and not bool(g["needs_ad"]) and String(g["reason"]) == "")
@@ -305,7 +306,8 @@ func _test_dollars_anywhere() -> void:
 	_fresh()
 	_place("garden")
 	GameState.dollars = 0
-	var poor := ShopService.buy("full_restore_pill", "dollars")
+	GameState.add_item("iron_ore", 1)
+	var poor := ShopService.buy("premium_unload", "dollars")
 	check("без долларов — отказ про доллары, а не про место", not bool(poor["ok"]) and String(poor["message"]).contains("доллар"))
 
 
@@ -592,12 +594,13 @@ func _test_ui_flow() -> void:
 
 	# Без роликов витрина за доллары работает как дома у двери (раунд 4).
 	ui._notice_panel.visible = false
+	GameState.add_item("iron_ore", 1)   # выгрузке есть что отправить
 	ui.open(ShopUI.SCREEN_PREMIUM)
-	var pill: ShopTile = ui._tiles["good:dollars:full_restore_pill"]
-	check("шахта без роликов: таблетка без замка и «N/3»", String(pill.offer["state"]) == "available" \
+	var pill: ShopTile = ui._tiles["good:dollars:premium_unload"]
+	check("шахта без роликов: выгрузка без замка и «N/3»", String(pill.offer["state"]) == "available" \
 		and not pill._corner_tr.visible and not pill._corner_tl.visible and String(pill.offer.get("count_text", "")) == "")
 	ui._on_tile_pressed(pill.offer, pill)
-	check("тап по таблетке открыл карточку", ui._card != null)
+	check("тап по выгрузке открыл карточку", ui._card != null)
 	var pill_ad_glyph := false
 	if ui._card_ok != null:
 		for c in ui._card_ok.get_children():
@@ -606,7 +609,7 @@ func _test_ui_flow() -> void:
 	check("на кнопке покупки за доллары значка ролика нет", not pill_ad_glyph)
 	var dollars_before := GameState.dollars
 	ui._confirm_card()
-	check("таблетка куплена за доллары, счётчик роликов тот же",
+	check("выгрузка куплена за доллары, счётчик роликов тот же",
 		GameState.dollars == dollars_before - int(pill.offer["price"]) and ShopRemote.used_today() == ShopRemote.limit())
 	ui.close()
 

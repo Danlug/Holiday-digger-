@@ -454,6 +454,10 @@ static func _good_offer(g: Dictionary, currency: String) -> Dictionary:
 	o["body"] = String(g.get("desc_ru", ""))
 	o["effects"] = good_effects(g)
 	_priced(o, currency, price)
+	if String(g.get("effect", "")) == PremiumUnload.EFFECT and not PremiumUnload.can_unload():
+		# Выгрузка при пустом рюкзаке: тусклая, без замка — нечего отправлять (раунд 6).
+		o["state"] = "poor"
+		o["extra"] = "Рюкзак пуст: отправлять нечего"
 	var depth := int(Balance.unwrap(g.get("unlock_depth", 0)))
 	if depth > GameState.max_depth_reached:
 		_locked(o, "Откроется на глубине %d" % depth, {"icon": ShopArt.tex("glyph_depth"),
@@ -481,10 +485,10 @@ static func good_effects(g: Dictionary) -> Array:
 			var hp := Healing.food_hp_percent(String(g.get("id", "")))   # еда лечит (раунд 4)
 			if hp > 0:
 				out.append({"icon": ShopArt.ui("icon_hp"), "text": "+%d" % hp})
-		"full_restore":
-			out.append({"icon": ShopArt.ui("icon_hp"), "text": "100"})
-			out.append({"icon": ShopArt.ui("icon_stamina"), "text": "100"})
-			out.append({"icon": ShopArt.ui("icon_hunger"), "text": "100"})
+		"premium_unload":
+			# Сколько улетит: рюкзак → склад, число штук (раунд 6).
+			out.append({"icon": ShopArt.ui("icon_backpack"), "text": "×%d" % PremiumUnload.movable_count()})
+			out.append(_eff("glyph_storage", ""))
 		"teleport_home":
 			out.append(_eff("glyph_house", ""))
 		"grant_item":

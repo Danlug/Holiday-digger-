@@ -142,6 +142,17 @@ static func open_premium() -> void:
 	instance.open(SCREEN_PREMIUM)
 
 
+## Витрина за доллары сразу с карточкой товара: кнопка «на склад» в рюкзаке
+## (раунд 6) ведёт к той же карточке с ценой, что и плитка, — без второй кассы.
+static func open_premium_good(good_id: String) -> void:
+	if instance == null:
+		return
+	instance.open(SCREEN_PREMIUM)
+	var t: ShopTile = instance._tiles.get("good:dollars:" + good_id)
+	if t != null:
+		instance._on_tile_pressed(t.offer, t)
+
+
 func _ready() -> void:
 	instance = self
 	layer = 20  # выше HUD: шторка обязана перекрывать джойстик и нижнюю полосу
@@ -1331,6 +1342,9 @@ func _confirm_card() -> void:
 	var t: ShopTile = _tiles.get(String(offer["key"]))
 	if t != null and not result.has("craft_fx"):
 		_after_snap(t, ShopArt.COL_GOLD if String(offer["kind"]) != "recipe" else ShopArt.COL_GOOD)
+	if result.has("unload"):   # выгрузка на склад (раунд 6): добыча летит из плитки домой
+		PremiumUnloadFx.play(self, t.get_global_rect().get_center() if t != null else Vector2(112, 240),
+			result["unload"].get("moved", {}))
 
 
 ## Единая точка вызова торговой логики для всех видов плиток.

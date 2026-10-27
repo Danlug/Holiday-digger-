@@ -111,6 +111,9 @@ func _start_autosave_timer() -> void:
 
 signal exhausted_changed(exhausted: bool)
 signal survival_warning(bar: String, severe: bool)
+## Урон по герою (после брони): source и info — как у take_damage. Голод и лава
+## приходят каплями каждый кадр — отклик (HurtJuice) сам решает, что из этого «удар».
+signal damaged(amount: float, source: String, info: Dictionary)
 
 var is_exhausted: bool = false
 # Что уже показали, чтобы не мигать красным каждый кадр. Сбрасывается, когда
@@ -200,6 +203,7 @@ func take_damage(amount: float, source: String = "", info: Dictionary = {}) -> v
 		return
 	hp = clamp(hp - amount, 0.0, get_max_hp())
 	hp_changed.emit(hp, get_max_hp())
+	damaged.emit(amount, source, info)
 	if hp <= 0.0:
 		die(DeathCause.make(source, info))
 
@@ -696,6 +700,8 @@ var ext: Dictionary = {}
 ##   slept          {hours: float, stamina: int, skipped: bool} — сон дома (ветка house)
 ##   food_ordered   {id: String, free: bool} / food_delivered {id: String} — заказ еды и приезд курьера
 ##   stored         {item: String, count: int, dir: String} — dir "put" на склад / "take" в рюкзак
+##                  (remote: true — выгрузка на склад издалека, scripts/shop/premium_unload.gd)
+##   premium_unload {count: int, weight: float, free: bool} — выгрузка на склад за доллары (free — первый раз в уроке)
 ##   chest_opened   {cell: Vector2i, tier: String, items: Dictionary, xp: int} — открыт тайник (scripts/mechanics)
 ##   fever_started  {seconds: float, stage: int} / fever_ended {} — жадность азарта: N секунд копка с первого удара, ход ×7, руда вдвое
 ##   mastery_star   {item: String, star: int, xp: int} — звезда мастерства породы

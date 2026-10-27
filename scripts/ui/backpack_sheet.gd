@@ -42,6 +42,7 @@ var _weight_text: Label
 var _total_pill: HudPill
 var _eat_btn: Button
 var _drop_btn: Button
+var _unload_btn: Button   # «всё на склад» за доллары (раунд 6, PremiumUnload)
 var _empty_hint: TextureRect
 
 var _closing: bool = false   # шторка уходит (анимация): по смыслу уже закрыта
@@ -322,6 +323,13 @@ func _build() -> void:
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	foot.add_child(sp)
+	# Выгрузка на склад (раунд 6): та же карточка с ценой, что в витрине за доллары.
+	_unload_btn = UiBtn.icon_button(ShopArt.item_icon(PremiumUnload.ID), Vector2(34, 30), UiBtn.Kind.NORMAL, 22)
+	_unload_btn.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		ShopUI.open_premium_good(PremiumUnload.ID))
+	foot.add_child(_unload_btn)
 	_eat_btn = UiBtn.icon_button(UiIcons.tex("eat"), Vector2(34, 30), UiBtn.Kind.ACCENT)
 	Tip.bind(_eat_btn, "Съесть", "Голод и бодрость вернутся")
 	_eat_btn.pressed.connect(func():
@@ -432,6 +440,11 @@ func _select(id: String) -> void:
 
 
 func _refresh_actions() -> void:
+	# Только под землёй: дома склад в двух шагах и кладётся бесплатно (ГДД п.14).
+	_unload_btn.visible = PremiumUnload.can_unload() and GameState.player_depth > 0 and not GameState.house_is_indoors
+	var g := ShopCatalog.good(PremiumUnload.ID, "dollars")
+	Tip.bind(_unload_btn, String(g.get("name_ru", "На склад")), "Вся добыча — сразу на склад дома: %d шт. Еда, аптечка и топливо остаются" \
+		% PremiumUnload.movable_count(), "%d $" % ShopCatalog.good_price(g, "dollars"))
 	var has := _selected != ""
 	_drop_btn.modulate = Color(1, 1, 1, 1.0 if has else 0.4)
 	var medkit := Healing.is_medkit(_selected)

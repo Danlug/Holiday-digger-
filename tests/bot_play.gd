@@ -591,6 +591,11 @@ func _dismiss_modals() -> void:
 	if unload != null and is_instance_valid(unload) and unload.is_active() and unload.target_rect().has_area():
 		open.append("unload_lesson")
 		_tap(unload.target_rect().get_center())
+	# Обучение часам-телепорту на 200 (27.10): тоже жмёт туда, куда стрелка, и «Наверх» в карточке.
+	var tlesson := TeleportLesson.instance
+	if tlesson != null and is_instance_valid(tlesson) and tlesson.is_active() and tlesson.target_rect().has_area():
+		open.append("teleport_lesson")
+		_tap(tlesson.target_rect().get_center())
 	if WellReport.is_open() and is_instance_valid(hud):
 		open.append("well_report")
 		hud.close_well_report()

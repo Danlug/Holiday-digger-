@@ -360,6 +360,8 @@ func _player_underground() -> bool:
 func _play_next_if_idle() -> void:
 	if _playing or _resetting or cutscene == null:
 		return
+	if GuideSpotlight.any_active():   # урок «затемнение + стрелка» (scripts/guidance/guide_spotlight.gd): сцена подождёт
+		return
 	if auto_dig != null and auto_dig.running and not auto_dig.paused:
 		return
 	if diary_ui != null and diary_ui.is_open:
@@ -538,6 +540,11 @@ func _enqueue_depth_scene() -> void:
 	if due.is_empty():
 		return
 	for i in range(due.size() - 1):
+		# Сцена-обучение ("lesson": true, часы-телепорт на 200) не пропускается тихо: за ней
+		# подарок и обучение, их нельзя потерять из-за перелёта сразу через два порога.
+		if bool(StoryData.scene(String(due[i])).get("lesson", false)):
+			StoryState.enqueue(due[i])
+			continue
 		StoryState.mark_seen(due[i])
 	StoryState.enqueue(due.back())
 
@@ -580,6 +587,8 @@ func _modal_open() -> bool:
 	if ProgressScreen.is_open():
 		return true
 	if DeathWindow.is_open_any():   # сцена подождёт, пока игрок прочтёт окно смерти
+		return true
+	if GuideSpotlight.any_active():   # идёт урок «затемнение + стрелка»
 		return true
 	return hud != null and hud.has_method("is_more_menu_open") and hud.is_more_menu_open()
 

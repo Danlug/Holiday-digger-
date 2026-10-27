@@ -41,6 +41,7 @@ const TUNNEL_WALL_RIGHT := 18   # правая стена, железобето�
 const TUNNEL_DEPTH := 4         # уровни 1..4, до самого фундамента
 const FUEL_STATION_X := 22      # левая клетка станции заправки (data/tech.json → fuel.station_x_cells)
 const WELL_X := 27              # левая клетка буровой скважины (две клетки шириной)
+const TELEPORT_PAD_X := 20      # площадка часов-телепорта: между парковкой бурмобиля (18) и станцией (scripts/teleport/)
 # Площадка под пробитым фундаментом: на сколько уровней ниже фундамента
 # расчищается приямок шириной со стены тоннеля (см. build_robert_tunnel).
 const TUNNEL_LANDING_HEIGHT := 2
@@ -552,6 +553,9 @@ func garden_decor_at(x: int) -> String:
 	# Площадки под станцию заправки и скважину (ветка «Техника») — по две клетки и по
 	# одной запасной с каждой стороны: деревья шире клетки и залезли бы на объект.
 	if (x >= FUEL_STATION_X - 1 and x < FUEL_STATION_X + 3) or (x >= WELL_X - 1 and x < WELL_X + 3):
+		return ""
+	# Площадка часов-телепорта — плита на траве; декор поверх неё торчал бы из-под героя.
+	if x == TELEPORT_PAD_X:
 		return ""
 	if _roll(x, 0, "garden_decor_has", 0) > GARDEN_DECOR_DENSITY:
 		return ""

@@ -612,7 +612,8 @@ func _check_quests() -> void:
 		var targets: Array = t.get("targets", [])
 		var min_tier := int(t.get("min_tier", 0))
 		var max_tier := mini(int(t.get("max_tier", targets.size() - 1)), targets.size() - 1)
-		if targets.size() < tier_depth.size():
+		# fixed_target — цель словами владельца на все ступени («посмотри рекламу 5 / 25 раз»).
+		if targets.size() < tier_depth.size() and not t.has("fixed_target"):
 			add("error", where, "целей %d, а ступеней игрока %d" % [targets.size(), tier_depth.size()])
 		if not f.has("item"):
 			continue

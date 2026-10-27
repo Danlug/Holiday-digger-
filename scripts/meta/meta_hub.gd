@@ -288,9 +288,9 @@ func _build_tasks() -> void:
 		_vbox.add_child(lock)
 		return
 	_vbox.add_child(_section_head("calendar", "Ежедневные", "Новые задания каждый день в полночь. Справа — время до обновления.", "day"))
+	_vbox.add_child(_bonus_card())
 	for q in daily:
 		_vbox.add_child(_quest_card(q))
-	_vbox.add_child(_bonus_card())
 	var sp := Control.new()
 	sp.custom_minimum_size = Vector2(0, 4)
 	_vbox.add_child(sp)
@@ -330,7 +330,8 @@ func _quest_card(q: Dictionary) -> Control:
 		g.modulate = Color(0.55, 0.55, 0.55)
 	holder.add_child(g)
 	if claimed:
-		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 18)
+		# Забранная миссия дня — её звезда (как в окне заданий), недельная — галочка.
+		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("star" if String(q["kind"]) == "daily" else "check"), 18)
 		ck.position = Vector2(20, 20)
 		holder.add_child(ck)
 	h.add_child(holder)
@@ -346,7 +347,15 @@ func _quest_card(q: Dictionary) -> Control:
 	bar.text = "%s/%s" % [MetaUiKit.compact(mini(int(q["progress"]), target)), MetaUiKit.compact(target)]
 	bar.fill_color = MetaUiKit.GREEN if done else MetaUiKit.GOLD
 	mid.add_child(bar)
-	mid.add_child(MetaUiKit.reward_row(q["reward"], 12, 9))
+	# Награда с долларом (недельное) рядом с «Забрать» и «×2» не влезает в ширину
+	# экрана: ряд значков обрезается справа, а не раздвигает плитку за край
+	# (полностью она — в подсказке).
+	var rr_box := ScrollContainer.new()
+	rr_box.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	rr_box.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rr_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rr_box.add_child(MetaUiKit.reward_row(q["reward"], 12, 9))
+	mid.add_child(rr_box)
 	h.add_child(mid)
 
 	var qid := String(q["id"])
@@ -386,12 +395,9 @@ func _claim_quest_ad(qid: String, from: Control) -> void:
 		Sfx.play("ui_deny")
 
 
+## Сундук звёзд: шкала звёзд дня (0…13, засечка на 10) и что в сундуке.
 func _bonus_card() -> Control:
 	var ds: Array = MetaState.sub("quests")["daily"]
-	var claimed_n := 0
-	for q in ds:
-		if bool(q["claimed"]):
-			claimed_n += 1
 	var ready := QuestEngine.bonus_ready()
 	var taken := bool(MetaState.sub("quests")["bonus_claimed"])
 	var card := PanelContainer.new()
@@ -403,24 +409,25 @@ func _bonus_card() -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 6)
 	card.add_child(h)
-	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("gift"), 32)
+	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("chest_open" if (ready or taken) else "chest"), 32)
 	if taken:
 		ic.modulate = Color(0.55, 0.55, 0.55)
 	h.add_child(ic)
-	var pips := HBoxContainer.new()
-	pips.add_theme_constant_override("separation", 3)
-	pips.alignment = BoxContainer.ALIGNMENT_CENTER
-	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for i in range(maxi(3, ds.size())):
-		var pip := ColorRect.new()
-		pip.custom_minimum_size = Vector2(9, 9)
-		pip.color = MetaUiKit.GREEN if i < claimed_n else Color(0.18, 0.15, 0.12)
-		pips.add_child(pip)
-	h.add_child(pips)
+	var mid := VBoxContainer.new()
+	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mid.alignment = BoxContainer.ALIGNMENT_CENTER
+	mid.add_theme_constant_override("separation", 3)
+	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var track := MetaStarTrack.new()
+	track.custom_minimum_size = Vector2(0, 13)
+	track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	track.total = maxi(1, ds.size())
+	track.needed = QuestEngine.stars_needed()
+	track.stars = QuestEngine.stars_today()
+	mid.add_child(track)
 	var reward := QuestEngine.bonus_reward()
-	var rr := MetaUiKit.reward_row(reward, 12, 9)
-	rr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h.add_child(rr)
+	mid.add_child(MetaUiKit.reward_row(reward, 12, 9))
+	h.add_child(mid)
 	if ready:
 		var claim := _cta("check", Vector2(30, 32), MetaUiKit.GREEN_BTN)
 		claim.pressed.connect(func() -> void:
@@ -431,11 +438,12 @@ func _bonus_card() -> Control:
 			if bool(res["ok"]):
 				MetaFx.claim(get_tree(), origin, res["reward"], true, _anchors(), true)
 				_after_claim())
-		Tip.bind(claim, "Забрать бонус дня")
+		Tip.bind(claim, "Открыть сундук звёзд")
 		h.add_child(claim)
 	elif taken:
 		h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("check"), 22))
-	Tip.bind(card, "Бонус дня", "Забери награды за все ежедневные задания — и получишь подарок.", MetaRewards.describe(reward))
+	Tip.bind(card, "Сундук звёзд", "За каждую забранную миссию дня — звезда. %d звёзд открывают сундук." % QuestEngine.stars_needed(),
+		MetaRewards.describe(reward))
 	return card
 
 

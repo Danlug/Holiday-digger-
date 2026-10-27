@@ -629,7 +629,15 @@ func try_use_ad_reward(ad_id: String) -> bool:
 	if used >= limit:
 		return false
 	ad_daily_counts[ad_id] = used + 1
+	note_ad_watched(ad_id)
 	return true
+
+
+## Досмотренный ролик любой точки показа (лавка, «×2», замена задания, сон,
+## скважина, покупки из шахты) — событие шины ad_watched. На нём держатся миссии
+## «посмотри рекламу 5 / 25 раз» (ГДД §17.2). Лимит считает вызывающий.
+func note_ad_watched(ad_id: String) -> void:
+	emit_event(&"ad_watched", {"placement": ad_id})
 
 
 # ---------------------------------------------------------------------------
@@ -717,6 +725,7 @@ var ext: Dictionary = {}
 ##   ate            {id: String, hunger: float, stamina: float, hp: float} — герой поел (рюкзак или стол дома,
 ##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
 ##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
+##   ad_watched     {placement: String} — досмотрен rewarded-ролик любой точки показа (note_ad_watched)
 ##   hospital       {coins: int} — смерть: плата больнице (5% монет, от 50 до 5000, не в минус), перед сигналом died;
 ##                  причина и потерянное — GameState.death_cause / death_lost
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)

@@ -43,6 +43,7 @@ var _greed_was := false
 var _last_pos := Vector2.INF   # где герой был в прошлом кадре (клетки): туман по пути жадности
 var _hold_left := 0.0
 var _hold_cached := false
+var _fall_hooked := false   # подписка на остановки падения героя в жадности (Player.greed_fall_stopped)
 
 
 func _ready() -> void:
@@ -140,6 +141,9 @@ func _process(delta: float) -> void:
 func step(dt: float) -> void:
 	if player == null or not is_instance_valid(player):
 		return
+	if not _fall_hooked and player.has_signal("greed_fall_stopped"):
+		_fall_hooked = true
+		player.connect("greed_fall_stopped", _on_greed_fall_stop)
 	streak.set_stage(GreedRules.stage())
 	var digging: bool = player.get("digging") != null
 	var allowed := _streak_allowed()
@@ -327,6 +331,17 @@ func _on_fever_started() -> void:
 	Feel.punch(0.03)
 	GameState.emit_event(&"fever_started", {"seconds": streak.greed_s, "stage": streak.stage})
 	fever_started.emit()
+
+
+## Герой «зацепился» в падении (владелец 27.10): облачко и искра у ног, лёгкий стук
+## подошвы о стенку — без тостов и слов, отклик короче самой остановки.
+func _on_greed_fall_stop() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var feet := Vector2(float(player.x) * 32.0, (float(player.y) + 0.33) * 32.0)
+	Fx.burst("poof", feet, 0.45)
+	Fx.burst("spark", feet, 0.4, COL_GOLD)
+	Sfx.play("step_stone", 1.25, -7.0)
 
 
 func _on_fever_ended() -> void:

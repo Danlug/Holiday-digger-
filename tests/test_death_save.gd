@@ -84,6 +84,7 @@ func _close(m: Node2D) -> void:
 
 func _test_coalesce() -> void:
 	check("вне веба переноса в IndexedDB нет (flush_to_storage → 0)", SaveSystem.flush_to_storage("test") == 0)
+	check("вне веба перенос движка не трогаем (install_web_sync → 0)", SaveSystem.install_web_sync() == 0)
 	SaveSystem.save_at_frame_end("a")
 	SaveSystem.save_at_frame_end("b")
 	check("две просьбы за кадр — одна запись, причина первой", SaveSystem._pending_reason == "a")

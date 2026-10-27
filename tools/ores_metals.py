@@ -25,7 +25,7 @@ tools/sprite_kit.py и tools/gen_tiles_deep.py не правятся. Замен
 
 Цветовая карта (средний Lab тела залежи: L a b — то, на что настроены лесенки; check_ores требует ΔE >= 20 между
 соседями и >= 20 до грунта каждого пояса, поэтому цвета брифа сдвинуты там, где иначе не пройти):
-  серебро 88 -1 -4 | платина 79 20 -15 | алюминий 68 -1 -7 | ртуть 64 -17 -23 | свинец 50 4 -16 | титан 49 20 -38
+  серебро 88 -1 -4 | платина 67 5 -28 | алюминий 68 -1 -7 | ртуть 64 -17 -23 | свинец 50 4 -16 | титан 49 20 -38
   никель 60 -17 21 | железо 42 26 26 | медь 60 25 36 | золото 72 12 61 | металлолом 50 -1 11 | торф 18 -12 20
   уголь 7 -2 4 | уран 66 -41 47 | литий 65 35 -20
 Значок серебра, меди, торфа и угля нарисован контрастнее тайла (метрика меряет только тайл, значок — читаемость в 16-24 ед.);
@@ -352,7 +352,8 @@ class Pic:
 
 R_SILVER = ramp(262, 9, [40, 66, 81, 91, 96, 98, 100, 100], dh_dark=-14, dh_light=10, spec=(255, 255, 255))
 R_ALU = ramp(270, 8, [40, 55, 64, 71, 77, 82, 87, 93], dh_dark=-8, dh_light=0)
-R_PLAT = ramp(332, 42, [52, 66, 76, 84, 90, 94, 97, 100], dh_dark=-14, dh_light=6, spec=(255, 255, 255))
+R_PLAT = ramp(288, 48, [25, 41, 57, 70, 79, 88, 95, 100], dh_dark=-6, dh_light=-12, c_dark=0.9, c_light=0.8,
+              spec=(255, 255, 255))
 R_MERC = ramp(234, 44, [20, 33, 45, 56, 64, 72, 86, 100], dh_dark=-8, dh_light=4, spec=(255, 255, 255))
 R_LEAD = ramp(285, 20, [18, 29, 38, 45, 52, 59, 66, 76], dh_dark=-4, dh_light=0)
 R_TITAN = ramp(288, 62, [20, 31, 42, 51, 59, 69, 80, 92], dh_dark=-14, dh_light=40)
@@ -417,32 +418,6 @@ def _plate(p, cx, cy, r, rot, rp, thick=2, squash=0.62, crease=None):
         p.paint(m, rp[3])
         p.paint(shifted(m, 0, 1) & erode(face) & ~m, rp[6])
     return face
-
-
-def _shard(p, cx, cy, length, width, rot, rp, skew=0.34):
-    """Острый ромб-осколок из четырёх граней: свет с верхней левой."""
-    T = (0, -length / 2)
-    R = (width / 2, -length / 2 + skew * length)
-    B = (0, length / 2)
-    Lf = (-width / 2, -length / 2 + skew * length)
-    C = (0, -length / 2 + skew * length)
-
-    def tf(q):
-        return rot_pts([(cx + q[0], cy + q[1])], cx, cy, rot)[0]
-    t, r, b, l, c = (tf(q) for q in (T, R, B, Lf, C))
-    mask = poly([t, r, b, l])
-    p.ring(mask, rp[0])
-    p.paint(mask, rp[4])
-    p.paint(poly([t, l, c]), rp[6])
-    p.paint(poly([t, r, c]), rp[5])
-    p.paint(poly([l, c, b]), rp[4])
-    p.paint(poly([r, c, b]), rp[2])
-    # ребро-блик по верхнему левому краю и по центральной оси
-    p.line(t, l, rp[7], clip=mask)
-    p.line(l, b, rp[6], clip=mask)
-    p.line(t, c, rp[5], clip=mask)
-    p.px(int(round((t[0] + l[0]) / 2 + 0.4)), int(round((t[1] + l[1]) / 2 + 0.4)), rp[7])
-    return mask
 
 
 def _facet_poly(p, pts, rp, base=4.0, gain=3.2, lo=1, hi=6, edge=None, apex=(0.0, 0.0), tones=None):
@@ -515,13 +490,23 @@ def aluminium_tile():
     return p.sprite()
 
 
-def platinum_tile():
+def _plat_pic(chunks, seed):
+    """Самородная платина: тяжёлые бугристые зёрна стального тона, хромовая полоса отражения, тёмные раковины
+    и белый блик. Без граней и искр — это язык самоцветов."""
     p = Pic()
-    _shard(p, 20.5, 19.5, 11, 6, 0.62, R_PLAT)
-    _shard(p, 14, 14.5, 20, 9.5, -0.34, R_PLAT)
-    _shard(p, 7.5, 24, 8, 4.6, -0.95, R_PLAT)
-    p.sparkle(23, 7, 2, (255, 255, 255), (240, 225, 255))
-    return p.sprite()
+    k = dict(lo=-0.6, hi=1.0, spec_k=22, spec_thr=0.9, bounce=0.3, dither=0.3)
+    for i, (x, y, rx, ry, rot) in enumerate(chunks):
+        tex = (vnoise(seed + i, 2.0) - 0.5) * 0.20
+        # отражение «горизонта», как на полированном металле: светлая полоса, под ней резкая тёмная
+        st = ((x + y - 5.0, 2.0, 0.4), (x + y + 0.0, 2.0, -0.9), (x + y + 2.0, 1.0, -0.45)) if rx >= 4 else ()
+        m = _nugget(p, x, y, rx, ry, rot, R_PLAT, seed + i, 0.2, harm=5, pw=2.1, tex=tex, streaks=st, **k)
+        _speck(p, m, R_PLAT, seed + 20 + i, 1 + int(rx * 0.7), 2)
+    return p
+
+
+def platinum_tile():
+    return _plat_pic([(13.0, 16.5, 7.4, 6.2, -0.35), (23.5, 21.5, 4.6, 4.0, 0.4), (22.5, 9.0, 3.6, 3.0, 0.1),
+                      (6.5, 26.0, 2.4, 2.0, 0.3), (7.0, 7.0, 2.1, 1.8, 0.0)], 301).sprite()
 
 
 def _bead(p, cx, cy, r, rp):
@@ -1041,12 +1026,8 @@ def nickel_icon():
 
 
 def platinum_icon():
-    p = Pic()
-    _shard(p, 20.0, 19.0, 12, 7, 0.6, R_PLAT)
-    _shard(p, 13.0, 15.0, 24, 12, -0.32, R_PLAT)
-    p.sparkle(26, 6, 2, (255, 255, 255), (240, 225, 255))
-    p.sparkle(5, 24, 1, (255, 255, 255), (240, 225, 255))
-    return p.sprite(shadow=False)
+    return _plat_pic([(13.5, 16.5, 10.0, 8.4, -0.35), (25.0, 23.5, 5.4, 4.6, 0.4), (24.0, 8.5, 4.4, 3.8, 0.1),
+                      (5.0, 27.5, 2.4, 2.0, 0.3)], 311).sprite(shadow=False)
 
 
 def mercury_icon():

@@ -116,11 +116,13 @@ func _ready() -> void:
 	canvas.add_child(hud)
 	hud.set_player(player)
 
+	var loaded_dead := not GameState.is_alive   # до респавна: умерший встаёт дома, а не там, где упал
 	if not GameState.is_alive:
 		Healing.respawn_after_death()
 
 	_restore_top_soil_if_needed()
-	_position_from_save_or_start()
+	var spot := _position_from_save_or_start(loaded_dead)
+	SaveHooks.attach(self, spot == HeroSpot.HOVER)  # место героя между сессиями и запись при закрытии (scripts/core/save_hooks.gd)
 
 	world_view.set_view_size(_view_w(), _view_h())
 
@@ -207,10 +209,15 @@ func _view_h() -> int:
 	return hud.get_view_cells().y
 
 
-func _position_from_save_or_start() -> void:
+func _position_from_save_or_start(loaded_dead: bool = false) -> int:
+	# Закрыл игру под землёй — открыл там же (владелец, 27.10): клетка из сейва, а если она
+	# стала породой — ближайшая свободная (HeroSpot). Иначе — как раньше, у дома.
+	var spot := HeroSpot.restore(player, world, loaded_dead)
+	if spot != HeroSpot.NONE:
+		return spot
 	# Стартовая позиция героя — на поверхности сразу справа от дома, слева от
-	# тоннеля (player.HOME_X); между сессиями не сохраняется намеренно (см.
-	# GDD раздел 9 про респаун дома) — сохраняется только прогресс/мир.
+	# тоннеля (player.HOME_X). Сюда же — мёртвый в сейве (GDD раздел 9 про
+	# респаун дома), до конца онбординга и с отложенным землетрясением.
 	#
 	# player.teleport_home() делает то же самое (x=HOME_X, y=0.5) и ДОПОЛНИТЕЛЬНО
 	# паркует бурмобиль/переключает инструмент, если сейв закрыли, пока герой
@@ -221,6 +228,7 @@ func _position_from_save_or_start() -> void:
 	# без этого фикса, см. player.gd:teleport_home). SaveSystem.load_game()
 	# выше по _ready() уже накатил current_tool/rig_parked_at до этого вызова.
 	player.teleport_home()
+	return HeroSpot.NONE
 
 
 func _restore_top_soil_if_needed() -> void:

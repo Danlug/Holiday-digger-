@@ -18,6 +18,8 @@ const COLS := 6
 const TILE := Vector2(30, 32)
 const ROW_H := 20.0
 const GLYPH := 18.0
+## Карточка дня одной высоты (5 миссий и кнопка) — календарь не прыгает при выборе другого дня.
+const DETAIL_H := 166.0
 
 const BG_TODAY := Color8(0x2E, 0x26, 0x12)
 const BG_DONE := Color8(0x1B, 0x2A, 0x1C)
@@ -37,6 +39,8 @@ var _shown_index: int = -1
 var _tick: float = 0.0
 var _closing: bool = false
 var _pulses: Array = []
+## Широкие кнопки «мерцают» яркостью, а не масштабом: увеличенная, она вылезала бы за карточку.
+var _glows: Array = []
 
 
 func _ready() -> void:
@@ -173,6 +177,7 @@ func _build() -> void:
 
 func _fill() -> void:
 	_pulses.clear()
+	_glows.clear()
 	for c in _box.get_children():
 		_box.remove_child(c)
 		c.queue_free()
@@ -362,6 +367,7 @@ func _detail(n: int) -> Control:
 	var st := NewbieStreak.status(n)
 	var card := PanelContainer.new()
 	card.name = "Detail"
+	card.custom_minimum_size = Vector2(0, DETAIL_H)
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var edge := MetaUiKit.BORDER
 	match st:
@@ -430,6 +436,7 @@ func _locked_body(n: int) -> Control:
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_theme_constant_override("separation", 6)
 	h.custom_minimum_size = Vector2(0, 44)
+	h.size_flags_vertical = Control.SIZE_EXPAND_FILL   # замок — посередине карточки дня
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var lk := MetaUiKit.icon_rect(MetaUiKit.tex("lock"), 32)
 	lk.modulate = Color(1, 1, 1, 0.8)
@@ -511,13 +518,9 @@ func _reward_row(r: Dictionary) -> HBoxContainer:
 	return row
 
 
-func _cta(icon: Texture2D, color: Color, text: String = "") -> Button:
+## Широкая кнопка действия: содержимое (подпись, значки) — по центру, вплотную друг к другу.
+func _cta(color: Color, parts: Array) -> Button:
 	var b := Button.new()
-	b.icon = icon
-	b.text = text
-	b.add_theme_constant_override("icon_max_width", 16)
-	b.add_theme_constant_override("h_separation", 4)
-	b.add_theme_font_size_override("font_size", 10)
 	b.custom_minimum_size = Vector2(0, 26)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
@@ -526,22 +529,27 @@ func _cta(icon: Texture2D, color: Color, text: String = "") -> Button:
 			sb.bg_color = color.darkened(0.2)
 		sb.set_content_margin_all(3)
 		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_color_override("font_color", Color.WHITE)
-	b.add_theme_color_override("font_hover_color", Color.WHITE)
-	b.add_theme_color_override("font_pressed_color", Color.WHITE)
-	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	b.add_theme_constant_override("outline_size", 2)
 	b.focus_mode = Control.FOCUS_NONE
+	var h := HBoxContainer.new()
+	h.name = "Content"
+	h.set_anchors_preset(Control.PRESET_FULL_RECT)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_theme_constant_override("separation", 4)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in parts:
+		h.add_child(c)
+	b.add_child(h)
 	UiBtn.wire_feedback(b)
 	return b
 
 
 func _claim_button(n: int) -> Button:
-	var b := _cta(MetaUiKit.tex("check"), MetaUiKit.GREEN_BTN)
+	var parts: Array = [MetaUiKit.icon_rect(MetaUiKit.tex("check"), 18), _reward_row(NewbieStreak.reward(n))]
+	var b := _cta(MetaUiKit.GREEN_BTN, parts)
 	b.name = "Claim"
 	b.pressed.connect(func() -> void: _claim(n, b))
 	Tip.bind(b, NewbieStreak.text("claim"), "", NewbieStreak.text("reward") % NewbieStreak.describe_reward(NewbieStreak.reward(n)))
-	_pulses.append(b)
+	_glows.append(b)
 	return b
 
 
@@ -550,17 +558,19 @@ func _claim_button(n: int) -> Button:
 func _restore_button(n: int) -> Button:
 	var price := NewbieStreak.restore_price()
 	var afford := GameState.dollars >= price
-	var b := _cta(MetaUiKit.tex("dollar"), Color8(0x2F, 0x6B, 0x3B) if afford else Color8(0x3A, 0x34, 0x30),
-		NewbieStreak.text("restore") % price)
-	b.name = "Restore"
-	b.icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var cap := MetaUiKit.label(NewbieStreak.text("restore") % price, 10, Color.WHITE if afford else MetaUiKit.MUTED)
+	cap.name = "Caption"
+	cap.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("dollar"), 14)
 	if not afford:
-		b.add_theme_color_override("font_color", MetaUiKit.MUTED)
+		ic.modulate = Color(0.7, 0.7, 0.7)
+	var b := _cta(Color8(0x2F, 0x6B, 0x3B) if afford else Color8(0x3A, 0x34, 0x30), [cap, ic])
+	b.name = "Restore"
 	b.pressed.connect(func() -> void: _restore(n, b))
 	Tip.bind(b, NewbieStreak.text("restore_tip") % price, NewbieStreak.text("missed_body"),
 		"" if afford else NewbieStreak.text("no_dollars") % [GameState.dollars, price])
 	if afford:
-		_pulses.append(b)
+		_glows.append(b)
 	return b
 
 
@@ -697,6 +707,14 @@ func _start_pulses() -> void:
 		var tw := ctl.create_tween().set_loops()
 		tw.tween_property(ctl, "scale", Vector2.ONE * 1.06, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tw.tween_property(ctl, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_interval(0.6)
+	for c in _glows:
+		var ctl := c as Control
+		if ctl == null or not is_instance_valid(ctl):
+			continue
+		var tw := ctl.create_tween().set_loops()
+		tw.tween_property(ctl, "modulate", Color(1.25, 1.25, 1.15), 0.45).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(ctl, "modulate", Color.WHITE, 0.45).set_trans(Tween.TRANS_SINE)
 		tw.tween_interval(0.6)
 
 

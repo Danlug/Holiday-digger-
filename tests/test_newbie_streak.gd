@@ -407,7 +407,8 @@ func _test_screen() -> void:
 	await get_tree().process_frame
 	detail = p._box.find_child("Detail", true, false)
 	var rb := detail.find_child("Restore", true, false) as Button
-	check("пропущенный день — кнопка «Вернуть за 50»", rb != null and rb.text == "Вернуть за 50")
+	var cap := rb.find_child("Caption", true, false) as Label if rb != null else null
+	check("пропущенный день — кнопка «Вернуть за 50» со значком доллара", cap != null and cap.text == "Вернуть за 50")
 	rb.pressed.emit()
 	await get_tree().process_frame
 	check("нажатие вернуло день 2 за 50 $", NewbieStreak.status(2) == NewbieStreak.St.DONE and GameState.dollars == 10)

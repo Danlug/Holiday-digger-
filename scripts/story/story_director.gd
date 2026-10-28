@@ -362,6 +362,8 @@ func _play_next_if_idle() -> void:
 		return
 	if GuideSpotlight.any_active():   # урок «затемнение + стрелка» (scripts/guidance/guide_spotlight.gd): сцена подождёт
 		return
+	if ConsentDialog.is_open_any():   # окно согласия на аналитику: интро после ответа
+		return
 	if auto_dig != null and auto_dig.running and not auto_dig.paused:
 		return
 	if diary_ui != null and diary_ui.is_open:

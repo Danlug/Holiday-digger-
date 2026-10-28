@@ -2,7 +2,7 @@ class_name SettingsSheet
 extends Control
 ## SettingsSheet — шторка настроек (Settings: scripts/core/settings.gd), только
 ## иконки: ползунки громкости звука и музыки с кнопкой-«мьют» (динамик/нота),
-## переключатели «вибрация», «радиус обзора», «меньше движения», три режима
+## переключатели «вибрация», «радиус обзора», «меньше движения», «аналитика», три режима
 ## управления (джойстик/нажатия/стрелки), язык и восстановление покупок. Слова —
 ## в подсказках Tip; исключение — названия языков на самих кнопках.
 ##
@@ -35,6 +35,7 @@ var _music_slider: HSlider
 var _haptics_btn: Button
 var _vision_btn: Button
 var _motion_btn: Button
+var _analytics_btn: Button
 var _mode_btns: Dictionary = {}
 var _lang_btns: Dictionary = {}
 var _last_tick_ms: int = 0
@@ -90,6 +91,11 @@ func refresh() -> void:
 	_set_toggle(_motion_btn, not Settings.reduce_motion, "Движение интерфейса")
 	_motion_btn.icon = UiIcons.tex("motion" if not Settings.reduce_motion else "motion_off")
 	Tip.bind(_motion_btn, "Движение интерфейса", "Включено" if not Settings.reduce_motion else "Меньше движения: выключено")
+	var stats := Settings.analytics_consent == "granted"
+	_set_toggle(_analytics_btn, stats, "")
+	_analytics_btn.icon = UiIcons.tex("analytics" if stats else "analytics_off")
+	Tip.bind(_analytics_btn, "Аналитика: включена" if stats else "Аналитика: выключена",
+		"Обезличенная статистика игры, случайный номер вместо имени" if stats else "Нажми, чтобы помочь улучшить игру")
 
 	if _hints_row != null:
 		_hints_row.refresh()
@@ -233,6 +239,10 @@ func _build_toggle_row(body: Control) -> void:
 		Settings.set_show_vision_radius(not Settings.show_vision_radius))
 	_motion_btn = _toggle(row, "motion", func():
 		Settings.set_reduce_motion(not Settings.reduce_motion))
+	# аналитика по согласию (scripts/core/analytics.gd); выключение сразу стирает очередь
+	_analytics_btn = _toggle(row, "analytics", func():
+		Settings.set_analytics_consent("denied" if Settings.analytics_consent == "granted" else "granted"))
+	_analytics_btn.visible = Analytics.build_enabled()
 
 
 func _toggle(row: Control, icon_name: String, action: Callable) -> Button:

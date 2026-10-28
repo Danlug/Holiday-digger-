@@ -2260,7 +2260,7 @@ func _world_input_blocked() -> bool:
 	return not is_processing_input() or (_inv_sheet != null and _inv_sheet.visible) \
 		or (_settings_sheet != null and _settings_sheet.visible) or ProgressScreen.is_open() \
 		or is_more_menu_open() or TechSystem.is_modal_open() \
-		or DeathWindow.is_open_any()   # окно смерти: палец жмёт «Дальше», а не ведёт героя
+		or DeathWindow.is_open_any() or ConsentDialog.is_open_any()   # окно смерти, согласие: палец жмёт кнопку, а не ведёт героя
 
 
 ## Пока ввод заблокирован, отпускание пальца сюда не доходит: занятый указатель

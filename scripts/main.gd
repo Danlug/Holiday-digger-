@@ -167,6 +167,9 @@ func _ready() -> void:
 	# --- конец блока сюжета ---
 	MetaService.attach(self)  # мета-слой: ежедневная награда, задания, достижения, дорога трофеев
 	NewbieStreakService.attach(self)  # стрик новичка: 30 дней отметки за вход, пропуск за доллары, подарок за все 30 (scripts/meta/newbie_streak*.gd)
+	Analytics.attach(self)  # аналитика по согласию игрока: события в PostHog, только при «Разрешить» (scripts/core/analytics.gd)
+	if Analytics.should_ask():
+		ConsentDialog.open_on(self)  # первый запуск: спросить согласие до интро (сюжет ждёт окно)
 	HintDirector.attach(self)  # подсказки «знакомство с системами»: кольцо, палец, метки «new» (scripts/hints/)
 
 	# --- бой глубже 4000: монстры, удар, снаряжение, рейдбосс на дне (ветка combat) ---

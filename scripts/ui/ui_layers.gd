@@ -40,6 +40,7 @@ const HERO_CARD := 96     # карточка поверх экрана геро�
 const TOAST := 97         # тост наград сверху (meta_toast)
 const META_FX := 98       # искры наград
 const CUTSCENE := 100     # катсцена
+const CONSENT := 110      # окно согласия на аналитику: над всем, кроме Tip
 const TIP := 128          # подсказка Tip — над всем
 ## Группа слоёв HUD_WIDGETS: HUD прячет их вместе с собой (диалог сюжета, дом), см. hud.gd
 const WIDGETS_GROUP := &"hud_widget_layer"

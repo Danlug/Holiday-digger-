@@ -22,7 +22,7 @@ signal closed
 
 const HEAD_H := 32.0
 const ACTION_H := 46.0
-const LINE_COL := Color8(0x4A, 0x3F, 0x5C)
+const LINE_COL := UiTheme.NIGHT_LINE
 
 var _root: Control
 var _scroll: ScrollContainer
@@ -58,7 +58,7 @@ func _build() -> void:
 	add_child(_root)
 
 	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color8(0x26, 0x1E, 0x30), Color8(0x14, 0x0F, 0x1B)])
+	grad.colors = PackedColorArray([UiTheme.NIGHT_TOP, UiTheme.NIGHT_DEEP])
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill_from = Vector2(0, 0)

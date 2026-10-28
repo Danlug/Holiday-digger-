@@ -113,7 +113,7 @@ func _build_button() -> void:
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.06, 0.05, 0.04, 0.92)
-		sb.border_color = Color8(0xE0, 0xA9, 0x3B) if state == "pressed" or state == "hover" else Color8(0x3E, 0x31, 0x25)
+		sb.border_color = UiTheme.GOLD if state == "pressed" or state == "hover" else UiTheme.BORDER
 		sb.set_border_width_all(1)
 		sb.set_corner_radius_all(3)
 		sb.content_margin_top = 3
@@ -133,7 +133,7 @@ func _build_button() -> void:
 	_badge.size = Vector2(14, 14)
 	_badge.position = Vector2(26, -5)
 	var bsb := StyleBoxFlat.new()
-	bsb.bg_color = Color8(0xC2, 0x1E, 0x3A)
+	bsb.bg_color = UiTheme.DANGER   # тот же красный, что у бейджа UiBtn
 	bsb.set_corner_radius_all(7)
 	_badge.add_theme_stylebox_override("normal", bsb)
 	_badge.visible = false

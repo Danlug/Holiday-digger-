@@ -3,8 +3,8 @@ extends Control
 ## Рамка и расходящееся «эхо» вокруг цели подсказки. Рисует сама; пульс — свойство
 ## pulse (0..1), его гонит твин. Без твина (Settings.reduce_motion) рамка просто стоит.
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_LIGHT := Color8(0xF2, 0xD9, 0x9B)
+const GOLD := UiTheme.GOLD
+const GOLD_LIGHT := UiTheme.TEXT_HI
 
 var rect: Rect2 = Rect2()
 var pulse: float = 0.0:

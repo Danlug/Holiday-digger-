@@ -20,7 +20,7 @@ const ROW_H := 22.0
 const BAR_W := 58.0
 const COL_DIM := Color(0.62, 0.62, 0.7)
 const COL_FILL := Color8(0xF2, 0x8A, 0x2E)
-const COL_TRACK := Color8(0x2A, 0x24, 0x34)
+const COL_TRACK := UiTheme.NIGHT_HI
 
 var _anchor: Control = null
 var _q_row: HBoxContainer

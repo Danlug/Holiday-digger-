@@ -44,7 +44,7 @@ const NAV_H := 38.0
 const HEAD_H := 32.0
 const ACTION_H := 46.0
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+const GOLD := UiTheme.GOLD
 const INK := Color(0.05, 0.04, 0.08)
 
 ## Единственный живой экземпляр — чтобы дом мог открыть магазин одной
@@ -293,7 +293,7 @@ func _build() -> void:
 	add_child(_root)
 
 	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color8(0x26, 0x1E, 0x30), Color8(0x14, 0x0F, 0x1B)])
+	grad.colors = PackedColorArray([UiTheme.NIGHT_TOP, UiTheme.NIGHT_DEEP])
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill_from = Vector2(0, 0)
@@ -341,7 +341,7 @@ func _build_scroll() -> void:
 
 func _build_header() -> void:
 	var line := ColorRect.new()
-	line.color = Color8(0x4A, 0x3F, 0x5C)
+	line.color = UiTheme.NIGHT_LINE
 	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	line.offset_top = HEAD_H
 	line.offset_bottom = HEAD_H + 1.0
@@ -547,7 +547,7 @@ func _build_action_bar() -> void:
 	_sell_lead = ShopArt.rect(ShopArt.ui("icon_inventory"), Vector2(8, 5), Vector2(28, 28))
 	_sell_btn.add_child(_sell_lead)
 	_sell_btn.add_child(ShopArt.rect(ShopArt.ui("icon_coin"), Vector2(42, 11), Vector2(18, 18)))
-	_sell_label = ShopArt.label("0", 14, Color.WHITE, Color8(0x6A, 0x3E, 0x0A), 4)
+	_sell_label = ShopArt.label("0", 14, Color.WHITE, UiTheme.GOLD_INK, 4)
 	_sell_label.position = Vector2(62, 6)
 	_sell_label.size = Vector2(70, 26)
 	_sell_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -801,7 +801,7 @@ func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(ic)
 	var line := ColorRect.new()
-	line.color = Color8(0x4A, 0x3F, 0x5C)
+	line.color = UiTheme.NIGHT_LINE
 	line.custom_minimum_size = Vector2(0, 2)
 	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER

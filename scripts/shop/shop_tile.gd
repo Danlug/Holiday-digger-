@@ -17,8 +17,8 @@ extends Button
 
 const W := 64.0
 const H := 64.0
-const COL_GREEN := Color8(0x4D, 0xE0, 0x94)
-const COL_NEED := Color8(0xFF, 0x9A, 0x2E)
+const COL_GREEN := UiTheme.MONEY
+const COL_NEED := UiTheme.WARN
 
 var offer: Dictionary = {}
 
@@ -132,7 +132,7 @@ func setup(o: Dictionary) -> void:
 			body_col = Color(0.72, 0.72, 0.78)
 			icon_col = Color(0.55, 0.55, 0.62)
 		"locked":
-			rim_col = Color8(0x6A, 0x62, 0x78)
+			rim_col = UiTheme.NIGHT_RIM
 			body_col = Color(0.62, 0.62, 0.7)
 			icon_col = Color(0.07, 0.06, 0.11)
 		"away", "nosale", "off":

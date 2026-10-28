@@ -13,14 +13,14 @@ extends RefCounted
 
 enum Kind { NORMAL, ACCENT, DANGER, GHOST }
 
-const BG := Color8(0x26, 0x1E, 0x16)
-const BG_HOVER := Color8(0x34, 0x28, 0x1B)
-const BG_PRESS := Color8(0x1B, 0x15, 0x10)
-const BORDER := Color8(0x52, 0x40, 0x2D)
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_DIM := Color8(0x9C, 0x76, 0x2C)
-const RED := Color8(0xB8, 0x5A, 0x52)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
+const BG := UiTheme.BTN
+const BG_HOVER := UiTheme.BTN_HOVER
+const BG_PRESS := UiTheme.BTN_PRESS
+const BORDER := UiTheme.EDGE
+const GOLD := UiTheme.GOLD
+const GOLD_DIM := UiTheme.GOLD_DIM
+const RED := UiTheme.RED
+const MUTED := UiTheme.MUTED
 const SHADOW := Color(0, 0, 0, 0.6)
 const FEEDBACK_META := &"_ui_feedback"
 const BADGE_NAME := "Badge"
@@ -83,7 +83,7 @@ static func style(b: Button, kind: int = Kind.NORMAL, with_feedback: bool = true
 	b.add_theme_color_override("font_hover_color", GOLD)
 	b.add_theme_color_override("font_pressed_color", GOLD)
 	b.add_theme_color_override("font_hover_pressed_color", GOLD)
-	b.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
+	b.add_theme_color_override("font_disabled_color", UiTheme.DISABLED)
 	b.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.35))
 	b.focus_mode = Control.FOCUS_NONE
 	if with_feedback:
@@ -173,8 +173,8 @@ static func set_badge(b: Control, n: int) -> void:
 		badge.name = BADGE_NAME
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color8(0xD0, 0x45, 0x3C)
-		sb.border_color = Color8(0x1A, 0x10, 0x0C)
+		sb.bg_color = UiTheme.DANGER
+		sb.border_color = UiTheme.INK
 		sb.set_border_width_all(1)
 		sb.set_corner_radius_all(6)
 		sb.content_margin_left = 3

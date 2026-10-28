@@ -6,9 +6,9 @@ extends RefCounted
 
 const TILE_BG := Color(0.11, 0.09, 0.07, 1.0)
 const TILE_BG_HI := Color(0.17, 0.13, 0.08, 1.0)
-const ACCENT := Color8(0xE0, 0xA9, 0x3B)
-const OK := Color8(0x7D, 0xE0, 0x8A)
-const POOR := Color8(0xB8, 0x5A, 0x52)
+const ACCENT := UiTheme.GOLD
+const OK := UiTheme.OK_LIGHT
+const POOR := UiTheme.RED
 const TILE_H := 34.0     # высота плитки «иконка + число»: на узком экране цифры читаются крупнее
 const TILE_FONT := 11
 
@@ -17,7 +17,7 @@ const BRANCH_COLORS := {
 	"vision": Color8(0x3F, 0xB7, 0xC8),
 	"dig_speed": Color8(0xE8, 0xE0, 0xD0),
 	"hp": Color8(0xD2, 0x3A, 0x4A),
-	"stamina": Color8(0xFF, 0xE0, 0x66),
+	"stamina": UiTheme.GOLD_LIGHT,
 	"hunger": Color8(0xE0, 0x9A, 0x5A),
 	"strength": Color8(0x8A, 0xA0, 0xD0),
 	"luck_multiplier": Color8(0xC0, 0x8A, 0xFF),

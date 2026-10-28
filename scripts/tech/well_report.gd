@@ -214,7 +214,7 @@ func _build() -> void:
 func _make_tile(id: String, count: int) -> Control:
 	var tile := PanelContainer.new()
 	tile.custom_minimum_size = Vector2(86, 62)
-	tile.add_theme_stylebox_override("panel", TechUi.box(Color8(0x24, 0x1C, 0x14), TechUi.BORDER, 6, 4))
+	tile.add_theme_stylebox_override("panel", TechUi.box(UiTheme.ROW, TechUi.BORDER, 6, 4))
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 1)

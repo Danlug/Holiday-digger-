@@ -117,7 +117,7 @@ func _draw_bar() -> void:
 		return
 	var w := _bar.size.x
 	var need := maxi(1, QuestEngine.stars_needed())
-	_bar.draw_rect(Rect2(Vector2(-1, -1), Vector2(w + 2, BAR_H + 2)), Color8(0x1A, 0x10, 0x0C))
+	_bar.draw_rect(Rect2(Vector2(-1, -1), Vector2(w + 2, BAR_H + 2)), UiTheme.INK)
 	_bar.draw_rect(Rect2(0, 0, w, BAR_H), Color(0.16, 0.13, 0.10))
 	var stars := QuestEngine.stars_today()
 	var done := stars

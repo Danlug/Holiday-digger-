@@ -8,15 +8,15 @@ extends CanvasLayer
 ## Пока экран открыт, герой стоит и ввод HUD выключен — так же, как у
 ## магазина (ShopUI): джойстик под плиткой иначе забирал бы нажатия раньше.
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
-const DIM := Color8(0x5A, 0x50, 0x44)
-const RED := Color8(0xC4, 0x52, 0x4A)
-const GREEN := Color8(0x7F, 0xB8, 0x6B)
+const GOLD := UiTheme.GOLD
+const MUTED := UiTheme.MUTED
+const DIM := UiTheme.DISABLED
+const RED := UiTheme.RED
+const GREEN := UiTheme.OK
 const BG := ProgressUiKit.BG_SOLID
-const TILE_BG := Color8(0x26, 0x1E, 0x16)
+const TILE_BG := UiTheme.BTN
 const TIER_COLORS := {
-	0: Color8(0xF2, 0xD9, 0x9B),
+	0: UiTheme.TEXT_HI,
 	1: Color8(0xC4, 0x62, 0x2A),
 	2: Color8(0x8E, 0x6C, 0xD8),
 	3: Color8(0x4D, 0xC4, 0xC0),
@@ -188,7 +188,7 @@ func _tile(icon: Texture2D, tier_color: Color, size: Vector2, dim: bool = false,
 	b.focus_mode = Control.FOCUS_NONE
 	for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = TILE_BG if st != "pressed" else Color8(0x1B, 0x15, 0x10)
+		sb.bg_color = TILE_BG if st != "pressed" else UiTheme.BTN_PRESS
 		sb.border_color = tier_color if not dim else Color(tier_color, 0.35)
 		sb.set_border_width_all(2 if st in ["hover", "pressed", "hover_pressed"] else 1)
 		sb.set_corner_radius_all(4)
@@ -256,7 +256,7 @@ func _build_gear_tab() -> void:
 		var id := CombatService.equipped(k)
 		var tier := int(CombatData.gear(id).get("tier", 0)) if id != "" else -1
 		var icon: Texture2D = CombatData.icon(id) if id != "" else CombatData.ui_icon("slot_" + k.rstrip("12"))
-		var t := _tile(icon, _tier_color(tier) if id != "" else Color8(0x52, 0x40, 0x2D), Vector2(60, 60), id == "", 32)
+		var t := _tile(icon, _tier_color(tier) if id != "" else UiTheme.EDGE, Vector2(60, 60), id == "", 32)
 		if id != "":
 			Tip.bind(t, CombatData.item_name(id), _gear_tip(id), "Тап — снять")
 		else:
@@ -290,7 +290,7 @@ func _build_gear_tab() -> void:
 		var chip := PanelContainer.new()
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.11, 0.09, 0.07, 1.0)
-		sb.border_color = Color8(0x3E, 0x31, 0x25)
+		sb.border_color = UiTheme.BORDER
 		sb.set_border_width_all(1)
 		sb.set_corner_radius_all(3)
 		sb.set_content_margin_all(2)
@@ -307,7 +307,7 @@ func _build_gear_tab() -> void:
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(ic)
-		var num := _small_label(sp[1], 10, Color8(0xF2, 0xD9, 0x9B))
+		var num := _small_label(sp[1], 10, UiTheme.TEXT_HI)
 		num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(num)
 		chip.custom_minimum_size = Vector2(38, 0)
@@ -397,7 +397,7 @@ func _build_socket_row() -> Control:
 		var mid := String(s["id"])
 		var filled := CombatService.socket_filled(mid)
 		var chk := CombatService.check_socket(mid)
-		var t := _tile(CombatData.icon(mid), GOLD if filled else Color8(0x52, 0x40, 0x2D), Vector2(36, 36), not filled and not glove_ok, 32)
+		var t := _tile(CombatData.icon(mid), GOLD if filled else UiTheme.EDGE, Vector2(36, 36), not filled and not glove_ok, 32)
 		var bonus := _socket_text(s)
 		if filled:
 			Tip.bind(t, CombatData.material_name(mid), "Сокет заполнен: " + bonus)
@@ -491,7 +491,7 @@ func _recipe_row(id: String) -> Control:
 	var panel := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.11, 0.09, 0.07, 1.0) if not owned else Color(0.08, 0.1, 0.07, 1.0)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.border_color = UiTheme.BORDER
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(4)
 	sb.set_content_margin_all(3)

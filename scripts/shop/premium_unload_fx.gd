@@ -22,7 +22,7 @@ const STAGGER := 0.07
 const HOLD := 0.45
 ## Сколько длится всё целиком при MAX_ICONS (уроку — сколько ждать до объяснения).
 const DURATION := 0.2 + STAGGER * (MAX_ICONS - 1) + FLY + HOLD + 0.35
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+const GOLD := UiTheme.GOLD
 
 var count: int = 0
 var _root: Control

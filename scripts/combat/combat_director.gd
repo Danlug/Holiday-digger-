@@ -351,11 +351,11 @@ func _on_monster_died(m: Monster) -> void:
 		var n := randi_range(int(drop.get("min", 1)), int(drop.get("max", 1)))
 		var got := GameState.add_item(String(drop["id"]), n)
 		if got > 0:
-			Fx.float_text(pos + Vector2(0, -10), "+%d %s" % [got, _short_name(String(drop["id"]))], Color8(0xF2, 0xD9, 0x9B))
+			Fx.float_text(pos + Vector2(0, -10), "+%d %s" % [got, _short_name(String(drop["id"]))], UiTheme.TEXT_HI)
 		else:
 			lost = true
 	if lost:
-		Fx.float_text(pos + Vector2(0, -22), "рюкзак полон", Color8(0xB8, 0x5A, 0x52))
+		Fx.float_text(pos + Vector2(0, -22), "рюкзак полон", UiTheme.RED)
 	monster_died.emit(m)
 
 
@@ -374,7 +374,7 @@ func _on_guard_died(m: Monster) -> void:
 	Haptics.buzz(60)
 	Fx.burst("spark", cpos, 1.4, Caves.color_of(c))
 	Fx.burst("pickup_glint", cpos, 1.0, Caves.color_of(c))
-	Fx.float_icon(cpos + Vector2(0, -22), Mechanics.tex("chest_cave_icon"), "", Color8(0xFF, 0xE0, 0x66))
+	Fx.float_icon(cpos + Vector2(0, -22), Mechanics.tex("chest_cave_icon"), "", UiTheme.GOLD_LIGHT)
 	GameState.emit_event(&"cave_cleared", {"id": m.cave_id, "kind": String(c.kind), "depth": int(c.cy), "pos": cpos})
 
 
@@ -490,7 +490,7 @@ func _do_swing(dir: int, st: Dictionary) -> void:
 				# ядро закрыто: удар глухо бьёт по камню, число серое
 				Sfx.play("hurt_armor", randf_range(0.8, 0.95))
 				Fx.burst("spark", bpos + Vector2(float(-dir) * 20.0, 0.0), 0.6)
-				Fx.float_text(bpos + Vector2(0, -20), str(int(round(bd))), Color8(0x9D, 0x8B, 0x73))
+				Fx.float_text(bpos + Vector2(0, -20), str(int(round(bd))), UiTheme.MUTED)
 			Haptics.tap()
 		else:
 			Sfx.play("hurt_armor", 0.7)
@@ -522,7 +522,7 @@ func _hurt_hero(raw: float, kind: String, dir: int, source: String, info: Dictio
 	GameState.take_damage(dmg, source, info)
 	hero_hurt.emit(dmg, source)
 	var pos := Vector2(player.x, player.y) * TILE
-	Fx.float_text(pos + Vector2(0, -18), "-%d" % int(round(dmg)), Color8(0xFF, 0x70, 0x70))
+	Fx.float_text(pos + Vector2(0, -18), "-%d" % int(round(dmg)), UiTheme.BAD_LIGHT)
 	if not GameState.is_alive:
 		return
 	iframes = float(CombatData.player_cfg("iframes_sec", 0.5))

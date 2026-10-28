@@ -9,8 +9,8 @@ extends CanvasLayer
 ## Слой знает только как нарисовать; когда показать и когда снять — решает HintDirector.
 
 const LAYER := UiLayers.HINTS
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_LIGHT := Color8(0xF2, 0xD9, 0x9B)
+const GOLD := UiTheme.GOLD
+const GOLD_LIGHT := UiTheme.TEXT_HI
 const FINGER_TIP := Vector2(7.5, 1.5)   # где в рисунке кончик пальца (в единицах экрана)
 const ARROW_TIP := Vector2(6.0, 11.0)
 const CHIP_GAP := 3.0

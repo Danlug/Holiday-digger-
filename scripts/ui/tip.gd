@@ -44,11 +44,11 @@ const TAP_META := &"_tip_tap"
 const ANCHOR_META := &"_tip_anchor"
 const TAP_HIDE := 6.0
 
-const COL_BG := Color8(0x17, 0x13, 0x0F, 0xF2)
-const COL_BORDER := Color8(0xE0, 0xA9, 0x3B)
-const COL_TITLE := Color8(0xF2, 0xD9, 0x9B)
-const COL_BODY := Color8(0xD8, 0xCF, 0xC0)
-const COL_EXTRA := Color8(0x9D, 0x8B, 0x73)
+const COL_BG := UiTheme.FLOAT_BG
+const COL_BORDER := UiTheme.GOLD
+const COL_TITLE := UiTheme.TEXT_HI
+const COL_BODY := UiTheme.TEXT
+const COL_EXTRA := UiTheme.MUTED
 
 static var _layer: CanvasLayer = null
 static var _panel: PanelContainer = null

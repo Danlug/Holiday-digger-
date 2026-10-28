@@ -28,8 +28,8 @@ const MAX_BADGE := 999
 ## Цвета редкости: обычная, необычная, редкая, эпическая, легендарная.
 const TIER_COLORS: Array[Color] = [
 	Color8(0x75, 0x6B, 0x5E), Color8(0x6E, 0xA8, 0x5A), Color8(0x5B, 0x8F, 0xD0),
-	Color8(0xA2, 0x6B, 0xD6), Color8(0xE0, 0xA9, 0x3B)]
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+	Color8(0xA2, 0x6B, 0xD6), UiTheme.GOLD]
+const GOLD := UiTheme.GOLD
 const CARD_BG := ProgressUiKit.SHEET_BG
 const EDGE := ProgressUiKit.EDGE
 
@@ -146,8 +146,8 @@ func refresh() -> void:
 	var max_kg := maxf(GameState.get_max_carry_kg(), 0.001)
 	var frac := load_kg / max_kg
 	_weight_bar.set_fraction(minf(frac, 1.0))
-	_weight_bar.fill_color = Color8(0x7F, 0xB8, 0x6B) if frac < 0.6 \
-		else (Color8(0xE0, 0xA9, 0x3B) if frac < 0.85 else Color8(0xD9, 0x4F, 0x4A))
+	_weight_bar.fill_color = UiTheme.OK if frac < 0.6 \
+		else (UiTheme.GOLD if frac < 0.85 else UiTheme.DANGER)
 	_weight_text.text = "%.1f/%.0f" % [load_kg, max_kg]
 	Tip.bind(_weight_bar, "Вес рюкзака", "%.1f из %.0f кг" % [load_kg, max_kg])
 	_total_pill.set_value(total)
@@ -253,14 +253,14 @@ func _build() -> void:
 	bag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(bag)
-	_weight_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
+	_weight_bar = HudBar.new().setup(UiTheme.OK, UiIcons.tex("weight"))
 	_weight_bar.bar_width = 84.0
 	_weight_bar.pulse_above = 1.0
 	_weight_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_weight_bar)
 	_weight_text = Label.new()
 	_weight_text.add_theme_font_size_override("font_size", 10)
-	_weight_text.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
+	_weight_text.add_theme_color_override("font_color", UiTheme.TEXT_SOFT)
 	_weight_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_weight_text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_weight_text)
@@ -514,7 +514,7 @@ func _build_drop_panel() -> void:
 	_drop_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_drop_slider.custom_minimum_size = Vector2(0, 22)
-	UiBtn.style_slider(_drop_slider, Color8(0xB8, 0x5A, 0x52))
+	UiBtn.style_slider(_drop_slider, UiTheme.RED)
 	_drop_slider.value_changed.connect(_on_drop_slider_changed)
 	row.add_child(_drop_slider)
 	var plus := UiBtn.icon_button(UiIcons.tex("plus"), Vector2(26, 26))

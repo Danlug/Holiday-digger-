@@ -115,7 +115,7 @@ func _build_banner() -> void:
 	_banner_label.text = StoryText.get_text("ui.autodig_banner")
 	_banner_label.position = Vector2(8, 5)
 	_banner_label.add_theme_font_size_override("font_size", 11)
-	_banner_label.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
+	_banner_label.add_theme_color_override("font_color", UiTheme.CREAM)
 	_banner.add_child(_banner_label)
 
 	# Тот же «Пропустить», что и в катсценах: иконка, подтверждение удержанием или двойным тапом.

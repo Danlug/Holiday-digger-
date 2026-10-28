@@ -167,7 +167,7 @@ func _make_tile(i: int) -> Control:
 	tile.custom_minimum_size = Vector2(w, TILE_H)
 	tile.mouse_filter = Control.MOUSE_FILTER_PASS
 	var border := MetaUiKit.GOLD if today else (MetaUiKit.GOLD.darkened(0.45) if grand else MetaUiKit.BORDER)
-	var bg := Color8(0x3A, 0x2C, 0x14) if today else MetaUiKit.SLOT
+	var bg := UiTheme.GOLD_BG if today else MetaUiKit.SLOT
 	var sb := MetaUiKit.box(bg, border, 2 if (today or grand) else 1, 4)
 	sb.set_content_margin_all(2)
 	tile.add_theme_stylebox_override("panel", sb)
@@ -192,7 +192,7 @@ func _make_tile(i: int) -> Control:
 		var rr := reward
 		col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("coins"), str(int(rr.get("coins", 0))), MetaUiKit.GOLD_LIGHT, 12, 9))
 		if rr.has("dollars"):
-			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("dollars"), str(int(rr["dollars"])), Color8(0x4D, 0xE0, 0x94), 12, 9))
+			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("dollars"), str(int(rr["dollars"])), UiTheme.MONEY, 12, 9))
 		if rr.has("xp"):
 			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("xp"), str(int(rr["xp"])), MetaUiKit.BLUE, 12, 9))
 		lay.add_child(col)
@@ -256,7 +256,7 @@ func _build_buttons() -> Control:
 	_ad_btn.add_theme_constant_override("icon_max_width", 16)
 	_ad_btn.add_theme_font_size_override("font_size", 11)
 	_ad_btn.custom_minimum_size = Vector2(62, 34)
-	_style_cta(_ad_btn, Color8(0x3C, 0x3A, 0x1A))
+	_style_cta(_ad_btn, UiTheme.AD_BG)
 	_ad_btn.pressed.connect(_claim_ad)
 	Tip.bind(_ad_btn, "Удвоить за ролик", "Монеты и опыт сегодняшнего приза ×2. Доллары не удваиваются.",
 		"Осталось сегодня: %d" % MetaAds.uses_left(MetaAds.DAILY))

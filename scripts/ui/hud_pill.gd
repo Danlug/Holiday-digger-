@@ -3,7 +3,7 @@ extends PanelContainer
 ## HudPill — «таблетка» кошелька: иконка и число с накруткой на тёмной
 ## полупрозрачной плашке. Название валюты и точная сумма — в подсказке (Tip).
 ##
-##   var p := HudPill.new().setup(UiIcons.tex("coin"), Color8(0xE0,0xA9,0x3B))
+##   var p := HudPill.new().setup(UiIcons.tex("coin"), UiTheme.GOLD)
 ##   p.set_value(1250)
 
 var icon_rect: TextureRect

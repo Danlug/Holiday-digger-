@@ -19,13 +19,13 @@ const TILE := Vector2(30, 32)
 ## Карточка дня одной высоты (строка дня и кнопка) — календарь не прыгает при выборе другого дня.
 const DETAIL_H := 72.0
 
-const BG_TODAY := Color8(0x2E, 0x26, 0x12)
+const BG_TODAY := UiTheme.GOLD_BG
 const BG_DONE := Color8(0x1B, 0x2A, 0x1C)
 const BG_MISSED := Color8(0x33, 0x17, 0x1A)
 const BG_LOCKED := Color8(0x1A, 0x16, 0x1E)
 const RED_EDGE := Color8(0x8A, 0x2E, 0x35)
 const PURPLE := Color8(0x2A, 0x1A, 0x33)
-const DOLLAR_GREEN := Color8(0x4D, 0xE0, 0x94)
+const DOLLAR_GREEN := UiTheme.MONEY
 
 var _root: Control = null
 var _card: PanelContainer = null
@@ -496,7 +496,7 @@ func _restore_button(n: int) -> Button:
 	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("dollar"), 14)
 	if not afford:
 		ic.modulate = Color(0.7, 0.7, 0.7)
-	var b := _cta(Color8(0x2F, 0x6B, 0x3B) if afford else Color8(0x3A, 0x34, 0x30), [cap, ic])
+	var b := _cta(UiTheme.OK_BTN if afford else Color8(0x3A, 0x34, 0x30), [cap, ic])
 	b.name = "Restore"
 	b.pressed.connect(func() -> void: _restore(n, b))
 	Tip.bind(b, NewbieStreak.text("restore_tip") % price, NewbieStreak.text("missed_body"),

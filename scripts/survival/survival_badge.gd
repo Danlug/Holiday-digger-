@@ -134,7 +134,7 @@ func _draw() -> void:
 	var s := 1.0 + 0.45 * _pop * _pop + 0.08 * pulse
 	var c := size * 0.5
 	var half := SIZE * 0.5 * s
-	var ring := Color8(0xE0, 0xA9, 0x3B) if _rank == 1 else Color8(0xE8, 0x50, 0x4A)
+	var ring := UiTheme.GOLD if _rank == 1 else UiTheme.DANGER
 	_box.border_color = ring.lerp(Color.WHITE, 0.35 * pulse)
 	draw_style_box(_box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2.0))
 	var tex := UiIcons.tex(String(_status.get("icon", "")))

@@ -16,9 +16,9 @@ const W := 46.0
 const H := 24.0
 const POLL := 0.4
 const COL_BG := Color(0.07, 0.055, 0.045, 0.86)
-const COL_EDGE := Color8(0x52, 0x40, 0x2D)
-const COL_READY := Color8(0x7F, 0xD0, 0x6B)
-const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
+const COL_EDGE := UiTheme.EDGE
+const COL_READY := UiTheme.OK_LIGHT
+const COL_FILL := UiTheme.GOLD
 const COL_TRACK := Color(0, 0, 0, 0.55)
 
 var _id := ""

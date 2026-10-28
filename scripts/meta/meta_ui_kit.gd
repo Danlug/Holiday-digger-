@@ -6,17 +6,17 @@ extends RefCounted
 ## живут в Tip.
 
 const GOLD := ProgressUiKit.GOLD
-const GOLD_LIGHT := Color8(0xFF, 0xE0, 0x66)
+const GOLD_LIGHT := UiTheme.GOLD_LIGHT
 const MUTED := ProgressUiKit.MUTED
 const DIM := ProgressUiKit.DIM
 const BORDER := ProgressUiKit.BORDER
 const BG := ProgressUiKit.BG
 const CARD := ProgressUiKit.CARD_BG
-const SLOT := Color8(0x24, 0x1E, 0x2C)
+const SLOT := UiTheme.NIGHT_SLOT
 const GREEN := ProgressUiKit.GREEN
-const GREEN_BTN := Color8(0x2F, 0x6B, 0x3B)
-const RED := Color8(0xC2, 0x1E, 0x3A)
-const BLUE := Color8(0x6F, 0xE0, 0xD8)
+const GREEN_BTN := UiTheme.OK_BTN
+const RED := UiTheme.CRIMSON
+const BLUE := UiTheme.TEAL
 ## Рамки достижений: бронза, серебро, золото.
 const TIER_COL := [Color8(0xB0, 0x74, 0x3B), Color8(0xB8, 0xC4, 0xC8), Color8(0xE8, 0xB3, 0x2E)]
 
@@ -111,7 +111,7 @@ static func reward_row(reward: Dictionary, px: float = 12.0, size: int = 9) -> H
 	if r.has("coins"):
 		row.add_child(chip(reward_tex("coins"), UiFmt.short(int(r["coins"])), GOLD_LIGHT, px, size))
 	if r.has("dollars"):
-		row.add_child(chip(reward_tex("dollars"), str(int(r["dollars"])), Color8(0x4D, 0xE0, 0x94), px, size))
+		row.add_child(chip(reward_tex("dollars"), str(int(r["dollars"])), UiTheme.MONEY, px, size))
 	if r.has("xp"):
 		row.add_child(chip(reward_tex("xp"), UiFmt.short(int(r["xp"])), BLUE, px, size))
 	if r.has("item"):

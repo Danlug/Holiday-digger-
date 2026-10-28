@@ -7,8 +7,8 @@ extends RefCounted
 
 const DIR := "res://art/house_ui/"
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_BRIGHT := Color8(0xFF, 0xD8, 0x5A)
+const GOLD := UiTheme.GOLD
+const GOLD_BRIGHT := UiTheme.GOLD_BRIGHT
 const INK := Color(0.05, 0.04, 0.08)
 
 

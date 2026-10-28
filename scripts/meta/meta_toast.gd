@@ -173,5 +173,5 @@ func _build(item: Dictionary) -> void:
 
 
 func _style(frame: Color) -> StyleBoxFlat:
-	var sb := ProgressUiKit.popup_box(frame, Color8(0x1A, 0x14, 0x0F, 0xF5), 4)
+	var sb := ProgressUiKit.popup_box(frame, UiTheme.FLOAT_BG, 4)
 	return sb

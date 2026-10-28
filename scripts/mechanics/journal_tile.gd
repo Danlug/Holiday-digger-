@@ -4,10 +4,10 @@ extends Control
 ## Ненайденная — тёмный силуэт того же значка (форма подсказывает, что искать).
 ## Рамка — золотая у мастера (пять звёзд), зелёная у новой, ещё не виденной.
 
-const COL_BG := Color8(0x1D, 0x17, 0x12)
-const COL_BG_LOCKED := Color8(0x14, 0x10, 0x0D)
+const COL_BG := UiTheme.CARD
+const COL_BG_LOCKED := UiTheme.PANEL_DARK
 const COL_BAR_BG := Color(0, 0, 0, 0.45)
-const COL_BAR := Color8(0xE0, 0xA9, 0x3B)
+const COL_BAR := UiTheme.GOLD
 
 var item: String = ""
 ## Новое с прошлого открытия журнала (порода впервые или новая звезда): зелёная рамка.

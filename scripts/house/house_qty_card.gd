@@ -120,7 +120,7 @@ func _init() -> void:
 	Tip.bind(cancel, "Отмена")
 	btns.add_child(cancel)
 	_max_btn = HouseArt.button("gold", null, Vector2(46, 32))
-	var ml := ShopArt.label("MAX", 11, Color.WHITE, Color8(0x6A, 0x3E, 0x0A), 3)
+	var ml := ShopArt.label("MAX", 11, Color.WHITE, UiTheme.GOLD_INK, 3)
 	ml.position = Vector2(0, 0)
 	ml.size = Vector2(46, 30)
 	ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -151,8 +151,8 @@ static func _icon(t: Texture2D, px: float) -> TextureRect:
 ## «язычок» вместо стандартной круглой ручки темы.
 static func _style_slider(s: HSlider) -> void:
 	var track := StyleBoxFlat.new()
-	track.bg_color = Color8(0x14, 0x10, 0x1B)
-	track.border_color = Color8(0x4A, 0x3F, 0x5C)
+	track.bg_color = UiTheme.NIGHT_DEEP
+	track.border_color = UiTheme.NIGHT_LINE
 	track.set_border_width_all(1)
 	track.set_content_margin_all(0)
 	track.content_margin_top = 3

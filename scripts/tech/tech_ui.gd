@@ -10,9 +10,9 @@ const GOLD := ProgressUiKit.GOLD
 const MUTED := ProgressUiKit.MUTED
 const DIM := ProgressUiKit.DIM
 const GREEN := ProgressUiKit.GREEN
-const RED := Color8(0xD0, 0x5A, 0x4E)
+const RED := UiTheme.DANGER
 const PANEL := ProgressUiKit.CARD_BG
-const PANEL_DARK := Color8(0x12, 0x0D, 0x0A)
+const PANEL_DARK := UiTheme.PANEL_DARK
 const BORDER := ProgressUiKit.EDGE
 const FIRE := Color8(0xF0, 0x70, 0x1E)
 

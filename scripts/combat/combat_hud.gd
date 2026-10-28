@@ -14,11 +14,11 @@ const BOTTOM_PAD := 28.0          # над отладочной кнопкой �
 const BAR_W := 58.0
 const BAR_H := 9.0
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_DIM := Color8(0x9C, 0x76, 0x2C)
-const RED := Color8(0xC4, 0x52, 0x4A)
+const GOLD := UiTheme.GOLD
+const GOLD_DIM := UiTheme.GOLD_DIM
+const RED := UiTheme.RED
 const BG := Color(0.11, 0.09, 0.07, 0.82)
-const BORDER := Color8(0x52, 0x40, 0x2D)
+const BORDER := UiTheme.EDGE
 
 var director: CombatDirector = null
 
@@ -144,7 +144,7 @@ func _draw_bar() -> void:
 	var vul := b.vulnerable()
 	_bar.draw_rect(Rect2(x0, 6, BAR_W, BAR_H), Color(0.06, 0.04, 0.03, 0.95))
 	_bar.draw_rect(Rect2(x0, 6, BAR_W * _hp_shown, BAR_H), Color(0.85, 0.85, 0.85, 0.5))
-	var fill := Color8(0xE0, 0xA9, 0x3B) if vul else RED
+	var fill := UiTheme.GOLD if vul else RED
 	if _hit_flash > 0.0:
 		fill = Color(1, 1, 1)
 	_bar.draw_rect(Rect2(x0, 6, BAR_W * frac, BAR_H), fill)

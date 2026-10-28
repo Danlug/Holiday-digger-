@@ -33,11 +33,11 @@ extends CanvasLayer
 
 signal action_requested(action: String, arg: String)
 
-const BG := Color8(0x14, 0x0F, 0x0B)
-const PANEL_BG := Color8(0x1E, 0x18, 0x11)
-const PANEL_BORDER := Color8(0x3E, 0x31, 0x25)
-const ACCENT := Color8(0xE0, 0xA9, 0x3B)
-const DIM := Color8(0x9D, 0x8B, 0x73)
+const BG := UiTheme.PANEL_DARK
+const PANEL_BG := UiTheme.CARD
+const PANEL_BORDER := UiTheme.BORDER
+const ACCENT := UiTheme.GOLD
+const DIM := UiTheme.MUTED
 
 ## Высота игрового поля дома — вся высота экрана (480) минус тонкая шапка со
 ## статами (HUD на время дома скрыт целиком, см. house_system.enter_house).
@@ -296,9 +296,9 @@ func _build_header() -> void:
 	var bars := _need(header, "Bars", HBoxContainer) as HBoxContainer
 	bars.position = Vector2(8, 22)
 	bars.add_theme_constant_override("separation", 6)
-	_bars["hp"] = _bar_row(bars, "Hp", Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
+	_bars["hp"] = _bar_row(bars, "Hp", UiTheme.RED, "res://art/ui/icon_hp.png")
 	_bars["hunger"] = _bar_row(bars, "Hunger", Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
-	_bars["stamina"] = _bar_row(bars, "Stamina", Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
+	_bars["stamina"] = _bar_row(bars, "Stamina", UiTheme.BLUE, "res://art/ui/icon_stamina.png")
 	for id in ["hp", "hunger", "stamina"]:
 		var row: Control = (_bars[id] as Node).get_parent().get_parent()
 		_bar_icons[id] = row.get_node_or_null("Icon")

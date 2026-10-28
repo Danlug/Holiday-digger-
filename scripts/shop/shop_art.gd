@@ -15,9 +15,9 @@ const TIER_COLORS := [
 	Color8(0xB0, 0x70, 0xE8), Color8(0xF0, 0xB8, 0x30), Color8(0xFF, 0x62, 0x4A),
 ]
 
-const COL_GOLD := Color8(0xFF, 0xD8, 0x5A)
-const COL_GOOD := Color8(0x6F, 0xE0, 0x8A)
-const COL_BAD := Color8(0xFF, 0x6B, 0x6B)
+const COL_GOLD := UiTheme.GOLD_BRIGHT
+const COL_GOOD := UiTheme.OK_LIGHT
+const COL_BAD := UiTheme.BAD_LIGHT
 
 static var _cache: Dictionary = {}
 

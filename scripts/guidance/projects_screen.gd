@@ -19,10 +19,10 @@ signal track_changed(id: String)
 
 const BAR_W := 92.0
 const ROW_H := 34.0
-const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
-const COL_FILL_VIA := Color8(0xE0, 0xA9, 0x3B, 0x70)
-const COL_DONE := Color8(0x7F, 0xD0, 0x6B)
-const COL_TRACK := Color8(0x0E, 0x0B, 0x08)
+const COL_FILL := UiTheme.GOLD
+const COL_FILL_VIA := Color(UiTheme.GOLD, 0.44)
+const COL_DONE := UiTheme.OK_LIGHT
+const COL_TRACK := UiTheme.INSET
 const HEAD_TOP := UiBtn.CLOSE_ROW   # над шапкой — полоса крестика, как на всех экранах
 const HEAD_H := 62.0          # заголовок, подзаголовок, фишки и черта под ними
 const TITLE_SIZES := [13, 12, 11, 10]   # длинное имя проекта ужимается, а не обрезается

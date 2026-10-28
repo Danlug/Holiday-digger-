@@ -13,7 +13,7 @@ signal closed
 signal mode_chosen(mode: String)
 signal restore_pressed
 
-const ROW_BG := Color8(0x23, 0x1B, 0x14)
+const ROW_BG := UiTheme.ROW
 const GOLD := ProgressUiKit.GOLD
 const MUTED := ProgressUiKit.MUTED
 ## Высота кнопок во всех рядах одна: раньше было 26/30/32/34/36 и ряды выглядели рваными.

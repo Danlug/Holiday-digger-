@@ -111,7 +111,7 @@ func _next() -> void:
 	var is_branch: bool = _entry["kind"] == "branch"
 	Sfx.play("quest_done" if is_branch else "artifact")
 	Haptics.buzz(120 if is_branch else 60)
-	HeroUi.burst_particles(self, _card_center(), ProgressUiKit.GOLD if not is_branch else Color8(0xFF, 0xE0, 0x66),
+	HeroUi.burst_particles(self, _card_center(), ProgressUiKit.GOLD if not is_branch else UiTheme.GOLD_LIGHT,
 		36 if is_branch else 26, 130.0)
 
 	if _tween != null:

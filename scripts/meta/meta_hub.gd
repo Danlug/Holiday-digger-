@@ -125,7 +125,7 @@ func _build() -> void:
 	var sb := HudSafeArea.bottom(get_viewport())
 	_tab_buttons = bar.get_meta("buttons")
 	for t in _tab_buttons.keys():
-		(_tab_buttons[t] as HeroTabButton).badge_color = Color8(0xD0, 0x45, 0x3C)   # красный: есть что забрать
+		(_tab_buttons[t] as HeroTabButton).badge_color = UiTheme.DANGER   # красный: есть что забрать
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 6
 	bar.offset_right = -6
@@ -367,7 +367,7 @@ func _quest_card(q: Dictionary) -> Control:
 		Tip.bind(claim, "Забрать награду")
 		h.add_child(claim)
 		if MetaAds.can(MetaAds.QUEST):
-			var ad := _cta("ad", Vector2(36, 34), Color8(0x3C, 0x3A, 0x1A), "×2")
+			var ad := _cta("ad", Vector2(36, 34), UiTheme.AD_BG, "×2")
 			ad.pressed.connect(func() -> void: _claim_quest_ad(qid, ad))
 			Tip.bind(ad, "Удвоить за ролик", "Монеты и опыт ×2. Доллары и очки не удваиваются.",
 				"Осталось сегодня: %d" % MetaAds.uses_left(MetaAds.QUEST))
@@ -507,7 +507,7 @@ func _ach_tile(a: Dictionary) -> Control:
 	t.custom_minimum_size = Vector2(ACH_W, ACH_H)
 	t.mouse_filter = Control.MOUSE_FILTER_PASS
 	var border := tcol if got else (MetaUiKit.GOLD.darkened(0.45) if started else MetaUiKit.BORDER)
-	t.add_theme_stylebox_override("panel", MetaUiKit.box(Color8(0x2C, 0x24, 0x34) if got else MetaUiKit.SLOT, border, 2 if got else 1, 4))
+	t.add_theme_stylebox_override("panel", MetaUiKit.box(UiTheme.NIGHT_HI if got else MetaUiKit.SLOT, border, 2 if got else 1, 4))
 
 	var ring := MetaRing.new()
 	ring.size = Vector2(44, 44)
@@ -647,7 +647,7 @@ func _step_tile(i: int) -> Control:
 	t.custom_minimum_size = Vector2(STEP_W, 92)
 	t.mouse_filter = Control.MOUSE_FILTER_PASS
 	var border := MetaUiKit.GOLD if (ready or big) else MetaUiKit.BORDER
-	var bg := Color8(0x3A, 0x2C, 0x14) if ready else MetaUiKit.SLOT
+	var bg := UiTheme.GOLD_BG if ready else MetaUiKit.SLOT
 	t.add_theme_stylebox_override("panel", MetaUiKit.box(bg, border if (ready or reached or big) else MetaUiKit.BORDER, 2 if ready else 1, 4))
 
 	var icon_name := "chest" if big else ("gift" if (reward.has("item") and reward.get("coins", 0) == 0) else "coins")

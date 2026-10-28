@@ -282,7 +282,7 @@ func _tile(q: Dictionary) -> Control:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(0, TILE_H)
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
-	var bg := Color8(0x2E, 0x26, 0x12) if claimable else MetaUiKit.CARD
+	var bg := UiTheme.GOLD_BG if claimable else MetaUiKit.CARD
 	var sb := MetaUiKit.box(bg, MetaUiKit.GOLD if claimable else MetaUiKit.BORDER, 2 if claimable else 1, 4)
 	sb.set_content_margin_all(3)
 	card.add_theme_stylebox_override("panel", sb)
@@ -340,7 +340,7 @@ func _tile(q: Dictionary) -> Control:
 		h.add_child(claim)
 		_pulses.append(claim)
 		if MetaAds.can(MetaAds.QUEST):
-			var ad := _cta("ad", Vector2(34, 30), Color8(0x3C, 0x3A, 0x1A), "×2")
+			var ad := _cta("ad", Vector2(34, 30), UiTheme.AD_BG, "×2")
 			ad.pressed.connect(func() -> void: _claim_ad(qid, ad))
 			Tip.bind(ad, "Удвоить за ролик", "Монеты и опыт ×2. Доллары и очки не удваиваются.",
 				"Осталось сегодня: %d" % MetaAds.uses_left(MetaAds.QUEST))
@@ -408,7 +408,7 @@ func _stars_row() -> Control:
 	card.name = "StarsRow"
 	card.custom_minimum_size = Vector2(0, 46)
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
-	var sb := MetaUiKit.box(Color8(0x2E, 0x26, 0x12) if ready else MetaUiKit.SLOT,
+	var sb := MetaUiKit.box(UiTheme.GOLD_BG if ready else MetaUiKit.SLOT,
 		MetaUiKit.GOLD if ready else MetaUiKit.GOLD.darkened(0.45), 2, 5)
 	sb.set_content_margin_all(3)
 	sb.content_margin_right = 6

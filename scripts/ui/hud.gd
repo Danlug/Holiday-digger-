@@ -324,9 +324,9 @@ func _build_gauges(parent: Control) -> void:
 	bars.alignment = BoxContainer.ALIGNMENT_BEGIN
 	top.add_child(bars)
 
-	_hp_bar = _make_gauge(bars, Color8(0xD9, 0x4F, 0x4A), "hp", "hp")
-	_hunger_bar = _make_gauge(bars, Color8(0xE8, 0x7E, 0x6E), "hunger", "hunger")
-	_stamina_bar = _make_gauge(bars, Color8(0xE8, 0xC5, 0x47), "stamina", "stamina")
+	_hp_bar = _make_gauge(bars, UiTheme.DANGER, "hp", "hp")
+	_hunger_bar = _make_gauge(bars, UiTheme.HUNGER, "hunger", "hunger")
+	_stamina_bar = _make_gauge(bars, UiTheme.STAMINA, "stamina", "stamina")
 	# Значки «слабее/медленнее/шатает» на конце полосок (раунд 5, ГДД §7; scripts/survival/).
 	SurvivalBadge.attach(_hunger_bar, "hunger", self)
 	SurvivalBadge.attach(_stamina_bar, "stamina", self)
@@ -372,8 +372,8 @@ func _build_hero_button(parent: Control) -> void:
 	var lvl := PanelContainer.new()
 	lvl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.border_color = Color8(0x1A, 0x10, 0x0C)
+	sb.bg_color = UiTheme.GOLD
+	sb.border_color = UiTheme.INK
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(5)
 	sb.content_margin_left = 3
@@ -388,7 +388,7 @@ func _build_hero_button(parent: Control) -> void:
 	lvl.offset_bottom = 3
 	_level_label = Label.new()
 	_level_label.add_theme_font_size_override("font_size", 9)
-	_level_label.add_theme_color_override("font_color", Color8(0x1A, 0x10, 0x0C))
+	_level_label.add_theme_color_override("font_color", UiTheme.INK)
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.custom_minimum_size = Vector2(9, 0)
 	lvl.add_child(_level_label)
@@ -407,7 +407,7 @@ func _build_hero_button(parent: Control) -> void:
 	_hero_plus.visible = false
 	_hero_button.add_child(_hero_plus)
 
-	_xp_bar = HudBar.new().setup(Color8(0xE0, 0xA9, 0x3B), null)
+	_xp_bar = HudBar.new().setup(UiTheme.GOLD, null)
 	_xp_bar.bar_h = 4.0
 	_xp_bar.bar_width = 36.0
 	col.add_child(_xp_bar)
@@ -437,7 +437,7 @@ func _build_clock(parent: Control) -> void:
 	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clock.add_child(clock_icon)
 	_clock_label = Label.new()
-	_clock_label.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
+	_clock_label.add_theme_color_override("font_color", UiTheme.TEXT_SOFT)
 	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
 	_clock_label.add_theme_constant_override("outline_size", 2)
 	_clock_label.add_theme_font_size_override("font_size", 9)
@@ -481,8 +481,8 @@ func _build_purse(parent: Control) -> void:
 	parent.add_child(box)
 	_purse_box = box
 
-	_coins_pill = _make_pill(box, "coin", Color8(0xE0, 0xA9, 0x3B), "coins")
-	_dollars_pill = _make_pill(box, "dollar", Color8(0x7F, 0xB8, 0x6B), "dollars")
+	_coins_pill = _make_pill(box, "coin", UiTheme.GOLD, "coins")
+	_dollars_pill = _make_pill(box, "dollar", UiTheme.OK, "dollars")
 	Tip.bind(_coins_pill, "Монеты")
 	Tip.bind(_dollars_pill, "Доллары", "Премиум-валюта")
 	# Три таблетки одной ширины: ровный правый и левый край столбика (раньше 72/64/58).
@@ -490,12 +490,12 @@ func _build_purse(parent: Control) -> void:
 	_dollars_pill.custom_minimum_size.x = PILL_W
 
 	_load_pill = PanelContainer.new()
-	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(Color8(0x8F, 0xA3, 0x5C)))
+	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(UiTheme.OLIVE))
 	_load_pill.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_load_pill.custom_minimum_size.x = PILL_W
 	_load_pill.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(_load_pill)
-	_load_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
+	_load_bar = HudBar.new().setup(UiTheme.OK, UiIcons.tex("weight"))
 	_load_bar.bar_width = 48.0
 	_load_bar.pulse_above = 1.0
 	_load_pill.add_child(_load_bar)
@@ -533,7 +533,7 @@ func _build_depth(parent: Control) -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.071, 0.055, 0.043, 0.82)
-	sb.border_color = Color8(0x52, 0x40, 0x2D)
+	sb.border_color = UiTheme.EDGE
 	sb.set_border_width_all(1)
 	sb.border_width_right = 0
 	sb.corner_radius_top_left = ProgressUiKit.R_CARD
@@ -561,7 +561,7 @@ func _build_depth(parent: Control) -> void:
 	row.add_child(icon)
 	_depth_label = Label.new()
 	_depth_label.add_theme_font_size_override("font_size", 12)
-	_depth_label.add_theme_color_override("font_color", Color8(0xF2, 0xE6, 0xC8))
+	_depth_label.add_theme_color_override("font_color", UiTheme.CREAM)
 	_depth_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_depth_label.add_theme_constant_override("outline_size", 2)
 	_depth_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -581,10 +581,10 @@ const TOAST_MAX_W := 200.0      # шире не бывает: длинный т�
 const TOAST_PAD := Vector2(9, 5)
 const TOAST_FONT := 12
 const TOAST_COLORS := {
-	"info": Color8(0xE0, 0xA9, 0x3B),
-	"good": Color8(0x7F, 0xB8, 0x6B),
-	"bad": Color8(0xD9, 0x4F, 0x4A),
-	"rare": Color8(0xFF, 0xD0, 0x5A),
+	"info": UiTheme.GOLD,
+	"good": UiTheme.OK,
+	"bad": UiTheme.DANGER,
+	"rare": UiTheme.GOLD_BRIGHT,
 }
 
 
@@ -628,7 +628,7 @@ func _build_stick(parent: Control) -> void:
 	hint.text = ""
 	# Кегль под уменьшившийся стик: при 8 подпись вылезала за круг.
 	hint.add_theme_font_size_override("font_size", 6)
-	hint.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
+	hint.add_theme_color_override("font_color", UiTheme.OLIVE)
 	hint.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	hint.offset_top = 4
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -641,7 +641,7 @@ func _build_stick(parent: Control) -> void:
 	_knob.draw.connect(func():
 		var live: bool = hold_active()
 		var c := Vector2(knob_r, knob_r)
-		var rim := Color8(0xE0, 0xA9, 0x3B) if live else Color8(0xB8, 0xA3, 0x84)
+		var rim := UiTheme.GOLD if live else UiTheme.TEXT_SOFT
 		_knob.draw_circle(c + Vector2(0, 1.5), knob_r, Color(0, 0, 0, 0.4))
 		_knob.draw_circle(c, knob_r, Color8(0x3A, 0x2C, 0x20))
 		_knob.draw_circle(c, knob_r - 2.5, rim.darkened(0.35))
@@ -861,7 +861,7 @@ func _on_drop_confirmed(id: String, n: int) -> void:
 	_inv_sheet.refresh()
 	_sync_purse()
 	toast_parts([
-		{"icon_tex": UiIcons.item_small(id), "text": "−%d" % n, "color": Color8(0xE8, 0x8C, 0x80)},
+		{"icon_tex": UiIcons.item_small(id), "text": "−%d" % n, "color": UiTheme.BAD_TEXT},
 	], 1.6)
 
 
@@ -886,7 +886,7 @@ func _build_strip() -> void:
 	add_child(root)
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x16, 0x12, 0x0E)
+	sb.bg_color = UiTheme.PANEL_DARK
 	sb.border_color = ProgressUiKit.EDGE
 	sb.border_width_top = 2
 	var bg_panel := Panel.new()
@@ -1038,7 +1038,7 @@ func _build_more_menu() -> void:
 	_more_panel.name = "MoreMenu"
 	_more_panel.visible = false
 	_more_panel.add_theme_stylebox_override("panel",
-		ProgressUiKit.popup_box(ProgressUiKit.EDGE, Color8(0x1A, 0x14, 0x0F, 0xF5), 5))
+		ProgressUiKit.popup_box(ProgressUiKit.EDGE, UiTheme.FLOAT_BG, 5))
 	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_windows_root.add_child(_more_panel)   # окно, а не виджет: слой окон HUD
 
@@ -1058,7 +1058,7 @@ func _build_more_menu() -> void:
 	var build_label := Label.new()
 	build_label.text = _build_stamp()
 	build_label.add_theme_font_size_override("font_size", 8)
-	build_label.add_theme_color_override("font_color", Color8(0x86, 0x76, 0x60))
+	build_label.add_theme_color_override("font_color", UiTheme.DIM)
 	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(build_label)
@@ -1132,7 +1132,7 @@ func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) ->
 	var label := Label.new()
 	label.text = "+%d" % count
 	label.add_theme_font_size_override("font_size", 11)
-	label.add_theme_color_override("font_color", Color8(0xF5, 0xD0, 0x6B))
+	label.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1146,7 +1146,7 @@ func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	label.add_theme_color_override("font_color", UiTheme.GOLD)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1240,7 +1240,7 @@ func _build_objective_line() -> void:
 	row.add_child(icon)
 	_objective_label = Label.new()
 	_objective_label.add_theme_font_size_override("font_size", 10)
-	_objective_label.add_theme_color_override("font_color", Color8(0xF2, 0xD9, 0x9B))
+	_objective_label.add_theme_color_override("font_color", UiTheme.TEXT_HI)
 	_objective_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1516,7 +1516,7 @@ func _connect_game_state() -> void:
 	GameState.respawned.connect(func(): _sync_all())
 	GameState.exhausted_changed.connect(func(on: bool):
 		if on:
-			toast_parts([{"icon": "stamina"}, {"text": "−50%", "color": Color8(0xE8, 0x8C, 0x80)}], 2.4, "bad"))
+			toast_parts([{"icon": "stamina"}, {"text": "−50%", "color": UiTheme.BAD_TEXT}], 2.4, "bad"))
 	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
 
 
@@ -1627,8 +1627,8 @@ func _sync_purse(instant: bool = false) -> void:
 	var frac := load_kg / max_kg
 	_load_bar.set_fraction(minf(frac, 1.0), instant)
 	# Зелёный -> янтарь -> красный: тот же красный, что у перегруза в остальных экранах.
-	_load_bar.fill_color = Color8(0x7F, 0xB8, 0x6B) if frac < 0.6 \
-		else (Color8(0xE0, 0xA9, 0x3B) if frac < 0.85 else Color8(0xD9, 0x4F, 0x4A))
+	_load_bar.fill_color = UiTheme.OK if frac < 0.6 \
+		else (UiTheme.GOLD if frac < 0.85 else UiTheme.DANGER)
 	Tip.bind(_load_pill, "Рюкзак", "%.1f / %.0f кг" % [load_kg, max_kg])
 
 
@@ -1848,7 +1848,7 @@ func _on_survival_warning(bar_name: String, severe: bool) -> void:
 	var bar: HudBar = _hunger_bar if bar_name == "hunger" else _stamina_bar
 	if bar == null:
 		return
-	toast_parts([{"icon": bar_name}, {"text": "!!" if severe else "!", "color": Color8(0xE8, 0x8C, 0x80)}],
+	toast_parts([{"icon": bar_name}, {"text": "!!" if severe else "!", "color": UiTheme.BAD_TEXT}],
 		2.0, "bad")
 	Sfx.play("warn_low")
 	if severe:
@@ -1862,7 +1862,7 @@ func _on_survival_warning(bar_name: String, severe: bool) -> void:
 
 func _on_fell(damage: float, _speed: float) -> void:
 	if damage > 0.0:
-		toast_icon("hp", "−%d" % int(damage), 1.6, Color8(0xE8, 0x8C, 0x80), "bad")
+		toast_icon("hp", "−%d" % int(damage), 1.6, UiTheme.BAD_TEXT, "bad")
 
 
 func _on_dig_blocked(tile_type: int) -> void:
@@ -1874,7 +1874,7 @@ func _on_dig_blocked(tile_type: int) -> void:
 		parts.append({"icon_tex": load(tool_path)})
 	if not mineral_id.is_empty():
 		parts.append({"icon_tex": UiIcons.item_small(mineral_id)})
-	parts.append({"text": "Звон!", "color": Color8(0xE8, 0x8C, 0x80)})
+	parts.append({"text": "Звон!", "color": UiTheme.BAD_TEXT})
 	toast_parts(parts, 2.0, "bad")
 	Sfx.play("ui_deny")
 
@@ -1885,7 +1885,7 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 		toast_parts([
 			{"icon_tex": UiIcons.item_small(mineral_id)},
 			{"icon": "weight"},
-			{"text": "Полно", "color": Color8(0xE8, 0x8C, 0x80)},
+			{"text": "Полно", "color": UiTheme.BAD_TEXT},
 		], 2.2, "bad")
 		Sfx.play("ui_deny")
 		UiAnim.shake(_load_pill, 3.0, 0.3)
@@ -1905,7 +1905,7 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 		toast_parts([
 			{"icon_tex": UiIcons.item_small("diamond")},
 			{"icon_tex": load("res://art/items/pickaxe_rusty_cracked.png")},
-			{"text": "−25%", "color": Color8(0xE8, 0x8C, 0x80)},
+			{"text": "−25%", "color": UiTheme.BAD_TEXT},
 		], 4.0, "bad")
 
 
@@ -1936,13 +1936,13 @@ func _on_gear_unlocked(gear_id: String) -> void:
 		toast_parts([
 			{"icon_tex": load("res://art/items/backpack_propeller.png")},
 			{"icon": "arrow_up"},
-			{"text": "Полёт", "color": Color8(0xF2, 0xD9, 0x9B)},
+			{"text": "Полёт", "color": UiTheme.TEXT_HI},
 		], 4.0, "good")
 	if gear_id == "drill_rig":
 		# Глубина 1000, собран бурмобиль: копает вдвое быстрее бура.
 		toast_parts([
 			{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24},
-			{"text": "×2", "color": Color8(0xF2, 0xD9, 0x9B)},
+			{"text": "×2", "color": UiTheme.TEXT_HI},
 		], 4.0, "good")
 
 
@@ -1953,7 +1953,7 @@ func _on_tool_switched(tool_id: String) -> void:
 		# Лопата упёрлась в старый фундамент, нашлась дедова кирка.
 		toast_parts([
 			{"icon_tex": load("res://art/items/pickaxe_rusty.png"), "icon_px": 24},
-			{"text": "Дедова кирка", "color": Color8(0xF2, 0xD9, 0x9B)},
+			{"text": "Дедова кирка", "color": UiTheme.TEXT_HI},
 		], 3.4, "info")
 
 
@@ -1969,7 +1969,7 @@ func _on_entered_rig() -> void:
 ## _move_y и :_start_dig); на экране — топливо «0», а если надо идти на
 ## верстак — ещё и значок верстака.
 func _on_rig_fuel_warning(message: String) -> void:
-	var parts: Array = [{"icon": "fuel", "text": "0", "color": Color8(0xE8, 0x8C, 0x80)}]
+	var parts: Array = [{"icon": "fuel", "text": "0", "color": UiTheme.BAD_TEXT}]
 	if message.contains("верстак"):
 		parts.append({"icon": "workshop"})
 	toast_parts(parts, 2.8, "bad")
@@ -2013,8 +2013,8 @@ func _eat_from_inventory(id: String) -> void:
 		Sfx.play("ui_deny")
 		return
 	var parts: Array = [
-		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": Color8(0xE8, 0x7E, 0x6E)},
-		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": Color8(0xE8, 0xC5, 0x47)},
+		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": UiTheme.HUNGER},
+		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": UiTheme.STAMINA},
 	]
 	# Еда и аптечка лечат (раунд 4, healing): +HP в тосте, у аптечки — только он.
 	var medkit := Healing.is_medkit(id)
@@ -2022,7 +2022,7 @@ func _eat_from_inventory(id: String) -> void:
 	if medkit:
 		parts.clear()
 	if hp_pct > 0 or medkit:
-		parts.append({"icon": "hp", "text": "+%d" % hp_pct, "color": Color8(0xE8, 0x6A, 0x6A)})
+		parts.append({"icon": "hp", "text": "+%d" % hp_pct, "color": UiTheme.DANGER})
 	toast_parts(parts, 2.0)
 	Sfx.play("heal" if medkit else "eat")
 	_render_inventory()

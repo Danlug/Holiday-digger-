@@ -395,7 +395,7 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 // не дотягивается. Подмена стоит ДО загрузки index.js: движок просит wasm,
 // пак и ворклеты сам.
 (function () {
-	const V = "20261028-0646";
+	const V = "20261028-0709";
 	// Свежая ли сама страница: GitHub Pages отдаёт index.html с кэшем до 10 минут,
 	// и Chrome показывает прошлую сборку. version.json берётся мимо кэша; если там
 	// метка новее — перезагрузка на адрес с ?b=<новая метка>, которого в кэше нет.
@@ -441,14 +441,14 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 	}
 }());
 		</script>
-		<script src="index.js?v=20261028-0646"></script>
+		<script src="index.js?v=20261028-0709"></script>
 <script>
 (function () {
 	'use strict';
 	var shell = window.RaskopkiShell;
 	var $ = function (id) { return document.getElementById(id); };
 	var canvas = $('canvas'), splash = $('splash');
-	var GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":19259664,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
+	var GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":19294512,"index.wasm":43682606},"focusCanvas":true,"gdextensionLibs":[]};
 	var GODOT_THREADS_ENABLED = false;
 
 	// ---------- проверка возможностей браузера

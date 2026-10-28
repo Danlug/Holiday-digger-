@@ -30,6 +30,7 @@ func _ready() -> void:
 	_check_layout_kit()
 	_check_small_item_icon()
 	_check_tap_scale()
+	_check_one_button_factory()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -187,3 +188,23 @@ func _check_tap_scale() -> void:
 	check("вкладка героя получает то же «проседание»", tab.has_meta(UiBtn.FEEDBACK_META))
 	b.free()
 	tab.free()
+
+
+## Все виды кнопок — из UiBtn: одинаковый отклик и цель нажатия не меньше TOUCH_MIN.
+func _check_one_button_factory() -> void:
+	var made := [
+		UiBtn.text_button("+1", UiBtn.Kind.NORMAL, Vector2(34, 20)),
+		UiBtn.icon_button(UiIcons.tex("gear"), Vector2(16, 16)),
+		UiBtn.fill_button(MetaUiKit.tex("check"), Vector2(30, 30), UiTheme.OK_BTN),
+		UiBtn.texture_button("red", null, Vector2(24, 22), 12.0, false),
+	]
+	var ok := true
+	for b in made:
+		var m: Vector2 = (b as Button).custom_minimum_size
+		ok = ok and b.has_meta(UiBtn.FEEDBACK_META) and m.x >= UiBtn.TOUCH_MIN and m.y >= UiBtn.TOUCH_MIN
+	check("каждый вид кнопки проседает и не меньше %d" % int(UiBtn.TOUCH_MIN), ok)
+	var auto := UiBtn.text_button("x")
+	check("ширина «по содержимому» не раздувается", auto.custom_minimum_size.x == 0.0)
+	auto.free()
+	for b in made:
+		b.free()

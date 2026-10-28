@@ -118,15 +118,6 @@ static func make_wrapped_label(text: String, size: int = UiTheme.FS_SMALL, color
 	return l
 
 
-## Текстовая кнопка в общем стиле (приподнятая плитка UiBtn с откликом нажатия).
-static func make_button(text: String, font_size: int = UiTheme.FS_SMALL) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", font_size)
-	UiBtn.style(b)
-	return b
-
-
 ## Горизонтальная полоска заполнения (опыт, прогресс коллекции).
 ## Возвращает сам заполнитель — двигать надо его size.x.
 static func make_bar(parent: Control, width: float, height: float, fill_color: Color) -> ColorRect:

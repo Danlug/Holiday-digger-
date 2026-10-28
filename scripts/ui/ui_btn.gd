@@ -8,8 +8,14 @@ extends RefCounted
 ##   Tip.bind(b, "Настройки")
 ##   UiBtn.set_badge(b, 3)            # красная цифра в углу (0 — скрыть)
 ##
-## Старые кнопки с текстом тоже можно «одеть»: UiBtn.style(button, kind).
-## Тот же отклик через ProgressUiKit.make_button получают экраны прокачки/музея.
+## Единственная фабрика кнопок. Виды:
+##   UiBtn.text_button / style(b, kind)  — плитка: NORMAL (обычная), ACCENT (главная),
+##                                         DANGER (опасная), GHOST (без плашки, крестик);
+##   UiBtn.icon_button                   — плитка с одной иконкой;
+##   UiBtn.fill(b, цвет)                 — цветная плашка-призыв («Забрать», «×2»);
+##   UiBtn.texture_button("green", …)    — рисованная кнопка магазина и дома.
+## У всех одинаково: «проседание» на нажатие вниз (UiAnim.press), звук и вибро на
+## отпускание, цель нажатия не меньше TOUCH_MIN.
 
 enum Kind { NORMAL, ACCENT, DANGER, GHOST }
 
@@ -28,6 +34,7 @@ const BADGE_NAME := "Badge"
 const CLOSE_SIZE := 28.0   # ≥ 25 единиц ≈ 44 pt на iPhone
 const CLOSE_INSET := 4.0   # от правого и верхнего края окна
 const CLOSE_ROW := CLOSE_SIZE + CLOSE_INSET * 2.0   # высота полосы под крестиком сверху
+const TOUCH_MIN := 25.0   # меньше пальцем не попасть (≈ 44 pt на iPhone)
 
 
 static func _box(kind: int, state: String) -> StyleBox:
@@ -95,6 +102,89 @@ static func set_kind(b: Button, kind: int) -> void:
 	style(b, kind)
 
 
+## Кнопка с подписью в общем стиле.
+static func text_button(text: String, kind: int = Kind.NORMAL, size: Vector2 = Vector2.ZERO,
+		font_size: int = UiTheme.FS_SMALL) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.add_theme_font_size_override("font_size", font_size)
+	b.custom_minimum_size = _touch(size)
+	return style(b, kind)
+
+
+## Цветная плашка-призыв: фон цветом, светлая рамка, золотая при наведении,
+## нажатая темнее. Белый текст; у выключенной — серый фон и тусклый текст.
+static func fill(b: Button, bg: Color, margin: int = 3, with_feedback: bool = true) -> Button:
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb := ProgressUiKit.box(bg, GOLD if st == "hover" else bg.lightened(0.25), ProgressUiKit.R_TILE)
+		if st == "pressed":
+			sb.bg_color = bg.darkened(0.2)
+		if st == "disabled":
+			sb.bg_color = Color(0.15, 0.13, 0.11)
+			sb.border_color = UiTheme.BORDER
+		sb.set_content_margin_all(margin)
+		b.add_theme_stylebox_override(st, sb)
+	b.add_theme_color_override("font_color", Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", UiTheme.DIM)
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = _touch(b.custom_minimum_size)
+	if with_feedback:
+		wire_feedback(b)
+	return b
+
+
+## Плашка-призыв с иконкой (и подписью): «Забрать», «×2 за ролик».
+static func fill_button(icon: Texture2D, size: Vector2, bg: Color, text: String = "",
+		font_size: int = UiTheme.FS_BODY) -> Button:
+	var b := Button.new()
+	b.icon = icon
+	b.text = text
+	b.add_theme_constant_override("icon_max_width", 16)
+	b.add_theme_font_size_override("font_size", font_size)
+	b.custom_minimum_size = size
+	return fill(b, bg)
+
+
+## Рисованная кнопка магазина и дома: девятизонник btn_<kind> (green/red/gold/gray)
+## и знак по центру (узел «Glyph»). with_sound = false — звук даёт сам экран.
+static func texture_button(kind: String, glyph: Texture2D, size: Vector2, glyph_px: float = 16.0,
+		with_sound: bool = true) -> Button:
+	size = _touch(size)
+	var b := Button.new()
+	b.custom_minimum_size = size
+	b.size = size
+	b.focus_mode = Control.FOCUS_NONE
+	var texture := ShopArt.tex("btn_" + kind)
+	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+		var sb := StyleBoxTexture.new()
+		sb.texture = texture
+		sb.texture_margin_left = 5
+		sb.texture_margin_right = 5
+		sb.texture_margin_top = 5
+		sb.texture_margin_bottom = 5
+		match st:
+			"pressed", "hover_pressed":
+				sb.modulate_color = Color(0.78, 0.78, 0.78)
+			"disabled":
+				sb.modulate_color = Color(0.45, 0.45, 0.5)
+		b.add_theme_stylebox_override(st, sb)
+	if glyph != null:
+		var ic := ShopArt.rect(glyph, (size - Vector2(glyph_px, glyph_px)) * 0.5, Vector2(glyph_px, glyph_px))
+		ic.name = "Glyph"
+		b.add_child(ic)
+	if with_sound:
+		wire_feedback(b)
+	else:
+		wire_sink(b)
+	return b
+
+
+static func _touch(size: Vector2) -> Vector2:
+	if size == Vector2.ZERO:
+		return Vector2(0, TOUCH_MIN)
+	return Vector2(maxf(size.x, TOUCH_MIN) if size.x > 0.0 else 0.0, maxf(size.y, TOUCH_MIN))
+
+
 ## Кнопка с одной иконкой. icon_px — размер картинки в проектных единицах
 ## (16 = один пиксель рисунка на единицу; 32 — вдвое крупнее).
 static func icon_button(icon: Texture2D, size: Vector2 = Vector2(28, 28), kind: int = Kind.NORMAL, icon_px: int = 16) -> Button:
@@ -104,7 +194,7 @@ static func icon_button(icon: Texture2D, size: Vector2 = Vector2(28, 28), kind: 
 	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	b.expand_icon = false
 	b.add_theme_constant_override("icon_max_width", icon_px)
-	b.custom_minimum_size = size
+	b.custom_minimum_size = _touch(size)
 	style(b, kind)
 	return b
 

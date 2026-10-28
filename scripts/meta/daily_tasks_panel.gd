@@ -334,13 +334,13 @@ func _tile(q: Dictionary) -> Control:
 
 	var qid := String(q["id"])
 	if claimable:
-		var claim := _cta("check", Vector2(30, 30), MetaUiKit.GREEN_BTN)
+		var claim := UiBtn.fill_button(MetaUiKit.tex("check"), Vector2(30, 30), MetaUiKit.GREEN_BTN)
 		claim.pressed.connect(func() -> void: _claim(qid, 1.0, claim))
 		Tip.bind(claim, "Забрать награду", "И звезду дня.")
 		h.add_child(claim)
 		_pulses.append(claim)
 		if MetaAds.can(MetaAds.QUEST):
-			var ad := _cta("ad", Vector2(34, 30), UiTheme.AD_BG, "×2")
+			var ad := UiBtn.fill_button(MetaUiKit.tex("ad"), Vector2(34, 30), UiTheme.AD_BG, "×2")
 			ad.pressed.connect(func() -> void: _claim_ad(qid, ad))
 			Tip.bind(ad, "Удвоить за ролик", "Монеты и опыт ×2. Доллары и очки не удваиваются.",
 				"Осталось сегодня: %d" % MetaAds.uses_left(MetaAds.QUEST))
@@ -371,25 +371,6 @@ func _reroll_button(qid: String, free: bool, placement: String) -> Button:
 	else:
 		Tip.bind(b, "Заменить за ролик", "Бесплатная замена на сегодня потрачена.",
 			"Осталось роликов: %d" % MetaAds.uses_left(placement))
-	return b
-
-
-func _cta(icon_name: String, sz: Vector2, color: Color, text: String = "") -> Button:
-	var b := Button.new()
-	b.icon = MetaUiKit.tex(icon_name)
-	b.text = text
-	b.add_theme_constant_override("icon_max_width", 16)
-	b.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
-	b.custom_minimum_size = sz
-	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := MetaUiKit.box(color, MetaUiKit.GOLD if st == "hover" else color.lightened(0.25), 1, 5)
-		if st == "pressed":
-			sb.bg_color = color.darkened(0.2)
-		sb.set_content_margin_all(3)
-		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_color_override("font_color", Color.WHITE)
-	b.focus_mode = Control.FOCUS_NONE
-	UiBtn.wire_feedback(b)
 	return b
 
 

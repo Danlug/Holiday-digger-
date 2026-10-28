@@ -147,7 +147,7 @@ func _build_clock() -> void:
 
 
 func _build_skip() -> void:
-	_skip = HouseArt.button("gold", HouseArt.tex("skip_sleep"), Vector2(72, 40), 24.0)
+	_skip = UiBtn.texture_button("gold", HouseArt.tex("skip_sleep"), Vector2(72, 40), 24.0)
 	_skip.name = "Skip"
 	_skip.anchor_left = 0.5
 	_skip.anchor_right = 0.5

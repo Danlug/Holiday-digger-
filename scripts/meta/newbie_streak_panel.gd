@@ -455,13 +455,7 @@ func _cta(color: Color, parts: Array) -> Button:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(0, 26)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := MetaUiKit.box(color, MetaUiKit.GOLD if st == "hover" else color.lightened(0.25), 1, 5)
-		if st == "pressed":
-			sb.bg_color = color.darkened(0.2)
-		sb.set_content_margin_all(3)
-		b.add_theme_stylebox_override(st, sb)
-	b.focus_mode = Control.FOCUS_NONE
+	UiBtn.fill(b, color)
 	var h := HBoxContainer.new()
 	h.name = "Content"
 	h.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -471,7 +465,6 @@ func _cta(color: Color, parts: Array) -> Button:
 	for c in parts:
 		h.add_child(c)
 	b.add_child(h)
-	UiBtn.wire_feedback(b)
 	return b
 
 

@@ -243,7 +243,7 @@ func _build_buttons() -> Control:
 	Tip.bind(_claim_btn, "Забрать")
 	_claim_btn.custom_minimum_size = Vector2(112, 34)
 	_claim_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_cta(_claim_btn, MetaUiKit.GREEN_BTN)
+	UiBtn.fill(_claim_btn, MetaUiKit.GREEN_BTN, 4)
 	_claim_btn.pressed.connect(func() -> void:
 		if Tip.swallowed():
 			return
@@ -256,7 +256,7 @@ func _build_buttons() -> Control:
 	_ad_btn.add_theme_constant_override("icon_max_width", 16)
 	_ad_btn.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_ad_btn.custom_minimum_size = Vector2(62, 34)
-	_style_cta(_ad_btn, UiTheme.AD_BG)
+	UiBtn.fill(_ad_btn, UiTheme.AD_BG, 4)
 	_ad_btn.pressed.connect(_claim_ad)
 	Tip.bind(_ad_btn, "Удвоить за ролик", "Монеты и опыт сегодняшнего приза ×2. Доллары не удваиваются.",
 		"Осталось сегодня: %d" % MetaAds.uses_left(MetaAds.DAILY))
@@ -267,22 +267,6 @@ func _build_buttons() -> Control:
 		_claim_btn.disabled = true
 		_ad_btn.disabled = true
 	return h
-
-
-func _style_cta(b: Button, bg: Color) -> void:
-	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := MetaUiKit.box(bg, MetaUiKit.GOLD if st == "hover" else bg.lightened(0.25), 1, 5)
-		if st == "pressed":
-			sb.bg_color = bg.darkened(0.2)
-		if st == "disabled":
-			sb.bg_color = Color(0.15, 0.13, 0.11)
-			sb.border_color = MetaUiKit.BORDER
-		sb.set_content_margin_all(4)
-		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_color_override("font_color", Color.WHITE)
-	b.add_theme_color_override("font_disabled_color", MetaUiKit.DIM)
-	b.focus_mode = Control.FOCUS_NONE
-	UiBtn.wire_feedback(b)
 
 
 func _claim_ad() -> void:

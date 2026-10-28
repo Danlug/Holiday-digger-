@@ -59,7 +59,7 @@ func _init() -> void:
 	_icon = ShopArt.rect(null, Vector2(12, 12), Vector2(FRAME - 24, FRAME - 24))
 	_frame.add_child(_icon)
 
-	_button = HouseArt.button("green", ShopArt.tex("glyph_check"), Vector2(112, 38), 22.0)
+	_button = UiBtn.texture_button("green", ShopArt.tex("glyph_check"), Vector2(112, 38), 22.0)
 	_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_button.pressed.connect(_on_pressed)
 	col.add_child(_button)

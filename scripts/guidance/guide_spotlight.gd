@@ -377,20 +377,7 @@ func _on_card_button() -> void:
 
 
 func _green_button(icon, text: String) -> Button:
-	var b := Button.new()
-	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(110, 32)
-	var tex := ShopArt.tex("btn_green")
-	for stn in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
-		var sb := StyleBoxTexture.new()
-		sb.texture = tex
-		for m in ["left", "right", "top", "bottom"]:
-			sb.set("texture_margin_" + m, 5)
-		sb.content_margin_left = 8
-		sb.content_margin_right = 10
-		if stn == "pressed" or stn == "hover_pressed":
-			sb.modulate_color = Color(0.78, 0.78, 0.78)
-		b.add_theme_stylebox_override(stn, sb)
+	var b := UiBtn.texture_button("green", null, Vector2(110, 32), 16.0, false)   # звук даёт _on_card_button
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER

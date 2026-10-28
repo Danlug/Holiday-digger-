@@ -42,35 +42,6 @@ static func nine(texture_name: String, margin: int, tint: Color = Color.WHITE,
 	return n
 
 
-## Кнопка в стиле магазина: цветной девятизонник (green/red/gold/gray) и значок.
-## Нажатие даёт звук и вибро (UiBtn), «проседание» — как у остальных кнопок.
-static func button(kind: String, glyph: Texture2D, size: Vector2, glyph_px: float = 16.0) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = size
-	b.size = size
-	b.focus_mode = Control.FOCUS_NONE
-	var texture := ShopArt.tex("btn_" + kind)
-	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
-		var sb := StyleBoxTexture.new()
-		sb.texture = texture
-		sb.texture_margin_left = 5
-		sb.texture_margin_right = 5
-		sb.texture_margin_top = 5
-		sb.texture_margin_bottom = 5
-		match st:
-			"pressed", "hover_pressed":
-				sb.modulate_color = Color(0.78, 0.78, 0.78)
-			"disabled":
-				sb.modulate_color = Color(0.45, 0.45, 0.5)
-		b.add_theme_stylebox_override(st, sb)
-	if glyph != null:
-		var ic := ShopArt.rect(glyph, (size - Vector2(glyph_px, glyph_px)) * 0.5, Vector2(glyph_px, glyph_px))
-		ic.name = "Glyph"
-		b.add_child(ic)
-	UiBtn.wire_feedback(b)
-	return b
-
-
 ## Рамка-панель магазина (тёмная с золотым верхом) для карточек и окон.
 static func panel_style(margin: int = 9) -> StyleBoxTexture:
 	var sb := StyleBoxTexture.new()

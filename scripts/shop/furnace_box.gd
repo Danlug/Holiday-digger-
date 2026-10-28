@@ -53,7 +53,7 @@ func setup(anchor: Control = null) -> FurnaceBox:
 	gap.custom_minimum_size = Vector2(4, 0)
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_q_row.add_child(gap)
-	_stop = HouseArt.button("red", ShopArt.tex("glyph_cross"), Vector2(24, ROW_H), 12.0)
+	_stop = UiBtn.texture_button("red", ShopArt.tex("glyph_cross"), Vector2(24, ROW_H), 12.0)
 	_stop.name = "FurnaceStop"
 	_stop.pressed.connect(_on_stop)
 	_q_row.add_child(_stop)

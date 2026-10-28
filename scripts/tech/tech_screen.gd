@@ -240,15 +240,6 @@ func _pips(parent: Node, total: int, filled: int, color: Color = TechUi.GOLD) ->
 		row.add_child(pip)
 
 
-func _text_button(text: String, kind: int = UiBtn.Kind.NORMAL, width: float = 40.0) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
-	b.custom_minimum_size = Vector2(width, 24)
-	UiBtn.style(b, kind)
-	return b
-
-
 ## Цена: монеты и материалы «есть/нужно» — красным то, чего не хватает.
 func _cost_row(parent: Node, cost) -> void:
 	if cost == null:
@@ -388,8 +379,8 @@ func _source_row(parent: Node, source: String, icon: Texture2D, have: int, allow
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
-	var one := _text_button("+1", UiBtn.Kind.NORMAL, 34)
-	var all := _text_button("", UiBtn.Kind.ACCENT, 48)
+	var one := UiBtn.text_button("+1", UiBtn.Kind.NORMAL, Vector2(34, 24))
+	var all := UiBtn.text_button("", UiBtn.Kind.ACCENT, Vector2(48, 24))
 	all.icon = UiIcons.tex("max")      # «до максимума» — значок, слова нет
 	all.add_theme_constant_override("icon_max_width", 16)
 	all.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER

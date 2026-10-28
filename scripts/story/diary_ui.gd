@@ -228,6 +228,7 @@ func _icon_button(tex: Texture2D) -> Button:
 	b.add_theme_color_override("icon_normal_color", INK)
 	b.add_theme_color_override("icon_hover_color", INK)
 	b.add_theme_color_override("icon_pressed_color", INK)
+	UiBtn.wire_sink(b)
 	return b
 
 
@@ -251,6 +252,7 @@ func _arrow_button(dir: Vector2) -> Button:
 	arrow.set_dir(dir)
 	arrow.set_color(INK)
 	b.add_child(arrow)
+	UiBtn.wire_sink(b)
 	return b
 
 

@@ -121,6 +121,7 @@ func _build_button() -> void:
 		_button.add_theme_stylebox_override(state, sb)
 	_button.visible = false
 	_button.pressed.connect(_on_pressed)
+	UiBtn.wire_sink(_button)
 	_layer.add_child(_button)
 
 	_badge = Label.new()

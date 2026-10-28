@@ -156,12 +156,12 @@ func _build_actions() -> void:
 	row.offset_bottom = 40.0
 	bar.add_child(row)
 
-	_take_btn = HouseArt.button("gold", HouseArt.tex("take_all"), Vector2(96, 34), 24.0)
+	_take_btn = UiBtn.texture_button("gold", HouseArt.tex("take_all"), Vector2(96, 34), 24.0)
 	_take_btn.pressed.connect(_on_take_all)
 	row.add_child(_take_btn)
 	_take_lock = ShopArt.rect(ShopArt.tex("glyph_lock"), Vector2(78, 16), Vector2(16, 16))
 	_take_btn.add_child(_take_lock)
-	_put_btn = HouseArt.button("green", HouseArt.tex("put_all"), Vector2(96, 34), 24.0)
+	_put_btn = UiBtn.texture_button("green", HouseArt.tex("put_all"), Vector2(96, 34), 24.0)
 	_put_btn.pressed.connect(_on_put_all)
 	row.add_child(_put_btn)
 	_put_lock = ShopArt.rect(ShopArt.tex("glyph_lock"), Vector2(78, 16), Vector2(16, 16))

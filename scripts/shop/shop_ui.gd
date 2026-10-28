@@ -380,41 +380,6 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	return {"root": root, "icon": ic, "label": lb}
 
 
-## Кнопка-картинка: рамка из девятизонника, знак по центру.
-func _make_btn(kind: String, glyph: String, sz: Vector2, icon_px: float = 16.0) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = sz
-	b.size = sz
-	b.focus_mode = Control.FOCUS_NONE
-	var tex := ShopArt.tex("btn_" + kind)
-	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
-		var sb := StyleBoxTexture.new()
-		sb.texture = tex
-		sb.texture_margin_left = 5
-		sb.texture_margin_right = 5
-		sb.texture_margin_top = 5
-		sb.texture_margin_bottom = 5
-		match st:
-			"pressed", "hover_pressed":
-				sb.modulate_color = Color(0.78, 0.78, 0.78)
-			"disabled":
-				sb.modulate_color = Color(0.45, 0.45, 0.5)
-		b.add_theme_stylebox_override(st, sb)
-	if glyph != "":
-		var ic := ShopArt.rect(ShopArt.tex(glyph), (sz - Vector2(icon_px, icon_px)) * 0.5, Vector2(icon_px, icon_px))
-		ic.name = "Glyph"
-		b.add_child(ic)
-	b.button_down.connect(func() -> void:
-		if b.disabled:
-			return
-		b.pivot_offset = b.size * 0.5
-		UiAnim.press(b, true, 0.94))
-	b.button_up.connect(func() -> void:
-		b.pivot_offset = b.size * 0.5
-		UiAnim.press(b, false))
-	return b
-
-
 func _build_nav() -> void:
 	_nav = Control.new()
 	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -499,7 +464,7 @@ func _build_nav() -> void:
 	_marker.get_parent().move_child(_marker, 0)
 
 	# На экране верстака вкладок нет: одна большая кнопка «готово» под большим пальцем.
-	_nav_done = _make_btn("green", "glyph_check", Vector2(96, 28), 18.0)
+	_nav_done = UiBtn.texture_button("green", ShopArt.tex("glyph_check"), Vector2(96, 28), 18.0, false)
 	_nav_done.anchor_left = 0.5
 	_nav_done.anchor_right = 0.5
 	_nav_done.offset_left = -48.0
@@ -530,7 +495,7 @@ func _build_action_bar() -> void:
 	_action.add_child(back)
 
 	# Ролик «×2»: слева, маленькая кнопка; справа — крупная «Продать».
-	_ad_btn = _make_btn("gray", "", Vector2(48, 36))
+	_ad_btn = UiBtn.texture_button("gray", null, Vector2(48, 36), 16.0, false)
 	_ad_btn.position = Vector2(6, 5)
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_video"), Vector2(4, 3), Vector2(14, 14)))
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(14, 8), Vector2(30, 24)))
@@ -542,7 +507,7 @@ func _build_action_bar() -> void:
 	_ad_btn.pressed.connect(_on_ad_x2_pressed)
 	_action.add_child(_ad_btn)
 
-	_sell_btn = _make_btn("gold", "", Vector2(158, 38))
+	_sell_btn = UiBtn.texture_button("gold", null, Vector2(158, 38), 16.0, false)
 	_sell_btn.position = Vector2(60, 4)
 	_sell_lead = ShopArt.rect(ShopArt.ui("icon_inventory"), Vector2(8, 5), Vector2(28, 28))
 	_sell_btn.add_child(_sell_lead)
@@ -970,7 +935,7 @@ func _after_snap(tile: ShopTile, color: Color) -> void:
 # ---------------------------------------------------------------------------
 
 func _build_door_strip() -> void:
-	_door_strip = ShopDoorStrip.new().setup(_make_btn("green", "", Vector2(56, 32)))
+	_door_strip = ShopDoorStrip.new().setup(UiBtn.texture_button("green", null, Vector2(56, 32), 16.0, false))
 	_door_strip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_door_strip.offset_top = -(_nav_bottom + ShopDoorStrip.H)
 	_door_strip.offset_bottom = -_nav_bottom
@@ -1134,20 +1099,20 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	var btns := HBoxContainer.new()
 	btns.add_theme_constant_override("separation", 6)
 	col.add_child(btns)
-	var cancel := _make_btn("red", "glyph_cross", Vector2(52, 32), 18.0)
+	var cancel := UiBtn.texture_button("red", ShopArt.tex("glyph_cross"), Vector2(52, 32), 18.0, false)
 	cancel.pressed.connect(func() -> void:
 		if not Tip.swallowed():
 			_close_card(true))
 	Tip.bind(cancel, "Отмена")
 	if is_recipe and bool(offer.get("can_invest", false)):
-		var inv := _make_btn("gray", "glyph_storage", Vector2(52, 32), 18.0)
+		var inv := UiBtn.texture_button("gray", ShopArt.tex("glyph_storage"), Vector2(52, 32), 18.0, false)
 		inv.pressed.connect(func() -> void: _invest(offer))
 		Tip.bind(inv, "На склад", "Переложить из рюкзака то, чего рецепту не хватает")
 		btns.add_child(inv)
 	btns.add_child(cancel)
 	btns.move_child(cancel, 0)
 	var ok_glyph := "glyph_hammer" if is_recipe else "glyph_check"
-	_card_ok = _make_btn("green", ok_glyph, Vector2(96, 32), 20.0)
+	_card_ok = UiBtn.texture_button("green", ShopArt.tex(ok_glyph), Vector2(96, 32), 20.0, false)
 	_card_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_card_ok.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	var can_do := _card_can_confirm(offer)

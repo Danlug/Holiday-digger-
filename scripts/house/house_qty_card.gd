@@ -91,7 +91,7 @@ func _init() -> void:
 	var srow := HBoxContainer.new()
 	srow.add_theme_constant_override("separation", 5)
 	col.add_child(srow)
-	_minus = HouseArt.button("gray", HouseArt.tex("glyph_minus"), Vector2(30, 28), 14.0)
+	_minus = UiBtn.texture_button("gray", HouseArt.tex("glyph_minus"), Vector2(30, 28), 14.0)
 	_minus.pressed.connect(func() -> void: _step(-1))
 	srow.add_child(_minus)
 	_slider = HSlider.new()
@@ -103,7 +103,7 @@ func _init() -> void:
 	_style_slider(_slider)
 	_slider.value_changed.connect(_on_slider)
 	srow.add_child(_slider)
-	_plus = HouseArt.button("gray", ShopArt.tex("glyph_plus"), Vector2(30, 28), 14.0)
+	_plus = UiBtn.texture_button("gray", ShopArt.tex("glyph_plus"), Vector2(30, 28), 14.0)
 	_plus.pressed.connect(func() -> void: _step(1))
 	srow.add_child(_plus)
 
@@ -113,13 +113,13 @@ func _init() -> void:
 	var btns := HBoxContainer.new()
 	btns.add_theme_constant_override("separation", 6)
 	col.add_child(btns)
-	var cancel := HouseArt.button("red", ShopArt.tex("glyph_cross"), Vector2(42, 32), 18.0)
+	var cancel := UiBtn.texture_button("red", ShopArt.tex("glyph_cross"), Vector2(42, 32), 18.0)
 	cancel.pressed.connect(func() -> void:
 		if not Tip.swallowed():
 			cancel_card())
 	Tip.bind(cancel, "Отмена")
 	btns.add_child(cancel)
-	_max_btn = HouseArt.button("gold", null, Vector2(46, 32))
+	_max_btn = UiBtn.texture_button("gold", null, Vector2(46, 32))
 	var ml := ShopArt.label("MAX", UiTheme.FS_LABEL, Color.WHITE, UiTheme.GOLD_INK, 3)
 	ml.position = Vector2(0, 0)
 	ml.size = Vector2(46, 30)
@@ -128,7 +128,7 @@ func _init() -> void:
 	_max_btn.add_child(ml)
 	_max_btn.pressed.connect(func() -> void: _slider.value = _max)
 	btns.add_child(_max_btn)
-	_ok = HouseArt.button("green", ShopArt.tex("glyph_check"), Vector2(80, 32), 20.0)
+	_ok = UiBtn.texture_button("green", ShopArt.tex("glyph_check"), Vector2(80, 32), 20.0)
 	_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# Глиф стоит по координатам под 80 px — держим его в центре растянутой кнопки.
 	_ok.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)

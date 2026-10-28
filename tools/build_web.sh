@@ -56,6 +56,7 @@ for f in index.html index.js index.wasm index.pck; do
 	[ -s "$OUT/$f" ] || { echo "build_web: нет $OUT/$f после экспорта" >&2; exit 1; }
 done
 python3 tools/stamp_web_build.py
+cp web/privacy.html "$OUT/privacy.html"   # политика аналитики: окно согласия открывает её рядом с игрой (ГДД §16.1)
 
 [ -n "$backup" ] && { cp "$backup" "$INFO"; rm -f "$backup"; }
 

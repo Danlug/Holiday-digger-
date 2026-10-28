@@ -27,6 +27,7 @@ static var _open_any := false
 
 var _root: Control = null
 var _card: PanelContainer = null
+var _closing := false   # окно уходит: закрыто по смыслу, но ещё видно
 var _report: Dictionary = {}
 var _opened_ms := 0
 
@@ -73,7 +74,7 @@ func _exit_tree() -> void:
 
 
 func is_open() -> bool:
-	return visible
+	return visible and not _closing
 
 
 func report() -> Dictionary:
@@ -83,22 +84,32 @@ func report() -> Dictionary:
 func open(report_data: Dictionary) -> void:
 	_report = report_data
 	_build()
+	_closing = false
 	visible = true
 	_open_any = true
 	_opened_ms = Time.get_ticks_msec()
 	Sfx.play("ui_open", 0.9)
 	if _card != null:
-		UiAnim.appear(_card, 0.88, 0.24)
+		UiAnim.open(_card, UiAnim.Kind.POP, _root)
 
 
 func close() -> void:
-	if not visible:
+	if not is_open():
 		return
-	visible = false
 	_open_any = false
-	if _root != null:
-		_root.queue_free()
-		_root = null
+	_closing = true
+	var finish := func() -> void:
+		if not _closing:
+			return
+		_closing = false
+		visible = false
+		if _root != null:
+			_root.queue_free()
+			_root = null
+	if _card != null and _root != null:
+		UiAnim.close(_card, UiAnim.Kind.POP, _root, finish)
+	else:
+		finish.call()
 	closed.emit()
 
 

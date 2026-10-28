@@ -41,7 +41,6 @@ var _prev: Button
 var _next: Button
 var _dots_row: HBoxContainer
 var _dots: Array = []
-var _tween: Tween = null
 
 
 func _init() -> void:
@@ -331,14 +330,7 @@ func open_diary(index: int = -1) -> void:
 	_goto(default_page() if index < 0 else index, false)
 	Sfx.play("ui_open")
 	Haptics.tap()
-	if _tween != null:
-		_tween.kill()
-	_panel.pivot_offset = _panel.size / 2.0
-	_panel.scale = Vector2(0.92, 0.92)
-	_panel.modulate.a = 0.0
-	_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(_panel, "scale", Vector2.ONE, 0.2)
-	_tween.tween_property(_panel, "modulate:a", 1.0, 0.14)
+	UiAnim.open(_panel, UiAnim.Kind.POP, _root)
 
 
 func close_diary() -> void:
@@ -346,8 +338,6 @@ func close_diary() -> void:
 		return
 	is_open = false
 	Sfx.play("ui_close")
-	if _tween != null:
-		_tween.kill()
 	UiAnim.close(_panel, UiAnim.Kind.POP, _root)
 	closed.emit()
 

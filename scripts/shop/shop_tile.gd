@@ -108,14 +108,12 @@ func _on_down() -> void:
 	if disabled:
 		return
 	pivot_offset = size * 0.5
-	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector2(0.93, 0.93), 0.06)
+	UiAnim.press(self, true, 0.93)
 
 
 func _on_up() -> void:
 	pivot_offset = size * 0.5
-	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	UiAnim.press(self, false)
 
 
 ## Заполняет плитку из предложения (формат — в шапке файла).

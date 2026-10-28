@@ -46,8 +46,7 @@ func _init() -> void:
 
 
 func _squash(target: float) -> void:
-	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector2(target, target), 0.06)
+	UiAnim.press(self, target < 1.0, target)
 
 
 ## Сторона узла задаёт дерево по ширине колонки (веток может стать больше).

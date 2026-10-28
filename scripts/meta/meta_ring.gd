@@ -20,8 +20,8 @@ func _init() -> void:
 
 
 func animate_to(v: float, seconds: float = 0.5) -> void:
-	if not is_inside_tree():
-		value = v
+	if not is_inside_tree() or UiAnim.reduced():
+		value = clampf(v, 0.0, 1.0)
 		return
 	var t := create_tween()
 	t.tween_property(self, "value", clampf(v, 0.0, 1.0), seconds).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

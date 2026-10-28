@@ -145,7 +145,7 @@ func _draw() -> void:
 			draw_texture_rect(need, b, false)
 	if number != "":
 		var font := ThemeDB.fallback_font
-		var fs := 10
+		var fs := UiTheme.FS_BODY
 		var asc := font.get_ascent(fs)
 		var h := font.get_height(fs)
 		draw_string(font, Vector2(0, (size.y - h) * 0.5 + asc), number,

@@ -91,7 +91,7 @@ func _draw() -> void:
 		draw_circle(c, 5.0, badge_color)
 		var font := ThemeDB.fallback_font
 		var text := str(mini(badge, 99))
-		var fs := 8
+		var fs := UiTheme.FS_TINY
 		draw_string(font, Vector2(c.x - 6.0, c.y + font.get_ascent(fs) * 0.5 - 1.0), text,
 			HORIZONTAL_ALIGNMENT_CENTER, 12.0, fs,
 			Color(0.05, 0.12, 0.06) if badge_color.get_luminance() > 0.5 else Color.WHITE)

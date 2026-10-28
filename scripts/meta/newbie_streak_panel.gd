@@ -206,7 +206,7 @@ func _header() -> Control:
 	title.add_theme_constant_override("separation", 2)
 	title.mouse_filter = Control.MOUSE_FILTER_PASS
 	title.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("newbie"), 22))
-	var cnt := MetaUiKit.label("%d/%d" % [NewbieStreak.done_count(), NewbieStreak.days_total()], 12, MetaUiKit.GOLD_LIGHT)
+	var cnt := MetaUiKit.label("%d/%d" % [NewbieStreak.done_count(), NewbieStreak.days_total()], UiTheme.FS_TITLE, MetaUiKit.GOLD_LIGHT)
 	cnt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_child(cnt)
 	Tip.bind(title, NewbieStreak.text("title"), NewbieStreak.text("about"),
@@ -214,7 +214,7 @@ func _header() -> Control:
 	h.add_child(title)
 
 	if NewbieStreak.today_n() > 0:
-		var tm := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 12, 9)
+		var tm := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 12, UiTheme.FS_SMALL)
 		tm.mouse_filter = Control.MOUSE_FILTER_PASS
 		_timer_label = tm.get_child(1)
 		Tip.bind(tm, NewbieStreak.text("timer"), NewbieStreak.text("today_body"))
@@ -227,7 +227,7 @@ func _header() -> Control:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(gap)
 
-	var wallet := MetaUiKit.chip(MetaUiKit.tex("dollar"), str(GameState.dollars), DOLLAR_GREEN, 12, 10)
+	var wallet := MetaUiKit.chip(MetaUiKit.tex("dollar"), str(GameState.dollars), DOLLAR_GREEN, 12, UiTheme.FS_BODY)
 	wallet.mouse_filter = Control.MOUSE_FILTER_PASS
 	wallet.name = "Wallet"
 	Tip.bind(wallet, NewbieStreak.text("wallet"))
@@ -289,12 +289,12 @@ func _tile(n: int) -> Control:
 			num_col = MetaUiKit.DIM
 
 	if st == NewbieStreak.St.TODAY:   # миг до отметки (она — в ближайшую секунду): крупный номер
-		var big := _num_label(n, 11, num_col)
+		var big := _num_label(n, UiTheme.FS_LABEL, num_col)
 		big.position = Vector2(0, 8)
 		big.size = Vector2(TILE.x, 14)
 		b.add_child(big)
 	else:
-		var num := _num_label(n, 9, num_col)
+		var num := _num_label(n, UiTheme.FS_SMALL, num_col)
 		num.position = Vector2(0, 1)
 		num.size = Vector2(TILE.x, 11)
 		b.add_child(num)
@@ -376,7 +376,7 @@ func _detail(n: int) -> Control:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 4)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var day := MetaUiKit.label(NewbieStreak.text("day") % n, 11, MetaUiKit.GOLD_LIGHT if st == NewbieStreak.St.TODAY else ProgressUiKit.TEXT_HI)
+	var day := MetaUiKit.label(NewbieStreak.text("day") % n, UiTheme.FS_LABEL, MetaUiKit.GOLD_LIGHT if st == NewbieStreak.St.TODAY else ProgressUiKit.TEXT_HI)
 	day.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top.add_child(day)
 	var st_icon := ""
@@ -424,7 +424,7 @@ func _locked_body(n: int) -> Control:
 	var lk := MetaUiKit.icon_rect(MetaUiKit.tex("lock"), 32)
 	lk.modulate = Color(1, 1, 1, 0.8)
 	h.add_child(lk)
-	var cl := MetaUiKit.chip(MetaUiKit.tex("clock"), "+%d" % NewbieStreak.days_until(n), MetaUiKit.MUTED, 14, 11)
+	var cl := MetaUiKit.chip(MetaUiKit.tex("clock"), "+%d" % NewbieStreak.days_until(n), MetaUiKit.MUTED, 14, UiTheme.FS_LABEL)
 	cl.mouse_filter = Control.MOUSE_FILTER_PASS
 	Tip.bind(cl, NewbieStreak.text("locked"), NewbieStreak.text("locked_body") % NewbieStreak.days_until(n))
 	h.add_child(cl)
@@ -437,16 +437,16 @@ func _reward_row(r: Dictionary) -> HBoxContainer:
 	row.add_theme_constant_override("separation", 3)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if r.has("coins"):
-		row.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), UiFmt.short(int(r["coins"])), MetaUiKit.GOLD_LIGHT, 12, 9))
+		row.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), UiFmt.short(int(r["coins"])), MetaUiKit.GOLD_LIGHT, 12, UiTheme.FS_SMALL))
 	if r.has("dollars"):
-		row.add_child(MetaUiKit.chip(MetaUiKit.tex("dollar"), str(int(r["dollars"])), DOLLAR_GREEN, 12, 9))
+		row.add_child(MetaUiKit.chip(MetaUiKit.tex("dollar"), str(int(r["dollars"])), DOLLAR_GREEN, 12, UiTheme.FS_SMALL))
 	if r.has("xp"):
-		row.add_child(MetaUiKit.chip(MetaUiKit.tex("xp"), UiFmt.short(int(r["xp"])), MetaUiKit.BLUE, 12, 9))
+		row.add_child(MetaUiKit.chip(MetaUiKit.tex("xp"), UiFmt.short(int(r["xp"])), MetaUiKit.BLUE, 12, UiTheme.FS_SMALL))
 	if r.has("item"):
 		var t := ShopArt.tex("item_" + String(r["item"]["id"]))
 		if t == null:
 			t = MetaUiKit.reward_tex("item", String(r["item"]["id"]))
-		row.add_child(MetaUiKit.chip(t, "×%d" % int(r["item"]["count"]), Color.WHITE, 12, 9))
+		row.add_child(MetaUiKit.chip(t, "×%d" % int(r["item"]["count"]), Color.WHITE, 12, UiTheme.FS_SMALL))
 	return row
 
 
@@ -490,7 +490,7 @@ func _claim_button(n: int) -> Button:
 func _restore_button(n: int) -> Button:
 	var price := NewbieStreak.restore_price()
 	var afford := GameState.dollars >= price
-	var cap := MetaUiKit.label(NewbieStreak.text("restore") % price, 10, Color.WHITE if afford else MetaUiKit.MUTED)
+	var cap := MetaUiKit.label(NewbieStreak.text("restore") % price, UiTheme.FS_BODY, Color.WHITE if afford else MetaUiKit.MUTED)
 	cap.name = "Caption"
 	cap.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("dollar"), 14)
@@ -549,7 +549,7 @@ func _grand() -> Control:
 	line.add_theme_constant_override("separation", 4)
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("newbie"), 16))
-	var cnt := MetaUiKit.label("%d" % total, 13, MetaUiKit.GOLD_LIGHT)
+	var cnt := MetaUiKit.label("%d" % total, UiTheme.FS_TITLE_L, MetaUiKit.GOLD_LIGHT)
 	cnt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	line.add_child(cnt)
 	var gap := Control.new()
@@ -564,13 +564,13 @@ func _grand() -> Control:
 	ssb.content_margin_bottom = 1
 	soon.add_theme_stylebox_override("panel", ssb)
 	soon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	soon.add_child(MetaUiKit.label(NewbieStreak.text("grand_soon"), 9, MetaUiKit.GOLD_LIGHT))
+	soon.add_child(MetaUiKit.label(NewbieStreak.text("grand_soon"), UiTheme.FS_SMALL, MetaUiKit.GOLD_LIGHT))
 	line.add_child(soon)
 	mid.add_child(line)
 	var bar := MetaBar.new()
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.custom_minimum_size = Vector2(40, 13)
-	bar.font_size = 9
+	bar.font_size = UiTheme.FS_SMALL
 	bar.frac = float(done) / float(maxi(1, total))
 	bar.text = "%d/%d" % [done, total]
 	bar.fill_color = MetaUiKit.GOLD

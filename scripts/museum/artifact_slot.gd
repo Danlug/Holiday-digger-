@@ -150,7 +150,7 @@ func _draw() -> void:
 		if tex != null:
 			draw_texture_rect(tex, Rect2(origin, Vector2(ICON, ICON)), false, Color(0.05, 0.045, 0.06, 1.0))
 		var font := ThemeDB.fallback_font
-		var fs := 15
+		var fs := UiTheme.FS_HEAD_L
 		var pos := Vector2(0.0, (size.y - font.get_height(fs)) * 0.5 + font.get_ascent(fs))
 		draw_string_outline(font, pos, "?", HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, 3, Color(0.05, 0.04, 0.03))
 		draw_string(font, pos, "?", HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(0.82, 0.68, 0.38, 0.95))
@@ -164,7 +164,7 @@ func _draw() -> void:
 
 func _draw_initials() -> void:
 	var font := ThemeDB.fallback_font
-	var fs := 12
+	var fs := UiTheme.FS_TITLE
 	var text := ArtifactArt.placeholder_initials(ArtifactText.name_of(artifact))
 	var pos := Vector2(0.0, (size.y - font.get_height(fs)) * 0.5 + font.get_ascent(fs))
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, ProgressUiKit.GOLD)

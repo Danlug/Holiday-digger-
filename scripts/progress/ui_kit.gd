@@ -103,7 +103,7 @@ static func make_panel(bg: Color = PANEL_BG, border: Color = BORDER) -> PanelCon
 	return p
 
 
-static func make_label(text: String, size: int = 10, color: Color = MUTED) -> Label:
+static func make_label(text: String, size: int = UiTheme.FS_BODY, color: Color = MUTED) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
@@ -111,7 +111,7 @@ static func make_label(text: String, size: int = 10, color: Color = MUTED) -> La
 	return l
 
 
-static func make_wrapped_label(text: String, size: int = 9, color: Color = DIM) -> Label:
+static func make_wrapped_label(text: String, size: int = UiTheme.FS_SMALL, color: Color = DIM) -> Label:
 	var l := make_label(text, size, color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -119,7 +119,7 @@ static func make_wrapped_label(text: String, size: int = 9, color: Color = DIM) 
 
 
 ## Текстовая кнопка в общем стиле (приподнятая плитка UiBtn с откликом нажатия).
-static func make_button(text: String, font_size: int = 9) -> Button:
+static func make_button(text: String, font_size: int = UiTheme.FS_SMALL) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", font_size)

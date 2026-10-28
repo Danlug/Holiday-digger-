@@ -190,7 +190,7 @@ static func set_badge(b: Control, n: int) -> void:
 		label = Label.new()
 		label.name = "N"
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.add_theme_font_size_override("font_size", 8)
+		label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 		label.add_theme_color_override("font_color", Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

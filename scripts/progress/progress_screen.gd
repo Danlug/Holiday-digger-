@@ -123,7 +123,7 @@ static func make_hud_button(chip: Button) -> Button:
 		chip.custom_minimum_size = Vector2(22, chip.custom_minimum_size.y)
 	else:
 		chip.text = "Герой"
-		chip.add_theme_font_size_override("font_size", 8)
+		chip.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 		for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 			var sb: StyleBox = chip.get_theme_stylebox(state)
 			if sb != null:

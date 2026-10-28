@@ -36,7 +36,7 @@ func _ready() -> void:
 	button.pressed.connect(_on_pressed)
 	add_child(button)
 
-	_count = MetaUiKit.label("", 9, MetaUiKit.GOLD_LIGHT)
+	_count = MetaUiKit.label("", UiTheme.FS_SMALL, MetaUiKit.GOLD_LIGHT)
 	_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_count.custom_minimum_size = Vector2(SIZE.x, 0)
 	_count.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -463,7 +463,7 @@ func _make_popup() -> Node2D:
 	root.add_child(sp)
 	var lb := Label.new()
 	lb.name = "Text"
-	lb.add_theme_font_size_override("font_size", 11)
+	lb.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	lb.add_theme_constant_override("outline_size", 3)
 	lb.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03, 0.95))
 	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE

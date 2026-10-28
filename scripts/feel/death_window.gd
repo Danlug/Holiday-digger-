@@ -182,7 +182,7 @@ func _build_title() -> Control:
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_theme_constant_override("separation", 6)
 	h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("skull"), 26))
-	var t := MetaUiKit.label(DeathCause.text("title"), 18, Color8(0xFF, 0x8A, 0x9A))
+	var t := MetaUiKit.label(DeathCause.text("title"), UiTheme.FS_HERO_L, Color8(0xFF, 0x8A, 0x9A))
 	t.name = "TitleText"
 	t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(t)
@@ -190,7 +190,7 @@ func _build_title() -> Control:
 
 
 func _section(text: String) -> Label:
-	return MetaUiKit.label(text, 9, MetaUiKit.MUTED)
+	return MetaUiKit.label(text, UiTheme.FS_SMALL, MetaUiKit.MUTED)
 
 
 func _divider() -> Control:
@@ -224,14 +224,14 @@ func _build_cause() -> Control:
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_child(texts)
-	var phrase := MetaUiKit.label(_typo(DeathCause.phrase(cause, true)), 11, Color.WHITE)
+	var phrase := MetaUiKit.label(_typo(DeathCause.phrase(cause, true)), UiTheme.FS_LABEL, Color.WHITE)
 	phrase.name = "CauseText"
 	phrase.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	phrase.custom_minimum_size = Vector2(WIDTH - 16 - 4 - 34 - 6, 0)
 	texts.add_child(phrase)
 	var depth := int(_report.get("depth", 0))
 	if depth > 0:
-		var d := MetaUiKit.label(DeathCause.text("depth") % depth, 9, MetaUiKit.MUTED)
+		var d := MetaUiKit.label(DeathCause.text("depth") % depth, UiTheme.FS_SMALL, MetaUiKit.MUTED)
 		d.name = "CauseDepth"
 		texts.add_child(d)
 	var hint := DeathCause.hint(cause)
@@ -260,7 +260,7 @@ func _build_lost() -> Control:
 		h.name = "Empty"
 		h.add_theme_constant_override("separation", 5)
 		h.add_child(MetaUiKit.icon_rect(UiIcons.tex("backpack"), 18))
-		h.add_child(MetaUiKit.label(DeathCause.text("empty_pack"), 11, Color.WHITE))
+		h.add_child(MetaUiKit.label(DeathCause.text("empty_pack"), UiTheme.FS_LABEL, Color.WHITE))
 		v.add_child(h)
 		return v
 	var grid := GridContainer.new()
@@ -281,7 +281,7 @@ func _build_lost() -> Control:
 		more.add_theme_stylebox_override("panel", MetaUiKit.box(MetaUiKit.SLOT, MetaUiKit.BORDER, 1, 3))
 		var cc := CenterContainer.new()
 		cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cc.add_child(MetaUiKit.label("+%d" % (lost.size() - shown), 12, Color.WHITE))
+		cc.add_child(MetaUiKit.label("+%d" % (lost.size() - shown), UiTheme.FS_TITLE, Color.WHITE))
 		more.add_child(cc)
 		var rest: Array = []
 		for i in range(shown, lost.size()):
@@ -304,7 +304,7 @@ func _item_tile(id: String, count: int) -> Control:
 	ic.position = Vector2(7, 3)
 	ic.size = Vector2(26, 26)
 	holder.add_child(ic)
-	var n := MetaUiKit.label("×%d" % count, 10, Color.WHITE)
+	var n := MetaUiKit.label("×%d" % count, UiTheme.FS_BODY, Color.WHITE)
 	n.name = "Count"
 	n.position = Vector2(2, 26)
 	n.size = Vector2(36, 12)
@@ -329,13 +329,13 @@ func _build_hospital() -> Control:
 	h.add_theme_constant_override("separation", 4)
 	h.mouse_filter = Control.MOUSE_FILTER_PASS
 	h.add_child(MetaUiKit.icon_rect(UiIcons.tex("hospital"), 20))
-	var l := MetaUiKit.label(DeathCause.text("hospital"), 10, Color.WHITE)
+	var l := MetaUiKit.label(DeathCause.text("hospital"), UiTheme.FS_BODY, Color.WHITE)
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(l)
 	# число целиком: плата не больше 5000, четыре цифры влезают, а «−5k» читается хуже
 	var chip := MetaUiKit.chip(MetaUiKit.tex("coin"), ("−%d" % fee) if fee > 0 else "0",
-			MetaUiKit.RED.lightened(0.45) if fee > 0 else MetaUiKit.MUTED, 14, 12)
+			MetaUiKit.RED.lightened(0.45) if fee > 0 else MetaUiKit.MUTED, 14, UiTheme.FS_TITLE)
 	chip.name = "Fee"
 	h.add_child(chip)
 	var lo := Healing.death_fee_min()
@@ -356,7 +356,7 @@ func _build_button() -> Control:
 	b.text = DeathCause.text("next")
 	b.icon = MetaUiKit.tex("check")
 	b.add_theme_constant_override("icon_max_width", 18)
-	b.add_theme_font_size_override("font_size", 13)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_TITLE_L)
 	b.custom_minimum_size = Vector2(0, 32)
 	UiBtn.style(b, UiBtn.Kind.ACCENT)
 	b.add_theme_color_override("font_color", Color.WHITE)

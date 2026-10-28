@@ -16,7 +16,7 @@ const PAD_TOP_NARR := 12.0
 const PAD_BOTTOM := 14.0
 const MIN_H := 62.0
 const MAX_H := 190.0
-const TEXT_SIZE := 11
+const TEXT_SIZE := UiTheme.FS_LABEL
 const RIBBON_H := 16.0
 const PORTRAIT_OVERLAP := 6.0     # на сколько портрет заходит на плашку
 const PORTRAIT_INSET := 4.0
@@ -84,7 +84,7 @@ func _build() -> void:
 	add_child(ribbon)
 	name_label = Label.new()
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	DialogueStyle.shadowed(name_label, 10, Color8(0xFF, 0xEB, 0xB8))
+	DialogueStyle.shadowed(name_label, UiTheme.FS_BODY, Color8(0xFF, 0xEB, 0xB8))
 	ribbon.add_child(name_label)
 
 	for side in ["left", "right"]:

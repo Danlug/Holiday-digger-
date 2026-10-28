@@ -86,7 +86,7 @@ static func panel_style(margin: int = 9) -> StyleBoxTexture:
 static func float_number(host: Control, at: Vector2, text: String, color: Color, rise: float = 18.0) -> void:
 	if host == null or not host.is_inside_tree():
 		return
-	var l := ShopArt.label(text, 11, color, INK, 4)
+	var l := ShopArt.label(text, UiTheme.FS_LABEL, color, INK, 4)
 	l.position = at
 	l.z_index = 120
 	host.add_child(l)

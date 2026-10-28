@@ -77,7 +77,7 @@ func _ready() -> void:
 	row.add_child(_chip_icon)
 	_chip_label = Label.new()
 	_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_chip_label.add_theme_font_size_override("font_size", 12)
+	_chip_label.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
 	_chip_label.add_theme_color_override("font_color", GOLD_LIGHT)
 	_chip_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_chip_label.add_theme_constant_override("outline_size", 2)

@@ -496,7 +496,7 @@ func _draw() -> void:
 		var font := ThemeDB.fallback_font
 		var txt := "%d/%d" % [stage, stages]
 		var done := stage >= stages
-		draw_string(font, Vector2(cx - 14.0, HEAD_Y + HEAD + 9.0), txt, HORIZONTAL_ALIGNMENT_CENTER, 28.0, 8,
+		draw_string(font, Vector2(cx - 14.0, HEAD_Y + HEAD + 9.0), txt, HORIZONTAL_ALIGNMENT_CENTER, 28.0, UiTheme.FS_TINY,
 			ProgressUiKit.GOLD if done else ProgressUiKit.MUTED)
 
 	if not _flash_line.is_empty():

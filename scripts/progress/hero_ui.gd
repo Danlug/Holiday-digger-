@@ -10,7 +10,7 @@ const ACCENT := UiTheme.GOLD
 const OK := UiTheme.OK_LIGHT
 const POOR := UiTheme.RED
 const TILE_H := 34.0     # высота плитки «иконка + число»: на узком экране цифры читаются крупнее
-const TILE_FONT := 11
+const TILE_FONT := UiTheme.FS_LABEL
 
 # Цвет каждой ветки прокачки: по нему читается дерево с первого взгляда.
 const BRANCH_COLORS := {

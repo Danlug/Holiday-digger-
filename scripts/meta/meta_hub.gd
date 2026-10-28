@@ -142,7 +142,7 @@ func _build() -> void:
 	wallet.add_theme_constant_override("separation", 10)
 	_root.add_child(wallet)
 	for k in [["coins", "coin", "Монеты"], ["dollars", "dollar", "Доллары"], ["points", "star", "Очки трофеев"]]:
-		var chip := MetaUiKit.chip(MetaUiKit.tex(k[1]), "0", MetaUiKit.GOLD_LIGHT, 14, 10)
+		var chip := MetaUiKit.chip(MetaUiKit.tex(k[1]), "0", MetaUiKit.GOLD_LIGHT, 14, UiTheme.FS_BODY)
 		chip.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(chip, k[2])
 		wallet.add_child(chip)
@@ -249,7 +249,7 @@ func _section_head(glyph: String, tip_title: String, tip_body: String, kind: Str
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(gap)
-	var chip := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 13, 9)
+	var chip := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 13, UiTheme.FS_SMALL)
 	h.add_child(chip)
 	_timers.append({"label": chip.get_child(1), "kind": kind})
 	Tip.bind(h, tip_title, tip_body)
@@ -262,7 +262,7 @@ func _cta(icon_name: String, size: Vector2, color: Color, text: String = "") -> 
 	b.icon = MetaUiKit.tex(icon_name)
 	b.text = text
 	b.add_theme_constant_override("icon_max_width", 16)
-	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	b.custom_minimum_size = size
 	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := MetaUiKit.box(color, MetaUiKit.GOLD if st == "hover" else color.lightened(0.25), 1, 5)
@@ -356,7 +356,7 @@ func _quest_card(q: Dictionary) -> Control:
 	rr_box.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	rr_box.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rr_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rr_box.add_child(MetaUiKit.reward_row(q["reward"], 12, 9))
+	rr_box.add_child(MetaUiKit.reward_row(q["reward"], 12, UiTheme.FS_SMALL))
 	mid.add_child(rr_box)
 	h.add_child(mid)
 
@@ -428,7 +428,7 @@ func _bonus_card() -> Control:
 	track.stars = QuestEngine.stars_today()
 	mid.add_child(track)
 	var reward := QuestEngine.bonus_reward()
-	mid.add_child(MetaUiKit.reward_row(reward, 12, 9))
+	mid.add_child(MetaUiKit.reward_row(reward, 12, UiTheme.FS_SMALL))
 	h.add_child(mid)
 	if ready:
 		var claim := _cta("check", Vector2(30, 32), MetaUiKit.GREEN_BTN)
@@ -478,7 +478,7 @@ func _build_ach() -> void:
 	medal.position = Vector2(7, 7)
 	holder.add_child(medal)
 	top.add_child(holder)
-	var count := MetaUiKit.label("%d/%d" % [done, all.size()], 16, MetaUiKit.GOLD_LIGHT)
+	var count := MetaUiKit.label("%d/%d" % [done, all.size()], UiTheme.FS_HERO, MetaUiKit.GOLD_LIGHT)
 	top.add_child(count)
 	Tip.bind(top, "Достижения", "Получено из всех.", "%d из %d" % [done, all.size()])
 	top.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -531,7 +531,7 @@ func _ach_tile(a: Dictionary) -> Control:
 		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 16)
 		ck.position = Vector2(30, 28)
 		t.add_child(ck)
-		var pts := MetaUiKit.chip(MetaUiKit.tex("star"), str(MetaData.points_for_tier(tier)), MetaUiKit.GOLD_LIGHT, 10, 8)
+		var pts := MetaUiKit.chip(MetaUiKit.tex("star"), str(MetaData.points_for_tier(tier)), MetaUiKit.GOLD_LIGHT, 10, UiTheme.FS_TINY)
 		pts.position = Vector2(12, 44)
 		t.add_child(pts)
 		if _new_ach.has(id):
@@ -546,7 +546,7 @@ func _ach_tile(a: Dictionary) -> Control:
 			var lk := MetaUiKit.icon_rect(MetaUiKit.tex("lock"), 16)
 			lk.position = Vector2(30, 28)
 			t.add_child(lk)
-		var n := MetaUiKit.label("%s/%s" % [UiFmt.short(pr.x), UiFmt.short(pr.y)], 8, MetaUiKit.MUTED)
+		var n := MetaUiKit.label("%s/%s" % [UiFmt.short(pr.x), UiFmt.short(pr.y)], UiTheme.FS_TINY, MetaUiKit.MUTED)
 		n.custom_minimum_size.x = ACH_W
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		n.position = Vector2(0, 43)
@@ -587,9 +587,9 @@ func _build_road() -> void:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 1)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(pts), MetaUiKit.GOLD_LIGHT, 20, 18))
+	col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(pts), MetaUiKit.GOLD_LIGHT, 20, UiTheme.FS_HERO_L))
 	if next >= 0:
-		col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [pts, int(steps[next]["at"])], MetaUiKit.MUTED, 10, 9))
+		col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [pts, int(steps[next]["at"])], MetaUiKit.MUTED, 10, UiTheme.FS_SMALL))
 	top.add_child(col)
 	top.mouse_filter = Control.MOUSE_FILTER_PASS
 	Tip.bind(top, "Очки трофеев", "Копятся за достижения и выполненные задания.",
@@ -654,12 +654,12 @@ func _step_tile(i: int) -> Control:
 	var ic := MetaUiKit.icon_rect(MetaUiKit.tex(icon_name), 32)
 	ic.position = Vector2((STEP_W - 32) * 0.5, 6)
 	t.add_child(ic)
-	var rr := MetaUiKit.reward_row(reward, 10, 8)
+	var rr := MetaUiKit.reward_row(reward, 10, UiTheme.FS_TINY)
 	rr.position = Vector2(2, 42)
 	rr.custom_minimum_size.x = STEP_W - 4
 	rr.alignment = BoxContainer.ALIGNMENT_CENTER
 	t.add_child(rr)
-	var pill := MetaUiKit.chip(MetaUiKit.tex("star"), str(int(s["at"])), MetaUiKit.GOLD_LIGHT if reached else MetaUiKit.MUTED, 11, 9)
+	var pill := MetaUiKit.chip(MetaUiKit.tex("star"), str(int(s["at"])), MetaUiKit.GOLD_LIGHT if reached else MetaUiKit.MUTED, 11, UiTheme.FS_SMALL)
 	pill.position = Vector2(STEP_W * 0.5 - 14, 72)
 	t.add_child(pill)
 
@@ -713,12 +713,12 @@ func _next_prize_card(steps: Array, pts: int) -> Control:
 	h.add_theme_constant_override("separation", 6)
 	card.add_child(h)
 	h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("chest"), 32))
-	var rr := MetaUiKit.reward_row(steps[idx]["reward"], 13, 10)
+	var rr := MetaUiKit.reward_row(steps[idx]["reward"], 13, UiTheme.FS_BODY)
 	rr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(rr)
 	var need := maxi(0, int(steps[idx]["at"]) - pts)
 	if need > 0:
-		h.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(need), MetaUiKit.GOLD_LIGHT, 13, 11))
+		h.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(need), MetaUiKit.GOLD_LIGHT, 13, UiTheme.FS_LABEL))
 	else:
 		h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("check"), 22))
 	Tip.bind(card, "Ближайший крупный приз", "Ступень %d" % (idx + 1),
@@ -738,7 +738,7 @@ func _road_stats() -> Control:
 		["flame", str(MetaState.counter("streak_best")), "Лучшая серия", "Дней подряд за ежедневной наградой."],
 	]
 	for it in items:
-		var chip := MetaUiKit.chip(MetaUiKit.tex(it[0]), it[1], MetaUiKit.GOLD_LIGHT, 22, 12)
+		var chip := MetaUiKit.chip(MetaUiKit.tex(it[0]), it[1], MetaUiKit.GOLD_LIGHT, 22, UiTheme.FS_TITLE)
 		chip.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(chip, it[2], it[3])
 		row.add_child(chip)

@@ -66,7 +66,7 @@ func _ready() -> void:
 	_icon = ShopArt.rect(HouseArt.tex("courier"), Vector2(10, 8), Vector2(32, 32))
 	_icon.pivot_offset = Vector2(16, 16)
 	_holder.add_child(_icon)
-	_label = ShopArt.label("", 11, Color.WHITE, HouseArt.INK, 4)
+	_label = ShopArt.label("", UiTheme.FS_LABEL, Color.WHITE, HouseArt.INK, 4)
 	_label.position = Vector2(0, 50)
 	_label.size = Vector2(52, 14)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -295,7 +295,7 @@ func _build_language_row(body: Control) -> void:
 		var b := UiBtn.icon_button(null, Vector2(0, 28))
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.text = String(entry.get("name", code))
-		b.add_theme_font_size_override("font_size", 10)
+		b.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 		b.disabled = not available
 		if not available:
 			# Языки ждут перевода (задание владельца: "дальше, после моего

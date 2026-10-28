@@ -28,7 +28,7 @@ func _ready() -> void:
 	_icon = Mechanics.tex("fever")
 	_label = Label.new()
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_label.add_theme_font_size_override("font_size", 11)
+	_label.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_label.add_theme_color_override("font_color", COL_GOLD)
 	_label.add_theme_constant_override("outline_size", 3)
 	_label.add_theme_color_override("font_outline_color", COL_SHADOW)

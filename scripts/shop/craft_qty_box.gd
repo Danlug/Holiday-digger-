@@ -58,7 +58,7 @@ func setup(rid: String, anchor: Control = null) -> void:
 	_plus.pressed.connect(func() -> void: _step(1))
 	srow.add_child(_plus)
 	_max_btn = HouseArt.button("gold", null, Vector2(38, ROW_H))
-	var ml := ShopArt.label("MAX", 10, Color.WHITE, UiTheme.GOLD_INK, 3)
+	var ml := ShopArt.label("MAX", UiTheme.FS_BODY, Color.WHITE, UiTheme.GOLD_INK, 3)
 	ml.size = Vector2(38, ROW_H - 2.0)
 	ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ml.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

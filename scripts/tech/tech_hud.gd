@@ -65,7 +65,7 @@ func _build_fuel() -> void:
 	_fuel_fill.color = TechUi.FIRE
 	_fuel_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_fuel_fill)
-	_fuel_num = TechUi.label("0", 8, Color.WHITE)
+	_fuel_num = TechUi.label("0", UiTheme.FS_TINY, Color.WHITE)
 	_fuel_num.position = Vector2(0, 54)
 	_fuel_num.size = Vector2(WIDTH, 10)
 	_fuel_num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -80,7 +80,7 @@ func _build_heat() -> void:
 	_heat_icon = TechUi.icon_rect(TechUi.tex("icon_thermo_0"), 20)
 	_heat_icon.position = Vector2(4, 3)
 	_heat_btn.add_child(_heat_icon)
-	_heat_num = TechUi.label("", 8, TechUi.MUTED)
+	_heat_num = TechUi.label("", UiTheme.FS_TINY, TechUi.MUTED)
 	_heat_num.position = Vector2(0, 25)
 	_heat_num.size = Vector2(WIDTH, 10)
 	_heat_num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

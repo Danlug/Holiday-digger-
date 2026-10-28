@@ -39,7 +39,7 @@ func setup(go: Button) -> ShopDoorStrip:
 	_door.name = "Door"
 	add_child(_door)
 
-	_label = ShopArt.label(TEXT_GARDEN, 9, ShopArt.COL_GOLD)
+	_label = ShopArt.label(TEXT_GARDEN, UiTheme.FS_SMALL, ShopArt.COL_GOLD)
 	_label.position = Vector2(42, 3)
 	_label.size = Vector2(112, H - 6.0)
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

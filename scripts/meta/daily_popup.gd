@@ -103,14 +103,14 @@ func _build_header() -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 3)
 	h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("flame"), 24))
-	_streak_label = MetaUiKit.label(str(int(_plan["streak"])), 18, MetaUiKit.GOLD_LIGHT)
+	_streak_label = MetaUiKit.label(str(int(_plan["streak"])), UiTheme.FS_HERO_L, MetaUiKit.GOLD_LIGHT)
 	h.add_child(_streak_label)
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(gap)
 	var pct := int(_plan["bonus_pct"])
 	if pct > 0:
-		var chip := MetaUiKit.chip(MetaUiKit.tex("up"), "+%d%%" % pct, MetaUiKit.GREEN, 14, 9)
+		var chip := MetaUiKit.chip(MetaUiKit.tex("up"), "+%d%%" % pct, MetaUiKit.GREEN, 14, UiTheme.FS_SMALL)
 		Tip.bind(chip, "Бонус серии", "Каждая пройденная неделя подряд добавляет к монетам и опыту.", "+%d%%" % pct)
 		h.add_child(chip)
 	h.add_child(UiBtn.close_button(close))
@@ -175,7 +175,7 @@ func _make_tile(i: int) -> Control:
 	var lay := Control.new()
 	lay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tile.add_child(lay)
-	var day_l := MetaUiKit.label(str(i + 1), 9, MetaUiKit.GOLD if today else MetaUiKit.MUTED)
+	var day_l := MetaUiKit.label(str(i + 1), UiTheme.FS_SMALL, MetaUiKit.GOLD if today else MetaUiKit.MUTED)
 	day_l.position = Vector2(3, 0)
 	lay.add_child(day_l)
 
@@ -190,17 +190,17 @@ func _make_tile(i: int) -> Control:
 		col.position = Vector2(44, 9)
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var rr := reward
-		col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("coins"), str(int(rr.get("coins", 0))), MetaUiKit.GOLD_LIGHT, 12, 9))
+		col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("coins"), str(int(rr.get("coins", 0))), MetaUiKit.GOLD_LIGHT, 12, UiTheme.FS_SMALL))
 		if rr.has("dollars"):
-			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("dollars"), str(int(rr["dollars"])), UiTheme.MONEY, 12, 9))
+			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("dollars"), str(int(rr["dollars"])), UiTheme.MONEY, 12, UiTheme.FS_SMALL))
 		if rr.has("xp"):
-			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("xp"), str(int(rr["xp"])), MetaUiKit.BLUE, 12, 9))
+			col.add_child(MetaUiKit.chip(MetaUiKit.reward_tex("xp"), str(int(rr["xp"])), MetaUiKit.BLUE, 12, UiTheme.FS_SMALL))
 		lay.add_child(col)
 		var crown := MetaUiKit.icon_rect(MetaUiKit.tex("crown"), 14)
 		crown.position = Vector2(w - 21, 0)
 		lay.add_child(crown)
 	else:
-		var amt := MetaUiKit.label(UiFmt.short(int(reward.get("coins", 0))), 9, MetaUiKit.GOLD_LIGHT)
+		var amt := MetaUiKit.label(UiFmt.short(int(reward.get("coins", 0))), UiTheme.FS_SMALL, MetaUiKit.GOLD_LIGHT)
 		amt.custom_minimum_size.x = TILE_W - 4
 		amt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		amt.position = Vector2(0, TILE_H - 16)
@@ -254,7 +254,7 @@ func _build_buttons() -> Control:
 	_ad_btn.text = "×2"
 	_ad_btn.icon = MetaUiKit.tex("ad")
 	_ad_btn.add_theme_constant_override("icon_max_width", 16)
-	_ad_btn.add_theme_font_size_override("font_size", 11)
+	_ad_btn.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_ad_btn.custom_minimum_size = Vector2(62, 34)
 	_style_cta(_ad_btn, UiTheme.AD_BG)
 	_ad_btn.pressed.connect(_claim_ad)

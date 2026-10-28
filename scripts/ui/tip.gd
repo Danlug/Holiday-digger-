@@ -373,9 +373,9 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override("separation", 1)
 	_panel.add_child(box)
-	_title = _make_label(11, COL_TITLE)
-	_body = _make_label(10, COL_BODY)
-	_extra = _make_label(10, COL_EXTRA)
+	_title = _make_label(UiTheme.FS_LABEL, COL_TITLE)
+	_body = _make_label(UiTheme.FS_BODY, COL_BODY)
+	_extra = _make_label(UiTheme.FS_BODY, COL_EXTRA)
 	box.add_child(_title)
 	box.add_child(_body)
 	box.add_child(_extra)

@@ -79,7 +79,7 @@ static func box(bg: Color, border: Color = BORDER, border_w: int = 1, radius: in
 	return ProgressUiKit.box(bg, border, ProgressUiKit.snap_radius(radius), border_w)
 
 
-static func label(text: String, size: int = 9, color: Color = MUTED) -> Label:
+static func label(text: String, size: int = UiTheme.FS_SMALL, color: Color = MUTED) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
@@ -91,7 +91,7 @@ static func label(text: String, size: int = 9, color: Color = MUTED) -> Label:
 
 
 ## Значок + число в ряд: «монета 130».
-static func chip(t: Texture2D, text: String, color: Color = Color.WHITE, px: float = 12.0, size: int = 9) -> HBoxContainer:
+static func chip(t: Texture2D, text: String, color: Color = Color.WHITE, px: float = 12.0, size: int = UiTheme.FS_SMALL) -> HBoxContainer:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 1)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -103,7 +103,7 @@ static func chip(t: Texture2D, text: String, color: Color = Color.WHITE, px: flo
 
 
 ## Ряд значков награды: монеты, доллары, опыт, предмет (без слов).
-static func reward_row(reward: Dictionary, px: float = 12.0, size: int = 9) -> HBoxContainer:
+static func reward_row(reward: Dictionary, px: float = 12.0, size: int = UiTheme.FS_SMALL) -> HBoxContainer:
 	var r := MetaRewards.normalize(reward)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)

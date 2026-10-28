@@ -370,7 +370,7 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	root.add_child(bg)
 	var ic := ShopArt.rect(icon, Vector2(3, 3), Vector2(14, 14))
 	root.add_child(ic)
-	var lb := ShopArt.label("", 10)
+	var lb := ShopArt.label("", UiTheme.FS_BODY)
 	lb.position = Vector2(20, 1)
 	lb.size = Vector2(w - 24.0, 18)
 	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -534,7 +534,7 @@ func _build_action_bar() -> void:
 	_ad_btn.position = Vector2(6, 5)
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_video"), Vector2(4, 3), Vector2(14, 14)))
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(14, 8), Vector2(30, 24)))
-	_ad_label = ShopArt.label("", 9)
+	_ad_label = ShopArt.label("", UiTheme.FS_SMALL)
 	_ad_label.position = Vector2(2, 20)
 	_ad_label.size = Vector2(44, 14)
 	_ad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -547,7 +547,7 @@ func _build_action_bar() -> void:
 	_sell_lead = ShopArt.rect(ShopArt.ui("icon_inventory"), Vector2(8, 5), Vector2(28, 28))
 	_sell_btn.add_child(_sell_lead)
 	_sell_btn.add_child(ShopArt.rect(ShopArt.ui("icon_coin"), Vector2(42, 11), Vector2(18, 18)))
-	_sell_label = ShopArt.label("0", 14, Color.WHITE, UiTheme.GOLD_INK, 4)
+	_sell_label = ShopArt.label("0", UiTheme.FS_HEAD, Color.WHITE, UiTheme.GOLD_INK, 4)
 	_sell_label.position = Vector2(62, 6)
 	_sell_label.size = Vector2(70, 26)
 	_sell_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -556,7 +556,7 @@ func _build_action_bar() -> void:
 	_sell_x2 = ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(134, 8), Vector2(22, 22))
 	_sell_x2.visible = false
 	_sell_btn.add_child(_sell_x2)
-	_sell_uses = ShopArt.label("", 9, Color.WHITE, Color(0.2, 0.12, 0.02), 4)
+	_sell_uses = ShopArt.label("", UiTheme.FS_SMALL, Color.WHITE, Color(0.2, 0.12, 0.02), 4)
 	_sell_uses.position = Vector2(2, 20)
 	_sell_uses.size = Vector2(36, 16)
 	_sell_uses.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -596,7 +596,7 @@ func _build_notice() -> void:
 	_notice_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_notice_label.offset_left = 6
 	_notice_label.offset_right = -6
-	_notice_label.add_theme_font_size_override("font_size", 9)
+	_notice_label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_notice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -815,7 +815,7 @@ func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
 		gift.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		gift.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(gift)
-		row.add_child(ShopArt.label(badge_text, 10, ShopArt.COL_GOOD))
+		row.add_child(ShopArt.label(badge_text, UiTheme.FS_BODY, ShopArt.COL_GOOD))
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(row, "Бесплатные заказы", "Бабка оставила денег: сегодня еда даром", "Осталось: " + badge_text)
 	return row
@@ -1235,7 +1235,7 @@ func _make_chip_row(icon: Texture2D, text: String, color: Color) -> Control:
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(ic)
 	if text != "":
-		row.add_child(ShopArt.label(text, 12, color))
+		row.add_child(ShopArt.label(text, UiTheme.FS_TITLE, color))
 	return row
 
 
@@ -1250,7 +1250,7 @@ func _make_compare_row(cmp: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	row.add_child(ShopArt.label(String(cmp["from"]), 11, Color(0.7, 0.7, 0.76)))
+	row.add_child(ShopArt.label(String(cmp["from"]), UiTheme.FS_LABEL, Color(0.7, 0.7, 0.76)))
 	var arrow := TextureRect.new()
 	arrow.texture = ShopArt.tex("glyph_arrow")
 	arrow.custom_minimum_size = Vector2(14, 14)
@@ -1258,7 +1258,7 @@ func _make_compare_row(cmp: Dictionary) -> Control:
 	arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(arrow)
-	row.add_child(ShopArt.label(String(cmp["to"]), 13, ShopArt.COL_GOOD))
+	row.add_child(ShopArt.label(String(cmp["to"]), UiTheme.FS_TITLE_L, ShopArt.COL_GOOD))
 	return row
 
 
@@ -1276,7 +1276,7 @@ func _make_price_row(offer: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else UiFmt.short(price), 15,
+	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else UiFmt.short(price), UiTheme.FS_HEAD_L,
 		Color.WHITE if ok else ShopArt.COL_BAD, INK, 4))
 	return row
 
@@ -1422,7 +1422,7 @@ func _craft_qty_sync() -> void:
 		return
 	var glyph := _card_ok.get_node_or_null("Glyph") as Control
 	if _craft_qty_ok == null:
-		_craft_qty_ok = ShopArt.label("", 13, Color.WHITE, INK, 3)
+		_craft_qty_ok = ShopArt.label("", UiTheme.FS_TITLE_L, Color.WHITE, INK, 3)
 		_craft_qty_ok.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_card_ok.add_child(_craft_qty_ok)
 		_craft_qty_ok.anchor_left = 0.5   # правая половина кнопки — кнопка тянется на всю ширину
@@ -1523,7 +1523,7 @@ func _craft_qty_hit(ref: String, made: int, icon_override: Texture2D = null) -> 
 	ic.pivot_offset = Vector2(12, 12)
 	ic.scale = Vector2(0.4, 0.4)
 	tile.add_child(ic)
-	var lbl := ShopArt.label("+" + UiFmt.short(made), 16, ShopArt.COL_GOOD, INK, 4)
+	var lbl := ShopArt.label("+" + UiFmt.short(made), UiTheme.FS_HERO, ShopArt.COL_GOOD, INK, 4)
 	lbl.z_index = 111
 	lbl.position = c + Vector2(4, -14)
 	tile.add_child(lbl)

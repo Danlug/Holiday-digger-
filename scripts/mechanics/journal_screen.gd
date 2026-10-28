@@ -201,7 +201,7 @@ func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
 	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(tr)
-	var l := ProgressUiKit.make_label(text, 11, ProgressUiKit.TEXT_HI)
+	var l := ProgressUiKit.make_label(text, UiTheme.FS_LABEL, ProgressUiKit.TEXT_HI)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)
 	_head.add_child(box)
@@ -293,7 +293,7 @@ func _stat_row(icon: Texture2D, num: String, title: String, body: String) -> Con
 	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(tr)
-	var l := ProgressUiKit.make_label(num, 16, ProgressUiKit.TEXT_HI)
+	var l := ProgressUiKit.make_label(num, UiTheme.FS_HERO, ProgressUiKit.TEXT_HI)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(l)

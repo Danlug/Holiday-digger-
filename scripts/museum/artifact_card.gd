@@ -217,7 +217,7 @@ func _draw() -> void:
 	if dollars > 0:
 		items.append(["ui_dollar", str(dollars), HeroUi.OK])
 	var font := ThemeDB.fallback_font
-	var fs := 10
+	var fs := UiTheme.FS_BODY
 	var total_w := 0.0
 	for it: Array in items:
 		total_w += 16.0 + 2.0 + font.get_string_size(String(it[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 8.0

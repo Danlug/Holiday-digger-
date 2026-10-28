@@ -194,7 +194,7 @@ func _build() -> void:
 	_title_row.add_child(_title_label)
 	top.add_child(_title_row)
 
-	_subtitle_label = ProgressUiKit.make_label(subheading(), 9, ProgressUiKit.MUTED)
+	_subtitle_label = ProgressUiKit.make_label(subheading(), UiTheme.FS_SMALL, ProgressUiKit.MUTED)
 	_subtitle_label.name = "Subtitle"
 	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -347,7 +347,7 @@ func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
 	box.add_theme_constant_override("separation", 3)
 	box.mouse_filter = Control.MOUSE_FILTER_STOP
 	box.add_child(_icon_rect(icon, 18))
-	var l := ProgressUiKit.make_label(text, 11, ProgressUiKit.TEXT_HI)
+	var l := ProgressUiKit.make_label(text, UiTheme.FS_LABEL, ProgressUiKit.TEXT_HI)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)
 	_head.add_child(box)
@@ -405,7 +405,7 @@ func _project_card(id: String) -> Control:
 	bar_row.add_theme_constant_override("separation", 4)
 	bar_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_row.add_child(_bar_ctrl(68.0, 10.0, frac, 0.0, built or ProjectChain.ready(id)))
-	var pct := ProgressUiKit.make_label("%d%%" % int(floor(frac * 100.0)), 11, ProgressUiKit.TEXT_HI)
+	var pct := ProgressUiKit.make_label("%d%%" % int(floor(frac * 100.0)), UiTheme.FS_LABEL, ProgressUiKit.TEXT_HI)
 	pct.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_row.add_child(pct)
 	mid.add_child(bar_row)
@@ -475,7 +475,7 @@ func _material_row(m: Dictionary) -> Control:
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var via_frac := clampf(float(int(m["effective"])) / maxf(1.0, float(need)), 0.0, 1.0)
 	mid.add_child(_bar_ctrl(BAR_W, 8.0, clampf(float(have) / maxf(1.0, float(need)), 0.0, 1.0), via_frac, done))
-	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], 10,
+	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], UiTheme.FS_BODY,
 		COL_DONE if done else ProgressUiKit.TEXT)
 	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(nums)
@@ -511,12 +511,12 @@ func _via_row(m: Dictionary, v: Dictionary) -> Control:
 	var h := _row_box(p)
 	h.add_child(_arrow(Vector2(10, 18), true))
 	h.add_child(_icon_rect(UiIcons.item_small(src, 18), 18))
-	var cnt := ProgressUiKit.make_label(UiFmt.short(int(v["have"])), 10, ProgressUiKit.TEXT)
+	var cnt := ProgressUiKit.make_label(UiFmt.short(int(v["have"])), UiTheme.FS_BODY, ProgressUiKit.TEXT)
 	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(cnt)
 	h.add_child(_arrow(Vector2(14, 18), false))
 	h.add_child(_icon_rect(UiIcons.item_small(String(m["id"]), 16), 16))
-	var plus := ProgressUiKit.make_label("+%s" % UiFmt.short(int(v["makes"])), 10,
+	var plus := ProgressUiKit.make_label("+%s" % UiFmt.short(int(v["makes"])), UiTheme.FS_BODY,
 		ProgressUiKit.GOLD if int(v["makes"]) > 0 else ProgressUiKit.DIM)
 	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(plus)
@@ -546,7 +546,7 @@ func _coins_row(need: int) -> Control:
 	mid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(_bar_ctrl(BAR_W, 8.0, clampf(float(have) / maxf(1.0, float(need)), 0.0, 1.0), 0.0, done))
-	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], 10,
+	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], UiTheme.FS_BODY,
 		COL_DONE if done else ProgressUiKit.TEXT)
 	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(nums)
@@ -568,7 +568,7 @@ func _where_chip(item: String) -> Control:
 		return box
 	box.add_child(_icon_rect(ShopArt.tex("glyph_depth"), 12))
 	var reached := GameState.max_depth_reached >= int(w["min"])
-	var l := ProgressUiKit.make_label(UiFmt.short(int(w["best"])), 10,
+	var l := ProgressUiKit.make_label(UiFmt.short(int(w["best"])), UiTheme.FS_BODY,
 		ProgressUiKit.TEXT_HI if reached else ProgressUiKit.DIM)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)
@@ -620,7 +620,7 @@ func _mini_chip(icon: Texture2D, text: String, title: String, body: String) -> C
 	box.mouse_filter = Control.MOUSE_FILTER_STOP
 	box.add_child(_icon_rect(icon, 14))
 	if text != "":
-		var l := ProgressUiKit.make_label(text, 10, ProgressUiKit.TEXT)
+		var l := ProgressUiKit.make_label(text, UiTheme.FS_BODY, ProgressUiKit.TEXT)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(l)
 	Tip.bind_tap(box, title, body)

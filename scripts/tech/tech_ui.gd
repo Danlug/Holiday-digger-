@@ -89,7 +89,7 @@ static func icon_rect(texture: Texture2D, px: float) -> TextureRect:
 	return r
 
 
-static func label(text: String, size: int = 9, color: Color = MUTED, outline: bool = true) -> Label:
+static func label(text: String, size: int = UiTheme.FS_SMALL, color: Color = MUTED, outline: bool = true) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
@@ -115,7 +115,7 @@ static func chip(texture: Texture2D, number: String, color: Color = MUTED, icon_
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(icon_rect(texture, icon_px))
-	row.add_child(label(number, 10, color))
+	row.add_child(label(number, UiTheme.FS_BODY, color))
 	return row
 
 

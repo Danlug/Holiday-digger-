@@ -110,7 +110,7 @@ func _build_header() -> Control:
 	row.add_child(icon)
 	var title := Label.new()
 	title.text = StoryText.get_text("diary.title")
-	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
 	title.add_theme_color_override("font_color", INK)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -137,7 +137,7 @@ func _build_body() -> Control:
 
 	_text = Label.new()
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_text.add_theme_font_size_override("font_size", 11)
+	_text.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_text.add_theme_color_override("font_color", INK)
 	_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body.add_child(_text)
@@ -153,7 +153,7 @@ func _build_body() -> Control:
 	_note_row.add_child(pencil)
 	_note = Label.new()
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_note.add_theme_font_size_override("font_size", 10)
+	_note.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_note.add_theme_color_override("font_color", NOTE)
 	_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_note_row.add_child(_note)
@@ -173,7 +173,7 @@ func _build_body() -> Control:
 	_sealed_text = Label.new()
 	_sealed_text.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_sealed_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sealed_text.add_theme_font_size_override("font_size", 10)
+	_sealed_text.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_sealed_text.add_theme_color_override("font_color", INK)
 	_sealed_box.add_child(_sealed_text)
 	_body.add_child(_sealed_box)

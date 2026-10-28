@@ -124,7 +124,7 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	root.add_child(HouseArt.nine("pill", 4))
 	var ic := ShopArt.rect(icon, Vector2(3, 3), Vector2(14, 14))
 	root.add_child(ic)
-	var lb := ShopArt.label("", 10)
+	var lb := ShopArt.label("", UiTheme.FS_BODY)
 	lb.position = Vector2(20, 1)
 	lb.size = Vector2(w - 24.0, 18)
 	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

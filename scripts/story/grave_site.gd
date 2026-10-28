@@ -125,7 +125,7 @@ func _build_button() -> void:
 
 	_badge = Label.new()
 	_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_badge.add_theme_font_size_override("font_size", 9)
+	_badge.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_badge.add_theme_color_override("font_color", Color.WHITE)
 	_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

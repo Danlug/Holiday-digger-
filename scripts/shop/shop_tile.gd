@@ -63,7 +63,7 @@ func _init() -> void:
 	_lock.visible = false
 	add_child(_lock)
 
-	_count = ShopArt.label("", 9, Color.WHITE, Color(0.05, 0.04, 0.08), 3)
+	_count = ShopArt.label("", UiTheme.FS_SMALL, Color.WHITE, Color(0.05, 0.04, 0.08), 3)
 	_count.position = Vector2(2, 27)
 	_count.size = Vector2(W - 5, 12)
 	_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -265,7 +265,7 @@ func _set_pill(p: Dictionary) -> void:
 		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		parts.append([d, 5.0])
 	if text != "":
-		var l := ShopArt.label(text, 9, col, Color(0.05, 0.04, 0.08), 2)
+		var l := ShopArt.label(text, UiTheme.FS_SMALL, col, Color(0.05, 0.04, 0.08), 2)
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var tw := l.get_minimum_size().x
 		l.size = Vector2(tw, 15.0)

@@ -160,12 +160,12 @@ func _build(item: Dictionary) -> void:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(title)
 	title.add_child(MetaUiKit.icon_rect(MetaUiKit.tex(String(item["head"])), 12))
-	var name_l := MetaUiKit.label(String(item["name"]), 10, Color.WHITE)
+	var name_l := MetaUiKit.label(String(item["name"]), UiTheme.FS_BODY, Color.WHITE)
 	name_l.clip_text = true
 	name_l.custom_minimum_size.x = 100
 	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_child(name_l)
-	var rr := MetaUiKit.reward_row(item["reward"], 11, 9)
+	var rr := MetaUiKit.reward_row(item["reward"], 11, UiTheme.FS_SMALL)
 	if rr.get_child_count() > 0:
 		v.add_child(rr)
 	else:

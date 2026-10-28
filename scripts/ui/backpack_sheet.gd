@@ -259,7 +259,7 @@ func _build() -> void:
 	_weight_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_weight_bar)
 	_weight_text = Label.new()
-	_weight_text.add_theme_font_size_override("font_size", 10)
+	_weight_text.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_weight_text.add_theme_color_override("font_color", UiTheme.TEXT_SOFT)
 	_weight_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_weight_text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -373,7 +373,7 @@ static func make_tile(id: String, count: int, selected: bool = false) -> Button:
 	if count > 1:
 		var badge := Label.new()
 		badge.text = str(count) if count <= MAX_BADGE else "%d+" % MAX_BADGE
-		badge.add_theme_font_size_override("font_size", 10)
+		badge.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 		badge.add_theme_color_override("font_color", Color.WHITE)
 		badge.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 		badge.add_theme_constant_override("outline_size", 3)
@@ -497,7 +497,7 @@ func _build_drop_panel() -> void:
 	_drop_icon.mouse_filter = Control.MOUSE_FILTER_PASS
 	title.add_child(_drop_icon)
 	_drop_count_label = Label.new()
-	_drop_count_label.add_theme_font_size_override("font_size", 14)
+	_drop_count_label.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	_drop_count_label.add_theme_color_override("font_color", GOLD)
 	_drop_count_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	title.add_child(_drop_count_label)
@@ -529,7 +529,7 @@ func _build_drop_panel() -> void:
 	_drop_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_drop_field.max_length = 6
-	_drop_field.add_theme_font_size_override("font_size", 14)
+	_drop_field.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	var fsb := ProgressUiKit.box(ProgressUiKit.INSET_BG, EDGE)
 	fsb.set_content_margin_all(4)
 	_drop_field.add_theme_stylebox_override("normal", fsb)

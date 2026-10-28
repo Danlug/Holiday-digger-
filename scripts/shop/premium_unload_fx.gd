@@ -58,7 +58,7 @@ func _init() -> void:
 	_house = ShopArt.rect(ShopArt.tex("glyph_house"), Vector2((PLATE.x - HOUSE) * 0.5, 5.0), Vector2(HOUSE, HOUSE))
 	_house.pivot_offset = Vector2(HOUSE * 0.5, HOUSE)
 	_plate.add_child(_house)
-	_label = ShopArt.label("", 13, GOLD)
+	_label = ShopArt.label("", UiTheme.FS_TITLE_L, GOLD)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.position = Vector2(0, HOUSE + 4.0)
 	_label.size = Vector2(PLATE.x, 16)

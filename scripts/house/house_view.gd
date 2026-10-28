@@ -255,7 +255,7 @@ func _build_header() -> void:
 	cal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_day = _need(header, "Day", Label) as Label
 	_day.position = Vector2(45, 3)
-	_day.add_theme_font_size_override("font_size", 9)
+	_day.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_day.add_theme_color_override("font_color", ACCENT)
 	_day.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var clk := _need(header, "ClockIcon", TextureRect) as TextureRect
@@ -266,7 +266,7 @@ func _build_header() -> void:
 	clk.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_clock = _need(header, "Clock", Label) as Label
 	_clock.position = Vector2(83, 3)
-	_clock.add_theme_font_size_override("font_size", 9)
+	_clock.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_clock.add_theme_color_override("font_color", DIM)
 	_clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -315,7 +315,7 @@ func _build_header() -> void:
 	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_notice.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_notice.add_theme_font_size_override("font_size", 9)
+	_notice.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_notice.add_theme_color_override("font_color", ACCENT)
 	_notice.add_theme_stylebox_override("normal", _box(Color(0.07, 0.055, 0.043, 0.92), ACCENT))
 	_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1331,7 +1331,7 @@ func _box(bg: Color, border: Color) -> StyleBoxFlat:
 
 
 func _style_button(b: Button) -> void:
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	b.custom_minimum_size = Vector2(0, 22)
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()

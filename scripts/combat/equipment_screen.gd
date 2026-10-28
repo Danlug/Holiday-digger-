@@ -202,7 +202,7 @@ func _tile(icon: Texture2D, tier_color: Color, size: Vector2, dim: bool = false,
 	return b
 
 
-func _small_label(text: String, size: int = 9, color: Color = MUTED) -> Label:
+func _small_label(text: String, size: int = UiTheme.FS_SMALL, color: Color = MUTED) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
@@ -215,7 +215,7 @@ func _small_label(text: String, size: int = 9, color: Color = MUTED) -> Label:
 
 ## Подпись-число в нижнем правом углу плитки.
 func _corner_number(b: Control, text: String, color: Color = Color.WHITE) -> void:
-	var l := _small_label(text, 9, color)
+	var l := _small_label(text, UiTheme.FS_SMALL, color)
 	l.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	l.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	l.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -307,7 +307,7 @@ func _build_gear_tab() -> void:
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(ic)
-		var num := _small_label(sp[1], 10, UiTheme.TEXT_HI)
+		var num := _small_label(sp[1], UiTheme.FS_BODY, UiTheme.TEXT_HI)
 		num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(num)
 		chip.custom_minimum_size = Vector2(38, 0)
@@ -533,7 +533,7 @@ func _recipe_row(id: String) -> Control:
 		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.add_child(ic)
-		var num := _small_label("%d/%d" % [mini(have, 999), need], 9, GREEN if have >= need else RED)
+		var num := _small_label("%d/%d" % [mini(have, 999), need], UiTheme.FS_SMALL, GREEN if have >= need else RED)
 		chip.add_child(num)
 		Tip.bind(chip, CombatData.material_name(String(mid)), "Есть %d, нужно %d (склад и рюкзак)" % [have, need])
 		line.add_child(chip)
@@ -550,7 +550,7 @@ func _recipe_row(id: String) -> Control:
 		ci.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cl.add_child(ci)
 		var enough := GameState.debug_free_shop or GameState.coins >= coins
-		cl.add_child(_small_label(UiFmt.short(coins), 9, GREEN if enough else RED))
+		cl.add_child(_small_label(UiFmt.short(coins), UiTheme.FS_SMALL, GREEN if enough else RED))
 		Tip.bind(cl, "Монеты", "%d монет за работу кузнеца" % coins)
 		mats.add_child(cl)
 

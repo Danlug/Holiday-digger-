@@ -243,7 +243,7 @@ func _pips(parent: Node, total: int, filled: int, color: Color = TechUi.GOLD) ->
 func _text_button(text: String, kind: int = UiBtn.Kind.NORMAL, width: float = 40.0) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	b.custom_minimum_size = Vector2(width, 24)
 	UiBtn.style(b, kind)
 	return b
@@ -320,7 +320,7 @@ func _build_tank() -> void:
 		_gauge_from = -1.0
 	else:
 		TechUi.set_fill(bar, frac, color)
-	var num := TechUi.label("%.1f/%d" % [FuelTank.fuel(_tool), int(FuelTank.capacity(_tool))], 9, Color.WHITE)
+	var num := TechUi.label("%.1f/%d" % [FuelTank.fuel(_tool), int(FuelTank.capacity(_tool))], UiTheme.FS_SMALL, Color.WHITE)
 	num.set_anchors_preset(Control.PRESET_FULL_RECT)
 	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -453,17 +453,17 @@ func _build_refinery() -> void:
 	var rate := _hbox(top, 1)
 	rate.mouse_filter = Control.MOUSE_FILTER_STOP
 	rate.add_child(TechUi.icon_rect(TechUi.item_icon_small(_raw_sel, 14), 14))
-	rate.add_child(TechUi.label(str(per), 10, TechUi.MUTED))
+	rate.add_child(TechUi.label(str(per), UiTheme.FS_BODY, TechUi.MUTED))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 14))
-	rate.add_child(TechUi.label("1", 10, TechUi.MUTED))
+	rate.add_child(TechUi.label("1", UiTheme.FS_BODY, TechUi.MUTED))
 	Tip.bind(rate, "Курс перегонки", "%s: %d шт. = 1 топливный блок" % [TechUi.item_name(_raw_sel), per])
 
 	# Превращение: сырьё -> куб -> блоки. Куб — кнопка «перегнать».
 	var conv := _hbox(v, 3)
 	var raw_ic := TechUi.icon_rect(TechUi.item_icon(_raw_sel), 24)
 	conv.add_child(raw_ic)
-	var used_lbl := TechUi.label("", 11, TechUi.MUTED)
+	var used_lbl := TechUi.label("", UiTheme.FS_LABEL, TechUi.MUTED)
 	used_lbl.custom_minimum_size = Vector2(26, 0)
 	conv.add_child(used_lbl)
 	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
@@ -475,7 +475,7 @@ func _build_refinery() -> void:
 	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	var out_ic := TechUi.icon_rect(TechUi.tex("fuel_block"), 24)
 	conv.add_child(out_ic)
-	var made_lbl := TechUi.label("", 11, TechUi.GOLD)
+	var made_lbl := TechUi.label("", UiTheme.FS_LABEL, TechUi.GOLD)
 	made_lbl.custom_minimum_size = Vector2(26, 0)
 	conv.add_child(made_lbl)
 
@@ -537,7 +537,7 @@ func _raw_tile(raw: String) -> Control:
 	b.modulate = Color(1, 1, 1, 1.0 if unlocked else 0.5)
 	var held := FuelRefinery.held(raw)
 	if unlocked:
-		var n := TechUi.label("×" + UiFmt.short(held), 9,
+		var n := TechUi.label("×" + UiFmt.short(held), UiTheme.FS_SMALL,
 			Color.WHITE if held >= FuelRefinery.per_block(raw) else TechUi.DIM)
 		n.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 		n.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -678,7 +678,7 @@ func _flare(at: Vector2, delay: float) -> void:
 func _float_text(at: Vector2, text: String) -> void:
 	if UiAnim.reduced() or _fx_layer == null or not _fx_layer.is_inside_tree():
 		return
-	var l := TechUi.label(text, 12, TechUi.GOLD)
+	var l := TechUi.label(text, UiTheme.FS_TITLE, TechUi.GOLD)
 	l.position = at - Vector2(10, 8)
 	_fx_layer.add_child(l)
 	var tw := l.create_tween()
@@ -706,7 +706,7 @@ func _build_suit() -> void:
 	var z := Heat.zone(cur_depth)
 	Tip.bind(th, String(z.get("name_ru", "")), "Температура породы на твоей глубине", "%d °C" % int(Heat.temperature(cur_depth)))
 	hv.add_child(th)
-	hv.add_child(TechUi.label("%d°" % int(Heat.temperature(cur_depth)), 12,
+	hv.add_child(TechUi.label("%d°" % int(Heat.temperature(cur_depth)), UiTheme.FS_TITLE,
 		[TechUi.GREEN, TechUi.FIRE, TechUi.RED][lvl]))
 	var arrow := TechUi.icon_rect(TechUi.tex("icon_down"), 14)
 	hv.add_child(arrow)

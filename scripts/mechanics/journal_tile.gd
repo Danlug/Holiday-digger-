@@ -42,7 +42,7 @@ func _draw() -> void:
 		draw_texture_rect(_icon, r, false, Color.WHITE if found else Color(0, 0, 0, 0.75))
 	if not found:
 		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(0, 42), "?", HORIZONTAL_ALIGNMENT_CENTER, size.x, 11, ProgressUiKit.DIM)
+		draw_string(font, Vector2(0, 42), "?", HORIZONTAL_ALIGNMENT_CENTER, size.x, UiTheme.FS_LABEL, ProgressUiKit.DIM)
 		return
 	# пять звёзд по 7 пикселей с шагом 7
 	var sx := (size.x - 5.0 * 7.0) * 0.5

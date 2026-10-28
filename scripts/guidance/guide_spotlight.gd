@@ -311,12 +311,12 @@ func show_card(def: Dictionary) -> void:
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.add_child(ic)
 		head.add_child(frame)
-	var title := ShopArt.label(String(def.get("title", "")), 13, ProgressUiKit.TEXT_HI)
+	var title := ShopArt.label(String(def.get("title", "")), UiTheme.FS_TITLE_L, ProgressUiKit.TEXT_HI)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	title.clip_text = true
 	head.add_child(title)
-	var body := ShopArt.label(String(def.get("text", "")), 11, ProgressUiKit.TEXT, Color(0.05, 0.04, 0.08), 2)
+	var body := ShopArt.label(String(def.get("text", "")), UiTheme.FS_LABEL, ProgressUiKit.TEXT, Color(0.05, 0.04, 0.08), 2)
 	body.name = "Text"
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# Ширина переноса явно: без неё метка с переносом считает себя узкой и высокой,
@@ -407,7 +407,7 @@ func _green_button(icon, text: String) -> Button:
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(ic)
 	if text != "":
-		var l := ShopArt.label(text, 12, Color.WHITE)
+		var l := ShopArt.label(text, UiTheme.FS_TITLE, Color.WHITE)
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(l)
 	UiBtn.wire_sink(b)

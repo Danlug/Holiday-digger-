@@ -387,7 +387,7 @@ func _build_hero_button(parent: Control) -> void:
 	lvl.offset_right = 4
 	lvl.offset_bottom = 3
 	_level_label = Label.new()
-	_level_label.add_theme_font_size_override("font_size", 9)
+	_level_label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_level_label.add_theme_color_override("font_color", UiTheme.INK)
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.custom_minimum_size = Vector2(9, 0)
@@ -440,7 +440,7 @@ func _build_clock(parent: Control) -> void:
 	_clock_label.add_theme_color_override("font_color", UiTheme.TEXT_SOFT)
 	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
 	_clock_label.add_theme_constant_override("outline_size", 2)
-	_clock_label.add_theme_font_size_override("font_size", 9)
+	_clock_label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clock.add_child(_clock_label)
 	_clock_box = clock
@@ -560,7 +560,7 @@ func _build_depth(parent: Control) -> void:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 	_depth_label = Label.new()
-	_depth_label.add_theme_font_size_override("font_size", 12)
+	_depth_label.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
 	_depth_label.add_theme_color_override("font_color", UiTheme.CREAM)
 	_depth_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_depth_label.add_theme_constant_override("outline_size", 2)
@@ -579,7 +579,7 @@ func _build_depth(parent: Control) -> void:
 const TOAST_BOTTOM_OFFSET := -132.0
 const TOAST_MAX_W := 200.0      # шире не бывает: длинный текст переносится
 const TOAST_PAD := Vector2(9, 5)
-const TOAST_FONT := 12
+const TOAST_FONT := UiTheme.FS_TITLE
 const TOAST_COLORS := {
 	"info": UiTheme.GOLD,
 	"good": UiTheme.OK,
@@ -627,7 +627,7 @@ func _build_stick(parent: Control) -> void:
 	var hint := Label.new()
 	hint.text = ""
 	# Кегль под уменьшившийся стик: при 8 подпись вылезала за круг.
-	hint.add_theme_font_size_override("font_size", 6)
+	hint.add_theme_font_size_override("font_size", UiTheme.FS_MICRO)
 	hint.add_theme_color_override("font_color", UiTheme.OLIVE)
 	hint.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	hint.offset_top = 4
@@ -948,7 +948,7 @@ func _build_strip() -> void:
 	fuel_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fuel_box.add_child(fuel_icon)
 	_fuel_label = Label.new()
-	_fuel_label.add_theme_font_size_override("font_size", 11)
+	_fuel_label.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_fuel_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fuel_box.add_child(_fuel_label)
 	Tip.bind(_fuel_box, "Топливо", "Брикеты угля для бурмобиля")
@@ -1057,7 +1057,7 @@ func _build_more_menu() -> void:
 	# вопрос. Пишется tools/make_build_info.py перед экспортом.
 	var build_label := Label.new()
 	build_label.text = _build_stamp()
-	build_label.add_theme_font_size_override("font_size", 8)
+	build_label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 	build_label.add_theme_color_override("font_color", UiTheme.DIM)
 	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1131,7 +1131,7 @@ func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) ->
 	row.add_child(icon)
 	var label := Label.new()
 	label.text = "+%d" % count
-	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	label.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	label.add_theme_constant_override("outline_size", 3)
@@ -1145,7 +1145,7 @@ func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) ->
 func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	label.add_theme_color_override("font_color", UiTheme.GOLD)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	label.add_theme_constant_override("outline_size", 3)
@@ -1239,7 +1239,7 @@ func _build_objective_line() -> void:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 	_objective_label = Label.new()
-	_objective_label.add_theme_font_size_override("font_size", 10)
+	_objective_label.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_objective_label.add_theme_color_override("font_color", UiTheme.TEXT_HI)
 	_objective_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -1379,7 +1379,7 @@ func _build_stamp() -> String:
 func _make_chip(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	b.custom_minimum_size = Vector2(0, STRIP_H)
 	return UiBtn.style(b)
 

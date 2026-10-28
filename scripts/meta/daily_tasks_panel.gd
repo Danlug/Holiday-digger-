@@ -220,7 +220,7 @@ func _header() -> Control:
 	if streak <= 0:
 		fl.modulate = Color(0.5, 0.5, 0.5)
 	st.add_child(fl)
-	var sl := MetaUiKit.label(str(streak), 13, MetaUiKit.GOLD_LIGHT if streak > 0 else MetaUiKit.MUTED)
+	var sl := MetaUiKit.label(str(streak), UiTheme.FS_TITLE_L, MetaUiKit.GOLD_LIGHT if streak > 0 else MetaUiKit.MUTED)
 	sl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	st.add_child(sl)
 	var best := int(MetaState.sub("quests").get("streak", {}).get("best", 0))
@@ -228,7 +228,7 @@ func _header() -> Control:
 		"Рекорд: %d" % best)
 	h.add_child(st)
 
-	var tm := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 12, 9)
+	var tm := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 12, UiTheme.FS_SMALL)
 	tm.mouse_filter = Control.MOUSE_FILTER_PASS
 	_timer_label = tm.get_child(1)
 	Tip.bind(tm, "Новые задания", "Набор дня обновляется в полночь по твоим часам. Невзятые награды сгорают.")
@@ -240,7 +240,7 @@ func _header() -> Control:
 	if need > 0:
 		var past := stars >= need or bool(MetaState.sub("quests")["bonus_claimed"])
 		var sc := MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [stars, QuestEngine.daily().size() if past else need],
-			MetaUiKit.GOLD_LIGHT if past else Color.WHITE, 13, 11)
+			MetaUiKit.GOLD_LIGHT if past else Color.WHITE, 13, UiTheme.FS_LABEL)
 		sc.name = "StarsCount"
 		sc.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(sc, "Звёзды дня", "Звезда — за каждую забранную миссию. %d звёзд открывают сундук." % need)
@@ -251,7 +251,7 @@ func _header() -> Control:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(gap)
 
-	var wallet := MetaUiKit.chip(MetaUiKit.tex("coin"), UiFmt.short(_wallet_shown), MetaUiKit.GOLD_LIGHT, 12, 10)
+	var wallet := MetaUiKit.chip(MetaUiKit.tex("coin"), UiFmt.short(_wallet_shown), MetaUiKit.GOLD_LIGHT, 12, UiTheme.FS_BODY)
 	wallet.mouse_filter = Control.MOUSE_FILTER_PASS
 	_wallet_icon = wallet.get_child(0)
 	_wallet_label = wallet.get_child(1)
@@ -324,12 +324,12 @@ func _tile(q: Dictionary) -> Control:
 	var bar := MetaBar.new()
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.custom_minimum_size = Vector2(40, 13)
-	bar.font_size = 9
+	bar.font_size = UiTheme.FS_SMALL
 	bar.frac = frac
 	bar.text = "%s/%s" % [UiFmt.short(prog), UiFmt.short(target)]
 	bar.fill_color = MetaUiKit.GREEN if done else MetaUiKit.GOLD
 	mid.add_child(bar)
-	mid.add_child(MetaUiKit.reward_row(q["reward"], 11, 9))
+	mid.add_child(MetaUiKit.reward_row(q["reward"], 11, UiTheme.FS_SMALL))
 	h.add_child(mid)
 
 	var qid := String(q["id"])
@@ -379,7 +379,7 @@ func _cta(icon_name: String, sz: Vector2, color: Color, text: String = "") -> Bu
 	b.icon = MetaUiKit.tex(icon_name)
 	b.text = text
 	b.add_theme_constant_override("icon_max_width", 16)
-	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	b.custom_minimum_size = sz
 	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := MetaUiKit.box(color, MetaUiKit.GOLD if st == "hover" else color.lightened(0.25), 1, 5)
@@ -459,7 +459,7 @@ func _stars_row() -> Control:
 	_track.done = done_unclaimed
 	mid.add_child(_track)
 	var reward := QuestEngine.bonus_reward()
-	var rr := MetaUiKit.reward_row(reward, 11, 9)
+	var rr := MetaUiKit.reward_row(reward, 11, UiTheme.FS_SMALL)
 	rr.add_theme_constant_override("separation", 3)
 	mid.add_child(rr)
 	h.add_child(mid)
@@ -513,7 +513,7 @@ func _footer() -> Control:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(gap)
 	var free := QuestEngine.free_rerolls_left()
-	var rr := MetaUiKit.chip(MetaUiKit.tex("reroll"), "×%d" % free, MetaUiKit.BLUE if free > 0 else MetaUiKit.MUTED, 14, 10)
+	var rr := MetaUiKit.chip(MetaUiKit.tex("reroll"), "×%d" % free, MetaUiKit.BLUE if free > 0 else MetaUiKit.MUTED, 14, UiTheme.FS_BODY)
 	rr.mouse_filter = Control.MOUSE_FILTER_PASS
 	Tip.bind(rr, "Замены заданий", "Одна замена в день бесплатно, ещё две — за ролик.",
 		"Роликов осталось: %d" % MetaAds.uses_left(QuestEngine.ad_placement_reroll()))

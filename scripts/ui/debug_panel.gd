@@ -93,7 +93,7 @@ func _build() -> void:
 	_trigger.name = "DebugPanelTrigger"
 	_trigger.text = "Тест"
 	_trigger.focus_mode = Control.FOCUS_NONE
-	_trigger.add_theme_font_size_override("font_size", 9)
+	_trigger.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_trigger.tooltip_text = "Тестовая панель отладки (не для релиза)"
 	# Один угол-якорь (см. комментарий у _panel ниже): якорь и рост задаём
 	# ДО custom_minimum_size — иначе верхний край считается один раз от
@@ -147,7 +147,7 @@ func _build() -> void:
 		b.text = String(t["label"])
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 9)
+		b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		b.custom_minimum_size = Vector2(48.0, 28.0)
 		b.pressed.connect(_on_toggle_pressed.bind(field))
 		toggle_row.add_child(b)
@@ -162,7 +162,7 @@ func _build() -> void:
 		var b := Button.new()
 		b.text = String(a["label"])
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 9)
+		b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		b.custom_minimum_size = Vector2(48.0, 28.0)
 		b.pressed.connect(_on_action_pressed.bind(field))
 		action_row.add_child(b)

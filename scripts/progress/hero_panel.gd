@@ -77,7 +77,7 @@ func _build_card() -> void:
 	level_row.mouse_filter = Control.MOUSE_FILTER_STOP
 	right.add_child(level_row)
 	level_row.add_child(HeroIcons.make("ui_xp", 20.0))
-	_level_label = ProgressUiKit.make_label("1", 24, ProgressUiKit.GOLD)
+	_level_label = ProgressUiKit.make_label("1", UiTheme.FS_HUGE, ProgressUiKit.GOLD)
 	_level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level_row.add_child(_level_label)
 	Tip.bind(level_row, "Уровень героя", "Опыт даёт всё: копка, находки, новая глубина. Каждый уровень — очко навыков.")
@@ -93,7 +93,7 @@ func _build_card() -> void:
 	_xp_fill.position = Vector2(1, 1)
 	_xp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_xp_track.add_child(_xp_fill)
-	_xp_label = ProgressUiKit.make_label("", 8, Color(0.95, 0.93, 0.88))
+	_xp_label = ProgressUiKit.make_label("", UiTheme.FS_TINY, Color(0.95, 0.93, 0.88))
 	_xp_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_xp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -115,7 +115,7 @@ func _build_card() -> void:
 	_points_chip.add_child(chip_row)
 	_points_icon = HeroIcons.make("ui_star", 18.0)
 	chip_row.add_child(_points_icon)
-	_points_label = ProgressUiKit.make_label("0", 16, ProgressUiKit.GOLD)
+	_points_label = ProgressUiKit.make_label("0", UiTheme.FS_HERO, ProgressUiKit.GOLD)
 	_points_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip_row.add_child(_points_label)
 	Tip.bind(_points_chip, "Очки навыков", "Нажми — откроется дерево прокачки.")

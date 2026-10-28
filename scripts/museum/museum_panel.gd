@@ -88,7 +88,7 @@ func _make_header() -> Control:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(row)
 	row.add_child(HeroIcons.make("tab_museum", 16.0))
-	var count := ProgressUiKit.make_label("%d/%d" % [found, total], 12, ProgressUiKit.GOLD)
+	var count := ProgressUiKit.make_label("%d/%d" % [found, total], UiTheme.FS_TITLE, ProgressUiKit.GOLD)
 	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(count)
 	var bar := HeroUi.make_mini_bar(float(found) / float(maxi(total, 1)), ProgressUiKit.GOLD, 7.0)
@@ -152,7 +152,7 @@ func _make_case_header(branch: Dictionary, branch_num: int, found: int, total: i
 	row.add_theme_constant_override("separation", 4)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var numeral := ProgressUiKit.make_label(ROMAN[clampi(branch_num - 1, 0, ROMAN.size() - 1)], 10,
+	var numeral := ProgressUiKit.make_label(ROMAN[clampi(branch_num - 1, 0, ROMAN.size() - 1)], UiTheme.FS_BODY,
 		ProgressUiKit.GOLD if complete else ProgressUiKit.MUTED)
 	numeral.custom_minimum_size = Vector2(18, 0)
 	numeral.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -179,7 +179,7 @@ func _make_case_header(branch: Dictionary, branch_num: int, found: int, total: i
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(chip)
 	chip.add_child(HeroIcons.make("ui_check" if complete else "ui_chest", 14.0))
-	var coin_label := ProgressUiKit.make_label(UiFmt.short(coins), 9,
+	var coin_label := ProgressUiKit.make_label(UiFmt.short(coins), UiTheme.FS_SMALL,
 		ProgressUiKit.DIM if complete else ProgressUiKit.GOLD)
 	coin_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(coin_label)

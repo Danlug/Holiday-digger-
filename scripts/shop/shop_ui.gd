@@ -75,7 +75,6 @@ var _nav_bottom := NAV_H   # нижняя панель вместе с безо�
 
 var _nav: Control
 var _nav_tabs: Control
-var _nav_done: Button
 var _tab_buttons: Dictionary = {}
 var _tab_badges: Dictionary = {}
 var _marker: NinePatchRect
@@ -498,20 +497,6 @@ func _build_nav() -> void:
 		_tab_buttons[id] = b
 	_marker.get_parent().move_child(_marker, 0)
 
-	# На экране верстака вкладок нет: одна большая кнопка «готово» под большим пальцем.
-	_nav_done = _make_btn("green", "glyph_check", Vector2(96, 28), 18.0)
-	_nav_done.anchor_left = 0.5
-	_nav_done.anchor_right = 0.5
-	_nav_done.offset_left = -48.0
-	_nav_done.offset_right = 48.0
-	_nav_done.offset_top = 5.0
-	_nav_done.offset_bottom = 33.0
-	_nav_done.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	Tip.bind(_nav_done, "Готово")
-	_nav.add_child(_nav_done)
-
 
 func _build_action_bar() -> void:
 	_action = Control.new()
@@ -674,8 +659,7 @@ func _set_tab(tab: String, animate: bool) -> void:
 	_tab = tab
 	_close_card(false)
 	var equip := tab == SCREEN_EQUIP
-	_nav_tabs.visible = not equip
-	_nav_done.visible = equip
+	_nav.visible = not equip   # у верстака вкладок нет; закрывает крестик сверху справа, как везде
 	_chips["coins"]["root"].visible = not equip
 	_chips["dollars"]["root"].visible = not equip
 	_chips["dig"]["root"].visible = equip
@@ -1665,7 +1649,8 @@ func _selection_items() -> Dictionary:
 ## ГДД раздел 15) и значок ролика «×2».
 func _update_action_bar() -> void:
 	_action.visible = _tab == TAB_SELL
-	_scroll.offset_bottom = -(_nav_bottom + (ACTION_H if _tab == TAB_SELL else 0.0))
+	var nav := _nav_bottom - (NAV_H if _tab == SCREEN_EQUIP else 0.0)   # у верстака нижней панели нет
+	_scroll.offset_bottom = -(nav + (ACTION_H if _tab == TAB_SELL else 0.0))
 	if _tab != TAB_SELL:
 		return
 	var remote := _footer_mode == "remote"

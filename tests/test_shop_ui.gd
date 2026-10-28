@@ -638,9 +638,11 @@ func _test_navigation() -> void:
 	check("на «Продать» панель продажи видна", ui._action.visible)
 	check("прокрутка перетаскиванием подключена", ui._scroll.get_node_or_null("DragScroll") != null)
 	ui.open(ShopUI.SCREEN_EQUIP)
-	check("на экране верстака вкладок нет, есть кнопка «готово»", not ui._nav_tabs.visible and ui._nav_done.visible)
+	check("на экране верстака нижней панели нет", not ui._nav.visible)
+	ui._close_btn.pressed.emit()
+	check("верстак закрывается крестиком сверху справа", not ui.is_open())
 	ui.open(ShopUI.TAB_FOOD)
-	check("вкладки возвращаются", ui._nav_tabs.visible and not ui._nav_done.visible)
+	check("вкладки возвращаются", ui._nav.visible and ui._nav_tabs.visible)
 	ui.close()
 	check("шторка закрывается", not ui.is_open())
 

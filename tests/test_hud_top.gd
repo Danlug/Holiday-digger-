@@ -61,8 +61,21 @@ func _ready() -> void:
 	await _set_narrow(true)
 	await _check_house()
 	HudSafeArea.debug_top = -1.0
+	_check_stick()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(1 if failures > 0 else 0)
+
+
+## Джойстик: ручка идёт за пальцем 1:1, а не прыгает в 8 точек; за краем — на краю круга.
+func _check_stick() -> void:
+	var base := Vector2(hud.stick_r - hud.knob_r, hud.stick_r - hud.knob_r)
+	hud._apply_stick(hud._stick_center + Vector2(7, -3))
+	check("джойстик: ручка под пальцем 1:1", hud._knob.position.is_equal_approx(base + Vector2(7, -3)))
+	hud._apply_stick(hud._stick_center + Vector2(200, 0))
+	check("джойстик: за краем ручка на краю круга",
+		hud._knob.position.is_equal_approx(base + Vector2(hud.stick_r - hud.knob_r, 0)))
+	hud._release_stick()
+	check("джойстик: отпустил — ручка в центре", hud._knob.position.is_equal_approx(base))
 
 
 func _frames(n: int) -> void:

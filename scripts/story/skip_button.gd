@@ -7,7 +7,7 @@ extends Control
 
 signal confirmed
 
-const SIZE_PX := Vector2(30, 22)
+const SIZE_PX := Vector2(34, 26)   # цель нажатия ≥ 25 (44 pt)
 const HOLD_SEC := 0.6
 const DOUBLE_MS := 600
 const HINT_SEC := 2.2

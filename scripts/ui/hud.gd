@@ -453,7 +453,7 @@ func _build_clock(parent: Control) -> void:
 ## втором взгляде. Теперь новое задание показывается ненадолго и сворачивается
 ## сюда; нажатие разворачивает его обратно.
 func _build_quest_button(parent: Control) -> void:
-	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(28, 24))
+	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(36, 26))   # ширина столбика (задания дня), цель ≥ 25
 	_quest_button.visible = false
 	Tip.bind(_quest_button, "Задание")
 	_quest_button.pressed.connect(func():

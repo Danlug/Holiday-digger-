@@ -7,7 +7,7 @@ extends Control
 ## на термометр — открыть экран костюма.
 
 const FUEL_H := 30.0
-const WIDTH := 28.0
+const WIDTH := 36.0   # ширина левого столбика HUD (кнопка задания, задания дня)
 const Y_TOP := 104.0   # запасной верх, когда левого столбика HUD нет (см. _layout)
 
 var _fuel_btn: Button
@@ -53,10 +53,10 @@ func _layout() -> void:
 func _build_fuel() -> void:
 	_fuel_btn = UiBtn.icon_button(null, Vector2(WIDTH, 66), UiBtn.Kind.NORMAL)
 	var flame := TechUi.icon_rect(TechUi.tex("icon_flame"), 18)
-	flame.position = Vector2(5, 3)
+	flame.position = Vector2((WIDTH - 18.0) * 0.5, 3)
 	_fuel_btn.add_child(flame)
 	var track := Panel.new()
-	track.position = Vector2(9, 23)
+	track.position = Vector2((WIDTH - 10.0) * 0.5, 23)
 	track.size = Vector2(10, FUEL_H)
 	track.add_theme_stylebox_override("panel", TechUi.box(TechUi.PANEL_DARK, TechUi.BORDER, 2, 0))
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -78,7 +78,7 @@ func _build_fuel() -> void:
 func _build_heat() -> void:
 	_heat_btn = UiBtn.icon_button(null, Vector2(WIDTH, 38), UiBtn.Kind.NORMAL)
 	_heat_icon = TechUi.icon_rect(TechUi.tex("icon_thermo_0"), 20)
-	_heat_icon.position = Vector2(4, 3)
+	_heat_icon.position = Vector2((WIDTH - 20.0) * 0.5, 3)
 	_heat_btn.add_child(_heat_icon)
 	_heat_num = TechUi.label("", 8, TechUi.MUTED)
 	_heat_num.position = Vector2(0, 25)

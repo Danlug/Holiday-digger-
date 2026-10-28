@@ -76,7 +76,7 @@ func _build() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_top = HEAD_H + 2.0
-	_scroll.offset_bottom = -ACTION_H
+	_scroll.offset_bottom = -ACTION_H - HudSafeArea.bottom(get_viewport())
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	var margin := MarginContainer.new()
@@ -113,18 +113,7 @@ func _build_header() -> void:
 	_chip_items = _make_chip(UiIcons.tex("inventory"), 84.0, Vector2(6, 6))
 	_chip_load = _make_chip(ShopArt.ui("icon_backpack"), 78.0, Vector2(94, 6))
 
-	_close_btn = HouseArt.button("red", ShopArt.tex("glyph_cross"), Vector2(32, 24), 14.0)
-	_close_btn.anchor_left = 1.0
-	_close_btn.anchor_right = 1.0
-	_close_btn.offset_left = -38.0
-	_close_btn.offset_right = -6.0
-	_close_btn.offset_top = 4.0
-	_close_btn.offset_bottom = 28.0
-	_close_btn.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close_panel())
-	Tip.bind(_close_btn, "Закрыть")
-	_root.add_child(_close_btn)
+	_close_btn = UiBtn.close_button(close_panel, _root)
 
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
@@ -148,7 +137,7 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 func _build_actions() -> void:
 	var bar := Control.new()
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bar.offset_top = -ACTION_H
+	bar.offset_top = -ACTION_H - HudSafeArea.bottom(get_viewport())
 	bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(bar)
 	var line := ColorRect.new()
@@ -157,11 +146,14 @@ func _build_actions() -> void:
 	line.offset_bottom = 1.0
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(line)
+	# Обе кнопки делят ширину поровну (как ряд окна количества), значок по центру.
 	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 10)
+	row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	row.add_theme_constant_override("separation", 6)
+	row.offset_left = 8.0
+	row.offset_right = -8.0
 	row.offset_top = 6.0
+	row.offset_bottom = 40.0
 	bar.add_child(row)
 
 	_take_btn = HouseArt.button("gold", HouseArt.tex("take_all"), Vector2(96, 34), 24.0)
@@ -174,6 +166,15 @@ func _build_actions() -> void:
 	row.add_child(_put_btn)
 	_put_lock = ShopArt.rect(ShopArt.tex("glyph_lock"), Vector2(78, 16), Vector2(16, 16))
 	_put_btn.add_child(_put_lock)
+	for b: Button in [_take_btn, _put_btn]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
+	for l: Control in [_take_lock, _put_lock]:
+		l.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_KEEP_SIZE)
+		l.offset_left -= 2.0
+		l.offset_right -= 2.0
+		l.offset_top += 7.0
+		l.offset_bottom += 7.0
 
 
 # ---------------------------------------------------------------------------
@@ -315,11 +316,7 @@ func _offer(id: String, count: int, store: bool, accessible: bool) -> Dictionary
 
 
 func _grid() -> GridContainer:
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	return grid
+	return ShopArt.tile_grid()
 
 
 func _section(icon: Texture2D, locked: bool) -> Control:

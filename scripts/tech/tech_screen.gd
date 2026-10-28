@@ -102,8 +102,8 @@ func _ready() -> void:
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.offset_left = 6
 	column.offset_right = -6
-	column.offset_top = 6
-	column.offset_bottom = -6
+	column.offset_top = UiBtn.CLOSE_ROW
+	column.offset_bottom = -6 - HudSafeArea.bottom(get_viewport())
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
 	_content = VBoxContainer.new()
@@ -111,6 +111,7 @@ func _ready() -> void:
 	_content.add_theme_constant_override("separation", 6)
 	column.add_child(_content)
 	column.add_child(_build_tabs())   # вкладки внизу, в зоне большого пальца — как на экране героя
+	UiBtn.close_button(close, self)
 	_fx_layer = Control.new()
 	_fx_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -131,7 +132,7 @@ func _build_tabs() -> Control:
 		[TAB_WELL, TechUi.tex("icon_well"), "Скважина", "Копает сама, пока тебя нет"],
 	]
 	var bar := HeroTabButton.make_bar(specs, _tab,
-		func(key: String) -> void: open_tab(key, _station), close)
+		func(key: String) -> void: open_tab(key, _station))
 	_tab_buttons = bar.get_meta("buttons")
 	return bar
 

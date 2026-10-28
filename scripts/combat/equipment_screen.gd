@@ -133,10 +133,11 @@ func _rebuild() -> void:
 
 	var page := VBoxContainer.new()
 	page.name = "Page"
-	page.position = Vector2(8, 6)
-	page.size = _root.size - Vector2(16, 12)
+	page.position = Vector2(8, UiBtn.CLOSE_ROW)
+	page.size = _root.size - Vector2(16, UiBtn.CLOSE_ROW + 6 + HudSafeArea.bottom(get_viewport()))
 	page.add_theme_constant_override("separation", 5)
 	_root.add_child(page)
+	UiBtn.close_button(close, _root)
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -163,7 +164,7 @@ func _build_header() -> Control:
 		if _tab == key:
 			return
 		_tab = key
-		_rebuild(), close)
+		_rebuild())
 	_tab_buttons = bar.get_meta("buttons")
 	return bar
 

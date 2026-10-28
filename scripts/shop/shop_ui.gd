@@ -70,6 +70,7 @@ var _shown_dollars: int = 0
 var _wallet_hold: bool = false
 var _wallet_tween: Dictionary = {}
 var _close_btn: Button
+var _nav_bottom := NAV_H   # нижняя панель вместе с безопасной зоной (полоска «домой»)
 
 var _nav: Control
 var _nav_tabs: Control
@@ -302,6 +303,7 @@ func _build() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bg)
 
+	_nav_bottom = NAV_H + HudSafeArea.bottom(get_viewport())
 	_build_scroll()
 	_build_header()
 	_build_action_bar()
@@ -314,7 +316,7 @@ func _build_scroll() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_top = HEAD_H + 2.0
-	_scroll.offset_bottom = -NAV_H
+	_scroll.offset_bottom = -_nav_bottom
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_root.add_child(_scroll)
@@ -346,17 +348,7 @@ func _build_header() -> void:
 	_chips["dig"] = _make_chip(ShopArt.tex("glyph_dig"), 56.0, Vector2(6, 6))
 	_chips["fly"] = _make_chip(ShopArt.tex("glyph_fly"), 56.0, Vector2(66, 6))
 
-	_close_btn = _make_btn("red", "glyph_cross", Vector2(32, 24), 14.0)
-	_close_btn.position = Vector2(224.0 - 32.0 - 6.0, 4.0)
-	_close_btn.anchor_left = 1.0
-	_close_btn.anchor_right = 1.0
-	_close_btn.offset_left = -38.0
-	_close_btn.offset_right = -6.0
-	_close_btn.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	Tip.bind(_close_btn, "Закрыть")
-	_root.add_child(_close_btn)
+	_close_btn = UiBtn.close_button(close, _root)
 
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
@@ -422,7 +414,7 @@ func _make_btn(kind: String, glyph: String, sz: Vector2, icon_px: float = 16.0) 
 func _build_nav() -> void:
 	_nav = Control.new()
 	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_nav.offset_top = -NAV_H
+	_nav.offset_top = -_nav_bottom
 	_nav.offset_bottom = 0.0
 	_nav.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(_nav)
@@ -448,30 +440,44 @@ func _build_nav() -> void:
 	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_nav_tabs.add_child(_marker)
 
+	# Вкладки делят всю ширину (премиум в 4/3 шире); маркер встаёт после раскладки.
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	row.offset_bottom = NAV_H
+	row.add_theme_constant_override("separation", 0)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.sort_children.connect(func() -> void: _move_marker(false))
+	_nav_tabs.add_child(row)
 	var widths := {TAB_FOOD: 42.0, TAB_PICKS: 42.0, TAB_TECH: 42.0, TAB_SELL: 42.0, SCREEN_PREMIUM: 56.0}
-	var x := 0.0
 	for id in NAV_TABS:
 		var w: float = widths[id]
 		var b := Button.new()
 		b.flat = true
 		b.focus_mode = Control.FOCUS_NONE
-		b.position = Vector2(x, 0)
-		b.size = Vector2(w, NAV_H)
-		b.custom_minimum_size = b.size
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.size_flags_stretch_ratio = w / 42.0
+		b.custom_minimum_size = Vector2(w, NAV_H)
+		b.size = b.custom_minimum_size
 		for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
 			b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
 		if id == SCREEN_PREMIUM:
 			_premium_glow = ShopArt.rect(ShopArt.tex("glow"), Vector2(0, -2), Vector2(w, NAV_H + 4.0))
 			_premium_glow.stretch_mode = TextureRect.STRETCH_SCALE
+			_premium_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			_premium_glow.offset_top = -2.0
+			_premium_glow.offset_bottom = 2.0
 			_premium_glow.modulate = Color(0.4, 1.0, 0.65, 0.5)
 			b.add_child(_premium_glow)
 		var isz := 30.0 if id == SCREEN_PREMIUM else 26.0
 		var ic := ShopArt.rect(ShopArt.tex(String(NAV_ICONS[id])),
 			Vector2((w - isz) * 0.5, (NAV_H - isz) * 0.5), Vector2(isz, isz))
 		ic.name = "Icon"
+		ic.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 		ic.pivot_offset = ic.size * 0.5
 		b.add_child(ic)
 		var badge := ShopArt.rect(ShopArt.tex("glyph_new"), Vector2(w - 15.0, 2), Vector2(11, 11))
+		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_KEEP_SIZE)
+		badge.position = Vector2(w - 15.0, 2)
 		badge.visible = false
 		b.add_child(badge)
 		_tab_badges[id] = badge
@@ -484,9 +490,8 @@ func _build_nav() -> void:
 				_scroll.scroll_vertical = 0)
 		var tip: Array = NAV_TIPS[id]
 		Tip.bind(b, String(tip[0]), String(tip[1]))
-		_nav_tabs.add_child(b)
+		row.add_child(b)
 		_tab_buttons[id] = b
-		x += w
 	_marker.get_parent().move_child(_marker, 0)
 
 	# На экране верстака вкладок нет: одна большая кнопка «готово» под большим пальцем.
@@ -507,8 +512,8 @@ func _build_nav() -> void:
 func _build_action_bar() -> void:
 	_action = Control.new()
 	_action.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_action.offset_top = -(NAV_H + ACTION_H)
-	_action.offset_bottom = -NAV_H
+	_action.offset_top = -(_nav_bottom + ACTION_H)
+	_action.offset_bottom = -_nav_bottom
 	_action.mouse_filter = Control.MOUSE_FILTER_STOP
 	_action.visible = false
 	_root.add_child(_action)
@@ -556,6 +561,13 @@ func _build_action_bar() -> void:
 	_sell_btn.add_child(_sell_uses)
 	_sell_btn.pressed.connect(_on_sell_pressed)
 	_action.add_child(_sell_btn)
+	# «Продать» тянется до правого края; «×2» прижата к его правому краю, сумма — между.
+	_sell_btn.anchor_right = 1.0
+	_sell_btn.offset_right = -6.0
+	_sell_x2.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_KEEP_SIZE)
+	_sell_x2.position.x = _sell_btn.size.x - 24.0
+	_sell_label.anchor_right = 1.0
+	_sell_label.offset_right = -26.0
 
 
 ## Сообщение магазина. Живёт ВНЕ шторки: о том, что бур теперь собирается на
@@ -815,10 +827,7 @@ func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
 
 
 func _make_grid(offers: Array) -> GridContainer:
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
+	var grid := ShopArt.tile_grid()
 	for o in offers:
 		var t := ShopTile.new()
 		t.setup(o)
@@ -968,8 +977,8 @@ func _after_snap(tile: ShopTile, color: Color) -> void:
 func _build_door_strip() -> void:
 	_door_strip = ShopDoorStrip.new().setup(_make_btn("green", "", Vector2(56, 32)))
 	_door_strip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_door_strip.offset_top = -(NAV_H + ShopDoorStrip.H)
-	_door_strip.offset_bottom = -NAV_H
+	_door_strip.offset_top = -(_nav_bottom + ShopDoorStrip.H)
+	_door_strip.offset_bottom = -_nav_bottom
 	_door_strip.visible = false
 	_door_strip.go_btn.pressed.connect(_go_to_door)
 	_root.add_child(_door_strip)
@@ -982,7 +991,7 @@ func _sync_door_strip() -> void:
 	_door_strip.visible = want
 	if not want:
 		return
-	_scroll.offset_bottom = -(NAV_H + ShopDoorStrip.H)
+	_scroll.offset_bottom = -(_nav_bottom + ShopDoorStrip.H)
 	_door_strip.configure(ShopService.purchase_place(), _door_dir())
 
 
@@ -1075,7 +1084,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	panel.anchor_bottom = 1.0
 	panel.offset_left = 10.0
 	panel.offset_right = -10.0
-	panel.offset_bottom = -(NAV_H + 8.0)
+	panel.offset_bottom = -(_nav_bottom + 8.0)
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var sb := StyleBoxTexture.new()
@@ -1125,10 +1134,10 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	else:
 		col.add_child(_make_price_row(offer))
 
-	# Низ: красный крестик слева, зелёная галочка справа — под большим пальцем.
+	# Низ: красный крестик прижат влево, зелёная галочка растянута до правого края
+	# (как в HouseQtyCard) — под большим пальцем и без дыр на широком экране.
 	var btns := HBoxContainer.new()
-	btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns.add_theme_constant_override("separation", 8)
+	btns.add_theme_constant_override("separation", 6)
 	col.add_child(btns)
 	var cancel := _make_btn("red", "glyph_cross", Vector2(52, 32), 18.0)
 	cancel.pressed.connect(func() -> void:
@@ -1144,6 +1153,8 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	btns.move_child(cancel, 0)
 	var ok_glyph := "glyph_hammer" if is_recipe else "glyph_check"
 	_card_ok = _make_btn("green", ok_glyph, Vector2(96, 32), 20.0)
+	_card_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_card_ok.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	var can_do := _card_can_confirm(offer)
 	_card_ok.disabled = not can_do
 	_card_ok.pressed.connect(_confirm_card)
@@ -1418,9 +1429,14 @@ func _craft_qty_sync() -> void:
 	if _craft_qty_ok == null:
 		_craft_qty_ok = ShopArt.label("", 13, Color.WHITE, INK, 3)
 		_craft_qty_ok.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_craft_qty_ok.position = Vector2(_card_ok.size.x * 0.5 - 2.0, 0)
-		_craft_qty_ok.size = Vector2(_card_ok.size.x * 0.5, _card_ok.size.y - 2.0)
 		_card_ok.add_child(_craft_qty_ok)
+		_craft_qty_ok.anchor_left = 0.5   # правая половина кнопки — кнопка тянется на всю ширину
+		_craft_qty_ok.anchor_right = 1.0
+		_craft_qty_ok.anchor_bottom = 1.0
+		_craft_qty_ok.offset_left = -2.0
+		_craft_qty_ok.offset_right = 0.0
+		_craft_qty_ok.offset_top = 0.0
+		_craft_qty_ok.offset_bottom = -2.0
 		if glyph != null:
 			glyph.position.x = _card_ok.size.x * 0.5 - glyph.size.x - 4.0
 	_craft_qty_ok.text = "×" + ShopArt.compact(_craft_qty.amount())
@@ -1654,7 +1670,7 @@ func _selection_items() -> Dictionary:
 ## ГДД раздел 15) и значок ролика «×2».
 func _update_action_bar() -> void:
 	_action.visible = _tab == TAB_SELL
-	_scroll.offset_bottom = -(NAV_H + (ACTION_H if _tab == TAB_SELL else 0.0))
+	_scroll.offset_bottom = -(_nav_bottom + (ACTION_H if _tab == TAB_SELL else 0.0))
 	if _tab != TAB_SELL:
 		return
 	var remote := _footer_mode == "remote"

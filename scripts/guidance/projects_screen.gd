@@ -23,7 +23,7 @@ const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
 const COL_FILL_VIA := Color8(0xE0, 0xA9, 0x3B, 0x70)
 const COL_DONE := Color8(0x7F, 0xD0, 0x6B)
 const COL_TRACK := Color8(0x0E, 0x0B, 0x08)
-const HEAD_TOP := 6.0
+const HEAD_TOP := UiBtn.CLOSE_ROW   # над шапкой — полоса крестика, как на всех экранах
 const HEAD_H := 62.0          # заголовок, подзаголовок, фишки и черта под ними
 const TITLE_SIZES := [13, 12, 11, 10]   # длинное имя проекта ужимается, а не обрезается
 
@@ -217,10 +217,11 @@ func _build() -> void:
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
 	_scroll.offset_top = HEAD_TOP + HEAD_H + 4
-	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + HudSafeArea.bottom(get_viewport()))
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
+	UiBtn.close_button(close, _root)
 
 	_body = VBoxContainer.new()
 	_body.custom_minimum_size = Vector2(212, 0)
@@ -236,13 +237,14 @@ func _build_tabs() -> void:
 	for id in ProjectChain.ids():
 		specs.append([String(id), ProjectChain.icon(String(id)), ProjectChain.title(String(id)),
 			"Цепочка материалов и где их копать"])
-	_bar = HeroTabButton.make_bar(specs, _current, _set_project, close)
+	_bar = HeroTabButton.make_bar(specs, _current, _set_project)
+	var sb := HudSafeArea.bottom(get_viewport())
 	_tab_buttons = _bar.get_meta("buttons")
 	_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_bar.offset_left = 6
 	_bar.offset_right = -6
-	_bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
-	_bar.offset_bottom = -4
+	_bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4 + sb)
+	_bar.offset_bottom = -4 - sb
 	_root.add_child(_bar)
 
 

@@ -140,13 +140,7 @@ func _build() -> void:
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(sp)
-	var close_btn := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 26), UiBtn.Kind.GHOST)
-	Tip.bind(close_btn, "Закрыть")
-	close_btn.pressed.connect(func():
-		if Tip.swallowed():
-			return
-		close())
-	head.add_child(close_btn)
+	head.add_child(UiBtn.close_button(close))
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

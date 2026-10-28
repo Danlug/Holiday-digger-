@@ -258,13 +258,7 @@ func _header() -> Control:
 	Tip.bind(wallet, "Монеты")
 	h.add_child(wallet)
 
-	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(24, 24), UiBtn.Kind.GHOST)
-	Tip.bind(x, "Закрыть")
-	x.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		close())
-	h.add_child(x)
+	h.add_child(UiBtn.close_button(close))
 	return h
 
 

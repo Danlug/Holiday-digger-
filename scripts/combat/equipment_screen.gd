@@ -133,8 +133,9 @@ func _rebuild() -> void:
 
 	var page := VBoxContainer.new()
 	page.name = "Page"
-	page.position = Vector2(8, UiBtn.CLOSE_ROW)
-	page.size = _root.size - Vector2(16, UiBtn.CLOSE_ROW + 6 + HudSafeArea.bottom(get_viewport()))
+	var st := HudSafeArea.top(get_viewport())
+	page.position = Vector2(8, UiBtn.CLOSE_ROW + st)
+	page.size = _root.size - Vector2(16, UiBtn.CLOSE_ROW + st + 6 + HudSafeArea.bottom(get_viewport()))
 	page.add_theme_constant_override("separation", 5)
 	_root.add_child(page)
 	UiBtn.close_button(close, _root)

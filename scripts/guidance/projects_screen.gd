@@ -175,8 +175,9 @@ func _build() -> void:
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.offset_left = 8
 	top.offset_right = -8
-	top.offset_top = HEAD_TOP
-	top.offset_bottom = HEAD_TOP + HEAD_H
+	var st := HudSafeArea.top(get_viewport())
+	top.offset_top = HEAD_TOP + st
+	top.offset_bottom = HEAD_TOP + HEAD_H + st
 	top.add_theme_constant_override("separation", 2)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(top)
@@ -216,7 +217,7 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
-	_scroll.offset_top = HEAD_TOP + HEAD_H + 4
+	_scroll.offset_top = HEAD_TOP + HEAD_H + 4 + st
 	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + HudSafeArea.bottom(get_viewport()))
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)

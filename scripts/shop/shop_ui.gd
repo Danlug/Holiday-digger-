@@ -71,6 +71,7 @@ var _shown_dollars: int = 0
 var _wallet_hold: bool = false
 var _wallet_tween: Dictionary = {}
 var _close_btn: Button
+var _safe_top := 0.0   # шапка — под вырезом/статус-баром (HudSafeArea.top)
 var _nav_bottom := NAV_H   # нижняя панель вместе с безопасной зоной (полоска «домой»)
 
 var _nav: Control
@@ -308,6 +309,7 @@ func _build() -> void:
 	_root.add_child(bg)
 
 	_nav_bottom = NAV_H + HudSafeArea.bottom(get_viewport())
+	_safe_top = HudSafeArea.top(get_viewport())
 	_build_scroll()
 	_build_header()
 	_build_action_bar()
@@ -319,7 +321,7 @@ func _build() -> void:
 func _build_scroll() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_scroll.offset_top = HEAD_H + 2.0
+	_scroll.offset_top = HEAD_H + 2.0 + _safe_top
 	_scroll.offset_bottom = -_nav_bottom
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
@@ -342,8 +344,8 @@ func _build_header() -> void:
 	var line := ColorRect.new()
 	line.color = Color8(0x4A, 0x3F, 0x5C)
 	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	line.offset_top = HEAD_H
-	line.offset_bottom = HEAD_H + 1.0
+	line.offset_top = HEAD_H + _safe_top
+	line.offset_bottom = HEAD_H + 1.0 + _safe_top
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(line)
 
@@ -357,7 +359,7 @@ func _build_header() -> void:
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	var root := Control.new()
-	root.position = pos
+	root.position = pos + Vector2(0, _safe_top)
 	root.size = Vector2(w, 20)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	var bg := NinePatchRect.new()
@@ -566,8 +568,8 @@ func _build_notice() -> void:
 	_notice_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_notice_panel.offset_left = 10
 	_notice_panel.offset_right = -10
-	_notice_panel.offset_top = HEAD_H + 6.0
-	_notice_panel.offset_bottom = HEAD_H + 46.0
+	_notice_panel.offset_top = HEAD_H + 6.0 + _safe_top
+	_notice_panel.offset_bottom = HEAD_H + 46.0 + _safe_top
 	_notice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_notice_panel.visible = false
 	var sb := StyleBoxFlat.new()

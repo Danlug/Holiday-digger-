@@ -124,8 +124,9 @@ static func close_button(on_close: Callable, parent: Control = null, tip: String
 		b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 		b.offset_left = -CLOSE_INSET - CLOSE_SIZE
 		b.offset_right = -CLOSE_INSET
-		b.offset_top = CLOSE_INSET
-		b.offset_bottom = CLOSE_INSET + CLOSE_SIZE
+		var st := HudSafeArea.top((Engine.get_main_loop() as SceneTree).root)   # под вырезом/статус-баром
+		b.offset_top = CLOSE_INSET + st
+		b.offset_bottom = CLOSE_INSET + CLOSE_SIZE + st
 		parent.add_child(b)
 	return b
 

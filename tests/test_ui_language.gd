@@ -150,6 +150,10 @@ func _check_layout_kit() -> void:
 		and x.offset_right == -UiBtn.CLOSE_INSET and x.offset_top == UiBtn.CLOSE_INSET)
 	x.pressed.emit()
 	check("крестик закрывает", closed[0])
+	HudSafeArea.debug_top = 20.0
+	var xn := UiBtn.close_button(func() -> void: pass, host)
+	check("крестик: под вырезом опускается на верхнюю безопасную зону", xn.offset_top == UiBtn.CLOSE_INSET + 20.0)
+	HudSafeArea.debug_top = -1.0
 	var g := ShopArt.tile_grid()
 	host.add_child(g)
 	g.size = Vector2(208, 64)

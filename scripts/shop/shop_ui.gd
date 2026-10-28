@@ -59,6 +59,7 @@ var _busy: bool = false
 var _shown_new: Array = []
 
 var _root: Control
+var _closing := false   # шторка уезжает: уже закрыта по смыслу, но ещё видна
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _drag: DragScroll
@@ -175,14 +176,15 @@ func _exit_tree() -> void:
 
 
 func is_open() -> bool:
-	return _root != null and _root.visible
+	return _root != null and _root.visible and not _closing
 
 
 func open(tab: String = TAB_FOOD) -> void:
 	_resolve_refs()
 	# Повторное open() при открытой шторке (из вкладки в экипировку) мир второй
 	# раз не замораживает: иначе «как было» запомнилось бы уже замороженным.
-	if not is_open():
+	var was_open := is_open()
+	if not was_open:
 		_freeze_world(true)
 	_door_guide.stop()
 	ShopItems.seed_seen()
@@ -196,8 +198,10 @@ func open(tab: String = TAB_FOOD) -> void:
 	# Печь бронзы: всё сплавленное за время вылазки само ложится в рюкзак/на склад.
 	if ShopService.is_at_workshop():
 		_furnace_pop += int(BronzeFurnace.collect()["count"])
+	_closing = false
 	_root.visible = true
-	_root.modulate.a = 1.0
+	if not was_open:
+		UiAnim.open(_root, UiAnim.Kind.SHEET)
 	Sfx.play("ui_open")
 	if tab == SCREEN_EQUIP:
 		# Ржавая кирка находится в мастерской среди удочек, лопат и палок (слова
@@ -221,12 +225,13 @@ func _announce_place(tab: String) -> void:
 
 
 func close() -> void:
-	if _root == null or not _root.visible:
+	if not is_open():
 		return
 	_close_card(false)
 	_leave_tab()
 	_furnace_pop = 0
-	_root.visible = false
+	_closing = true
+	UiAnim.close(_root, UiAnim.Kind.SHEET, null, func() -> void: _closing = false)
 	Tip.hide_all()
 	Sfx.play("ui_close")
 	_freeze_world(false)
@@ -411,11 +416,10 @@ func _make_btn(kind: String, glyph: String, sz: Vector2, icon_px: float = 16.0) 
 		if b.disabled:
 			return
 		b.pivot_offset = b.size * 0.5
-		b.create_tween().tween_property(b, "scale", Vector2(0.94, 0.94), 0.05))
+		UiAnim.press(b, true, 0.94))
 	b.button_up.connect(func() -> void:
 		b.pivot_offset = b.size * 0.5
-		b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.12) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+		UiAnim.press(b, false))
 	return b
 
 
@@ -692,6 +696,7 @@ func _leave_tab() -> void:
 
 
 func _move_marker(animate: bool) -> void:
+	animate = animate and not ShopFx.reduced()
 	var b: Button = _tab_buttons.get(_tab)
 	for id in _tab_buttons.keys():
 		var btn: Button = _tab_buttons[id]
@@ -1748,6 +1753,9 @@ func _do_sell(remote: bool) -> void:
 		if k > 0:
 			ShopFx.coins(_root, coin_tex, c, wallet, k, on_arrive)
 			spawned += k
+		if ShopFx.reduced():
+			tile.create_tween().tween_property(tile, "modulate:a", 0.0, 0.12)
+			continue
 		tile.pivot_offset = tile.size * 0.5
 		var tw := tile.create_tween()
 		tw.tween_interval(0.04 * float(sold_tiles.find(t)))

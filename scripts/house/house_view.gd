@@ -116,6 +116,7 @@ const KEY_RIGHT_D: Key = KEY_D
 const KEY_RIGHT_ARROW: Key = KEY_RIGHT
 
 var _root: Control
+var _closing := false   # интерьер уходит: слой ещё виден
 var _clock: Label
 var _day: Label
 var _bars: Dictionary = {}       # "hp"|"hunger"|"stamina" -> ColorRect (заливка)
@@ -508,6 +509,9 @@ func _load_hero_sheets() -> void:
 ## enter_x — доля 0..1, где герой появится в комнате (обычно дверь, из
 ## которой он вышел в предыдущей); -1 (по умолчанию) — spawn_x комнаты.
 func open(room: String, enter_x: float = -1.0) -> void:
+	if not visible or _closing:
+		UiAnim.open(_root, UiAnim.Kind.FADE)
+	_closing = false
 	visible = true
 	_sleeping = false
 	# Замок сна снимается вместе с самим сном: тап посреди ролика «house_sleep»
@@ -520,13 +524,20 @@ func open(room: String, enter_x: float = -1.0) -> void:
 
 
 func close() -> void:
-	visible = false
 	_sleeping = false
 	_locked = false
 	_knock_t = -1.0
 	if _sleep_fx != null:
 		_sleep_fx.stop()
 	hide_npc()
+	if not visible or _closing:
+		return
+	# слой прячется после ухода интерьера; войдут снова посреди ухода — развернётся
+	_closing = true
+	UiAnim.close(_root, UiAnim.Kind.FADE, null, func() -> void:
+		_closing = false
+		visible = false
+		_root.visible = true)
 
 
 func go_to_room(id: String, enter_x: float = -1.0) -> void:

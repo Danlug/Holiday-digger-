@@ -25,6 +25,7 @@ func _ready() -> void:
 	_check_kits_share_palette()
 	_check_anim_instant()
 	_check_open_close_reopen()
+	_check_spring()
 	_check_tab_bar()
 	_check_small_item_icon()
 	_check_tap_scale()
@@ -93,6 +94,29 @@ func _check_open_close_reopen() -> void:
 	UiAnim.close(card, UiAnim.Kind.POP, root)
 	check("закрытие без done не падает", not root.visible)
 	root.queue_free()
+
+
+func _check_spring() -> void:
+	var s := UiAnim.Spring.new()
+	s.target = 1.0
+	var peak := 0.0
+	for i in 60:
+		s.step(1.0 / 60.0)
+		peak = maxf(peak, s.x)
+	check("пружина приходит в цель за секунду и не перелетает", s.settled() and peak <= 1.0 + 1e-4)
+	s.x = 0.0
+	s.v = 0.0
+	for i in 5:
+		s.step(1.0 / 60.0)
+	var x0 := s.x
+	var v0 := s.v
+	s.target = 0.0
+	check("смена цели не двигает значение", s.x == x0 and s.v == v0)
+	s.step(1.0 / 60.0)
+	check("разворот без скачка: сдвиг за кадр не больше скорости", absf(s.x - x0) <= absf(v0) / 60.0 + 1e-4)
+	for i in 60:
+		s.step(1.0 / 60.0)
+	check("после разворота пружина приходит в новую цель", s.settled())
 
 
 func _check_tab_bar() -> void:

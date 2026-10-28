@@ -130,18 +130,8 @@ static func wire_sink(b: Button) -> void:
 
 
 static func _sink(b: Button, down: bool) -> void:
-	if not is_instance_valid(b) or not b.is_inside_tree() or UiAnim.reduced():
-		return
-	if b.has_meta(&"_sink_tween"):
-		var old = b.get_meta(&"_sink_tween")
-		if old is Tween and (old as Tween).is_valid():
-			(old as Tween).kill()
-	var tw := b.create_tween()
-	b.set_meta(&"_sink_tween", tw)
-	if down:
-		tw.tween_property(b, "scale", Vector2.ONE * UiAnim.TAP_SCALE, 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	else:
-		tw.tween_property(b, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if is_instance_valid(b):
+		UiAnim.press(b, down)
 
 
 ## Красная цифра в правом верхнем углу кнопки. n <= 0 — прячет значок,

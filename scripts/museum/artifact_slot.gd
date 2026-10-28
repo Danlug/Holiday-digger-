@@ -44,10 +44,8 @@ func _init() -> void:
 		add_theme_stylebox_override(st, StyleBoxEmpty.new())
 	_sb.set_corner_radius_all(ProgressUiKit.R_TILE)
 	_sb.set_border_width_all(1)
-	button_down.connect(func() -> void: create_tween().tween_property(self, "scale", Vector2(0.92, 0.92), 0.05))
-	button_up.connect(func() -> void:
-		var tw := create_tween()
-		tw.tween_property(self, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+	button_down.connect(func() -> void: UiAnim.press(self, true))
+	button_up.connect(func() -> void: UiAnim.press(self, false))
 	pressed.connect(_on_pressed)
 	visibility_changed.connect(_sync_process)
 

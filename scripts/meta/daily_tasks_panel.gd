@@ -119,14 +119,7 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	# Тап мимо окна закрывает его — как у шторок.
-	dim.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
-			close())
-	_root.add_child(dim)
+	UiTheme.scrim(_root, close)   # тап мимо окна закрывает его — как у шторок
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

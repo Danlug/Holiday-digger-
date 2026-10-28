@@ -139,14 +139,8 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0.1, 0.0, 0.02, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			_close_by_player())
-	_root.add_child(dim)
+	var dim := UiTheme.scrim(_root, _close_by_player)
+	dim.color = Color(0.1, 0.0, 0.02, UiTheme.SCRIM_MODAL)   # та же сила, но с красным отливом смерти
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

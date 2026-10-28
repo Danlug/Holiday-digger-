@@ -92,15 +92,7 @@ func close() -> void:
 
 
 func _build() -> void:
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.gui_input.connect(func(e: InputEvent) -> void:
-		var mb := e as InputEventMouseButton
-		var st := e as InputEventScreenTouch
-		if (mb != null and mb.pressed) or (st != null and st.pressed):
-			close())
-	add_child(dim)
+	UiTheme.scrim(self, close)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

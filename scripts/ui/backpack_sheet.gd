@@ -219,12 +219,7 @@ static func tier_of(id: String) -> int:
 # ---------------------------------------------------------------------------
 
 func _build() -> void:
-	_dim = ColorRect.new()
-	_dim.color = Color(0, 0, 0, 0.6)
-	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_dim)
-	# Тап по затемнению над карточкой закрывает шторку.
-	UiBtn.on_tap(_dim, close)
+	_dim = UiTheme.scrim(self, close, UiTheme.SCRIM_SHEET)   # тап над карточкой закрывает шторку
 
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -459,10 +454,7 @@ func _build_drop_panel() -> void:
 	_drop_panel.visible = false
 	add_child(_drop_panel)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_drop_panel.add_child(dim)
+	UiTheme.scrim(_drop_panel, Callable(), UiTheme.SCRIM_SHEET)
 
 	_drop_card = PanelContainer.new()
 	_drop_card.set_anchors_preset(Control.PRESET_CENTER)

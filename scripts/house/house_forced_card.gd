@@ -29,11 +29,7 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 
-	var shade := ColorRect.new()
-	shade.color = Color(0.03, 0.02, 0.02, 0.84)
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shade)
+	UiTheme.scrim(self)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

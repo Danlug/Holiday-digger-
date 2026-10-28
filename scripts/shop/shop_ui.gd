@@ -1026,16 +1026,8 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	_root.add_child(_card)
 	_drag.set_process_input(false)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.62)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and ev.pressed or ev is InputEventScreenTouch and ev.pressed:
-			# Тап мимо открытого описания гасит только описание, окно остаётся.
-			if not Tip.swallowed() and not Tip.dismissed_by_tap():
-				_close_card(true))
-	_card.add_child(dim)
+	# Тап мимо открытого описания гасит только описание, окно остаётся.
+	var dim := UiTheme.scrim(_card, _close_card.bind(true), UiTheme.SCRIM_SHEET)
 
 	var panel := PanelContainer.new()
 	panel.anchor_left = 0.0

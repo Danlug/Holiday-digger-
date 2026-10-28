@@ -84,3 +84,22 @@ const FS_HERO := 16
 const FS_HERO_L := 18
 const FS_BIG := 20
 const FS_HUGE := 24
+
+
+## Затемнение за окном на весь parent. Модальное окно — SCRIM_MODAL, шторка и
+## окно поверх шторки — SCRIM_SHEET; окно «рядом с игрой» затемнения не берёт.
+## on_tap — тап мимо окна (не тот, что закрыл подсказку или открыл её долгим нажатием).
+static func scrim(parent: Control, on_tap: Callable = Callable(), alpha: float = SCRIM_MODAL) -> ColorRect:
+	var dim := ColorRect.new()
+	dim.name = "Scrim"
+	dim.color = Color(0, 0, 0, alpha)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	if on_tap.is_valid():
+		dim.gui_input.connect(func(ev: InputEvent) -> void:
+			var mb := ev as InputEventMouseButton
+			if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT \
+					and not Tip.swallowed() and not Tip.dismissed_by_tap():
+				on_tap.call())
+	parent.add_child(dim)
+	return dim

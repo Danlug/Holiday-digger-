@@ -37,12 +37,7 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 
-	_dim = ColorRect.new()
-	_dim.color = Color(0, 0, 0, 0.62)
-	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	_dim.gui_input.connect(_on_dim_input)
-	add_child(_dim)
+	_dim = UiTheme.scrim(self, cancel_card, UiTheme.SCRIM_SHEET)
 
 	_panel = PanelContainer.new()
 	_panel.anchor_left = 0.0
@@ -282,9 +277,3 @@ func _on_ok() -> void:
 	var n := amount()
 	_close()
 	confirmed.emit(n)
-
-
-func _on_dim_input(ev: InputEvent) -> void:
-	if (ev is InputEventMouseButton and ev.pressed) or (ev is InputEventScreenTouch and ev.pressed):
-		if not Tip.swallowed():
-			cancel_card()

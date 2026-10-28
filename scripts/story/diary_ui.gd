@@ -60,12 +60,7 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0.03, 0.02, 0.01, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.gui_input.connect(_on_dim_input)
-	_root.add_child(dim)
+	UiTheme.scrim(_root, close_diary)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -342,13 +337,6 @@ func close_diary() -> void:
 	Sfx.play("ui_close")
 	UiAnim.close(_panel, UiAnim.Kind.POP, _root)
 	closed.emit()
-
-
-func _on_dim_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		close_diary()
-	elif event is InputEventScreenTouch and event.pressed:
-		close_diary()
 
 
 func _flip(step: int) -> void:

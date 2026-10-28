@@ -104,11 +104,7 @@ func refresh() -> void:
 # ---------------------------------------------------------------------------
 
 func _build() -> void:
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(dim)
-	UiBtn.on_tap(dim, close)
+	UiTheme.scrim(self, close, UiTheme.SCRIM_SHEET)
 
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)

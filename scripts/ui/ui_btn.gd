@@ -338,12 +338,3 @@ static func knob_texture(col: Color) -> Texture2D:
 					shade = col.lightened(0.35)
 				img.set_pixel(x, y, shade)
 	return ImageTexture.create_from_image(img)
-
-
-## Вызывает action при нажатии левой кнопкой/пальцем по control (затемнение за
-## шторкой: тап мимо карточки закрывает её).
-static func on_tap(c: Control, action: Callable) -> void:
-	c.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
-				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-			action.call())

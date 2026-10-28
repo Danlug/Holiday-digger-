@@ -72,10 +72,7 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.78)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_root.add_child(dim)
+	UiTheme.scrim(_root)   # без закрытия по тапу: приз забирают кнопкой
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

@@ -145,15 +145,7 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.74)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
-			if Tip.dismissed_by_tap():
-				return   # тап закрыл подсказку миссии — окно остаётся
-			close())
-	_root.add_child(dim)
+	UiTheme.scrim(_root, close)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)

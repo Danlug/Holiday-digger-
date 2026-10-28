@@ -179,6 +179,10 @@ static func _style_slider(s: HSlider) -> void:
 ## offer — словарь плитки (см. ShopTile.setup), max_amount — сколько можно
 ## переложить, count — сколько всего в источнике, limit_text — причина, по
 ## которой влезает меньше (пусто — предел только остаток).
+func _ready() -> void:
+	_panel.offset_bottom = -12.0 - HudSafeArea.bottom(get_viewport())   # над полоской «домой»
+
+
 func open(offer: Dictionary, max_amount: int, count: int, unit_weight: float, limit_text: String = "",
 		verb: String = "Готово") -> void:
 	for c in _preview_box.get_children():

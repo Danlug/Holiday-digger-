@@ -27,6 +27,7 @@ func _ready() -> void:
 	_check_open_close_reopen()
 	_check_spring()
 	_check_tab_bar()
+	_check_layout_kit()
 	_check_small_item_icon()
 	_check_tap_scale()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -121,9 +122,8 @@ func _check_spring() -> void:
 
 func _check_tab_bar() -> void:
 	var picked := [""]
-	var closed := [false]
 	var specs := [["a", UiIcons.tex("gear"), "А", "первая"], ["b", UiIcons.tex("eye"), "Б", ""]]
-	var bar := HeroTabButton.make_bar(specs, "b", func(k: String) -> void: picked[0] = k, func() -> void: closed[0] = true)
+	var bar := HeroTabButton.make_bar(specs, "b", func(k: String) -> void: picked[0] = k)
 	add_child(bar)
 	var buttons: Dictionary = bar.get_meta("buttons")
 	check("полоса вкладок: кнопки по ключам", buttons.size() == 2 and buttons.has("a") and buttons.has("b"))
@@ -137,6 +137,32 @@ func _check_tab_bar() -> void:
 	check("нажатие вкладки отдаёт ключ", picked[0] == "a")
 	bar.queue_free()
 	check("значок вкладки задаётся картинкой", (HeroTabButton.new() as HeroTabButton).icon_tex == null)
+
+
+func _check_layout_kit() -> void:
+	var host := Control.new()
+	host.size = Vector2(300, 200)
+	add_child(host)
+	var closed := [false]
+	var x := UiBtn.close_button(func() -> void: closed[0] = true, host)
+	check("крестик: цель нажатия не меньше 25", x.custom_minimum_size.x >= 25.0 and x.custom_minimum_size.y >= 25.0)
+	check("крестик: правый верхний угол", x.anchor_left == 1.0 and x.anchor_right == 1.0 and x.anchor_top == 0.0
+		and x.offset_right == -UiBtn.CLOSE_INSET and x.offset_top == UiBtn.CLOSE_INSET)
+	x.pressed.emit()
+	check("крестик закрывает", closed[0])
+	var g := ShopArt.tile_grid()
+	host.add_child(g)
+	g.size = Vector2(208, 64)
+	check("сетка 208: три колонки, зазор 8", g.columns == 3 and g.get_theme_constant("h_separation") == 8)
+	g.size = Vector2(254, 64)
+	check("сетка 254: три колонки, зазоры растут", g.columns == 3 and g.get_theme_constant("h_separation") == 31)
+	g.size = Vector2(300, 64)
+	check("сетка 300: четыре колонки", g.columns == 4)
+	check("безопасная зона снизу на компьютере — 0", HudSafeArea.bottom(get_viewport()) == 0.0)
+	HudSafeArea.debug_bottom = 20.0
+	check("безопасная зона снизу: подмена для тестов", HudSafeArea.bottom(get_viewport()) == 20.0)
+	HudSafeArea.debug_bottom = -1.0
+	host.queue_free()
 
 
 func _check_small_item_icon() -> void:

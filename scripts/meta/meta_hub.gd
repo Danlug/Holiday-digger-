@@ -121,21 +121,22 @@ func _build() -> void:
 	var specs: Array = []
 	for t in [TAB_TASKS, TAB_ACH, TAB_ROAD]:
 		specs.append([t, MetaUiKit.tex(TAB_ICONS[t]), TAB_TIPS[t][0], TAB_TIPS[t][1]])
-	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab, close)
+	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab)
+	var sb := HudSafeArea.bottom(get_viewport())
 	_tab_buttons = bar.get_meta("buttons")
 	for t in _tab_buttons.keys():
 		(_tab_buttons[t] as HeroTabButton).badge_color = Color8(0xD0, 0x45, 0x3C)   # красный: есть что забрать
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 6
 	bar.offset_right = -6
-	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
-	bar.offset_bottom = -4
+	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4 + sb)
+	bar.offset_bottom = -4 - sb
 	_root.add_child(bar)
 
 	var wallet := HBoxContainer.new()
 	wallet.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	wallet.offset_left = 8
-	wallet.offset_right = -8
+	wallet.offset_right = -UiBtn.CLOSE_ROW
 	wallet.offset_top = 8
 	wallet.offset_bottom = 26
 	wallet.add_theme_constant_override("separation", 10)
@@ -152,11 +153,12 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 8
 	_scroll.offset_right = -8
-	_scroll.offset_top = 32
-	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
+	_scroll.offset_top = UiBtn.CLOSE_ROW
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + sb)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
+	UiBtn.close_button(close, _root)
 	_vbox = VBoxContainer.new()
 	_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_vbox.add_theme_constant_override("separation", 5)

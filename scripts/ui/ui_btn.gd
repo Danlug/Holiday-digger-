@@ -24,6 +24,10 @@ const MUTED := Color8(0x9D, 0x8B, 0x73)
 const SHADOW := Color(0, 0, 0, 0.6)
 const FEEDBACK_META := &"_ui_feedback"
 const BADGE_NAME := "Badge"
+## Крестик «закрыть»: один размер и отступ на всех экранах и окнах.
+const CLOSE_SIZE := 28.0   # ≥ 25 единиц ≈ 44 pt на iPhone
+const CLOSE_INSET := 4.0   # от правого и верхнего края окна
+const CLOSE_ROW := CLOSE_SIZE + CLOSE_INSET * 2.0   # высота полосы под крестиком сверху
 
 
 static func _box(kind: int, state: String) -> StyleBox:
@@ -102,6 +106,27 @@ static func icon_button(icon: Texture2D, size: Vector2 = Vector2(28, 28), kind: 
 	b.add_theme_constant_override("icon_max_width", icon_px)
 	b.custom_minimum_size = size
 	style(b, kind)
+	return b
+
+
+## Крестик «закрыть» — единственное место, где он создаётся. С parent (обычный
+## Control, не контейнер) встаёт в его правый верхний угол; без parent — для ряда
+## заголовка окна, вызывающий сам ставит его последним (справа).
+static func close_button(on_close: Callable, parent: Control = null, tip: String = "Закрыть") -> Button:
+	var b := icon_button(UiIcons.tex("close"), Vector2(CLOSE_SIZE, CLOSE_SIZE), Kind.GHOST)
+	b.name = "Close"
+	b.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	Tip.bind(b, tip)
+	b.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			on_close.call())
+	if parent != null:
+		b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		b.offset_left = -CLOSE_INSET - CLOSE_SIZE
+		b.offset_right = -CLOSE_INSET
+		b.offset_top = CLOSE_INSET
+		b.offset_bottom = CLOSE_INSET + CLOSE_SIZE
+		parent.add_child(b)
 	return b
 
 

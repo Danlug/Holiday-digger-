@@ -113,13 +113,7 @@ func _build_header() -> Control:
 		var chip := MetaUiKit.chip(MetaUiKit.tex("up"), "+%d%%" % pct, MetaUiKit.GREEN, 14, 9)
 		Tip.bind(chip, "Бонус серии", "Каждая пройденная неделя подряд добавляет к монетам и опыту.", "+%d%%" % pct)
 		h.add_child(chip)
-	var x := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 28), UiBtn.Kind.GHOST)   # тот же крестик, что у шторок
-	Tip.bind(x, "Закрыть")
-	x.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		close())
-	h.add_child(x)
+	h.add_child(UiBtn.close_button(close))
 	Tip.bind(h.get_child(0) as Control, "Серия", "Дней подряд. Пропуск в один день серию не рвёт, два — рвёт.", str(int(_plan["streak"])))
 	return h
 

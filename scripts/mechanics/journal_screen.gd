@@ -121,7 +121,7 @@ func _build() -> void:
 	_head = HBoxContainer.new()
 	_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_head.offset_left = 8
-	_head.offset_right = -8
+	_head.offset_right = -UiBtn.CLOSE_ROW   # справа — крестик
 	_head.offset_top = 8
 	_head.offset_bottom = 30
 	_head.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -132,8 +132,9 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
+	var sb := HudSafeArea.bottom(get_viewport())
 	_scroll.offset_top = 36
-	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + sb)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
@@ -142,14 +143,15 @@ func _build() -> void:
 		[TAB_ORES, UiIcons.item_small("gold", 16), "Руды", "Мастерство: звёзды за добычу каждой породы"],
 		[TAB_CHESTS, Mechanics.tex("chest_gold_icon"), "Тайники", "Открытые сундуки и жадность"],
 	]
-	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab, close)
+	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab)
 	_tab_buttons = bar.get_meta("buttons")
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 6
 	bar.offset_right = -6
-	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
-	bar.offset_bottom = -4
+	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4 + sb)
+	bar.offset_bottom = -4 - sb
 	_root.add_child(bar)
+	UiBtn.close_button(close, _root)
 
 
 func _set_tab(t: String) -> void:

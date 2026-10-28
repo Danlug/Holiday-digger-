@@ -74,6 +74,20 @@ static func rect(texture: Texture2D, pos: Vector2, sz: Vector2) -> TextureRect:
 ## Подпись с обводкой. Кегль и цвет — через LabelSettings, а не через
 ## add_theme_*_override: вне дерева Label запоминает минимальный размер по
 ## кеглю темы (16) и выходит вдвое выше и шире, чем нарисован.
+## Сетка плиток на всю ширину (магазин, склад): колонок столько, сколько влезает
+## (не меньше трёх), остаток ширины уходит в зазоры — справа не остаётся дыры.
+static func tile_grid(cell: float = 64.0, gap: int = 8) -> GridContainer:
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", gap)
+	grid.add_theme_constant_override("v_separation", gap)
+	grid.resized.connect(func() -> void:
+		var cols := maxi(3, int((grid.size.x + gap) / (cell + gap)))
+		grid.columns = cols
+		grid.add_theme_constant_override("h_separation", maxi(gap, int((grid.size.x - cols * cell) / (cols - 1)))))
+	return grid
+
+
 static func label(text: String, font_size: int, color: Color = Color.WHITE,
 		outline: Color = Color(0.05, 0.04, 0.08), outline_size: int = 3) -> Label:
 	var ls := LabelSettings.new()

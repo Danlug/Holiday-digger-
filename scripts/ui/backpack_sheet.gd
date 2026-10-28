@@ -264,13 +264,7 @@ func _build() -> void:
 	_weight_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_weight_text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_weight_text)
-	var close_btn := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 26), UiBtn.Kind.GHOST)
-	Tip.bind(close_btn, "Закрыть")
-	close_btn.pressed.connect(func():
-		if Tip.swallowed():
-			return
-		close())
-	head.add_child(close_btn)
+	head.add_child(UiBtn.close_button(close))
 
 	# --- сетка слотов ---
 	# Область — обычный Control: ScrollContainer сам раскладывает детей и

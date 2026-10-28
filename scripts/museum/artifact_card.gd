@@ -211,9 +211,9 @@ func _draw() -> void:
 		coins = Balance.get_artifact_find_coins(String(_entry.get("id", "")))
 	var items: Array = []
 	if xp > 0:
-		items.append(["ui_xp", HeroUi.short_num(xp), Color8(0x5E, 0xA8, 0xF0)])
+		items.append(["ui_xp", UiFmt.short(xp), Color8(0x5E, 0xA8, 0xF0)])
 	if coins > 0:
-		items.append(["ui_coin", HeroUi.short_num(coins), ProgressUiKit.GOLD])
+		items.append(["ui_coin", UiFmt.short(coins), ProgressUiKit.GOLD])
 	if dollars > 0:
 		items.append(["ui_dollar", str(dollars), HeroUi.OK])
 	var font := ThemeDB.fallback_font

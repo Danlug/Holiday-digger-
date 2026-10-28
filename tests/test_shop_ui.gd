@@ -100,16 +100,11 @@ func _tap(key: String) -> void:
 # ---------------------------------------------------------------------------
 
 func _test_number_format() -> void:
-	check("950 остаётся 950", ShopArt.compact(950) == "950")
-	check("9999 без сокращения", ShopArt.compact(9999) == "9999")
-	check("12345 -> 12.3K", ShopArt.compact(12345) == "12.3K")
-	check("123456 -> 123K", ShopArt.compact(123456) == "123K")
-	check("1234567 -> 1.23M", ShopArt.compact(1234567) == "1.23M")
-	check("1000000 -> 1M без хвоста нулей", ShopArt.compact(1000000) == "1M")
-	check("полное число с пробелами: 1 234 567", ShopArt.full(1234567) == "1 234 567")
-	check("полное число: 0 и 999", ShopArt.full(0) == "0" and ShopArt.full(999) == "999")
-	check("кошелёк до миллиона целиком", ShopUI.wallet_text(999999) == "999 999")
-	check("кошелёк от миллиона сжимается", ShopUI.wallet_text(1234567) == "1.23M")
+	for c in [[0, "0"], [999, "999"], [9999, "9999"], [10000, "10к"], [15300, "15.3к"],
+			[99999, "99.9к"], [123456, "123к"], [999999, "999к"], [1000000, "1М"], [1250000, "1.2М"], [-15300, "-15.3к"]]:
+		check("UiFmt.short(%d) -> «%s»" % c, UiFmt.short(c[0]) == c[1])
+	check("полное число с пробелами: 1 234 567", UiFmt.full(1234567) == "1 234 567")
+	check("полное число: 0 и 999", UiFmt.full(0) == "0" and UiFmt.full(999) == "999")
 
 
 func _test_offers_are_well_formed() -> void:
@@ -433,7 +428,7 @@ func _test_recipe_chips_by_tap() -> void:
 	check("тап по материалу раскрывает описание", Tip.is_pinned())
 	check("название — название предмета", Tip._title.text == ShopCatalog.item_name(String(first_input["id"])))
 	check("в описании «есть из нужно» полными числами",
-		Tip._body.text == "Есть: %s из %s" % [ShopArt.full(int(first_input["have"])), ShopArt.full(int(first_input["need"]))])
+		Tip._body.text == "Есть: %s из %s" % [UiFmt.full(int(first_input["have"])), UiFmt.full(int(first_input["need"]))])
 	check("тап по материалу ничего не собирает", not GameState.owns_tool("hand_drill") and GameState.coins == 900 and ui._card != null)
 	check("и не включает swallowed()", not Tip.swallowed())
 	_click(chips[1])
@@ -483,21 +478,21 @@ func _test_sell_flow() -> void:
 	check("по умолчанию отмечено всё", ui._selection_items().size() == 2)
 	_tap("sell:lead")
 	check("тап по плитке снимает стопку с продажи", ui._selection_items().size() == 1 and not ui._selection_items().has("lead"))
-	check("итог на кнопке пересчитан", ui._sell_label.text == ShopArt.full(gold_sum))
+	check("итог на кнопке пересчитан", ui._sell_label.text == UiFmt.short(gold_sum))
 	_tap("nosale:bronze")
 	check("нескупаемую плитку нажать безопасно", GameState.get_item_count("bronze") == 2)
 	ui._sell_btn.pressed.emit()
 	await get_tree().create_timer(1.3).timeout
 	check("продано только выбранное: монеты = сумма золота", GameState.coins == gold_sum)
 	check("золото ушло, свинец остался", GameState.get_item_count("gold") == 0 and GameState.get_item_count("lead") == 9)
-	check("в шапке итоговые монеты", ui._chips["coins"]["label"].text == ShopUI.wallet_text(gold_sum))
+	check("в шапке итоговые монеты", ui._chips["coins"]["label"].text == UiFmt.short(gold_sum))
 	check("после продажи вкладка перерисована без проданного", not ui._tiles.has("sell:gold") and ui._tiles.has("sell:lead"))
 	check("busy снят", not ui._busy)
 	# удвоение рекламой
 	GameState.coins = 0
 	GameState.next_sale_doubled = true
 	ui._render()
-	check("с роликом ×2 на кнопке удвоенная сумма", ui._sell_label.text == ShopArt.full(lead_sum * 2) and ui._sell_x2.visible)
+	check("с роликом ×2 на кнопке удвоенная сумма", ui._sell_label.text == UiFmt.short(lead_sum * 2) and ui._sell_x2.visible)
 	ui._on_sell_pressed()
 	await get_tree().create_timer(1.3).timeout
 	check("выручка удвоена", GameState.coins == lead_sum * 2 and not GameState.next_sale_doubled)

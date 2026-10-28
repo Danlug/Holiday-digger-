@@ -109,24 +109,14 @@ static func reward_row(reward: Dictionary, px: float = 12.0, size: int = 9) -> H
 	row.add_theme_constant_override("separation", 4)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if r.has("coins"):
-		row.add_child(chip(reward_tex("coins"), compact(int(r["coins"])), GOLD_LIGHT, px, size))
+		row.add_child(chip(reward_tex("coins"), UiFmt.short(int(r["coins"])), GOLD_LIGHT, px, size))
 	if r.has("dollars"):
 		row.add_child(chip(reward_tex("dollars"), str(int(r["dollars"])), Color8(0x4D, 0xE0, 0x94), px, size))
 	if r.has("xp"):
-		row.add_child(chip(reward_tex("xp"), compact(int(r["xp"])), BLUE, px, size))
+		row.add_child(chip(reward_tex("xp"), UiFmt.short(int(r["xp"])), BLUE, px, size))
 	if r.has("item"):
 		row.add_child(chip(reward_tex("item", String(r["item"]["id"])), "×%d" % int(r["item"]["count"]), Color.WHITE, px, size))
 	return row
-
-
-## 1500 -> «1.5k», чтобы число влезало в плитку.
-static func compact(n: int) -> String:
-	if n >= 10000:
-		return "%dk" % (n / 1000)
-	if n >= 1000:
-		var s := "%.1fk" % (float(n) / 1000.0)
-		return s.replace(".0k", "k")
-	return str(n)
 
 
 ## Куда лететь награде: якорь HUD (coins, dollars, backpack, menu…).

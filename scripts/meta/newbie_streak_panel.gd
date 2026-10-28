@@ -443,11 +443,11 @@ func _reward_row(r: Dictionary) -> HBoxContainer:
 	row.add_theme_constant_override("separation", 3)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if r.has("coins"):
-		row.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), MetaUiKit.compact(int(r["coins"])), MetaUiKit.GOLD_LIGHT, 12, 9))
+		row.add_child(MetaUiKit.chip(MetaUiKit.tex("coin"), UiFmt.short(int(r["coins"])), MetaUiKit.GOLD_LIGHT, 12, 9))
 	if r.has("dollars"):
 		row.add_child(MetaUiKit.chip(MetaUiKit.tex("dollar"), str(int(r["dollars"])), DOLLAR_GREEN, 12, 9))
 	if r.has("xp"):
-		row.add_child(MetaUiKit.chip(MetaUiKit.tex("xp"), MetaUiKit.compact(int(r["xp"])), MetaUiKit.BLUE, 12, 9))
+		row.add_child(MetaUiKit.chip(MetaUiKit.tex("xp"), UiFmt.short(int(r["xp"])), MetaUiKit.BLUE, 12, 9))
 	if r.has("item"):
 		var t := ShopArt.tex("item_" + String(r["item"]["id"]))
 		if t == null:

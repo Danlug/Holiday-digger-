@@ -450,16 +450,6 @@ func _deny(c: Control) -> void:
 # Вкладка «Ковка»
 # ---------------------------------------------------------------------------
 
-static func fmt_num(n: int) -> String:
-	if n >= 1000000:
-		return "%.1fм" % (float(n) / 1000000.0)
-	if n >= 10000:
-		return "%dк" % int(round(float(n) / 1000.0))
-	if n >= 1000:
-		return "%.1fк" % (float(n) / 1000.0)
-	return str(n)
-
-
 func _build_forge_tab() -> void:
 	var at_bench := CombatService.at_workbench()
 	if not at_bench:
@@ -559,7 +549,7 @@ func _recipe_row(id: String) -> Control:
 		ci.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cl.add_child(ci)
 		var enough := GameState.debug_free_shop or GameState.coins >= coins
-		cl.add_child(_small_label(fmt_num(coins), 9, GREEN if enough else RED))
+		cl.add_child(_small_label(UiFmt.short(coins), 9, GREEN if enough else RED))
 		Tip.bind(cl, "Монеты", "%d монет за работу кузнеца" % coins)
 		mats.add_child(cl)
 

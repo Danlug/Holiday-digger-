@@ -257,7 +257,7 @@ func _cost_row(parent: Node, cost) -> void:
 	var coins := TechCost.coins_of(cost)
 	if coins > 0:
 		var lack: bool = int(check["missing_coins"]) > 0
-		var c := TechUi.chip(UiIcons.tex("coin"), TechUi.short(coins), TechUi.RED if lack else TechUi.GOLD)
+		var c := TechUi.chip(UiIcons.tex("coin"), UiFmt.short(coins), TechUi.RED if lack else TechUi.GOLD)
 		Tip.bind(c, "Монеты", "Есть: %d" % GameState.coins)
 		c.mouse_filter = Control.MOUSE_FILTER_STOP
 		row.add_child(c)
@@ -536,7 +536,7 @@ func _raw_tile(raw: String) -> Control:
 	b.modulate = Color(1, 1, 1, 1.0 if unlocked else 0.5)
 	var held := FuelRefinery.held(raw)
 	if unlocked:
-		var n := TechUi.label("×%d" % held if held < 1000 else TechUi.short(held), 9,
+		var n := TechUi.label("×" + UiFmt.short(held), 9,
 			Color.WHITE if held >= FuelRefinery.per_block(raw) else TechUi.DIM)
 		n.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 		n.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -827,7 +827,7 @@ func _build_well() -> void:
 	var stats := _hbox(v, 8)
 	stats.add_child(_stat_chip(UiIcons.tex("depth"), str(IdleWell.effective_depth()), "Глубина копки",
 		"До какой глубины копает скважина (рекорд героя или предел ступени)", "предел %d" % IdleWell.depth_cap()))
-	stats.add_child(_stat_chip(UiIcons.tex("coin"), TechUi.short(int(IdleWell.income_per_hour())), "Доход в час",
+	stats.add_child(_stat_chip(UiIcons.tex("coin"), UiFmt.short(int(IdleWell.income_per_hour())), "Доход в час",
 		"В монетах-эквиваленте; платит рудой на склад", "%d клеток в час" % int(IdleWell.cells_per_hour())))
 	stats.add_child(_stat_chip(TechUi.tex("icon_hourglass"), "%dч" % int(IdleWell.cap_hours()), "Офлайн-кап",
 		"Дольше этого скважина не копит — заглядывай почаще"))

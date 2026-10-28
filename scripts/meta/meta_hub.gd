@@ -207,7 +207,7 @@ func refresh() -> void:
 func _sync_wallet() -> void:
 	if _wallet_labels.is_empty():
 		return
-	(_wallet_labels["coins"] as Label).text = MetaUiKit.compact(GameState.coins)
+	(_wallet_labels["coins"] as Label).text = UiFmt.short(GameState.coins)
 	(_wallet_labels["dollars"] as Label).text = str(GameState.dollars)
 	(_wallet_labels["points"] as Label).text = str(TrophyRoad.points())
 
@@ -344,7 +344,7 @@ func _quest_card(q: Dictionary) -> Control:
 	var bar := MetaBar.new()
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.frac = frac
-	bar.text = "%s/%s" % [MetaUiKit.compact(mini(int(q["progress"]), target)), MetaUiKit.compact(target)]
+	bar.text = "%s/%s" % [UiFmt.short(mini(int(q["progress"]), target)), UiFmt.short(target)]
 	bar.fill_color = MetaUiKit.GREEN if done else MetaUiKit.GOLD
 	mid.add_child(bar)
 	# Награда с долларом (недельное) рядом с «Забрать» и «×2» не влезает в ширину
@@ -544,7 +544,7 @@ func _ach_tile(a: Dictionary) -> Control:
 			var lk := MetaUiKit.icon_rect(MetaUiKit.tex("lock"), 16)
 			lk.position = Vector2(30, 28)
 			t.add_child(lk)
-		var n := MetaUiKit.label("%s/%s" % [MetaUiKit.compact(pr.x), MetaUiKit.compact(pr.y)], 8, MetaUiKit.MUTED)
+		var n := MetaUiKit.label("%s/%s" % [UiFmt.short(pr.x), UiFmt.short(pr.y)], 8, MetaUiKit.MUTED)
 		n.custom_minimum_size.x = ACH_W
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		n.position = Vector2(0, 43)

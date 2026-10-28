@@ -204,7 +204,7 @@ func _on_max_depth(depth: int) -> void:
 		head = Vector2(float(player.x), float(player.y) - 0.9) * 32.0
 	var tier := milestone_tier(top)
 	# выше, чем «+N» добычи, чтобы не налезать на них
-	Fx.float_icon(head + Vector2(0, -18), UiIcons.tex("star"), "+%s" % MetaUiKit.compact(xp), COL_GOLD if tier > 1 else COL_RARE)
+	Fx.float_icon(head + Vector2(0, -18), UiIcons.tex("star"), "+%s" % UiFmt.short(xp), COL_GOLD if tier > 1 else COL_RARE)
 	match tier:
 		1:
 			Sfx.play("pickup", 1.45, -11.0)

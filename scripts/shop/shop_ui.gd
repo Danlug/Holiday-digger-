@@ -605,16 +605,6 @@ func notice(text: String, seconds: float = 2.4) -> void:
 # Кошелёк
 # ---------------------------------------------------------------------------
 
-## Число в плашке кошелька: целиком, пока влезает, дальше 1.23M. Плашка с
-## долларами уже монетной, поэтому ей «длинно» наступает раньше.
-static func wallet_text(n: int, compact_from: int = 1000000) -> String:
-	return ShopArt.full(n) if n < compact_from else ShopArt.compact(n)
-
-
-func _chip_fmt(n: int, which: String) -> String:
-	return wallet_text(n, 1000000 if which == "coins" else 10000)
-
-
 func _sync_wallet(animate: bool) -> void:
 	if _chips.is_empty():
 		return
@@ -622,8 +612,8 @@ func _sync_wallet(animate: bool) -> void:
 		return
 	_set_chip_value("coins", GameState.coins, animate)
 	_set_chip_value("dollars", GameState.dollars, animate)
-	Tip.bind(_chips["coins"]["root"], "Монеты", "", ShopArt.full(GameState.coins))
-	Tip.bind(_chips["dollars"]["root"], "Доллары", "", ShopArt.full(GameState.dollars))
+	Tip.bind(_chips["coins"]["root"], "Монеты", "", UiFmt.full(GameState.coins))
+	Tip.bind(_chips["dollars"]["root"], "Доллары", "", UiFmt.full(GameState.dollars))
 
 
 func _set_chip_value(which: String, value: int, animate: bool) -> void:
@@ -634,10 +624,10 @@ func _set_chip_value(which: String, value: int, animate: bool) -> void:
 		(_wallet_tween[which] as Tween).kill()
 		_wallet_tween[which] = null
 	if animate and is_open() and shown != value:
-		_wallet_tween[which] = ShopFx.count_up(self, label, shown, value, 0.45, 0.0, _chip_fmt.bind(which))
+		_wallet_tween[which] = ShopFx.count_up(self, label, shown, value, 0.45, 0.0, UiFmt.short)
 		ShopFx.pop(chip["root"], 0.12, 0.2)
 	else:
-		label.text = _chip_fmt(value, which)
+		label.text = UiFmt.short(value)
 	if which == "coins":
 		_shown_coins = value
 	else:
@@ -1270,7 +1260,7 @@ func _make_price_row(offer: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else ShopArt.full(price), 15,
+	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else UiFmt.short(price), 15,
 		Color.WHITE if ok else ShopArt.COL_BAD, INK, 4))
 	return row
 
@@ -1284,8 +1274,8 @@ func _make_chip_tappable(row: Control, title: String, have: int, need: int) -> v
 		if c is Label:
 			(c as Label).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var short := need - have
-	Tip.bind_tap(row, title, "Есть: %s из %s" % [ShopArt.full(have), ShopArt.full(need)],
-		"Не хватает: %s" % ShopArt.full(short) if short > 0 else "Хватает", _card_panel)
+	Tip.bind_tap(row, title, "Есть: %s из %s" % [UiFmt.full(have), UiFmt.full(need)],
+		"Не хватает: %s" % UiFmt.full(short) if short > 0 else "Хватает", _card_panel)
 
 
 ## Материалы рецепта значками: «есть/нужно», зелёное — хватает, красное — нет.
@@ -1298,7 +1288,7 @@ func _make_inputs_grid(offer: Dictionary) -> Control:
 	for inp in offer.get("inputs", []):
 		var have := int(inp["have"])
 		var need := int(inp["need"])
-		var chip := _make_chip_row(inp["icon"], "%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)],
+		var chip := _make_chip_row(inp["icon"], "%s/%s" % [UiFmt.short(have), UiFmt.short(need)],
 			ShopArt.COL_GOOD if have >= need else ShopArt.COL_BAD)
 		_make_chip_tappable(chip, ShopCatalog.item_name(String(inp["id"])), have, need)
 		grid.add_child(chip)
@@ -1306,7 +1296,7 @@ func _make_inputs_grid(offer: Dictionary) -> Control:
 	if coins_need > 0:
 		var have := int(offer.get("coins_have", 0))
 		var coin_chip := _make_chip_row(ShopArt.ui("icon_coin"),
-			"%s/%s" % [ShopArt.compact(have), ShopArt.compact(coins_need)],
+			"%s/%s" % [UiFmt.short(have), UiFmt.short(coins_need)],
 			ShopArt.COL_GOOD if have >= coins_need or GameState.debug_free_shop else ShopArt.COL_BAD)
 		_make_chip_tappable(coin_chip, "Монеты", have, coins_need)
 		grid.add_child(coin_chip)
@@ -1423,7 +1413,7 @@ func _craft_qty_sync() -> void:
 		_card_ok.add_child(_craft_qty_ok)
 		if glyph != null:
 			glyph.position.x = _card_ok.size.x * 0.5 - glyph.size.x - 4.0
-	_craft_qty_ok.text = "×" + ShopArt.compact(_craft_qty.amount())
+	_craft_qty_ok.text = "×" + UiFmt.short(_craft_qty.amount())
 
 
 ## Крафт с числом с ползунка. Точки полёта снимаются ДО закрытия карточки:
@@ -1512,7 +1502,7 @@ func _craft_qty_hit(ref: String, made: int, icon_override: Texture2D = null) -> 
 	ic.pivot_offset = Vector2(12, 12)
 	ic.scale = Vector2(0.4, 0.4)
 	tile.add_child(ic)
-	var lbl := ShopArt.label("+" + ShopArt.compact(made), 16, ShopArt.COL_GOOD, INK, 4)
+	var lbl := ShopArt.label("+" + UiFmt.short(made), 16, ShopArt.COL_GOOD, INK, 4)
 	lbl.z_index = 111
 	lbl.position = c + Vector2(4, -14)
 	tile.add_child(lbl)
@@ -1662,7 +1652,7 @@ func _update_action_bar() -> void:
 	var q := ShopService.quote(items)
 	var coins := int(q["coins"])
 	var doubled := GameState.next_sale_doubled and coins > 0
-	_sell_label.text = ShopArt.full(coins * 2 if doubled else coins) if coins < 100000000 else ShopArt.compact(coins)
+	_sell_label.text = UiFmt.short(coins * 2 if doubled else coins)
 	_sell_x2.visible = doubled
 	_sell_uses.visible = remote
 	_sell_uses.text = "%d/%d" % [ShopService.ad_uses_left("remote_dump_loot_for_sale"),
@@ -1676,7 +1666,7 @@ func _update_action_bar() -> void:
 	var tip_body := "Мастерская в подвале дома. Отсюда весь лут уходит за ролик (%d/%d сегодня)." % [
 		ShopService.ad_uses_left("remote_dump_loot_for_sale"), Balance.get_ad_daily_limit("remote_dump_loot_for_sale")] \
 		if remote else "Выбранное уходит в скупку. Тап по плитке — убрать из продажи."
-	Tip.bind(_sell_btn, tip_title, tip_body, "Выручка: %s монет%s" % [ShopArt.full(coins * 2 if doubled else coins),
+	Tip.bind(_sell_btn, tip_title, tip_body, "Выручка: %s монет%s" % [UiFmt.full(coins * 2 if doubled else coins),
 		" (×2 за ролик)" if doubled else ""])
 	# ролик ×2: золотой — можно смотреть, зелёный — уже включён, серый — лимит
 	var ad_id := ShopCatalog.ad_double_sale_id()
@@ -1748,7 +1738,7 @@ func _do_sell(remote: bool) -> void:
 		arrived += 1
 		Sfx.play("coin", 1.0 + 0.04 * float(arrived % 6))
 		var part := coins_before + int(round(float(gained) * float(arrived) / float(n_total)))
-		(_chips["coins"]["label"] as Label).text = _chip_fmt(mini(part, coins_before + gained), "coins")
+		(_chips["coins"]["label"] as Label).text = UiFmt.short(mini(part, coins_before + gained))
 		ShopFx.pop(_chips["coins"]["root"], 0.1, 0.12)
 	var spawned := 0
 	for t in sold_tiles:

@@ -206,7 +206,7 @@ func _make_tile(i: int) -> Control:
 		crown.position = Vector2(w - 21, 0)
 		lay.add_child(crown)
 	else:
-		var amt := MetaUiKit.label(MetaUiKit.compact(int(reward.get("coins", 0))), 9, MetaUiKit.GOLD_LIGHT)
+		var amt := MetaUiKit.label(UiFmt.short(int(reward.get("coins", 0))), 9, MetaUiKit.GOLD_LIGHT)
 		amt.custom_minimum_size.x = TILE_W - 4
 		amt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		amt.position = Vector2(0, TILE_H - 16)

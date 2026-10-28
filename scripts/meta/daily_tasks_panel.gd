@@ -251,7 +251,7 @@ func _header() -> Control:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(gap)
 
-	var wallet := MetaUiKit.chip(MetaUiKit.tex("coin"), MetaUiKit.compact(_wallet_shown), MetaUiKit.GOLD_LIGHT, 12, 10)
+	var wallet := MetaUiKit.chip(MetaUiKit.tex("coin"), UiFmt.short(_wallet_shown), MetaUiKit.GOLD_LIGHT, 12, 10)
 	wallet.mouse_filter = Control.MOUSE_FILTER_PASS
 	_wallet_icon = wallet.get_child(0)
 	_wallet_label = wallet.get_child(1)
@@ -332,7 +332,7 @@ func _tile(q: Dictionary) -> Control:
 	bar.custom_minimum_size = Vector2(40, 13)
 	bar.font_size = 9
 	bar.frac = frac
-	bar.text = "%s/%s" % [MetaUiKit.compact(prog), MetaUiKit.compact(target)]
+	bar.text = "%s/%s" % [UiFmt.short(prog), UiFmt.short(target)]
 	bar.fill_color = MetaUiKit.GREEN if done else MetaUiKit.GOLD
 	mid.add_child(bar)
 	mid.add_child(MetaUiKit.reward_row(q["reward"], 11, 9))
@@ -628,7 +628,7 @@ func _after_change(coins_before: int) -> void:
 		tw.tween_method(func(v: float) -> void:
 			_wallet_shown = int(v)
 			if is_instance_valid(lbl):
-				lbl.text = MetaUiKit.compact(int(v)), float(coins_before), float(to), 0.5)
+				lbl.text = UiFmt.short(int(v)), float(coins_before), float(to), 0.5)
 		tw.tween_callback(func() -> void:
 			if is_instance_valid(icon):
 				UiAnim.pulse(icon, 0.4, 0.25))

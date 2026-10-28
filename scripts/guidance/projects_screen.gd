@@ -337,7 +337,7 @@ func _fill_head() -> void:
 			built += 1
 	_chip(Guidance.tex("projects"), "%d/%d" % [built, all.size()], "Проекты",
 		"Большие постройки из материалов: бур, скважина, бурмобиль, костюм. Руду для них не продавай — копи на складе.")
-	_chip(UiIcons.tex("coin"), ShopArt.compact(GameState.coins), "Монеты", "Сколько монет у тебя сейчас.")
+	_chip(UiIcons.tex("coin"), UiFmt.short(GameState.coins), "Монеты", "Сколько монет у тебя сейчас.")
 
 
 func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
@@ -473,7 +473,7 @@ func _material_row(m: Dictionary) -> Control:
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var via_frac := clampf(float(int(m["effective"])) / maxf(1.0, float(need)), 0.0, 1.0)
 	mid.add_child(_bar_ctrl(BAR_W, 8.0, clampf(float(have) / maxf(1.0, float(need)), 0.0, 1.0), via_frac, done))
-	var nums := ProgressUiKit.make_label("%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)], 10,
+	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], 10,
 		COL_DONE if done else ProgressUiKit.TEXT)
 	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(nums)
@@ -509,12 +509,12 @@ func _via_row(m: Dictionary, v: Dictionary) -> Control:
 	var h := _row_box(p)
 	h.add_child(_arrow(Vector2(10, 18), true))
 	h.add_child(_icon_rect(UiIcons.item_small(src, 18), 18))
-	var cnt := ProgressUiKit.make_label(ShopArt.compact(int(v["have"])), 10, ProgressUiKit.TEXT)
+	var cnt := ProgressUiKit.make_label(UiFmt.short(int(v["have"])), 10, ProgressUiKit.TEXT)
 	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(cnt)
 	h.add_child(_arrow(Vector2(14, 18), false))
 	h.add_child(_icon_rect(UiIcons.item_small(String(m["id"]), 16), 16))
-	var plus := ProgressUiKit.make_label("+%s" % ShopArt.compact(int(v["makes"])), 10,
+	var plus := ProgressUiKit.make_label("+%s" % UiFmt.short(int(v["makes"])), 10,
 		ProgressUiKit.GOLD if int(v["makes"]) > 0 else ProgressUiKit.DIM)
 	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(plus)
@@ -544,12 +544,12 @@ func _coins_row(need: int) -> Control:
 	mid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(_bar_ctrl(BAR_W, 8.0, clampf(float(have) / maxf(1.0, float(need)), 0.0, 1.0), 0.0, done))
-	var nums := ProgressUiKit.make_label("%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)], 10,
+	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], 10,
 		COL_DONE if done else ProgressUiKit.TEXT)
 	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(nums)
 	h.add_child(mid)
-	Tip.bind_tap(p, "Монеты", "Сборка стоит ещё и монет: %s из %s." % [ShopArt.full(mini(have, need)), ShopArt.full(need)])
+	Tip.bind_tap(p, "Монеты", "Сборка стоит ещё и монет: %s из %s." % [UiFmt.full(mini(have, need)), UiFmt.full(need)])
 	return p
 
 
@@ -566,7 +566,7 @@ func _where_chip(item: String) -> Control:
 		return box
 	box.add_child(_icon_rect(ShopArt.tex("glyph_depth"), 12))
 	var reached := GameState.max_depth_reached >= int(w["min"])
-	var l := ProgressUiKit.make_label(ShopArt.compact(int(w["best"])), 10,
+	var l := ProgressUiKit.make_label(UiFmt.short(int(w["best"])), 10,
 		ProgressUiKit.TEXT_HI if reached else ProgressUiKit.DIM)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)

@@ -42,8 +42,9 @@ var _glows: Array = []
 
 
 func _ready() -> void:
-	layer = 93  # как окно заданий дня: выше хаба (92), HUD и шторок; ниже подарка дня (94) и экрана героя (95)
+	layer = UiLayers.MODAL  # как окно заданий дня: выше хаба (92), HUD и шторок; ниже подарка дня (94) и экрана героя (95)
 	visible = false
+	add_to_group("meta_hub")   # тост идёт снизу, не закрывая шапку
 
 
 func is_open() -> bool:

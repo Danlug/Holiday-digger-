@@ -8,7 +8,7 @@ extends CanvasLayer
 ##    нажатие по нему показывает подсказку).
 ## Слой знает только как нарисовать; когда показать и когда снять — решает HintDirector.
 
-const LAYER := 40
+const LAYER := UiLayers.HINTS
 const GOLD := Color8(0xE0, 0xA9, 0x3B)
 const GOLD_LIGHT := Color8(0xF2, 0xD9, 0x9B)
 const FINGER_TIP := Vector2(7.5, 1.5)   # где в рисунке кончик пальца (в единицах экрана)

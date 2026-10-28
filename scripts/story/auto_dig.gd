@@ -98,7 +98,7 @@ func _build_banner() -> void:
 		_banner_layer.visible = true
 		return
 	_banner_layer = CanvasLayer.new()
-	_banner_layer.layer = 90  # под катсценой (100), над HUD
+	_banner_layer.layer = UiLayers.BANNER  # под катсценой (100), над HUD
 	add_child(_banner_layer)
 
 	_banner = Panel.new()

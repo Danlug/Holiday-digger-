@@ -41,7 +41,7 @@ var _closing: bool = false   # хаб гаснет (анимация): по см
 
 func _ready() -> void:
 	add_to_group("meta_hub")
-	layer = 92  # выше HUD, дома и шторок; ниже окна ежедневной награды (94) и экрана героя (95)
+	layer = UiLayers.META  # выше HUD, дома и шторок; ниже окна ежедневной награды (94) и экрана героя (95)
 	_build()
 	_root.visible = false
 	GameState.coins_changed.connect(_on_wallet_changed)

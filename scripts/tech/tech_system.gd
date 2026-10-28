@@ -129,7 +129,7 @@ func _register_menu() -> void:
 func _build_hotspot(host: Node) -> void:
 	_hot_layer = CanvasLayer.new()
 	_hot_layer.name = "TechHotspot"
-	_hot_layer.layer = 8
+	_hot_layer.layer = UiLayers.WORLD_BUBBLES
 	host.add_child(_hot_layer)
 	_hot_btn = UiBtn.icon_button(TechUi.tex("icon_tank"), Vector2(36, 32), UiBtn.Kind.ACCENT, 24)
 	_hot_btn.visible = false
@@ -146,7 +146,7 @@ func _build_hotspot(host: Node) -> void:
 func _build_haze(host: Node) -> void:
 	_haze_layer = CanvasLayer.new()
 	_haze_layer.name = "HeatHaze"
-	_haze_layer.layer = 1
+	_haze_layer.layer = UiLayers.HUD
 	host.add_child(_haze_layer)
 	# Тот же слой, что у HUD, но раньше него в дереве: дрожит мир, а не интерфейс.
 	if hud != null and hud.get_parent() != null:

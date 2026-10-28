@@ -55,7 +55,7 @@ static func attach(host: Node, player: Node) -> TechScreen:
 	var layer := CanvasLayer.new()
 	layer.name = "TechLayer"
 	# 94: выше HUD и дома, ниже экрана героя (95), окна отчёта (96) и катсцен (100).
-	layer.layer = 94
+	layer.layer = UiLayers.DAILY
 	host.add_child(layer)
 	var screen := TechScreen.new()
 	screen.name = "TechScreen"

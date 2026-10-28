@@ -6,7 +6,7 @@ extends RefCounted
 ## без правки здесь. Собственный взрыв значков рисуется всегда — на случай, если
 ## сервиса Fx ещё нет, награда всё равно должна «взорваться» в руках.
 
-const LAYER := 98
+const LAYER := UiLayers.META_FX
 static var _overlay: Control = null
 
 

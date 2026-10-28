@@ -62,7 +62,7 @@ static func is_open_any() -> bool:
 
 
 func _ready() -> void:
-	layer = 93   # выше HUD и шторок, ниже окна дня (94) и катсцен (100)
+	layer = UiLayers.DEATH   # выше HUD и шторок, ниже окна дня (94) и катсцен (100)
 	visible = false
 	add_to_group("hint_block")
 
@@ -82,6 +82,7 @@ func report() -> Dictionary:
 
 func open(report_data: Dictionary) -> void:
 	_report = report_data
+	Tip.hide_all()   # подсказка, открытая до смерти, не светится поверх окна
 	_build()
 	visible = true
 	_open_any = true

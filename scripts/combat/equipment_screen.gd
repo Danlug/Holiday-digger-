@@ -42,7 +42,7 @@ var _tab_buttons: Dictionary = {}
 
 
 func _ready() -> void:
-	layer = 92
+	layer = UiLayers.META
 	_root = Control.new()
 	_root.name = "Root"
 	_root.visible = false

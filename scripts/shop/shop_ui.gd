@@ -155,7 +155,7 @@ static func open_premium_good(good_id: String) -> void:
 
 func _ready() -> void:
 	instance = self
-	layer = 20  # выше HUD: шторка обязана перекрывать джойстик и нижнюю полосу
+	layer = UiLayers.SHEETS  # выше HUD: шторка обязана перекрывать джойстик и нижнюю полосу
 	_build()
 	_root.visible = false
 	_door_guide = ShopDoorGuide.new()

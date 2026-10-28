@@ -101,7 +101,7 @@ func _build_world() -> void:
 func _build_button() -> void:
 	_layer = CanvasLayer.new()
 	_layer.name = "GraveHotspot"
-	_layer.layer = 8
+	_layer.layer = UiLayers.WORLD_BUBBLES
 	add_child(_layer)
 
 	_button = Button.new()

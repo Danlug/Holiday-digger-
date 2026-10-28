@@ -45,7 +45,7 @@ var _put_ok := false
 
 
 func _ready() -> void:
-	layer = 12
+	layer = UiLayers.STORAGE
 	_build()
 	visible = false
 

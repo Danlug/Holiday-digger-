@@ -37,7 +37,7 @@ var _edge_arrow: TextureRect
 
 func _ready() -> void:
 	name = "DoorGuide"
-	layer = 8   # как пузыри дома: под HUD-шторками, над миром
+	layer = UiLayers.WORLD_BUBBLES   # как пузыри дома: под HUD-шторками, над миром
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE

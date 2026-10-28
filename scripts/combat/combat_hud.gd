@@ -33,7 +33,7 @@ var _last_boss_hp: float = -1.0
 
 
 func _ready() -> void:
-	layer = 3
+	layer = UiLayers.COMBAT_HUD
 	_icon = CombatData.ui_icon("attack")
 	_boss_icon = CombatData.ui_icon("boss")
 

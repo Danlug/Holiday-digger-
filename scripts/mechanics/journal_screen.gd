@@ -31,7 +31,7 @@ var _hud_input_was_on := true
 
 
 func _ready() -> void:
-	layer = 92   # как хаб наград: выше HUD, дома и шторок, ниже окна дня и экрана героя
+	layer = UiLayers.META   # как хаб наград: выше HUD, дома и шторок, ниже окна дня и экрана героя
 	_build()
 	_root.visible = false
 

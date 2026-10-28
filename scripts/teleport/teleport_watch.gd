@@ -330,7 +330,7 @@ func _on_died() -> void:
 func _build_button() -> void:
 	_layer = CanvasLayer.new()
 	_layer.name = "TeleportHotspot"
-	_layer.layer = 8   # как «Зайти» и «В бурмобиль»: над миром, под окнами
+	_layer.layer = UiLayers.WORLD_BUBBLES   # как «Зайти» и «В бурмобиль»: над миром, под окнами
 	add_child(_layer)
 	_button = HouseBubble.create({"action": "teleport_down", "label": text("down_title"),
 		"icon": "act_teleport_down", "tip": text("down_tip")})

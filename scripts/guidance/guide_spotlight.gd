@@ -25,7 +25,7 @@ signal target_pressed
 signal skipped
 signal card_pressed
 
-const LAYER := 60   # над витриной (20) и подсказками (40), под окнами мета (92+) и катсценой (100)
+const LAYER := UiLayers.SPOTLIGHT   # над витриной (20) и подсказками (40), под окнами мета (92+) и катсценой (100)
 const DIM := Color(0.02, 0.015, 0.03, 0.76)
 const GROW := 3.0   # рамка и «окно» в затемнении чуть шире цели
 const ARROW := Vector2(24, 24)

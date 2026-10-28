@@ -350,7 +350,7 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	if _panel != null and is_instance_valid(_panel):
 		return
 	_layer = CanvasLayer.new()
-	_layer.layer = 128
+	_layer.layer = UiLayers.TIP
 	_layer.name = "TipLayer"
 	tree.root.add_child(_layer)
 	_panel = PanelContainer.new()

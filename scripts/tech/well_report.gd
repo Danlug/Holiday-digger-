@@ -28,7 +28,7 @@ static func attach(host: Node) -> WellReport:
 		return _instance
 	var layer := CanvasLayer.new()
 	layer.name = "WellReportLayer"
-	layer.layer = 96   # выше экрана героя (95), ниже катсцен (100)
+	layer.layer = UiLayers.HERO_CARD   # выше экрана героя (95), ниже катсцен (100)
 	host.add_child(layer)
 	var w := WellReport.new()
 	w.name = "WellReport"

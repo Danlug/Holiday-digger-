@@ -64,7 +64,7 @@ static func open_for(id: String = "") -> void:
 
 func _ready() -> void:
 	_instance = self
-	layer = 93   # выше мастерской (20) и HUD, рядом с журналом и хабом наград
+	layer = UiLayers.MODAL   # выше мастерской (20) и HUD, рядом с журналом и хабом наград
 	_build()
 	_root.visible = false
 

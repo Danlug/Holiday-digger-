@@ -260,7 +260,7 @@ func _build_scenes() -> void:
 func _build_outdoor_hotspot() -> void:
 	_outdoor_layer = CanvasLayer.new()
 	_outdoor_layer.name = "OutdoorHotspot"
-	_outdoor_layer.layer = 8
+	_outdoor_layer.layer = UiLayers.WORLD_BUBBLES
 	add_child(_outdoor_layer)
 
 	# Пузырь-значок, а не кнопка с подписью: «Зайти» — заголовок его подсказки.
@@ -280,7 +280,7 @@ func _build_outdoor_hotspot() -> void:
 func _build_rig_hotspot() -> void:
 	_rig_layer = CanvasLayer.new()
 	_rig_layer.name = "RigHotspot"
-	_rig_layer.layer = 8
+	_rig_layer.layer = UiLayers.WORLD_BUBBLES
 	add_child(_rig_layer)
 
 	_rig_button = HouseBubble.create({"action": "board_rig", "label": "В бурмобиль",

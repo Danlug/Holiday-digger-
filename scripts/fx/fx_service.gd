@@ -14,8 +14,8 @@ extends Node2D
 
 signal flier_landed(target: Vector2, index: int, total: int)
 
-const LAYER_FLASH := 58
-const LAYER_FLY := 59
+const LAYER_FLASH := UiLayers.FX_FLASH
+const LAYER_FLY := UiLayers.FX_FLY
 const FLY_SIZE := 14.0
 const POPUP_RISE := 24.0
 

@@ -20,7 +20,7 @@ extends CanvasLayer
 
 signal finished(scene_id: String)
 
-const LAYER := 100
+const LAYER := UiLayers.CUTSCENE
 const STAGE_TOP := 0.06        # доля высоты, где начинается "небо" сцены
 const GROUND_LINE := 0.56      # доля высоты, на которой проходит линия земли
 ## Вид реплик, карточек, «Пропустить» и кинополос вынесен в DialogueUI, SceneCard,

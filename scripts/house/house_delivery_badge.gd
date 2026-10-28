@@ -12,7 +12,7 @@ extends CanvasLayer
 ## поверх витрины. Свои секунды значок считает сам; приезд объявляет дом
 ## (arrive) — таймер доставки остаётся одним, в HouseSystem.
 
-const LAYER_ORDER := 10
+const LAYER_ORDER := UiLayers.HUD_TOP
 const POS := Vector2(6.0, 108.0)
 const SIZE := Vector2(52.0, 66.0)
 const KNOCK_SECONDS := 1.3

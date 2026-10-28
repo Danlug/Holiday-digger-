@@ -37,7 +37,7 @@ static func num(key: String, default: float) -> float:
 
 
 func _ready() -> void:
-	layer = 57   # над HUD и окнами, под общей вспышкой Fx (58) и окном смерти (93)
+	layer = UiLayers.HURT   # над HUD и окнами, под общей вспышкой Fx (58) и окном смерти (93)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rect = ColorRect.new()
 	_rect.name = "HurtTint"

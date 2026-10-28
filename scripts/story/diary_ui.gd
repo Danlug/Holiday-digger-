@@ -12,7 +12,7 @@ extends CanvasLayer
 signal closed
 signal page_shown(id: String)
 
-const LAYER := 30
+const LAYER := UiLayers.PROMPTS
 const PAPER := Color8(0xE8, 0xD8, 0xB0)
 const PAPER_EDGE := Color8(0xA4, 0x83, 0x5A)
 const INK := Color8(0x2E, 0x20, 0x14)

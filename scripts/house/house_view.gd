@@ -195,7 +195,7 @@ func _ready() -> void:
 	# Выше HUD (его слой 1), но НИЖЕ экранов соседних систем (магазин 20,
 	# экран героя 10): их окна открываются из комнат дома и обязаны лечь
 	# поверх интерьера, а не под него.
-	layer = 9
+	layer = UiLayers.HOUSE
 	_ensure_structure()
 	_build_live_overlays()
 	visible = false

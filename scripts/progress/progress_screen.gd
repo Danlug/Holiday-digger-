@@ -61,7 +61,7 @@ static func attach(host: Node) -> ProgressScreen:
 	# сюжетный ролик обязан перекрывать всё. Экран модальный, на весь
 	# вьюпорт — если он окажется ниже чужого прозрачного оверлея, тот съест
 	# нажатия по вкладкам, хотя на экране ничего не видно.
-	layer.layer = 95
+	layer.layer = UiLayers.HERO
 	host.add_child(layer)
 
 	var screen := ProgressScreen.new()
@@ -73,7 +73,7 @@ static func attach(host: Node) -> ProgressScreen:
 	# находят под землёй, экран при этом закрыт, а при открытом — тоже виден.
 	var card_layer := CanvasLayer.new()
 	card_layer.name = "ArtifactCardLayer"
-	card_layer.layer = 96
+	card_layer.layer = UiLayers.HERO_CARD
 	host.add_child(card_layer)
 	var card := ArtifactCard.new()
 	card.name = "ArtifactCard"

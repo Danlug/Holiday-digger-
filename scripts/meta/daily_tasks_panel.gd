@@ -43,7 +43,7 @@ var _pulses: Array = []
 func _ready() -> void:
 	# Пока окно открыто, тост мета-слоя идёт снизу (MetaToast ищет эту группу).
 	add_to_group("meta_hub")
-	layer = 93  # выше хаба (92), HUD и шторок; ниже окна подарка дня (94) и экрана героя (95)
+	layer = UiLayers.MODAL  # выше хаба (92), HUD и шторок; ниже окна подарка дня (94) и экрана героя (95)
 	visible = false
 
 

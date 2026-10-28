@@ -509,6 +509,7 @@ func _load_hero_sheets() -> void:
 ## enter_x — доля 0..1, где герой появится в комнате (обычно дверь, из
 ## которой он вышел в предыдущей); -1 (по умолчанию) — spawn_x комнаты.
 func open(room: String, enter_x: float = -1.0) -> void:
+	GameState.emit_event("screen_opened", {"id": "house", "tab": room})   # аналитика (scripts/core/analytics.gd)
 	if not visible or _closing:
 		UiAnim.open(_root, UiAnim.Kind.FADE)
 	_closing = false

@@ -61,6 +61,7 @@ func current_tab() -> String:
 
 
 func open(tab: String = "") -> void:
+	GameState.emit_event("screen_opened", {"id": "meta_hub", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	if tab != "":
 		_tab = tab
 	_new_ach.clear()

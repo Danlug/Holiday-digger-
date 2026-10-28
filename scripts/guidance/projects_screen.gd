@@ -83,6 +83,7 @@ func current() -> String:
 
 
 func open(id: String = "") -> void:
+	GameState.emit_event("screen_opened", {"id": "projects"})   # аналитика (scripts/core/analytics.gd)
 	var list := ProjectChain.ids()
 	if list.is_empty():
 		return

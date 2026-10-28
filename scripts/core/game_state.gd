@@ -726,6 +726,8 @@ var ext: Dictionary = {}
 ##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
 ##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
 ##   ad_watched     {placement: String} — досмотрен rewarded-ролик любой точки показа (note_ad_watched)
+##   screen_opened  {id: String, tab: String} — открыт экран (shop, house, storage, journal, meta_hub, progress,
+##                  projects, tech, daily_tasks, newbie_streak, backpack, settings) — для аналитики
 ##   hospital       {coins: int} — смерть: плата больнице (5% монет, от 50 до 5000, не в минус), перед сигналом died;
 ##                  причина и потерянное — GameState.death_cause / death_lost
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)

@@ -836,6 +836,7 @@ func _refresh_settings_panel() -> void:
 
 
 func open_settings() -> void:
+	GameState.emit_event("screen_opened", {"id": "settings"})   # аналитика (scripts/core/analytics.gd)
 	close_more_menu()
 	_settings_sheet.open()
 
@@ -1989,6 +1990,7 @@ func _on_inv_button_pressed() -> void:
 
 
 func open_inventory() -> void:
+	GameState.emit_event("screen_opened", {"id": "backpack"})   # аналитика (scripts/core/analytics.gd)
 	_release_stick()
 	_has_touch = false
 	if player != null:

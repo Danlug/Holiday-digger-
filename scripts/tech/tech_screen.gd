@@ -138,6 +138,7 @@ func _build_tabs() -> Control:
 
 
 func open_tab(tab: String, station: bool = false) -> void:
+	GameState.emit_event("screen_opened", {"id": "tech", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	_tab = tab
 	_station = station or (visible and _station and tab == TAB_TANK)
 	if not visible or _closing:

@@ -184,6 +184,7 @@ func _build_actions() -> void:
 # ---------------------------------------------------------------------------
 
 func open() -> void:
+	GameState.emit_event("screen_opened", {"id": "storage"})   # аналитика (scripts/core/analytics.gd)
 	visible = true
 	_signature = ""
 	_head_sig = ""

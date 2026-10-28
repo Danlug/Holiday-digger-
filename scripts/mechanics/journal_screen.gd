@@ -41,6 +41,7 @@ func is_open() -> bool:
 
 
 func open(tab: String = "") -> void:
+	GameState.emit_event("screen_opened", {"id": "journal", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	if tab != "":
 		_tab = tab
 	for k in _tab_buttons.keys():

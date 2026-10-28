@@ -52,6 +52,7 @@ func is_open() -> bool:
 
 
 func open() -> void:
+	GameState.emit_event("screen_opened", {"id": "newbie_streak"})   # аналитика (scripts/core/analytics.gd)
 	_closing = false
 	_selected = _default_day()
 	_shown_index = NewbieStreak.current_index()

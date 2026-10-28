@@ -181,6 +181,7 @@ func is_open() -> bool:
 
 
 func open(tab: String = TAB_FOOD) -> void:
+	GameState.emit_event("screen_opened", {"id": "shop", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	_resolve_refs()
 	# Повторное open() при открытой шторке (из вкладки в экипировку) мир второй
 	# раз не замораживает: иначе «как было» запомнилось бы уже замороженным.

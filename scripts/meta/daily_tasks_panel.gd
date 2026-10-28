@@ -52,6 +52,7 @@ func is_open() -> bool:
 
 
 func open() -> void:
+	GameState.emit_event("screen_opened", {"id": "daily_tasks"})   # аналитика (scripts/core/analytics.gd)
 	QuestEngine.refresh()
 	QuestEngine.mark_opened()
 	_closing = false

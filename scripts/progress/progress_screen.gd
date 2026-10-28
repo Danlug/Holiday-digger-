@@ -278,6 +278,7 @@ func _sync_tabs() -> void:
 # ---------------------------------------------------------------------------
 
 func open_tab(tab: String) -> void:
+	GameState.emit_event("screen_opened", {"id": "progress", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	var to_records := tab == TAB_RECORDS
 	if to_records:
 		tab = TAB_HERO

@@ -108,7 +108,7 @@ func refresh() -> void:
 	var home := ShopService.is_at_workshop()
 	var busy := q > 0
 
-	_q_lbl.text = ShopArt.compact(q)
+	_q_lbl.text = UiFmt.short(q)
 	_q_lbl.modulate = Color.WHITE if busy else COL_DIM
 	_q_icon.modulate = Color.WHITE if busy else Color(1, 1, 1, 0.45)
 	var can_stop := q > 1
@@ -120,7 +120,7 @@ func refresh() -> void:
 	_t_icon.modulate = Color.WHITE if busy else Color(1, 1, 1, 0.45)
 	_fill.size.x = floorf(BAR_W * BronzeFurnace.unit_progress(now)) if busy else 0.0
 
-	_r_lbl.text = "готово %s" % ShopArt.compact(ready)
+	_r_lbl.text = "готово %s" % UiFmt.short(ready)
 	_r_lbl.modulate = ShopArt.COL_GOOD if ready > 0 else COL_DIM
 
 	var sig := "%d|%d|%d|%s" % [q, ready, next, str(home)]
@@ -128,18 +128,18 @@ func refresh() -> void:
 		return
 	_sig = sig
 	var whole := BronzeFurnace.all_in(now)
-	Tip.bind_tap(_q_row, "Печь: в очереди %s" % ShopArt.full(q),
+	Tip.bind_tap(_q_row, "Печь: в очереди %s" % UiFmt.full(q),
 		"Вся очередь доплавится через %s." % BronzeFurnace.clock_text(whole) if busy
 			else "Печь пуста. Загрузи лом ползунком ниже — печь плавит, пока ты копаешь.",
 		"Минута на штуку, время идёт и при закрытой игре", _anchor)
 	Tip.bind_tap(_t_row, "До следующей штуки" if busy else "Одна штука",
 		BronzeFurnace.clock_text(next) if busy else "Плавится %s." % BronzeFurnace.clock_text(per), "", _anchor)
-	Tip.bind_tap(_r_row, "Готово: %s" % ShopArt.full(ready),
+	Tip.bind_tap(_r_row, "Готово: %s" % UiFmt.full(ready),
 		"Сплавлено и ждёт в печи." if ready > 0 else "Пока ничего не сплавилось.",
 		("Тап — забрать сейчас. Само заберётся при входе в магазин дома." if home
 			else "Заберётся само при входе в магазин дома."), _anchor)
 	Tip.bind(_stop, "Остановить печь",
-		"Штука в работе доплавится, лом за %s не начатых вернётся." % ShopArt.full(maxi(0, q - 1)),
+		"Штука в работе доплавится, лом за %s не начатых вернётся." % UiFmt.full(maxi(0, q - 1)),
 		"" if home else "Только дома, в мастерской")
 
 

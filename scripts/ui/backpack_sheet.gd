@@ -151,7 +151,7 @@ func refresh() -> void:
 	_weight_text.text = "%.1f/%.0f" % [load_kg, max_kg]
 	Tip.bind(_weight_bar, "Вес рюкзака", "%.1f из %.0f кг" % [load_kg, max_kg])
 	_total_pill.set_value(total)
-	Tip.bind(_total_pill, "К продаже", CountLabel.group_digits(total) + " монет в мастерской")
+	Tip.bind(_total_pill, "К продаже", UiFmt.full(total) + " монет в мастерской")
 	_refresh_actions()
 
 
@@ -400,8 +400,8 @@ static func make_tile(id: String, count: int, selected: bool = false) -> Button:
 	if hp > 0:
 		body += " · здоровье +%d%%" % hp
 	Tip.bind(b, name_ru, body,
-		("%s за штуку · всего %s" % [CountLabel.group_digits(price),
-			CountLabel.group_digits(price * count)]) if price > 0 else "Не продаётся")
+		("%s за штуку · всего %s" % [UiFmt.full(price),
+			UiFmt.full(price * count)]) if price > 0 else "Не продаётся")
 	return b
 
 

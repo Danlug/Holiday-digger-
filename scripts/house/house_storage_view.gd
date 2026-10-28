@@ -231,14 +231,14 @@ func refresh() -> void:
 		int(round(carried)), int(round(cap)), accessible, rows.size(), GameState.inventory.size()]
 	if head_sig != str(_head_sig):
 		_head_sig = head_sig
-		(_chip_items["label"] as Label).text = ShopArt.compact(HouseStorage.total_items())
+		(_chip_items["label"] as Label).text = UiFmt.short(HouseStorage.total_items())
 		Tip.bind(_chip_items["root"], "Склад", "Что лежит в мастерской. Верстак берёт материалы прямо отсюда.",
-			"%s шт · %s кг" % [ShopArt.full(HouseStorage.total_items()), ShopArt.full(int(round(HouseStorage.total_weight())))])
+			"%s шт · %s кг" % [UiFmt.full(HouseStorage.total_items()), UiFmt.full(int(round(HouseStorage.total_weight())))])
 		var load_label := _chip_load["label"] as Label
-		load_label.text = "%s/%s" % [ShopArt.compact(int(round(carried))), ShopArt.compact(int(round(cap)))]
+		load_label.text = "%s/%s" % [UiFmt.short(int(round(carried))), UiFmt.short(int(round(cap)))]
 		load_label.label_settings.font_color = ShopArt.COL_BAD if carried >= cap - 0.001 else Color.WHITE
 		Tip.bind(_chip_load["root"], "Рюкзак", "Сколько несёшь из скольки можно унести.",
-			"%s из %s кг" % [ShopArt.full(int(round(carried))), ShopArt.full(int(round(cap)))])
+			"%s из %s кг" % [UiFmt.full(int(round(carried))), UiFmt.full(int(round(cap)))])
 		_update_actions(accessible, rows)
 
 	# Список пересобирается только при изменениях: плитка, удалённая и созданная
@@ -299,10 +299,10 @@ func _offer(id: String, count: int, store: bool, accessible: bool) -> Dictionary
 		"tier": ShopItems.price_tier(Balance.get_mineral_price(id)),
 		"state": "available" if accessible else "away",
 		"title": ShopCatalog.item_name(id),
-		"body": "%s шт · %s кг" % [ShopArt.full(count), ShopArt.full(int(round(total_w)))],
+		"body": "%s шт · %s кг" % [UiFmt.full(count), UiFmt.full(int(round(total_w)))],
 		"extra": "",
-		"count_text": ShopArt.compact(count),
-		"pill": {"icon": UiIcons.tex("weight"), "text": ShopArt.compact(int(round(total_w))), "color": Color.WHITE},
+		"count_text": UiFmt.short(count),
+		"pill": {"icon": UiIcons.tex("weight"), "text": UiFmt.short(int(round(total_w))), "color": Color.WHITE},
 	}
 	if not accessible:
 		o["extra"] = HouseStorage.access_reason()
@@ -454,7 +454,7 @@ func _on_tile(store: bool, id: String, tile: ShopTile) -> void:
 			Tip.show_now(tile)
 			return
 		if limit < count:
-			limit_text = ShopArt.compact(limit)
+			limit_text = UiFmt.short(limit)
 	if limit == 1:
 		_move(store, id, 1, tile)
 		return
@@ -485,7 +485,7 @@ func _move(store: bool, id: String, amount: int, tile: Control) -> void:
 	Sfx.play("pickup" if store else "ui_toggle")
 	Haptics.tap()
 	ShopFx.sparkles(_root, center, ShopArt.COL_GOLD if store else ShopArt.COL_GOOD, 12, 28.0)
-	HouseArt.float_number(_root, center + Vector2(-8, -18), ("+%s" if store else "−%s") % ShopArt.compact(moved),
+	HouseArt.float_number(_root, center + Vector2(-8, -18), ("+%s" if store else "−%s") % UiFmt.short(moved),
 		ShopArt.COL_GOOD if store else ShopArt.COL_GOLD)
 	_signature = ""
 	_head_sig = ""
@@ -500,7 +500,7 @@ func _after_move(moved: int, button: Control, sound: String) -> void:
 	Haptics.tap()
 	var center := button.get_global_rect().get_center() - _root.get_global_rect().position
 	ShopFx.sparkles(_root, center, ShopArt.COL_GOLD, 16, 34.0)
-	HouseArt.float_number(_root, center + Vector2(-10, -26), "×%s" % ShopArt.compact(moved), ShopArt.COL_GOOD)
+	HouseArt.float_number(_root, center + Vector2(-10, -26), "×%s" % UiFmt.short(moved), ShopArt.COL_GOOD)
 	_signature = ""
 	_head_sig = ""
 	refresh()

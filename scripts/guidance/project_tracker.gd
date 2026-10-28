@@ -124,7 +124,7 @@ func _bind_tip() -> void:
 		lines.append("%s: %d/%d" % [ShopCatalog.item_name(String(m["id"])), int(m["have"]), int(m["need"])])
 	var c := ProjectChain.coins_need(_id)
 	if c > 0:
-		lines.append("Монеты: %s/%s" % [ShopArt.compact(mini(GameState.coins, c)), ShopArt.compact(c)])
+		lines.append("Монеты: %s/%s" % [UiFmt.short(mini(GameState.coins, c)), UiFmt.short(c)])
 	Tip.bind(self, ProjectChain.title(_id), "\n".join(lines),
 		"Всё есть — собирай!" if _is_ready else "Тап — цепочка материалов")
 

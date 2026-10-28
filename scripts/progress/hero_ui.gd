@@ -61,20 +61,6 @@ static func shake(c: Control, px: float = 2.5) -> void:
 		tw.tween_property(c, "position:x", x0 + dx, 0.04)
 
 
-## 1234 -> "1234", 12 345 -> "12.3k", 4 200 000 -> "4.2M": плитка узкая.
-static func short_num(n: int) -> String:
-	var a := absi(n)
-	if a < 10000:
-		return str(n)
-	if a < 1000000:
-		return _trim("%.1f" % (float(n) / 1000.0)) + "k"
-	return _trim("%.1f" % (float(n) / 1000000.0)) + "M"
-
-
-static func _trim(s: String) -> String:
-	return s.substr(0, s.length() - 2) if s.ends_with(".0") else s
-
-
 ## Плитка «иконка + число». Подпись плитки — только в подсказке Tip.
 ## Возвращает панель; число доступно через метаданные "value_label".
 static func make_tile(icon_name: String, value: String, color: Color = ProgressUiKit.GOLD,

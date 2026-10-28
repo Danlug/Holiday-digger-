@@ -1620,8 +1620,8 @@ func _update_clock() -> void:
 func _sync_purse(instant: bool = false) -> void:
 	_coins_pill.set_value(GameState.coins, instant)
 	_dollars_pill.set_value(GameState.dollars, instant)
-	Tip.bind(_coins_pill, "Монеты", CountLabel.group_digits(GameState.coins))
-	Tip.bind(_dollars_pill, "Доллары", CountLabel.group_digits(GameState.dollars) + " · премиум-валюта")
+	Tip.bind(_coins_pill, "Монеты", UiFmt.full(GameState.coins))
+	Tip.bind(_dollars_pill, "Доллары", UiFmt.full(GameState.dollars) + " · премиум-валюта")
 	var load_kg := GameState.get_total_weight()
 	var max_kg := maxf(GameState.get_max_carry_kg(), 0.001)
 	var frac := load_kg / max_kg

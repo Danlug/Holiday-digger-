@@ -179,7 +179,7 @@ func _make_case_header(branch: Dictionary, branch_num: int, found: int, total: i
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(chip)
 	chip.add_child(HeroIcons.make("ui_check" if complete else "ui_chest", 14.0))
-	var coin_label := ProgressUiKit.make_label(HeroUi.short_num(coins), 9,
+	var coin_label := ProgressUiKit.make_label(UiFmt.short(coins), 9,
 		ProgressUiKit.DIM if complete else ProgressUiKit.GOLD)
 	coin_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(coin_label)

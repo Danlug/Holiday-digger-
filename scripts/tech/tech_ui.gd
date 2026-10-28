@@ -119,17 +119,6 @@ static func chip(texture: Texture2D, number: String, color: Color = MUTED, icon_
 	return row
 
 
-## Компактная запись числа: 15000 -> «15k», 1250000 -> «1.2M».
-static func short(n: int) -> String:
-	if n >= 1000000:
-		return "%.1fM" % (float(n) / 1000000.0)
-	if n >= 10000:
-		return "%dk" % int(round(float(n) / 1000.0))
-	if n >= 1000:
-		return "%.1fk" % (float(n) / 1000.0)
-	return str(n)
-
-
 ## Длительность «5ч 12м» / «43м» — числа без слов-абзацев.
 static func hm(seconds: float) -> String:
 	var total := int(seconds)

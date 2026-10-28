@@ -134,12 +134,12 @@ func _rebuild_sum() -> void:
 		var ic := _icon(ShopArt.item_icon(String(id)), 16)
 		_sum.add_child(ic)
 		input_icons[String(id)] = ic
-		_sum.add_child(_num("−" + ShopArt.compact(total), 12, Color(0.92, 0.88, 0.8)))
-		used_parts.append("%s ×%s" % [ShopCatalog.item_name(String(id)), ShopArt.full(total)])
+		_sum.add_child(_num("−" + UiFmt.short(total), 12, Color(0.92, 0.88, 0.8)))
+		used_parts.append("%s ×%s" % [ShopCatalog.item_name(String(id)), UiFmt.full(total)])
 	_sum.add_child(_icon(ShopArt.tex("glyph_arrow"), 12))
 	var out_id := String(r["output"]["id"])
 	_sum.add_child(_icon(ShopArt.item_icon(out_id), 16))
-	_sum.add_child(_num("+" + ShopArt.compact(int(plan["made"])), 12, ShopArt.COL_GOOD))
+	_sum.add_child(_num("+" + UiFmt.short(int(plan["made"])), 12, ShopArt.COL_GOOD))
 	# Куда ляжет: значок рюкзака и/или склада с числом — мелко, это справка.
 	var where: Array = []
 	for dest in [["to_pack", "icon_backpack", "в рюкзак"], ["to_storage", "glyph_storage", "на склад"]]:
@@ -152,19 +152,19 @@ func _rebuild_sum() -> void:
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_sum.add_child(gap)
 		_sum.add_child(_icon(tex, 12))
-		_sum.add_child(_num(ShopArt.compact(k), 10, Color(0.72, 0.72, 0.8)))
-		where.append("%s %s" % [dest[2], ShopArt.full(k)])
+		_sum.add_child(_num(UiFmt.short(k), 10, Color(0.72, 0.72, 0.8)))
+		where.append("%s %s" % [dest[2], UiFmt.full(k)])
 	var coins := int(plan["coins"])
 	if coins > 0:
 		_sum.add_child(_icon(ShopArt.ui("icon_coin"), 14))
-		_sum.add_child(_num("−" + ShopArt.compact(coins), 12,
+		_sum.add_child(_num("−" + UiFmt.short(coins), 12,
 			Color.WHITE if GameState.coins >= coins or GameState.debug_free_shop else ShopArt.COL_BAD))
-		used_parts.append("монеты ×%s" % ShopArt.full(coins))
+		used_parts.append("монеты ×%s" % UiFmt.full(coins))
 	var lands := "Ляжет: " + ", ".join(where)
 	if int(r.get("seconds", 0)) > 0:
 		# Печь бронзы (BronzeFurnace): ляжет не сразу, а по штуке в минуту.
 		lands = "Плавится %s, потом ляжет: %s" % [BronzeFurnace.clock_text(n * int(r["seconds"])), ", ".join(where)]
-	Tip.bind_tap(_sum, "%s ×%s" % [String(r["name_ru"]), ShopArt.full(int(plan["made"]))],
+	Tip.bind_tap(_sum, "%s ×%s" % [String(r["name_ru"]), UiFmt.full(int(plan["made"]))],
 		"Уйдёт: " + ", ".join(used_parts), lands, _tip_anchor)
 
 

@@ -268,8 +268,8 @@ func _on_slider(_v: float) -> void:
 
 func _update_numbers() -> void:
 	var n := amount()
-	_count_label.text = "%s / %s" % [ShopArt.compact(n), ShopArt.compact(_max)] if _max > 1 else ShopArt.compact(n)
-	_weight_label.text = ShopArt.compact(int(round(_unit_weight * float(n))))
+	_count_label.text = "%s / %s" % [UiFmt.short(n), UiFmt.short(_max)] if _max > 1 else UiFmt.short(n)
+	_weight_label.text = UiFmt.short(int(round(_unit_weight * float(n))))
 
 
 func _on_ok() -> void:

@@ -215,8 +215,8 @@ func _sync() -> void:
 		HeroUi.TILE_BG_HI if points > 0 else HeroUi.TILE_BG,
 		ProgressUiKit.GOLD if points > 0 else ProgressUiKit.BORDER, 4, 2 if points > 0 else 1))
 
-	HeroUi.tile_value(_coins_tile).text = HeroUi.short_num(GameState.coins)
-	HeroUi.tile_value(_dollars_tile).text = HeroUi.short_num(GameState.dollars)
+	HeroUi.tile_value(_coins_tile).text = UiFmt.short(GameState.coins)
+	HeroUi.tile_value(_dollars_tile).text = UiFmt.short(GameState.dollars)
 	_sync_stats()
 
 

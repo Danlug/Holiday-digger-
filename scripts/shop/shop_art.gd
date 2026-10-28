@@ -97,37 +97,3 @@ static func tier_for(i: int, n: int) -> int:
 	if n <= 1:
 		return 0
 	return int(round(float(i) * 5.0 / float(n - 1)))
-
-
-## Короткая запись числа для бейджа на плитке: 950, 12K, 1.2M. Плитка в 64
-## точки не вмещает «1 234 567», а подсказка покажет полное число.
-static func compact(n: int) -> String:
-	var v := absi(n)
-	var minus := "-" if n < 0 else ""
-	if v < 10000:
-		return minus + str(v)
-	if v < 1000000:
-		var k := float(v) / 1000.0
-		return minus + (_trim("%.1f" % k) if k < 100.0 else str(int(k))) + "K"
-	if v < 1000000000:
-		return minus + _trim("%.2f" % (float(v) / 1000000.0)) + "M"
-	return minus + _trim("%.2f" % (float(v) / 1000000000.0)) + "B"
-
-
-static func _trim(s: String) -> String:
-	if s.contains("."):
-		s = s.rstrip("0").rstrip(".")
-	return s
-
-
-## Полное число с пробелами по три знака: 1 234 567 (для подсказок).
-static func full(n: int) -> String:
-	var s := str(absi(n))
-	var out := ""
-	var count := 0
-	for i in range(s.length() - 1, -1, -1):
-		out = s[i] + out
-		count += 1
-		if count % 3 == 0 and i > 0:
-			out = " " + out
-	return ("-" if n < 0 else "") + out

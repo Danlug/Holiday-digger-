@@ -124,8 +124,8 @@ func _build_banner() -> void:
 	_skip_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_skip_btn.offset_left = -SkipButton.SIZE_PX.x - 4.0
 	_skip_btn.offset_right = -4.0
-	_skip_btn.offset_top = 2.0
-	_skip_btn.offset_bottom = 2.0 + SkipButton.SIZE_PX.y
+	_skip_btn.offset_top = 0.0
+	_skip_btn.offset_bottom = SkipButton.SIZE_PX.y   # во всю высоту плашки (26)
 	_skip_btn.confirmed.connect(skip)
 	_banner.add_child(_skip_btn)
 

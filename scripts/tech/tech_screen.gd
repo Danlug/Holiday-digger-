@@ -102,7 +102,7 @@ func _ready() -> void:
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.offset_left = 6
 	column.offset_right = -6
-	column.offset_top = UiBtn.CLOSE_ROW
+	column.offset_top = UiBtn.CLOSE_ROW + HudSafeArea.top(get_viewport())
 	column.offset_bottom = -6 - HudSafeArea.bottom(get_viewport())
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)

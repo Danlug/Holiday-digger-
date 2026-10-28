@@ -71,11 +71,11 @@ var _shown_dollars: int = 0
 var _wallet_hold: bool = false
 var _wallet_tween: Dictionary = {}
 var _close_btn: Button
+var _safe_top := 0.0   # шапка — под вырезом/статус-баром (HudSafeArea.top)
 var _nav_bottom := NAV_H   # нижняя панель вместе с безопасной зоной (полоска «домой»)
 
 var _nav: Control
 var _nav_tabs: Control
-var _nav_done: Button
 var _tab_buttons: Dictionary = {}
 var _tab_badges: Dictionary = {}
 var _marker: NinePatchRect
@@ -309,6 +309,7 @@ func _build() -> void:
 	_root.add_child(bg)
 
 	_nav_bottom = NAV_H + HudSafeArea.bottom(get_viewport())
+	_safe_top = HudSafeArea.top(get_viewport())
 	_build_scroll()
 	_build_header()
 	_build_action_bar()
@@ -320,7 +321,7 @@ func _build() -> void:
 func _build_scroll() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_scroll.offset_top = HEAD_H + 2.0
+	_scroll.offset_top = HEAD_H + 2.0 + _safe_top
 	_scroll.offset_bottom = -_nav_bottom
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
@@ -343,8 +344,8 @@ func _build_header() -> void:
 	var line := ColorRect.new()
 	line.color = UiTheme.NIGHT_LINE
 	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	line.offset_top = HEAD_H
-	line.offset_bottom = HEAD_H + 1.0
+	line.offset_top = HEAD_H + _safe_top
+	line.offset_bottom = HEAD_H + 1.0 + _safe_top
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(line)
 
@@ -358,7 +359,7 @@ func _build_header() -> void:
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	var root := Control.new()
-	root.position = pos
+	root.position = pos + Vector2(0, _safe_top)
 	root.size = Vector2(w, 20)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	var bg := NinePatchRect.new()
@@ -463,20 +464,6 @@ func _build_nav() -> void:
 		_tab_buttons[id] = b
 	_marker.get_parent().move_child(_marker, 0)
 
-	# На экране верстака вкладок нет: одна большая кнопка «готово» под большим пальцем.
-	_nav_done = UiBtn.texture_button("green", ShopArt.tex("glyph_check"), Vector2(96, 28), 18.0, false)
-	_nav_done.anchor_left = 0.5
-	_nav_done.anchor_right = 0.5
-	_nav_done.offset_left = -48.0
-	_nav_done.offset_right = 48.0
-	_nav_done.offset_top = 5.0
-	_nav_done.offset_bottom = 33.0
-	_nav_done.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	Tip.bind(_nav_done, "Готово")
-	_nav.add_child(_nav_done)
-
 
 func _build_action_bar() -> void:
 	_action = Control.new()
@@ -546,8 +533,8 @@ func _build_notice() -> void:
 	_notice_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_notice_panel.offset_left = 10
 	_notice_panel.offset_right = -10
-	_notice_panel.offset_top = HEAD_H + 6.0
-	_notice_panel.offset_bottom = HEAD_H + 46.0
+	_notice_panel.offset_top = HEAD_H + 6.0 + _safe_top
+	_notice_panel.offset_bottom = HEAD_H + 46.0 + _safe_top
 	_notice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_notice_panel.visible = false
 	var sb := StyleBoxFlat.new()
@@ -639,8 +626,7 @@ func _set_tab(tab: String, animate: bool) -> void:
 	_tab = tab
 	_close_card(false)
 	var equip := tab == SCREEN_EQUIP
-	_nav_tabs.visible = not equip
-	_nav_done.visible = equip
+	_nav.visible = not equip   # у верстака вкладок нет; закрывает крестик сверху справа, как везде
 	_chips["coins"]["root"].visible = not equip
 	_chips["dollars"]["root"].visible = not equip
 	_chips["dig"]["root"].visible = equip
@@ -1622,7 +1608,8 @@ func _selection_items() -> Dictionary:
 ## ГДД раздел 15) и значок ролика «×2».
 func _update_action_bar() -> void:
 	_action.visible = _tab == TAB_SELL
-	_scroll.offset_bottom = -(_nav_bottom + (ACTION_H if _tab == TAB_SELL else 0.0))
+	var nav := _nav_bottom - (NAV_H if _tab == SCREEN_EQUIP else 0.0)   # у верстака нижней панели нет
+	_scroll.offset_bottom = -(nav + (ACTION_H if _tab == TAB_SELL else 0.0))
 	if _tab != TAB_SELL:
 		return
 	var remote := _footer_mode == "remote"

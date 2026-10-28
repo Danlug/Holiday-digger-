@@ -81,6 +81,7 @@ var _toast_timer: Timer
 var _toast_tween: Tween
 var _stick: Control
 var _knob: Control
+var _knob_tw: Tween
 var _hold_hint: TextureRect
 
 # --- третий режим: экранные стрелки ---
@@ -452,7 +453,7 @@ func _build_clock(parent: Control) -> void:
 ## втором взгляде. Теперь новое задание показывается ненадолго и сворачивается
 ## сюда; нажатие разворачивает его обратно.
 func _build_quest_button(parent: Control) -> void:
-	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(28, 24))
+	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(36, 26))   # ширина столбика (задания дня), цель ≥ 25
 	_quest_button.visible = false
 	Tip.bind(_quest_button, "Задание")
 	_quest_button.pressed.connect(func():
@@ -2220,24 +2221,34 @@ func _apply_stick(screen_pos: Vector2) -> void:
 	var v: Vector2 = (screen_pos - _stick_center) / stick_r
 	if v.length() > 1.0:
 		v = v.normalized()
-	var snap = player.resolve_dir(v.x, v.y, STICK_DEAD)
-	_position_knob(snap)
+	player.resolve_dir(v.x, v.y, STICK_DEAD)   # герой — по защёлкнутым направлениям
+	# Ручка — под пальцем 1:1 (там, куда он лёг), в пределах круга.
+	_set_knob((screen_pos - _stick_center).limit_length(stick_r - knob_r))
 	player.cancel_wrong_dig()
 
 
-func _position_knob(snap) -> void:
-	var base: Vector2 = Vector2(stick_r - knob_r, stick_r - knob_r)
-	if snap == null:
-		_knob.position = base
+## Ручка по направлению клавиатуры (snap) или в центр (null).
+func _position_knob(snap, glide: bool = false) -> void:
+	_set_knob(Vector2.ZERO if snap == null else Vector2(snap.x, snap.y).limit_length(1.0) * (stick_r - knob_r), glide)
+
+
+## off — смещение ручки от центра; glide — пружинкой домой, а не прыжком.
+func _set_knob(off: Vector2, glide: bool = false) -> void:
+	if _knob_tw != null:
+		_knob_tw.kill()
+	var to := Vector2(stick_r - knob_r, stick_r - knob_r) + off
+	if glide and not UiAnim.instant(_knob):
+		_knob_tw = create_tween()
+		_knob_tw.tween_property(_knob, "position", to, UiAnim.D_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
-		_knob.position = base + Vector2(snap.x, snap.y) * 34.0
+		_knob.position = to
 
 
 func _release_stick() -> void:
 	_stick_pointer = -100
 	if player != null:
 		player.release_control()
-	_position_knob(null)
+	_position_knob(null, true)
 
 
 ## Касания мира до джойстика сейчас не доходят: ввод HUD выключили снаружи

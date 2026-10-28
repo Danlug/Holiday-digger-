@@ -13,7 +13,7 @@ extends Control
 signal tapped
 
 const W := 46.0
-const H := 24.0
+const H := 26.0   # цель нажатия ≥ 25
 const POLL := 0.4
 const COL_BG := Color(0.07, 0.055, 0.045, 0.86)
 const COL_EDGE := UiTheme.EDGE

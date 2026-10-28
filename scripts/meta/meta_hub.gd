@@ -137,8 +137,9 @@ func _build() -> void:
 	wallet.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	wallet.offset_left = 8
 	wallet.offset_right = -UiBtn.CLOSE_ROW
-	wallet.offset_top = 8
-	wallet.offset_bottom = 26
+	var st := HudSafeArea.top(get_viewport())
+	wallet.offset_top = 8 + st
+	wallet.offset_bottom = 26 + st
 	wallet.add_theme_constant_override("separation", 10)
 	_root.add_child(wallet)
 	for k in [["coins", "coin", "Монеты"], ["dollars", "dollar", "Доллары"], ["points", "star", "Очки трофеев"]]:
@@ -153,7 +154,7 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 8
 	_scroll.offset_right = -8
-	_scroll.offset_top = UiBtn.CLOSE_ROW
+	_scroll.offset_top = UiBtn.CLOSE_ROW + st
 	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + sb)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)

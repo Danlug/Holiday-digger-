@@ -24,6 +24,7 @@ const HEAD_H := 32.0
 const ACTION_H := 46.0
 const LINE_COL := UiTheme.NIGHT_LINE
 
+var _safe_top := 0.0   # шапка — под вырезом/статус-баром (HudSafeArea.top)
 var _root: Control
 var _scroll: ScrollContainer
 var _list: VBoxContainer
@@ -51,6 +52,7 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	_safe_top = HudSafeArea.top(get_viewport())
 	_root = Control.new()
 	_root.name = "Root"
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -75,7 +77,7 @@ func _build() -> void:
 
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_scroll.offset_top = HEAD_H + 2.0
+	_scroll.offset_top = HEAD_H + 2.0 + _safe_top
 	_scroll.offset_bottom = -ACTION_H - HudSafeArea.bottom(get_viewport())
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
@@ -105,8 +107,8 @@ func _build_header() -> void:
 	var line := ColorRect.new()
 	line.color = LINE_COL
 	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	line.offset_top = HEAD_H
-	line.offset_bottom = HEAD_H + 1.0
+	line.offset_top = HEAD_H + _safe_top
+	line.offset_bottom = HEAD_H + 1.0 + _safe_top
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(line)
 
@@ -118,7 +120,7 @@ func _build_header() -> void:
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	var root := Control.new()
-	root.position = pos
+	root.position = pos + Vector2(0, _safe_top)
 	root.size = Vector2(w, 20)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(HouseArt.nine("pill", 4))

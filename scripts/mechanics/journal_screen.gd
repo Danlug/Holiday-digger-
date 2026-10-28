@@ -122,8 +122,9 @@ func _build() -> void:
 	_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_head.offset_left = 8
 	_head.offset_right = -UiBtn.CLOSE_ROW   # справа — крестик
-	_head.offset_top = 8
-	_head.offset_bottom = 30
+	var st := HudSafeArea.top(get_viewport())
+	_head.offset_top = 8 + st
+	_head.offset_bottom = 30 + st
 	_head.alignment = BoxContainer.ALIGNMENT_CENTER
 	_head.add_theme_constant_override("separation", 10)
 	_root.add_child(_head)
@@ -133,7 +134,7 @@ func _build() -> void:
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
 	var sb := HudSafeArea.bottom(get_viewport())
-	_scroll.offset_top = 36
+	_scroll.offset_top = 36 + st
 	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + sb)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)

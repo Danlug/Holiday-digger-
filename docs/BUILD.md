@@ -98,6 +98,20 @@ cd build/web && python3 -m http.server 8000
 
 Готовая сборка на момент сдачи лежит в `build/web/` (каталог в `.gitignore`, при необходимости пересобрать — команда выше).
 
+### Аналитика (PostHog)
+
+Аналитика по согласию игрока — ГДД §16.1. Пока в `data/analytics.json` пустой `api_key`, события копятся на устройстве и
+никуда не уходят. Чтобы включить отправку:
+
+1. Создать проект в PostHog **EU Cloud** (`eu.posthog.com`).
+2. Project settings → **Project API key** (`phc_…`) — вставить в `data/analytics.json → api_key`. Ключ публичный (им можно
+   только писать события), держать его в сборке нормально. `host` оставить `https://eu.i.posthog.com`.
+3. Там же включить **«Discard client IP data»** — IP не хранится вовсе (игра и так шлёт `$geoip_disable`).
+4. Пересобрать (`tools/build_web.sh`): ключ попадает в пак. `web/privacy.html` скрипт кладёт рядом с игрой; для родных сборок
+   ссылка — `privacy_url` в том же файле.
+
+`enabled_build: false` выключает аналитику в сборке целиком: ни окна согласия, ни переключателя в настройках.
+
 ### Оболочка веб-версии (`web/shell.html`)
 
 Страницу вокруг игры делаем сами: пресет `Web` берёт её из `html/custom_html_shell="res://web/shell.html"`

@@ -98,7 +98,7 @@ func _build_banner() -> void:
 		_banner_layer.visible = true
 		return
 	_banner_layer = CanvasLayer.new()
-	_banner_layer.layer = 90  # под катсценой (100), над HUD
+	_banner_layer.layer = UiLayers.BANNER  # под катсценой (100), над HUD
 	add_child(_banner_layer)
 
 	_banner = Panel.new()
@@ -114,8 +114,8 @@ func _build_banner() -> void:
 	_banner_label = Label.new()
 	_banner_label.text = StoryText.get_text("ui.autodig_banner")
 	_banner_label.position = Vector2(8, 5)
-	_banner_label.add_theme_font_size_override("font_size", 11)
-	_banner_label.add_theme_color_override("font_color", Color8(0xE8, 0xDC, 0xC0))
+	_banner_label.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
+	_banner_label.add_theme_color_override("font_color", UiTheme.CREAM)
 	_banner.add_child(_banner_label)
 
 	# Тот же «Пропустить», что и в катсценах: иконка, подтверждение удержанием или двойным тапом.
@@ -124,8 +124,8 @@ func _build_banner() -> void:
 	_skip_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_skip_btn.offset_left = -SkipButton.SIZE_PX.x - 4.0
 	_skip_btn.offset_right = -4.0
-	_skip_btn.offset_top = 2.0
-	_skip_btn.offset_bottom = 2.0 + SkipButton.SIZE_PX.y
+	_skip_btn.offset_top = 0.0
+	_skip_btn.offset_bottom = SkipButton.SIZE_PX.y   # во всю высоту плашки (26)
 	_skip_btn.confirmed.connect(skip)
 	_banner.add_child(_skip_btn)
 

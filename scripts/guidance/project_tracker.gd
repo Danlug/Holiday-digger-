@@ -13,12 +13,12 @@ extends Control
 signal tapped
 
 const W := 46.0
-const H := 24.0
+const H := 26.0   # цель нажатия ≥ 25
 const POLL := 0.4
 const COL_BG := Color(0.07, 0.055, 0.045, 0.86)
-const COL_EDGE := Color8(0x52, 0x40, 0x2D)
-const COL_READY := Color8(0x7F, 0xD0, 0x6B)
-const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
+const COL_EDGE := UiTheme.EDGE
+const COL_READY := UiTheme.OK_LIGHT
+const COL_FILL := UiTheme.GOLD
 const COL_TRACK := Color(0, 0, 0, 0.55)
 
 var _id := ""
@@ -124,7 +124,7 @@ func _bind_tip() -> void:
 		lines.append("%s: %d/%d" % [ShopCatalog.item_name(String(m["id"])), int(m["have"]), int(m["need"])])
 	var c := ProjectChain.coins_need(_id)
 	if c > 0:
-		lines.append("Монеты: %s/%s" % [ShopArt.compact(mini(GameState.coins, c)), ShopArt.compact(c)])
+		lines.append("Монеты: %s/%s" % [UiFmt.short(mini(GameState.coins, c)), UiFmt.short(c)])
 	Tip.bind(self, ProjectChain.title(_id), "\n".join(lines),
 		"Всё есть — собирай!" if _is_ready else "Тап — цепочка материалов")
 

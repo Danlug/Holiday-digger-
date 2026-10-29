@@ -87,7 +87,7 @@ static func can_pay(currency: String, price: int) -> bool:
 
 
 static func price_line(currency: String, price: int) -> String:
-	return "%s %s" % [ShopArt.full(price), "монет" if currency == COINS else "$"]
+	return "%s %s" % [UiFmt.full(price), "монет" if currency == COINS else "$"]
 
 
 static func currency_icon(currency: String) -> Texture2D:
@@ -110,13 +110,13 @@ static func _priced(o: Dictionary, currency: String, price: int) -> void:
 	o["price"] = price
 	var ok := can_pay(currency, price)
 	o["state"] = "available" if ok else "poor"
-	o["pill"] = {"icon": currency_icon(currency), "text": ShopArt.compact(price),
+	o["pill"] = {"icon": currency_icon(currency), "text": UiFmt.short(price),
 		"color": Color.WHITE if ok else COL_BAD}
 	if ok:
 		o["extra"] = price_line(currency, price)
 	else:
 		var have := GameState.coins if currency == COINS else GameState.dollars
-		o["extra"] = "%s. Не хватает: %s" % [price_line(currency, price), ShopArt.full(price - have)]
+		o["extra"] = "%s. Не хватает: %s" % [price_line(currency, price), UiFmt.full(price - have)]
 
 
 static func _owned(o: Dictionary, text: String = "Уже есть") -> void:
@@ -138,9 +138,12 @@ static func _locked(o: Dictionary, text: String, pill: Dictionary = {}) -> void:
 
 ## Дома у двери плитки как были. Под землёй, пока есть ролики: бейдж «осталось
 ## N/3» на значке и значок ролика в левом углу (покупка спишет один просмотр).
-## Вне двери и без роликов: плитка тускнеет, в правом углу замок, причина — в Tip
-## (state «away», а не «locked»: «заперто» — это про глубину, и такие плитки
-## не считаются виденными, а эти должны остаться «как были» для двери).
+## Под землёй без роликов: плитка тускнеет, в правом углу замок, причина — в Tip.
+## На огороде и в другой комнате дома (раунд 5): вместо замка значок двери и
+## флаг at_door — витрина отвечает на тап напоминанием «к двери», без ролика
+## и без «N/3». State в обоих случаях «away», а не «locked»: «заперто» — это про
+## глубину, и такие плитки не считаются виденными, а эти должны остаться «как
+## были» для двери.
 ## Купленное, запертое по глубине и всё, что вне правила (в том числе любые
 ## плитки за доллары — их можно купить где угодно), не трогаем.
 static func apply_purchase_rules(offers: Array) -> void:
@@ -160,6 +163,9 @@ static func apply_purchase_rules(offers: Array) -> void:
 			continue
 		o["state"] = "away"
 		o["corner"] = "lock"
+		if ShopService.is_door_reminder(gate):
+			o["corner"] = "door"
+			o["at_door"] = true
 		o["new"] = false
 		o["lock_reason"] = String(gate["reason"])
 		o["extra"] = String(gate["reason"])
@@ -193,6 +199,8 @@ static func tool_offers() -> Array:
 		elif price <= 0:
 			# Ржавая кирка не продаётся: она лежит в мастерской среди удочек и лопат.
 			_locked(o, "Не продаётся: лежит в мастерской", {"icon": ShopArt.tex("glyph_house")})
+		elif ShopService.missing_prev_tier(id) != "":
+			_tier_locked(o, id, price)
 		else:
 			_priced(o, COINS, price)
 		out.append(o)
@@ -219,11 +227,20 @@ static func gear_offers() -> Array:
 			"to": "×" + ShopCatalog.mult_text(fly)}
 		if GameState.has_gear(id):
 			_owned(o)
+		elif ShopService.missing_prev_tier(id) != "":
+			_tier_locked(o, id, price)
 		else:
 			_priced(o, COINS, price)
 		out.append(o)
 	_flag_new(out)
 	return out
+
+
+## Ступень выше следующей (владелец, 27.10: «нельзя перескочить кирку или
+## рюкзак»): замок и серая цена, как у ступеней бура, причина — в Tip.
+static func _tier_locked(o: Dictionary, id: String, price: int) -> void:
+	_locked(o, ShopService.prev_tier_reason(ShopService.missing_prev_tier(id)),
+		{"icon": ShopArt.ui("icon_coin"), "text": UiFmt.short(price), "color": Color(0.7, 0.7, 0.75)})
 
 
 ## Ступени апгрейда бурмобиля: покупаются строго по порядку.
@@ -245,7 +262,7 @@ static func drill_offers() -> Array:
 				_owned(o)
 			"locked":
 				_locked(o, "Сначала %s" % Balance.get_drill_rig_tier_name_ru(tier - 1).to_lower(),
-					{"icon": ShopArt.ui("icon_coin"), "text": ShopArt.compact(int(row["price_coins"])),
+					{"icon": ShopArt.ui("icon_coin"), "text": UiFmt.short(int(row["price_coins"])),
 					"color": Color(0.7, 0.7, 0.75)})
 			_:
 				_priced(o, COINS, int(row["price_coins"]))
@@ -298,7 +315,7 @@ static func recipe_offers() -> Array:
 			o["extra"] = "Материалов хватает — можно собирать"
 		elif bool(check["locked"]):
 			_locked(o, reason, {"icon": ShopArt.tex("glyph_depth"),
-				"text": ShopArt.compact(ShopCatalog.unlock_depth(rid)), "color": Color.WHITE})
+				"text": UiFmt.short(ShopCatalog.unlock_depth(rid)), "color": Color.WHITE})
 		elif reason == "Уже собрано":
 			_owned(o, reason)
 		elif reason == "Верстак дома, в подвале":
@@ -315,11 +332,42 @@ static func recipe_offers() -> Array:
 		# Переработка (ползунок в карточке): на плитке — на сколько штук хватает.
 		if o["state"] == "ready" and ShopService.is_batch(rid):
 			var most := ShopService.max_craft(rid)
-			o["pill"] = {"pips": pips, "text": "×" + ShopArt.compact(most), "color": COL_GOOD}
-			o["extra"] = "Хватит на %s" % ShopArt.full(most)
+			o["pill"] = {"pips": pips, "text": "×" + UiFmt.short(most), "color": COL_GOOD}
+			o["extra"] = "Хватит на %s" % UiFmt.full(most)
+		if BronzeFurnace.handles(rid):
+			furnace_decor(o)
 		out.append(o)
 	_flag_new(out)
 	return out
+
+
+## Печь бронзы на её плитке: плавится или ждёт готовое — огонёк в левом углу,
+## на значке отсчёт до следующей штуки («0:42») или «+N» готового, строка в Tip.
+## Витрина зовёт это и раз в секунду (ShopUI._furnace_tick) — отсчёт идёт.
+static func furnace_decor(o: Dictionary) -> void:
+	if not o.has("extra_base"):
+		o["extra_base"] = String(o.get("extra", ""))
+	var base := String(o["extra_base"])
+	var now := BronzeFurnace.now_unix()
+	var q := BronzeFurnace.queued(now)
+	var ready := BronzeFurnace.ready_count(now)
+	o["furnace"] = q > 0 or ready > 0
+	if not bool(o["furnace"]):
+		o["corner_tl"] = ""
+		o["count_text"] = ""
+		o["extra"] = base
+		return
+	o["corner_tl"] = "flame"
+	o["count_text"] = BronzeFurnace.clock_text(BronzeFurnace.next_in(now)) if q > 0 \
+		else "+" + UiFmt.short(ready)
+	var parts: Array = []
+	if q > 0:
+		parts.append("В печи %s, следующая через %s" % [UiFmt.full(q),
+			BronzeFurnace.clock_text(BronzeFurnace.next_in(now))])
+	if ready > 0:
+		parts.append("готово %s" % UiFmt.full(ready))
+	var line := ", ".join(parts)
+	o["extra"] = line if base == "" else line + "\n" + base
 
 
 static func recipe_icon(r: Dictionary) -> Texture2D:
@@ -417,10 +465,16 @@ static func _good_offer(g: Dictionary, currency: String) -> Dictionary:
 	o["body"] = String(g.get("desc_ru", ""))
 	o["effects"] = good_effects(g)
 	_priced(o, currency, price)
+	if String(g.get("effect", "")) == PremiumUnload.EFFECT and not PremiumUnload.can_unload():
+		# Выгрузка при пустом рюкзаке: тусклая, без замка — нечего отправлять (раунд 6).
+		o["state"] = "poor"
+		o["extra"] = "Рюкзак пуст: отправлять нечего"
 	var depth := int(Balance.unwrap(g.get("unlock_depth", 0)))
 	if depth > GameState.max_depth_reached:
 		_locked(o, "Откроется на глубине %d" % depth, {"icon": ShopArt.tex("glyph_depth"),
-			"text": ShopArt.compact(depth), "color": Color.WHITE})
+			"text": UiFmt.short(depth), "color": Color.WHITE})
+	if id == TeleportWatch.GOOD_ID and TeleportWatch.free_uses() > 0:
+		TeleportWatch.mark_free_offer(o)   # подарок обучения на 200: «0 $» и бант (scripts/teleport/)
 	return o
 
 
@@ -444,10 +498,10 @@ static func good_effects(g: Dictionary) -> Array:
 			var hp := Healing.food_hp_percent(String(g.get("id", "")))   # еда лечит (раунд 4)
 			if hp > 0:
 				out.append({"icon": ShopArt.ui("icon_hp"), "text": "+%d" % hp})
-		"full_restore":
-			out.append({"icon": ShopArt.ui("icon_hp"), "text": "100"})
-			out.append({"icon": ShopArt.ui("icon_stamina"), "text": "100"})
-			out.append({"icon": ShopArt.ui("icon_hunger"), "text": "100"})
+		"premium_unload":
+			# Сколько улетит: рюкзак → склад, число штук (раунд 6).
+			out.append({"icon": ShopArt.ui("icon_backpack"), "text": "×%d" % PremiumUnload.movable_count()})
+			out.append(_eff("glyph_storage", ""))
 		"teleport_home":
 			out.append(_eff("glyph_house", ""))
 		"grant_item":
@@ -489,7 +543,7 @@ static func ad_offer(a: Dictionary) -> Dictionary:
 	var amount := int(Balance.unwrap(a.get("coins", a.get("dollars", 0))))
 	o["count_text"] = "%d/%d" % [left, limit]
 	o["pill"] = {"icon": ShopArt.ui("icon_coin" if coins else "icon_dollar"),
-		"text": "+" + ShopArt.compact(amount), "color": COL_GOOD}
+		"text": "+" + UiFmt.short(amount), "color": COL_GOOD}
 	o["extra"] = "Сегодня осталось: %d из %d" % [left, limit]
 	o["left"] = left
 	o["state"] = "available" if left > 0 else "poor"
@@ -504,7 +558,7 @@ static func dollar_offers() -> Array:
 	ex["tier"] = 2
 	ex["title"] = "Обмен долларов на монеты"
 	ex["body"] = "1 $ = %d монет. Обратно не меняем." % per
-	ex["effects"] = [{"icon": ShopArt.ui("icon_coin"), "text": "+" + ShopArt.compact(per)}]
+	ex["effects"] = [{"icon": ShopArt.ui("icon_coin"), "text": "+" + UiFmt.short(per)}]
 	_priced(ex, DOLLARS, 1)
 	out.append(ex)
 	out.append_array(ad_offers("premium"))
@@ -546,13 +600,13 @@ static func sell_offers(selected: Dictionary, remote: bool) -> Array:
 		o["icon"] = ShopArt.item_icon(id)
 		o["tier"] = price_tier(int(row["price"]))
 		o["title"] = ShopCatalog.item_name(id)
-		o["body"] = "%d шт по %s" % [int(row["count"]), ShopArt.full(int(row["price"]))]
-		o["extra"] = "За стопку: %s монет" % ShopArt.full(int(row["sum"]))
+		o["body"] = "%d шт по %s" % [int(row["count"]), UiFmt.full(int(row["price"]))]
+		o["extra"] = "За стопку: %s монет" % UiFmt.full(int(row["sum"]))
 		o["count"] = int(row["count"])
-		o["count_text"] = ShopArt.compact(int(row["count"]))
+		o["count_text"] = UiFmt.short(int(row["count"]))
 		o["sum"] = int(row["sum"])
 		o["price"] = int(row["price"])
-		o["pill"] = {"icon": ShopArt.ui("icon_coin"), "text": ShopArt.compact(int(row["sum"])),
+		o["pill"] = {"icon": ShopArt.ui("icon_coin"), "text": UiFmt.short(int(row["sum"])),
 			"color": ShopArt.COL_GOLD}
 		if not remote:
 			o["selected"] = bool(selected.get(id, false))
@@ -577,7 +631,7 @@ static func nosale_offers() -> Array:
 		o["corner"] = "cross"
 		o["title"] = ShopCatalog.item_name(String(id))
 		o["body"] = "Мастерская не скупает: это материал или то, что она сама делает."
-		o["count_text"] = ShopArt.compact(count)
+		o["count_text"] = UiFmt.short(count)
 		out.append(o)
 	return out
 

@@ -25,9 +25,12 @@ func _ready() -> void:
 	_check_kits_share_palette()
 	_check_anim_instant()
 	_check_open_close_reopen()
+	_check_spring()
 	_check_tab_bar()
+	_check_layout_kit()
 	_check_small_item_icon()
 	_check_tap_scale()
+	_check_one_button_factory()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -95,11 +98,33 @@ func _check_open_close_reopen() -> void:
 	root.queue_free()
 
 
+func _check_spring() -> void:
+	var s := UiAnim.Spring.new()
+	s.target = 1.0
+	var peak := 0.0
+	for i in 60:
+		s.step(1.0 / 60.0)
+		peak = maxf(peak, s.x)
+	check("пружина приходит в цель за секунду и не перелетает", s.settled() and peak <= 1.0 + 1e-4)
+	s.x = 0.0
+	s.v = 0.0
+	for i in 5:
+		s.step(1.0 / 60.0)
+	var x0 := s.x
+	var v0 := s.v
+	s.target = 0.0
+	check("смена цели не двигает значение", s.x == x0 and s.v == v0)
+	s.step(1.0 / 60.0)
+	check("разворот без скачка: сдвиг за кадр не больше скорости", absf(s.x - x0) <= absf(v0) / 60.0 + 1e-4)
+	for i in 60:
+		s.step(1.0 / 60.0)
+	check("после разворота пружина приходит в новую цель", s.settled())
+
+
 func _check_tab_bar() -> void:
 	var picked := [""]
-	var closed := [false]
 	var specs := [["a", UiIcons.tex("gear"), "А", "первая"], ["b", UiIcons.tex("eye"), "Б", ""]]
-	var bar := HeroTabButton.make_bar(specs, "b", func(k: String) -> void: picked[0] = k, func() -> void: closed[0] = true)
+	var bar := HeroTabButton.make_bar(specs, "b", func(k: String) -> void: picked[0] = k)
 	add_child(bar)
 	var buttons: Dictionary = bar.get_meta("buttons")
 	check("полоса вкладок: кнопки по ключам", buttons.size() == 2 and buttons.has("a") and buttons.has("b"))
@@ -113,6 +138,36 @@ func _check_tab_bar() -> void:
 	check("нажатие вкладки отдаёт ключ", picked[0] == "a")
 	bar.queue_free()
 	check("значок вкладки задаётся картинкой", (HeroTabButton.new() as HeroTabButton).icon_tex == null)
+
+
+func _check_layout_kit() -> void:
+	var host := Control.new()
+	host.size = Vector2(300, 200)
+	add_child(host)
+	var closed := [false]
+	var x := UiBtn.close_button(func() -> void: closed[0] = true, host)
+	check("крестик: цель нажатия не меньше 25", x.custom_minimum_size.x >= 25.0 and x.custom_minimum_size.y >= 25.0)
+	check("крестик: правый верхний угол", x.anchor_left == 1.0 and x.anchor_right == 1.0 and x.anchor_top == 0.0
+		and x.offset_right == -UiBtn.CLOSE_INSET and x.offset_top == UiBtn.CLOSE_INSET)
+	x.pressed.emit()
+	check("крестик закрывает", closed[0])
+	HudSafeArea.debug_top = 20.0
+	var xn := UiBtn.close_button(func() -> void: pass, host)
+	check("крестик: под вырезом опускается на верхнюю безопасную зону", xn.offset_top == UiBtn.CLOSE_INSET + 20.0)
+	HudSafeArea.debug_top = -1.0
+	var g := ShopArt.tile_grid()
+	host.add_child(g)
+	g.size = Vector2(208, 64)
+	check("сетка 208: три колонки, зазор 8", g.columns == 3 and g.get_theme_constant("h_separation") == 8)
+	g.size = Vector2(254, 64)
+	check("сетка 254: три колонки, зазоры растут", g.columns == 3 and g.get_theme_constant("h_separation") == 31)
+	g.size = Vector2(300, 64)
+	check("сетка 300: четыре колонки", g.columns == 4)
+	check("безопасная зона снизу на компьютере — 0", HudSafeArea.bottom(get_viewport()) == 0.0)
+	HudSafeArea.debug_bottom = 20.0
+	check("безопасная зона снизу: подмена для тестов", HudSafeArea.bottom(get_viewport()) == 20.0)
+	HudSafeArea.debug_bottom = -1.0
+	host.queue_free()
 
 
 func _check_small_item_icon() -> void:
@@ -137,3 +192,23 @@ func _check_tap_scale() -> void:
 	check("вкладка героя получает то же «проседание»", tab.has_meta(UiBtn.FEEDBACK_META))
 	b.free()
 	tab.free()
+
+
+## Все виды кнопок — из UiBtn: одинаковый отклик и цель нажатия не меньше TOUCH_MIN.
+func _check_one_button_factory() -> void:
+	var made := [
+		UiBtn.text_button("+1", UiBtn.Kind.NORMAL, Vector2(34, 20)),
+		UiBtn.icon_button(UiIcons.tex("gear"), Vector2(16, 16)),
+		UiBtn.fill_button(MetaUiKit.tex("check"), Vector2(30, 30), UiTheme.OK_BTN),
+		UiBtn.texture_button("red", null, Vector2(24, 22), 12.0, false),
+	]
+	var ok := true
+	for b in made:
+		var m: Vector2 = (b as Button).custom_minimum_size
+		ok = ok and b.has_meta(UiBtn.FEEDBACK_META) and m.x >= UiBtn.TOUCH_MIN and m.y >= UiBtn.TOUCH_MIN
+	check("каждый вид кнопки проседает и не меньше %d" % int(UiBtn.TOUCH_MIN), ok)
+	var auto := UiBtn.text_button("x")
+	check("ширина «по содержимому» не раздувается", auto.custom_minimum_size.x == 0.0)
+	auto.free()
+	for b in made:
+		b.free()

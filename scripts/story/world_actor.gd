@@ -37,6 +37,9 @@ var flip: bool = false
 ## анимации ходьбы/копки совпадает с тем, что игрок уже видел у героя.
 var anim: float = 0.0
 
+## Рост относительно героя (StoryData.actor_height): бабушки чуть ниже внука.
+var height_k: float = 1.0
+
 var _dir: String = ""
 var _sprite: Sprite2D
 var _frames: int = 1
@@ -54,7 +57,7 @@ func _ready() -> void:
 	# невидимо. Правильный приём — тот же, что в character_view.gd:_process:
 	# текстура НЕ через AtlasTexture, кадр вырезает region_rect сам.
 	_sprite.region_enabled = true
-	_sprite.scale = Vector2(1.0 / ART_SCALE, 1.0 / ART_SCALE)
+	_sprite.scale = Vector2(height_k / ART_SCALE, height_k / ART_SCALE)
 	add_child(_sprite)
 	if not actor_id.is_empty():
 		set_pose(pose, flip)
@@ -66,7 +69,9 @@ func _ready() -> void:
 func setup(id: String) -> void:
 	actor_id = id
 	_dir = String(StoryData.actor(id).get("dir", id))
+	height_k = StoryData.actor_height(id)
 	if _sprite != null:
+		_sprite.scale = Vector2(height_k / ART_SCALE, height_k / ART_SCALE)
 		set_pose(pose, flip)
 
 
@@ -131,7 +136,11 @@ func _process(_dt: float) -> void:
 	# Центр по ширине — по РЕАЛЬНОЙ ширине текущего кадра (_frame_w), не по
 	# фиксированному CHAR_FRAME: у широких кадров копки (см. WIDE_DIG_FRAME_W
 	# выше) иначе персонаж сидел бы смещённым от клетки на разницу ширин.
-	_sprite.position = Vector2(-_frame_w / (2.0 * ART_SCALE), -HH * TILE - 16.0)
+	# Рост height_k меняет кадр вокруг линии земли: верх опускается ровно на
+	# столько, на сколько кадр стал ниже, и ступни остаются там же, где у героя.
+	var s := height_k / ART_SCALE
+	_sprite.position = Vector2(-_frame_w * s / 2.0,
+		-HH * TILE - 16.0 + GROUND_Y * (1.0 / ART_SCALE - s))
 	if _frames <= 1 or _sprite.texture == null:
 		return
 	var idx: int = int(anim / ANIM_DIV) % _frames

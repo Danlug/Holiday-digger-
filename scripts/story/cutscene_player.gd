@@ -20,7 +20,7 @@ extends CanvasLayer
 
 signal finished(scene_id: String)
 
-const LAYER := 100
+const LAYER := UiLayers.CUTSCENE
 const STAGE_TOP := 0.06        # доля высоты, где начинается "небо" сцены
 const GROUND_LINE := 0.56      # доля высоты, на которой проходит линия земли
 ## Вид реплик, карточек, «Пропустить» и кинополос вынесен в DialogueUI, SceneCard,
@@ -168,19 +168,18 @@ var _world_dig: Dictionary = {}      # {"actor","cell":Vector2i,"left","total"} 
 ## физтик перепрыгнул сразу через несколько клеток экрана.
 var _world_dig_row: Dictionary = {}
 var _world_fall: Dictionary = {}     # {"actor","from","to","left","total"} или {}
-## Ограничивающий прямоугольник (в клеточных координатах, с дробной частью)
-## всех точек, куда за время режима "мир" реально указывала камера (см.
-## _tick_world: player.x/y зеркалит актёра из _camera_actor_id) — main.gd
-## каждый кадр раскрывает туман войны РОВНО вокруг текущего player.x/y
-## (main.gd:_reveal_around_player), не различая, герой ли это по-настоящему
-## идёт или это сюжет ведёт камеру по актёру катсцены. Без этой границы
-## огород, который дед раскопал за три года до игры (intro_grandpa),
-## оставался бы разведанным туманом и для внука, только что приехавшего в
-## деревню (отчёт владельца: "видно некоторые тайлы под землёй" сразу после
-## intro_boy) — см. использование в _exit_world_mode().
-var _world_reveal_min: Vector2 = Vector2.ZERO
-var _world_reveal_max: Vector2 = Vector2.ZERO
-var _world_reveal_seen: bool = false
+## Туман войны на входе в режим "мир" (FogOfWar.to_save_data) — на выходе он
+## возвращается как был. main.gd каждый кадр раскрывает туман вокруг
+## player.x/y (main.gd:_reveal_around_player), а во время сцены эти координаты
+## ведёт актёр — без отката огород, который дед раскопал за два лета до игры,
+## оставался бы разведанным для внука (отчёт владельца: "видно некоторые тайлы
+## под землёй" сразу после intro_boy). Раньше закрывался прямоугольник пути
+## камеры: он зависел от того, где сцену пропустили, и вместе с путём сцены
+## стирал настоящую разведку игрока вокруг (сцена смерти идёт посреди
+## огорода, который он сам открыл). null — снимка нет: сцена с
+## world_exit="actor" оставляет героя там, где кончила камера, и разведанное
+## по пути остаётся его.
+var _fog_entry: Variant = null
 ## Последний час, выставленный кадром "clock" — публично, чтобы тесты могли
 ## проверить ход времени сцены даже там, где автозагрузки /root/DayCycle ещё
 ## нет (см. GDD-контракт DayCycle в задании, узел параллельного агента).
@@ -196,6 +195,12 @@ var current_clock_hour: float = -1.0
 ## сцены. Без поля поведение прежнее.
 var _world_exit: String = ""
 var _world_entry_pos: Vector2 = Vector2.ZERO
+## Игровые часы на входе во флешбэк (эпоха не "now", сейчас — интро деда); -1 —
+## флешбэка нет. Часы сцены деда (6:00 → 22:00 → 19:30 следующего дня) — это
+## время деда за два лета до игры, а не внука: на выходе они возвращаются, как
+## возвращаются яма и туман. Иначе досмотревший интро начинал игру вечером
+## второго дня (а «Утром бабка улетала…»), а пропустивший — утром первого.
+var _flashback_clock: float = -1.0
 var _last_camera_pos: Vector2 = Vector2.INF
 ## Твин затемнения. Тап посреди «fade» переключает кадр, не дожидаясь конца
 ## твина, а тот дотягивал бы чёрный до конца и закрывал бы всё последующее
@@ -557,7 +562,10 @@ func _finish() -> void:
 	_hide_text()
 	_bars.close(true)
 	_clear_stage()
-	finished.emit(scene_id)
+	# Копия, а не поле: режиссёр в своём обработчике сразу запускает следующую
+	# сцену, и следующий подписчик получил бы уже её id (сигнал отдаёт ссылку на поле).
+	var id := scene_id
+	finished.emit(id)
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +654,13 @@ func _input(event: InputEvent) -> void:
 
 
 func _advance() -> void:
+	# "grow" держит сцену сам, так что любой переход дальше — конец развёртки.
+	_stop_grow()
+	_world_finish_pending()
+	# Карточка находки — окно «тапни и дальше»: по тапу она уходит. Иначе она
+	# висела бы посреди экрана всю следующую копку — и как дед проходит
+	# фундамент, видно не было: карточка исчезала, а он уже под плитой.
+	_item_card.hide_item()
 	while _index < _beats.size():
 		var beat: Dictionary = _beats[_index]
 		_index += 1
@@ -941,7 +956,7 @@ func _show_actor(beat: Dictionary) -> void:
 	var enter_from := String(beat.get("enter", ""))
 	if is_new and not enter_from.is_empty():
 		var a: Dictionary = _actors[id]
-		var w: float = a.frame_w * a.scale / ART_SCALE
+		var w: float = a.frame_w * a.scale * StoryData.actor_height(id) / ART_SCALE
 		var start_off: float = _fit_x(_stage_x(enter_from), w) - _fit_x(_stage_x(String(a.at)), w)
 		_actors[id].dx = start_off
 		_place_actor(id)
@@ -997,7 +1012,7 @@ func _hide_actor(beat: Dictionary) -> void:
 		_actors.erase(id)
 		return
 	var a: Dictionary = _actors[id]
-	var w: float = a.frame_w * a.scale / ART_SCALE
+	var w: float = a.frame_w * a.scale * StoryData.actor_height(id) / ART_SCALE
 	var to_off: float = _fit_x(_stage_x(exit_to), w) - _fit_x(_stage_x(String(a.at)), w)
 	var sec: float = maxf(0.05, float(beat.get("exit_sec", 0.6)))
 	# Пока уходит, тоже проигрываем позу ходьбы, если она есть (см. _show_actor:
@@ -1047,6 +1062,7 @@ func _show_prop(beat: Dictionary) -> void:
 ## (оба зовут _clear_stage напрямую или через _finish/abort) — одна точка
 ## гарантирует откат независимо от того, досмотрели сцену или пропустили.
 func _clear_stage() -> void:
+	_stop_grow()
 	for id in _actors.keys():
 		_actors[id].node.queue_free()
 	_actors.clear()
@@ -1098,7 +1114,8 @@ func _place_all() -> void:
 func _place_actor(id: String) -> void:
 	var a: Dictionary = _actors[id]
 	var node: TextureRect = a.node
-	var s: float = a.scale
+	# Рост актёра (бабушки чуть ниже внука) — тот же, что на живой карте.
+	var s: float = a.scale * StoryData.actor_height(id)
 	# Лист на диске в ART_SCALE раз крупнее логики (см. CHAR_FRAME выше) —
 	# делим перед тем, как накладывать "scale" сцены, иначе актёр выходит
 	# втрое крупнее замысла постановщика и не помещается на сцене портрета.
@@ -1268,6 +1285,18 @@ func _start_grow(beat: Dictionary) -> void:
 	_tick_grow(0.0)
 
 
+## БАГ (скриншот владельца 26.10, «бабка маленькая»): тап по развёртке
+## уводил сцену дальше, а тикер продолжал листать позы и после "hide" и
+## "clear" заново ставил классического актёра — мальчика age_15 в масштабе
+## 2.2 по центру экрана. В режиме «мир» эта иллюстрация висела поверх живой
+## карты, заслоняя настоящего мальчика-актёра (того же роста, что бабушка),
+## — вот и «великан» рядом с бабушкой. Развёртка живёт ровно пока держит сцену.
+func _stop_grow() -> void:
+	_grow_poses = []
+	_grow_left = 0.0
+	_grow_idx = -1
+
+
 func _tick_grow(dt: float) -> void:
 	if _grow_poses.is_empty() or _grow_left <= 0.0 and _grow_idx == _grow_poses.size() - 1:
 		return
@@ -1352,8 +1381,11 @@ func _enter_world_mode(era: String = "now") -> void:
 	# остаётся открытым ПОД живой картой того же кадра.
 	if house_mode:
 		_exit_house_mode()
+	if era != "now" and _flashback_clock < 0.0:
+		_flashback_clock = GameState.game_clock_hours
 	world_mode = true
-	_world_reveal_seen = false
+	if _fog_entry == null and _world_exit != "actor" and GameState.fog_ref != null:
+		_fog_entry = GameState.fog_ref.to_save_data()
 	_last_camera_pos = Vector2.INF
 	if player != null:
 		_world_entry_pos = Vector2(player.x, player.y)
@@ -1392,6 +1424,9 @@ func _exit_world_mode() -> void:
 	var dc := get_node_or_null("/root/DayCycle")
 	if dc != null and dc.has_method("set_time_scale"):
 		dc.set_time_scale(1.0)
+	if _flashback_clock >= 0.0:
+		GameState.game_clock_hours = _flashback_clock
+		_flashback_clock = -1.0
 	for id in _world_actors.keys():
 		_world_actors[id].queue_free()
 	_world_actors.clear()
@@ -1433,33 +1468,12 @@ func _exit_world_mode() -> void:
 		player.vx = 0.0
 		player.vy = 0.0
 
-	# БАГ (отчёт владельца, реальный iPhone, живая веб-сборка): "после того как
-	# мальчик приезжает в деревню, видно некоторые тайлы под землёй" — main.gd
-	# каждый кадр раскрывает туман войны вокруг ТЕКУЩЕГО player.x/y
-	# (main.gd:_reveal_around_player), не различая, герой ли это по-настоящему
-	# идёт или сюжет ведёт камеру по актёру сцены (см. _tick_world выше). Три
-	# года копки деда (intro_grandpa) на живой карте оставляли туман
-	# раскрытым по всему ряду, что он копал, — внук, приехавший в деревню
-	# СРАЗУ следующей сценой, находил на своей нетронутой карте уже
-	# разведанные клетки. forget_dug_cells() выше отменяет саму копку, но
-	# туман — отдельное состояние (main.gd:fog, не world), и его тоже нужно
-	# закрыть обратно — ровно там, куда камера сцены реально успела
-	# посмотреть (_world_reveal_min/_max, копится в _tick_world), а не всю
-	# карту разом (reset_all() стёр бы настоящую разведку игрока, если
-	# режим "мир" сработает посреди обычной игры — "death"/"backpack"/
-	# "intro_boy" тоже проходят через _enter_world_mode/_exit_world_mode).
-	if _world_reveal_seen and GameState.fog_ref != null and _world_exit.is_empty():
-		# Паддинг — радиус ауры обзора (та же формула, что и у настоящего
-		# раскрытия, см. main.gd:_reveal_around_player и fog.gd:vision_radius),
-		# с запасом в одну клетку на округление: иначе кромка ауры вокруг
-		# самой дальней точки сцены осталась бы неразобранной.
-		var pad: int = int(ceil(FogOfWar.vision_radius(GameState.get_vision_terrain_radius()))) + 1
-		var x0 := int(floor(_world_reveal_min.x)) - pad
-		var y0 := int(floor(_world_reveal_min.y)) - pad
-		var x1 := int(ceil(_world_reveal_max.x)) + pad
-		var y1 := int(ceil(_world_reveal_max.y)) + pad
-		GameState.fog_ref.reset_rect(x0, y0, x1 - x0 + 1, y1 - y0 + 1)
-	_world_reveal_seen = false
+	# Туман — как был до сцены (см. _fog_entry): камера сцены разведывала за
+	# актёром, а не за героем.
+	if _fog_entry != null:
+		if GameState.fog_ref != null:
+			GameState.fog_ref.load_save_data(_fog_entry)
+		_fog_entry = null
 
 
 ## Задник (забор/гора) — параллельная задача, контракт: узел с именем
@@ -1636,9 +1650,28 @@ func _world_place_actor(beat: Dictionary) -> void:
 		a.x = float(beat.get("x"))
 	if beat.has("y"):
 		a.y = float(beat.get("y"))
+	if bool(beat.get("land", false)):
+		_world_land(a)
 	a.set_pose(String(beat.get("pose", "idle")), bool(beat.get("flip", a.flip)))
 	if bool(beat.get("camera", false)):
 		_camera_actor_id = id
+
+
+## "land": true у world_actor — актёр встаёт на дно открытой клетки под собой, по
+## центру столбца. Сцена смерти начинается там, где игрок пробил фундамент, а он
+## в этот миг ещё стоит над пробитой клеткой или летит в неё: без посадки первая
+## «копка» внука уходила на уже пустой фундамент, и вглубь он выкапывал на клетку
+## меньше, чем обещано (владелец: шесть, как дед).
+func _world_land(a: WorldActor) -> void:
+	a.x = floor(a.x) + 0.5
+	if world == null:
+		return
+	var cx := int(floor(a.x))
+	var cy := maxi(1, int(round(a.y - 0.5)) + 1)
+	var limit := cy + 12
+	while cy < limit and world.get_tile(cx, cy) == TileTypes.Type.EMPTY:
+		cy += 1
+	a.y = float(cy) - 0.5
 
 
 ## "world_prop" — поставить статичный предмет (могила и т.п.) в клетку живой
@@ -1800,22 +1833,23 @@ func _tick_world(dt: float) -> void:
 		player.x = cam_a.x
 		player.y = cam_a.y
 		_last_camera_pos = Vector2(cam_a.x, cam_a.y)
-		_track_world_reveal_bounds(cam_a.x, cam_a.y)
 
 
-## Копит границы всего, что main.gd успел раскрыть туманом за кадром (см.
-## _world_reveal_min/_max выше) — вызывается из _tick_world на каждый кадр,
-## когда камера реально смотрит на живую карту глазами актёра сцены.
-func _track_world_reveal_bounds(x: float, y: float) -> void:
-	if not _world_reveal_seen:
-		_world_reveal_min = Vector2(x, y)
-		_world_reveal_max = Vector2(x, y)
-		_world_reveal_seen = true
-		return
-	_world_reveal_min.x = minf(_world_reveal_min.x, x)
-	_world_reveal_min.y = minf(_world_reveal_min.y, y)
-	_world_reveal_max.x = maxf(_world_reveal_max.x, x)
-	_world_reveal_max.y = maxf(_world_reveal_max.y, y)
+## Тап посреди кадра мира (ход, копка, ряд, рывок в яме) листает сцену дальше —
+## а сам кадр доводится до конца мгновенно, как если бы его досмотрели.
+## Раньше недоигранный кадр жил дальше в фоне: следующая копка затирала
+## недокопанную клетку, а недоигранный проезд по ряду продолжал тащить актёра
+## по X. Дед, которого пролистывали, оказывался в целой породе со сдвигом от
+## своей шахты — под нетронутым фундаментом (владелец, раунд 5: «когда дед
+## копает, если пропускать сюжет, он будто бы под фундаментом»). При честном
+## просмотре кадр к этому моменту уже закончен (таймер кадра и таймер хода
+## равны и убывают в одном кадре), и вызов ничего не делает.
+func _world_finish_pending() -> void:
+	const DONE := 1.0e6
+	_tick_world_walk(DONE)
+	_tick_world_dig(DONE)
+	_tick_world_dig_row(DONE)
+	_tick_world_fall(DONE)
 
 
 func _tick_world_walk(dt: float) -> void:

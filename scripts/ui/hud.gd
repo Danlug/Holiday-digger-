@@ -54,6 +54,7 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
+const HUD_MARGIN := 8.0   # поле верхних кластеров от края; сверху к нему прибавляется вырез телефона
 const PILL_W := 78.0    # ширина таблеток кошелька (монеты, доллары, вес)
 const GAUGE_W := 62.0   # ширина полоски: правее остаётся место кошельку
 var _xp_bar: HudBar
@@ -80,6 +81,7 @@ var _toast_timer: Timer
 var _toast_tween: Tween
 var _stick: Control
 var _knob: Control
+var _knob_tw: Tween
 var _hold_hint: TextureRect
 
 # --- третий режим: экранные стрелки ---
@@ -137,7 +139,8 @@ var _inv_sheet: BackpackSheet
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — НЕ для релиза
 ## игрокам, см. её собственный файл. Живёт отдельным классом, а не куском
 ## кода здесь, — не завязана на раскладку остального HUD, добавляется в
-## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего.
+## HUD последней (см. _build_ui), поэтому видна и кликабельна поверх всего HUD
+## (но не поверх окон: те на слое UiLayers.HUD_WINDOWS).
 var _debug_panel: DebugPanel
 
 ## Шторка настроек (scripts/ui/settings_sheet.gd): звук/музыка, вибро, управление,
@@ -145,6 +148,11 @@ var _debug_panel: DebugPanel
 ## что у рюкзака, — регуляторам (ползунки громкости) нужна ширина экрана, узкая
 ## popup-панель «•••» для них тесна.
 var _settings_sheet: SettingsSheet
+
+## Слой окон HUD (UiLayers.HUD_WINDOWS): шторки и меню «•••», см. _build_windows_layer.
+var _windows_layer: CanvasLayer
+var _windows_root: Control    # размер HUD — для меню «•••», прижатого к правому нижнему углу
+var _windows_stage: Control   # как Stage — всё, кроме нижней полосы: шторки её не закрывают
 
 
 func _ready() -> void:
@@ -247,10 +255,45 @@ func _build_ui() -> void:
 	_build_stick(stage)
 	_build_hold_hint(stage)
 	_build_arrows(stage)
-	_build_inventory_sheet(stage)
-	_build_settings_sheet(stage)
+	_build_windows_layer()
+	_build_inventory_sheet(_windows_stage)
+	_build_settings_sheet(_windows_stage)
 	_build_strip()
 	_build_debug_panel()
+
+
+## Окна HUD — рюкзак, настройки, меню «•••» — на своём слое UiLayers.HUD_WINDOWS:
+## выше слоёв HUD-виджетов (трекер проекта, бак бура, шкала азарта, курьер — 2…10),
+## ниже склада и мастерской. В самом HUD (слой 1) их перекрывал любой виджет со
+## своим слоем (владелец 26.10: «штука с буром светится поверх других менюшек»).
+## Слой — не CanvasItem и видимость HUD сам не наследует: прячем вместе с HUD (дом, сцены).
+func _build_windows_layer() -> void:
+	_windows_layer = CanvasLayer.new()
+	_windows_layer.name = "HudWindows"
+	_windows_layer.layer = UiLayers.HUD_WINDOWS
+	add_child(_windows_layer)
+	_windows_root = Control.new()
+	_windows_root.name = "Root"
+	_windows_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_windows_layer.add_child(_windows_root)
+	_windows_stage = Control.new()
+	_windows_stage.name = "Stage"
+	_windows_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_windows_stage.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_windows_stage.offset_bottom = -STRIP_H
+	_windows_root.add_child(_windows_stage)
+	visibility_changed.connect(_sync_windows_layer)
+	_sync_windows_layer.call_deferred()   # слои виджетов main.gd заводит позже HUD
+
+
+func _sync_windows_layer() -> void:
+	var shown := is_visible_in_tree()
+	if _windows_layer != null:
+		_windows_layer.visible = shown
+	# Виджеты со своим слоем (трекер проекта, бак и термометр, шкала азарта) — тоже:
+	# иначе в сюжетном диалоге HUD исчезал, а трекер бура висел над сценой один.
+	for n: Node in get_tree().get_nodes_in_group(UiLayers.WIDGETS_GROUP):
+		(n as CanvasLayer).visible = shown
 
 
 ## Левый верхний угол: портрет героя (кнопка «Герой», уровень и опыт под ним)
@@ -262,10 +305,11 @@ func _build_gauges(parent: Control) -> void:
 	var box := VBoxContainer.new()
 	box.name = "Gauges"
 	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Герой» внутри
-	box.position = Vector2(8, 8)
+	box.position = Vector2(HUD_MARGIN, HUD_MARGIN)
 	box.add_theme_constant_override("separation", 4)
 	parent.add_child(box)
 	_gauges_box = box
+	HudAnchors.join_left_column(box, 0)   # бак бура и курьер встают под ним
 
 	var top := HBoxContainer.new()
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -277,15 +321,20 @@ func _build_gauges(parent: Control) -> void:
 	var bars := VBoxContainer.new()
 	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bars.add_theme_constant_override("separation", 3)
-	bars.alignment = BoxContainer.ALIGNMENT_CENTER
+	# От верха, как портрет и монеты справа: столбик героя с часами выше трёх полосок.
+	bars.alignment = BoxContainer.ALIGNMENT_BEGIN
 	top.add_child(bars)
 
-	_hp_bar = _make_gauge(bars, Color8(0xD9, 0x4F, 0x4A), "hp", "hp")
-	_hunger_bar = _make_gauge(bars, Color8(0xE8, 0x7E, 0x6E), "hunger", "hunger")
-	_stamina_bar = _make_gauge(bars, Color8(0xE8, 0xC5, 0x47), "stamina", "stamina")
+	_hp_bar = _make_gauge(bars, UiTheme.DANGER, "hp", "hp")
+	_hunger_bar = _make_gauge(bars, UiTheme.HUNGER, "hunger", "hunger")
+	_stamina_bar = _make_gauge(bars, UiTheme.STAMINA, "stamina", "stamina")
+	# Значки «слабее/медленнее/шатает» на конце полосок (раунд 5, ГДД §7; scripts/survival/).
+	SurvivalBadge.attach(_hunger_bar, "hunger", self)
+	SurvivalBadge.attach(_stamina_bar, "stamina", self)
 
 	_build_quest_button(box)
 	_anchors["tasks"] = DailyTasksButton.mount(box).button   # ежедневные задания (ветка daily-tasks, scripts/meta/); до онбординга скрыта
+	_anchors["newbie"] = NewbieStreakButton.mount(box).button   # стрик новичка 30 дней — под ежедневными миссиями (владелец 27.10)
 
 
 func _make_gauge(parent: Control, color: Color, icon_name: String, anchor_id: String) -> HudBar:
@@ -306,7 +355,13 @@ func _build_hero_button(parent: Control) -> void:
 	col.add_theme_constant_override("separation", 3)
 	parent.add_child(col)
 
-	_hero_button = UiBtn.icon_button(UiIcons.tex("hero"), Vector2(36, 36), UiBtn.Kind.NORMAL, 32)
+	# Лицо героя, а не значок «мальчик в каске» (владелец 27.10) — HudPortrait под бейджами.
+	# 38 — прежний фактический размер: значок 32 с полями плитки растягивал кнопку 36 до 38.
+	_hero_button = UiBtn.icon_button(null, Vector2(38, 38), UiBtn.Kind.NORMAL, 32)
+	var face := HudPortrait.new()
+	face.name = "Portrait"
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hero_button.add_child(face)
 	_hero_button.pressed.connect(func():
 		if Tip.swallowed():
 			return
@@ -318,8 +373,8 @@ func _build_hero_button(parent: Control) -> void:
 	var lvl := PanelContainer.new()
 	lvl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0xE0, 0xA9, 0x3B)
-	sb.border_color = Color8(0x1A, 0x10, 0x0C)
+	sb.bg_color = UiTheme.GOLD
+	sb.border_color = UiTheme.INK
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(5)
 	sb.content_margin_left = 3
@@ -333,8 +388,8 @@ func _build_hero_button(parent: Control) -> void:
 	lvl.offset_right = 4
 	lvl.offset_bottom = 3
 	_level_label = Label.new()
-	_level_label.add_theme_font_size_override("font_size", 9)
-	_level_label.add_theme_color_override("font_color", Color8(0x1A, 0x10, 0x0C))
+	_level_label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+	_level_label.add_theme_color_override("font_color", UiTheme.INK)
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_level_label.custom_minimum_size = Vector2(9, 0)
 	lvl.add_child(_level_label)
@@ -353,10 +408,44 @@ func _build_hero_button(parent: Control) -> void:
 	_hero_plus.visible = false
 	_hero_button.add_child(_hero_plus)
 
-	_xp_bar = HudBar.new().setup(Color8(0xE0, 0xA9, 0x3B), null)
+	_xp_bar = HudBar.new().setup(UiTheme.GOLD, null)
 	_xp_bar.bar_h = 4.0
 	_xp_bar.bar_width = 36.0
 	col.add_child(_xp_bar)
+	_build_clock(col)
+
+
+## Часы — под портретом (владелец 27.10: «часы убери с правого верхнего угла под его
+## иконку»): там пустовало место рядом с полоской бодрости, а кошелёк справа теперь
+## начинается от верха экрана. Зачем они вообще (решение владельца, отчёт агента про
+## «время не течёт во дворе»): DayCycle.hour и раньше тикал на поверхности, но нигде не
+## показывался. Источник — /root/DayCycle, тот же, что у домашних часов (house_view.gd);
+## «День N» — в подсказке.
+func _build_clock(parent: Control) -> void:
+	var clock := HBoxContainer.new()
+	clock.name = "Clock"
+	clock.mouse_filter = Control.MOUSE_FILTER_PASS
+	clock.alignment = BoxContainer.ALIGNMENT_CENTER
+	clock.add_theme_constant_override("separation", 2)
+	parent.add_child(clock)
+	var clock_icon := TextureRect.new()
+	clock_icon.texture = UiIcons.tex("clock")
+	clock_icon.custom_minimum_size = Vector2(12, 12)
+	clock_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	clock_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	clock_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	clock_icon.modulate = Color(1, 1, 1, 0.75)
+	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock.add_child(clock_icon)
+	_clock_label = Label.new()
+	_clock_label.add_theme_color_override("font_color", UiTheme.TEXT_SOFT)
+	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	_clock_label.add_theme_constant_override("outline_size", 2)
+	_clock_label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock.add_child(_clock_label)
+	_clock_box = clock
+	_anchors["clock"] = clock
 
 
 ## Кнопка задания под героем (решение владельца). Баннер задания висел на
@@ -364,7 +453,7 @@ func _build_hero_button(parent: Control) -> void:
 ## втором взгляде. Теперь новое задание показывается ненадолго и сворачивается
 ## сюда; нажатие разворачивает его обратно.
 func _build_quest_button(parent: Control) -> void:
-	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(28, 24))
+	_quest_button = UiBtn.icon_button(UiIcons.tex("quest"), Vector2(36, 26))   # ширина столбика (задания дня), цель ≥ 25
 	_quest_button.visible = false
 	Tip.bind(_quest_button, "Задание")
 	_quest_button.pressed.connect(func():
@@ -377,7 +466,9 @@ func _build_quest_button(parent: Control) -> void:
 	parent.add_child(row)
 
 
-## Кошелёк справа сверху: часы, монеты, доллары, вес рюкзака и витрина.
+## Кошелёк справа сверху: монеты, доллары, вес рюкзака и витрина — от верха
+## экрана (часы переехали под портрет, владелец 27.10; верх — HUD_MARGIN под
+## вырезом телефона, см. _update_layout).
 ## Плашки-«таблетки» с иконкой и числом с накруткой; точные суммы и названия —
 ## в подсказках. Вес — полоска, которая краснеет и пульсирует на перегрузе.
 func _build_purse(parent: Control) -> void:
@@ -386,41 +477,13 @@ func _build_purse(parent: Control) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_PASS   # кнопка «Магазин» внутри
 	box.anchor_left = 1.0; box.anchor_right = 1.0
 	box.offset_left = -110; box.offset_right = -8
-	box.offset_top = 8
+	box.offset_top = HUD_MARGIN
 	box.add_theme_constant_override("separation", 3)
 	parent.add_child(box)
 	_purse_box = box
 
-	# Часы (решение владельца, отчёт агента про "время не течёт во дворе"):
-	# DayCycle.hour и раньше честно тикал на поверхности, но нигде не
-	# показывался — без часов игрок не мог заметить, что время вообще идёт.
-	# Источник — /root/DayCycle, тот же, что у домашних часов (house_view.gd);
-	# слово «День N» — в подсказке.
-	var clock := HBoxContainer.new()
-	clock.mouse_filter = Control.MOUSE_FILTER_PASS
-	clock.size_flags_horizontal = Control.SIZE_SHRINK_END
-	clock.add_theme_constant_override("separation", 3)
-	box.add_child(clock)
-	var clock_icon := TextureRect.new()
-	clock_icon.texture = UiIcons.tex("clock")
-	clock_icon.custom_minimum_size = Vector2(12, 12)
-	clock_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	clock_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	clock_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	clock_icon.modulate = Color(1, 1, 1, 0.75)
-	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	clock.add_child(clock_icon)
-	_clock_label = Label.new()
-	_clock_label.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
-	_clock_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	_clock_label.add_theme_constant_override("outline_size", 2)
-	_clock_label.add_theme_font_size_override("font_size", 9)
-	_clock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	clock.add_child(_clock_label)
-	_clock_box = clock
-
-	_coins_pill = _make_pill(box, "coin", Color8(0xE0, 0xA9, 0x3B), "coins")
-	_dollars_pill = _make_pill(box, "dollar", Color8(0x7F, 0xB8, 0x6B), "dollars")
+	_coins_pill = _make_pill(box, "coin", UiTheme.GOLD, "coins")
+	_dollars_pill = _make_pill(box, "dollar", UiTheme.OK, "dollars")
 	Tip.bind(_coins_pill, "Монеты")
 	Tip.bind(_dollars_pill, "Доллары", "Премиум-валюта")
 	# Три таблетки одной ширины: ровный правый и левый край столбика (раньше 72/64/58).
@@ -428,12 +491,12 @@ func _build_purse(parent: Control) -> void:
 	_dollars_pill.custom_minimum_size.x = PILL_W
 
 	_load_pill = PanelContainer.new()
-	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(Color8(0x8F, 0xA3, 0x5C)))
+	_load_pill.add_theme_stylebox_override("panel", HudPill.pill_style(UiTheme.OLIVE))
 	_load_pill.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_load_pill.custom_minimum_size.x = PILL_W
 	_load_pill.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(_load_pill)
-	_load_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
+	_load_bar = HudBar.new().setup(UiTheme.OK, UiIcons.tex("weight"))
 	_load_bar.bar_width = 48.0
 	_load_bar.pulse_above = 1.0
 	_load_pill.add_child(_load_bar)
@@ -471,7 +534,7 @@ func _build_depth(parent: Control) -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.071, 0.055, 0.043, 0.82)
-	sb.border_color = Color8(0x52, 0x40, 0x2D)
+	sb.border_color = UiTheme.EDGE
 	sb.set_border_width_all(1)
 	sb.border_width_right = 0
 	sb.corner_radius_top_left = ProgressUiKit.R_CARD
@@ -498,8 +561,8 @@ func _build_depth(parent: Control) -> void:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 	_depth_label = Label.new()
-	_depth_label.add_theme_font_size_override("font_size", 12)
-	_depth_label.add_theme_color_override("font_color", Color8(0xF2, 0xE6, 0xC8))
+	_depth_label.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
+	_depth_label.add_theme_color_override("font_color", UiTheme.CREAM)
 	_depth_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_depth_label.add_theme_constant_override("outline_size", 2)
 	_depth_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -517,12 +580,12 @@ func _build_depth(parent: Control) -> void:
 const TOAST_BOTTOM_OFFSET := -132.0
 const TOAST_MAX_W := 200.0      # шире не бывает: длинный текст переносится
 const TOAST_PAD := Vector2(9, 5)
-const TOAST_FONT := 12
+const TOAST_FONT := UiTheme.FS_TITLE
 const TOAST_COLORS := {
-	"info": Color8(0xE0, 0xA9, 0x3B),
-	"good": Color8(0x7F, 0xB8, 0x6B),
-	"bad": Color8(0xD9, 0x4F, 0x4A),
-	"rare": Color8(0xFF, 0xD0, 0x5A),
+	"info": UiTheme.GOLD,
+	"good": UiTheme.OK,
+	"bad": UiTheme.DANGER,
+	"rare": UiTheme.GOLD_BRIGHT,
 }
 
 
@@ -565,8 +628,8 @@ func _build_stick(parent: Control) -> void:
 	var hint := Label.new()
 	hint.text = ""
 	# Кегль под уменьшившийся стик: при 8 подпись вылезала за круг.
-	hint.add_theme_font_size_override("font_size", 6)
-	hint.add_theme_color_override("font_color", Color8(0x8F, 0xA3, 0x5C))
+	hint.add_theme_font_size_override("font_size", UiTheme.FS_MICRO)
+	hint.add_theme_color_override("font_color", UiTheme.OLIVE)
 	hint.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	hint.offset_top = 4
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -579,7 +642,7 @@ func _build_stick(parent: Control) -> void:
 	_knob.draw.connect(func():
 		var live: bool = hold_active()
 		var c := Vector2(knob_r, knob_r)
-		var rim := Color8(0xE0, 0xA9, 0x3B) if live else Color8(0xB8, 0xA3, 0x84)
+		var rim := UiTheme.GOLD if live else UiTheme.TEXT_SOFT
 		_knob.draw_circle(c + Vector2(0, 1.5), knob_r, Color(0, 0, 0, 0.4))
 		_knob.draw_circle(c, knob_r, Color8(0x3A, 0x2C, 0x20))
 		_knob.draw_circle(c, knob_r - 2.5, rim.darkened(0.35))
@@ -773,6 +836,7 @@ func _refresh_settings_panel() -> void:
 
 
 func open_settings() -> void:
+	GameState.emit_event("screen_opened", {"id": "settings"})   # аналитика (scripts/core/analytics.gd)
 	close_more_menu()
 	_settings_sheet.open()
 
@@ -799,7 +863,7 @@ func _on_drop_confirmed(id: String, n: int) -> void:
 	_inv_sheet.refresh()
 	_sync_purse()
 	toast_parts([
-		{"icon_tex": UiIcons.item_small(id), "text": "−%d" % n, "color": Color8(0xE8, 0x8C, 0x80)},
+		{"icon_tex": UiIcons.item_small(id), "text": "−%d" % n, "color": UiTheme.BAD_TEXT},
 	], 1.6)
 
 
@@ -824,7 +888,7 @@ func _build_strip() -> void:
 	add_child(root)
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x16, 0x12, 0x0E)
+	sb.bg_color = UiTheme.PANEL_DARK
 	sb.border_color = ProgressUiKit.EDGE
 	sb.border_width_top = 2
 	var bg_panel := Panel.new()
@@ -886,7 +950,7 @@ func _build_strip() -> void:
 	fuel_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fuel_box.add_child(fuel_icon)
 	_fuel_label = Label.new()
-	_fuel_label.add_theme_font_size_override("font_size", 11)
+	_fuel_label.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_fuel_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fuel_box.add_child(_fuel_label)
 	Tip.bind(_fuel_box, "Топливо", "Брикеты угля для бурмобиля")
@@ -940,7 +1004,8 @@ func _build_strip() -> void:
 
 ## Тестовая панель отладки (scripts/ui/debug_panel.gd) — добавляется в HUD
 ## САМОЙ ПОСЛЕДНЕЙ (после основной нижней полосы), поэтому её триггер рисуется
-## и кликается поверх всего остального. Не в общей нижней полосе (задание
+## и кликается поверх всего остального HUD; окна HUD (рюкзак, настройки, «•••»)
+## — над ним, на своём слое (_build_windows_layer). Не в общей нижней полосе (задание
 ## владельца: там уже инструмент/«•••»/топливо, и рядом другой агент двигает
 ## стрелки по бокам) — свой маленький триггер «Тест» стоит НАД полосой слева,
 ## зеркально «•••» справа, и раскрывается вверх, не занимая места, пока закрыт.
@@ -975,9 +1040,9 @@ func _build_more_menu() -> void:
 	_more_panel.name = "MoreMenu"
 	_more_panel.visible = false
 	_more_panel.add_theme_stylebox_override("panel",
-		ProgressUiKit.popup_box(ProgressUiKit.EDGE, Color8(0x1A, 0x14, 0x0F, 0xF5), 5))
+		ProgressUiKit.popup_box(ProgressUiKit.EDGE, UiTheme.FLOAT_BG, 5))
 	_more_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	add_child(_more_panel)
+	_windows_root.add_child(_more_panel)   # окно, а не виджет: слой окон HUD
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 3)
@@ -994,8 +1059,8 @@ func _build_more_menu() -> void:
 	# вопрос. Пишется tools/make_build_info.py перед экспортом.
 	var build_label := Label.new()
 	build_label.text = _build_stamp()
-	build_label.add_theme_font_size_override("font_size", 8)
-	build_label.add_theme_color_override("font_color", Color8(0x86, 0x76, 0x60))
+	build_label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	build_label.add_theme_color_override("font_color", UiTheme.DIM)
 	build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	build_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(build_label)
@@ -1068,8 +1133,8 @@ func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) ->
 	row.add_child(icon)
 	var label := Label.new()
 	label.text = "+%d" % count
-	label.add_theme_font_size_override("font_size", 11)
-	label.add_theme_color_override("font_color", Color8(0xF5, 0xD0, 0x6B))
+	label.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
+	label.add_theme_color_override("font_color", UiTheme.GOLD_BRIGHT)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1082,8 +1147,8 @@ func float_item(cell_x: int, cell_y: int, mineral_id: String, count: int = 1) ->
 func float_pickup(cell_x: int, cell_y: int, text: String) -> void:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color8(0xE0, 0xA9, 0x3B))
+	label.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	label.add_theme_color_override("font_color", UiTheme.GOLD)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1176,8 +1241,8 @@ func _build_objective_line() -> void:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 	_objective_label = Label.new()
-	_objective_label.add_theme_font_size_override("font_size", 10)
-	_objective_label.add_theme_color_override("font_color", Color8(0xF2, 0xD9, 0x9B))
+	_objective_label.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_objective_label.add_theme_color_override("font_color", UiTheme.TEXT_HI)
 	_objective_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1198,6 +1263,14 @@ func _place_objective() -> void:
 	if _gauges_box != null and _gauges_box.visible:
 		top = maxf(top, _gauges_box.position.y + _gauges_box.get_combined_minimum_size().y + 6.0)
 	_objective_panel.offset_top = top
+	# Бак бура, термометр и курьер стоят в левом столбике под портретом и рисуются своими
+	# слоями ВЫШЕ HUD: баннер, заходивший под них, терял начало строки — он встаёт правее.
+	var left := HUD_MARGIN
+	for n in get_tree().get_nodes_in_group(HudAnchors.LEFT_COLUMN) if is_inside_tree() else []:
+		var c := n as Control
+		if c != null and c.is_visible_in_tree() and int(c.get_meta(&"hud_column_rank", 0)) >= 1:
+			left = maxf(left, c.get_global_rect().end.x + 4.0)
+	_objective_panel.offset_left = left
 
 
 ## Ставит текст задания. Зовётся каждый кадр, поэтому разворачивает баннер
@@ -1308,7 +1381,7 @@ func _build_stamp() -> String:
 func _make_chip(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	b.custom_minimum_size = Vector2(0, STRIP_H)
 	return UiBtn.style(b)
 
@@ -1343,7 +1416,13 @@ func _update_layout() -> void:
 	# x=-100, нижняя полоса — на y=-32). Размер задаём явно.
 	position = Vector2.ZERO
 	size = vp
-	stick_r = maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
+	_windows_root.position = Vector2.ZERO
+	_windows_root.size = vp
+	# Портрет и кошелёк — под вырезом телефона (остальное верхнее держится за них).
+	var safe_top := HudSafeArea.top(get_viewport())
+	_gauges_box.position.y = HUD_MARGIN + safe_top
+	_purse_box.offset_top = HUD_MARGIN + safe_top
+	stick_r =maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
 	knob_r = stick_r * 0.39
 	stage_rect = Rect2(0, 0, vp.x, vp.y - STRIP_H)
 	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
@@ -1376,6 +1455,8 @@ func _process(_dt: float) -> void:
 	if _objective_panel != null and _objective_panel.visible \
 			and Time.get_ticks_msec() > _objective_hide_at_msec:
 		_objective_panel.visible = false
+	if _objective_panel != null and _objective_panel.visible:
+		_place_objective()   # столбики над баннером растут без сигнала (кнопка заданий дня, курьер)
 	if player != null:
 		_stick.queue_redraw()
 		_knob.queue_redraw()
@@ -1437,7 +1518,7 @@ func _connect_game_state() -> void:
 	GameState.respawned.connect(func(): _sync_all())
 	GameState.exhausted_changed.connect(func(on: bool):
 		if on:
-			toast_parts([{"icon": "stamina"}, {"text": "−50%", "color": Color8(0xE8, 0x8C, 0x80)}], 2.4, "bad"))
+			toast_parts([{"icon": "stamina"}, {"text": "−50%", "color": UiTheme.BAD_TEXT}], 2.4, "bad"))
 	GameState.skill_points_changed.connect(func(_p): _sync_hero_button())
 
 
@@ -1461,7 +1542,7 @@ func _sync_gauge(bar: HudBar, frac: float, title: String, value: float, instant:
 	var iv := int(round(value))
 	if int(bar.get_meta(&"_iv", -1)) != iv:
 		bar.set_meta(&"_iv", iv)
-		Tip.bind(bar, title, "%d%%" % iv)
+		Tip.bind(bar, title, "%d%%" % iv + SurvivalBadge.tip_suffix(bar))
 
 
 func _sync_hp(hp: float, max_hp: float, instant: bool = false) -> void:
@@ -1541,15 +1622,15 @@ func _update_clock() -> void:
 func _sync_purse(instant: bool = false) -> void:
 	_coins_pill.set_value(GameState.coins, instant)
 	_dollars_pill.set_value(GameState.dollars, instant)
-	Tip.bind(_coins_pill, "Монеты", CountLabel.group_digits(GameState.coins))
-	Tip.bind(_dollars_pill, "Доллары", CountLabel.group_digits(GameState.dollars) + " · премиум-валюта")
+	Tip.bind(_coins_pill, "Монеты", UiFmt.full(GameState.coins))
+	Tip.bind(_dollars_pill, "Доллары", UiFmt.full(GameState.dollars) + " · премиум-валюта")
 	var load_kg := GameState.get_total_weight()
 	var max_kg := maxf(GameState.get_max_carry_kg(), 0.001)
 	var frac := load_kg / max_kg
 	_load_bar.set_fraction(minf(frac, 1.0), instant)
 	# Зелёный -> янтарь -> красный: тот же красный, что у перегруза в остальных экранах.
-	_load_bar.fill_color = Color8(0x7F, 0xB8, 0x6B) if frac < 0.6 \
-		else (Color8(0xE0, 0xA9, 0x3B) if frac < 0.85 else Color8(0xD9, 0x4F, 0x4A))
+	_load_bar.fill_color = UiTheme.OK if frac < 0.6 \
+		else (UiTheme.GOLD if frac < 0.85 else UiTheme.DANGER)
 	Tip.bind(_load_pill, "Рюкзак", "%.1f / %.0f кг" % [load_kg, max_kg])
 
 
@@ -1640,7 +1721,11 @@ func _update_depth() -> void:
 	var screen_y: float = (player.y - current_cam.y) * TILE
 	var h := _depth_box.size.y
 	# Плашка на две клетки выше героя: на его уровне она закрывала монстров, подходящих справа.
-	_depth_box.position.y = clampf(screen_y - h * 0.5 - 2.0 * TILE, 116.0, stage_rect.size.y - h)
+	# Выше — не под кошелёк: его низ (раньше жёсткие 116 под столбиком с часами).
+	var top := _purse_box.position.y + _purse_box.size.y + 6.0
+	if _objective_panel != null and _objective_panel.visible:   # не под баннером задания (6 с)
+		top = maxf(top, _objective_panel.position.y + _objective_panel.size.y + 4.0)
+	_depth_box.position.y = clampf(screen_y - h * 0.5 - 2.0 * TILE, top, stage_rect.size.y - h)
 
 
 # ---------------------------------------------------------------------------
@@ -1765,7 +1850,7 @@ func _on_survival_warning(bar_name: String, severe: bool) -> void:
 	var bar: HudBar = _hunger_bar if bar_name == "hunger" else _stamina_bar
 	if bar == null:
 		return
-	toast_parts([{"icon": bar_name}, {"text": "!!" if severe else "!", "color": Color8(0xE8, 0x8C, 0x80)}],
+	toast_parts([{"icon": bar_name}, {"text": "!!" if severe else "!", "color": UiTheme.BAD_TEXT}],
 		2.0, "bad")
 	Sfx.play("warn_low")
 	if severe:
@@ -1779,7 +1864,7 @@ func _on_survival_warning(bar_name: String, severe: bool) -> void:
 
 func _on_fell(damage: float, _speed: float) -> void:
 	if damage > 0.0:
-		toast_icon("hp", "−%d" % int(damage), 1.6, Color8(0xE8, 0x8C, 0x80), "bad")
+		toast_icon("hp", "−%d" % int(damage), 1.6, UiTheme.BAD_TEXT, "bad")
 
 
 func _on_dig_blocked(tile_type: int) -> void:
@@ -1791,7 +1876,7 @@ func _on_dig_blocked(tile_type: int) -> void:
 		parts.append({"icon_tex": load(tool_path)})
 	if not mineral_id.is_empty():
 		parts.append({"icon_tex": UiIcons.item_small(mineral_id)})
-	parts.append({"text": "Звон!", "color": Color8(0xE8, 0x8C, 0x80)})
+	parts.append({"text": "Звон!", "color": UiTheme.BAD_TEXT})
 	toast_parts(parts, 2.0, "bad")
 	Sfx.play("ui_deny")
 
@@ -1802,7 +1887,7 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 		toast_parts([
 			{"icon_tex": UiIcons.item_small(mineral_id)},
 			{"icon": "weight"},
-			{"text": "Полно", "color": Color8(0xE8, 0x8C, 0x80)},
+			{"text": "Полно", "color": UiTheme.BAD_TEXT},
 		], 2.2, "bad")
 		Sfx.play("ui_deny")
 		UiAnim.shake(_load_pill, 3.0, 0.3)
@@ -1822,7 +1907,7 @@ func _on_dig_finished(x: int, y: int, tile_type: int, mineral_id: String, was_lo
 		toast_parts([
 			{"icon_tex": UiIcons.item_small("diamond")},
 			{"icon_tex": load("res://art/items/pickaxe_rusty_cracked.png")},
-			{"text": "−25%", "color": Color8(0xE8, 0x8C, 0x80)},
+			{"text": "−25%", "color": UiTheme.BAD_TEXT},
 		], 4.0, "bad")
 
 
@@ -1853,13 +1938,13 @@ func _on_gear_unlocked(gear_id: String) -> void:
 		toast_parts([
 			{"icon_tex": load("res://art/items/backpack_propeller.png")},
 			{"icon": "arrow_up"},
-			{"text": "Полёт", "color": Color8(0xF2, 0xD9, 0x9B)},
+			{"text": "Полёт", "color": UiTheme.TEXT_HI},
 		], 4.0, "good")
 	if gear_id == "drill_rig":
 		# Глубина 1000, собран бурмобиль: копает вдвое быстрее бура.
 		toast_parts([
 			{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24},
-			{"text": "×2", "color": Color8(0xF2, 0xD9, 0x9B)},
+			{"text": "×2", "color": UiTheme.TEXT_HI},
 		], 4.0, "good")
 
 
@@ -1870,7 +1955,7 @@ func _on_tool_switched(tool_id: String) -> void:
 		# Лопата упёрлась в старый фундамент, нашлась дедова кирка.
 		toast_parts([
 			{"icon_tex": load("res://art/items/pickaxe_rusty.png"), "icon_px": 24},
-			{"text": "Дедова кирка", "color": Color8(0xF2, 0xD9, 0x9B)},
+			{"text": "Дедова кирка", "color": UiTheme.TEXT_HI},
 		], 3.4, "info")
 
 
@@ -1881,12 +1966,11 @@ func _on_entered_rig() -> void:
 	toast_parts([{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24}], 1.8, "good")
 
 
-## Бурмобиль без топлива: либо не пускает в тоннель с поверхности, либо
-## глохнет прямо под землёй. Текст сообщения решает player.gd (см. player.gd:
-## _move_y и :_start_dig); на экране — топливо «0», а если надо идти на
+## Бурмобиль без топлива: посадка кнопкой «В бурмобиль» отказывает. Текст
+## сообщения решает отправитель; на экране — топливо «0», а если надо идти на
 ## верстак — ещё и значок верстака.
 func _on_rig_fuel_warning(message: String) -> void:
-	var parts: Array = [{"icon": "fuel", "text": "0", "color": Color8(0xE8, 0x8C, 0x80)}]
+	var parts: Array = [{"icon": "fuel", "text": "0", "color": UiTheme.BAD_TEXT}]
 	if message.contains("верстак"):
 		parts.append({"icon": "workshop"})
 	toast_parts(parts, 2.8, "bad")
@@ -1905,6 +1989,7 @@ func _on_inv_button_pressed() -> void:
 
 
 func open_inventory() -> void:
+	GameState.emit_event("screen_opened", {"id": "backpack"})   # аналитика (scripts/core/analytics.gd)
 	_release_stick()
 	_has_touch = false
 	if player != null:
@@ -1930,8 +2015,8 @@ func _eat_from_inventory(id: String) -> void:
 		Sfx.play("ui_deny")
 		return
 	var parts: Array = [
-		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": Color8(0xE8, 0x7E, 0x6E)},
-		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": Color8(0xE8, 0xC5, 0x47)},
+		{"icon": "hunger", "text": "+%d" % int(res.get("hunger", 0.0)), "color": UiTheme.HUNGER},
+		{"icon": "stamina", "text": "+%d" % int(res.get("stamina", 0.0)), "color": UiTheme.STAMINA},
 	]
 	# Еда и аптечка лечат (раунд 4, healing): +HP в тосте, у аптечки — только он.
 	var medkit := Healing.is_medkit(id)
@@ -1939,7 +2024,7 @@ func _eat_from_inventory(id: String) -> void:
 	if medkit:
 		parts.clear()
 	if hp_pct > 0 or medkit:
-		parts.append({"icon": "hp", "text": "+%d" % hp_pct, "color": Color8(0xE8, 0x6A, 0x6A)})
+		parts.append({"icon": "hp", "text": "+%d" % hp_pct, "color": UiTheme.DANGER})
 	toast_parts(parts, 2.0)
 	Sfx.play("heal" if medkit else "eat")
 	_render_inventory()
@@ -2137,24 +2222,34 @@ func _apply_stick(screen_pos: Vector2) -> void:
 	var v: Vector2 = (screen_pos - _stick_center) / stick_r
 	if v.length() > 1.0:
 		v = v.normalized()
-	var snap = player.resolve_dir(v.x, v.y, STICK_DEAD)
-	_position_knob(snap)
+	player.resolve_dir(v.x, v.y, STICK_DEAD)   # герой — по защёлкнутым направлениям
+	# Ручка — под пальцем 1:1 (там, куда он лёг), в пределах круга.
+	_set_knob((screen_pos - _stick_center).limit_length(stick_r - knob_r))
 	player.cancel_wrong_dig()
 
 
-func _position_knob(snap) -> void:
-	var base: Vector2 = Vector2(stick_r - knob_r, stick_r - knob_r)
-	if snap == null:
-		_knob.position = base
+## Ручка по направлению клавиатуры (snap) или в центр (null).
+func _position_knob(snap, glide: bool = false) -> void:
+	_set_knob(Vector2.ZERO if snap == null else Vector2(snap.x, snap.y).limit_length(1.0) * (stick_r - knob_r), glide)
+
+
+## off — смещение ручки от центра; glide — пружинкой домой, а не прыжком.
+func _set_knob(off: Vector2, glide: bool = false) -> void:
+	if _knob_tw != null:
+		_knob_tw.kill()
+	var to := Vector2(stick_r - knob_r, stick_r - knob_r) + off
+	if glide and not UiAnim.instant(_knob):
+		_knob_tw = create_tween()
+		_knob_tw.tween_property(_knob, "position", to, UiAnim.D_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
-		_knob.position = base + Vector2(snap.x, snap.y) * 34.0
+		_knob.position = to
 
 
 func _release_stick() -> void:
 	_stick_pointer = -100
 	if player != null:
 		player.release_control()
-	_position_knob(null)
+	_position_knob(null, true)
 
 
 ## Касания мира до джойстика сейчас не доходят: ввод HUD выключили снаружи
@@ -2163,7 +2258,8 @@ func _release_stick() -> void:
 func _world_input_blocked() -> bool:
 	return not is_processing_input() or (_inv_sheet != null and _inv_sheet.visible) \
 		or (_settings_sheet != null and _settings_sheet.visible) or ProgressScreen.is_open() \
-		or is_more_menu_open() or TechSystem.is_modal_open()
+		or is_more_menu_open() or TechSystem.is_modal_open() \
+		or DeathWindow.is_open_any() or ConsentDialog.is_open_any()   # окно смерти, согласие: палец жмёт кнопку, а не ведёт героя
 
 
 ## Пока ввод заблокирован, отпускание пальца сюда не доходит: занятый указатель

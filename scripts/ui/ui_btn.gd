@@ -8,22 +8,33 @@ extends RefCounted
 ##   Tip.bind(b, "Настройки")
 ##   UiBtn.set_badge(b, 3)            # красная цифра в углу (0 — скрыть)
 ##
-## Старые кнопки с текстом тоже можно «одеть»: UiBtn.style(button, kind).
-## Тот же отклик через ProgressUiKit.make_button получают экраны прокачки/музея.
+## Единственная фабрика кнопок. Виды:
+##   UiBtn.text_button / style(b, kind)  — плитка: NORMAL (обычная), ACCENT (главная),
+##                                         DANGER (опасная), GHOST (без плашки, крестик);
+##   UiBtn.icon_button                   — плитка с одной иконкой;
+##   UiBtn.fill(b, цвет)                 — цветная плашка-призыв («Забрать», «×2»);
+##   UiBtn.texture_button("green", …)    — рисованная кнопка магазина и дома.
+## У всех одинаково: «проседание» на нажатие вниз (UiAnim.press), звук и вибро на
+## отпускание, цель нажатия не меньше TOUCH_MIN.
 
 enum Kind { NORMAL, ACCENT, DANGER, GHOST }
 
-const BG := Color8(0x26, 0x1E, 0x16)
-const BG_HOVER := Color8(0x34, 0x28, 0x1B)
-const BG_PRESS := Color8(0x1B, 0x15, 0x10)
-const BORDER := Color8(0x52, 0x40, 0x2D)
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_DIM := Color8(0x9C, 0x76, 0x2C)
-const RED := Color8(0xB8, 0x5A, 0x52)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
+const BG := UiTheme.BTN
+const BG_HOVER := UiTheme.BTN_HOVER
+const BG_PRESS := UiTheme.BTN_PRESS
+const BORDER := UiTheme.EDGE
+const GOLD := UiTheme.GOLD
+const GOLD_DIM := UiTheme.GOLD_DIM
+const RED := UiTheme.RED
+const MUTED := UiTheme.MUTED
 const SHADOW := Color(0, 0, 0, 0.6)
 const FEEDBACK_META := &"_ui_feedback"
 const BADGE_NAME := "Badge"
+## Крестик «закрыть»: один размер и отступ на всех экранах и окнах.
+const CLOSE_SIZE := 28.0   # ≥ 25 единиц ≈ 44 pt на iPhone
+const CLOSE_INSET := 4.0   # от правого и верхнего края окна
+const CLOSE_ROW := CLOSE_SIZE + CLOSE_INSET * 2.0   # высота полосы под крестиком сверху
+const TOUCH_MIN := 25.0   # меньше пальцем не попасть (≈ 44 pt на iPhone)
 
 
 static func _box(kind: int, state: String) -> StyleBox:
@@ -79,7 +90,7 @@ static func style(b: Button, kind: int = Kind.NORMAL, with_feedback: bool = true
 	b.add_theme_color_override("font_hover_color", GOLD)
 	b.add_theme_color_override("font_pressed_color", GOLD)
 	b.add_theme_color_override("font_hover_pressed_color", GOLD)
-	b.add_theme_color_override("font_disabled_color", Color8(0x5A, 0x50, 0x44))
+	b.add_theme_color_override("font_disabled_color", UiTheme.DISABLED)
 	b.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.35))
 	b.focus_mode = Control.FOCUS_NONE
 	if with_feedback:
@@ -91,6 +102,89 @@ static func set_kind(b: Button, kind: int) -> void:
 	style(b, kind)
 
 
+## Кнопка с подписью в общем стиле.
+static func text_button(text: String, kind: int = Kind.NORMAL, size: Vector2 = Vector2.ZERO,
+		font_size: int = UiTheme.FS_SMALL) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.add_theme_font_size_override("font_size", font_size)
+	b.custom_minimum_size = _touch(size)
+	return style(b, kind)
+
+
+## Цветная плашка-призыв: фон цветом, светлая рамка, золотая при наведении,
+## нажатая темнее. Белый текст; у выключенной — серый фон и тусклый текст.
+static func fill(b: Button, bg: Color, margin: int = 3, with_feedback: bool = true) -> Button:
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb := ProgressUiKit.box(bg, GOLD if st == "hover" else bg.lightened(0.25), ProgressUiKit.R_TILE)
+		if st == "pressed":
+			sb.bg_color = bg.darkened(0.2)
+		if st == "disabled":
+			sb.bg_color = Color(0.15, 0.13, 0.11)
+			sb.border_color = UiTheme.BORDER
+		sb.set_content_margin_all(margin)
+		b.add_theme_stylebox_override(st, sb)
+	b.add_theme_color_override("font_color", Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", UiTheme.DIM)
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = _touch(b.custom_minimum_size)
+	if with_feedback:
+		wire_feedback(b)
+	return b
+
+
+## Плашка-призыв с иконкой (и подписью): «Забрать», «×2 за ролик».
+static func fill_button(icon: Texture2D, size: Vector2, bg: Color, text: String = "",
+		font_size: int = UiTheme.FS_BODY) -> Button:
+	var b := Button.new()
+	b.icon = icon
+	b.text = text
+	b.add_theme_constant_override("icon_max_width", 16)
+	b.add_theme_font_size_override("font_size", font_size)
+	b.custom_minimum_size = size
+	return fill(b, bg)
+
+
+## Рисованная кнопка магазина и дома: девятизонник btn_<kind> (green/red/gold/gray)
+## и знак по центру (узел «Glyph»). with_sound = false — звук даёт сам экран.
+static func texture_button(kind: String, glyph: Texture2D, size: Vector2, glyph_px: float = 16.0,
+		with_sound: bool = true) -> Button:
+	size = _touch(size)
+	var b := Button.new()
+	b.custom_minimum_size = size
+	b.size = size
+	b.focus_mode = Control.FOCUS_NONE
+	var texture := ShopArt.tex("btn_" + kind)
+	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+		var sb := StyleBoxTexture.new()
+		sb.texture = texture
+		sb.texture_margin_left = 5
+		sb.texture_margin_right = 5
+		sb.texture_margin_top = 5
+		sb.texture_margin_bottom = 5
+		match st:
+			"pressed", "hover_pressed":
+				sb.modulate_color = Color(0.78, 0.78, 0.78)
+			"disabled":
+				sb.modulate_color = Color(0.45, 0.45, 0.5)
+		b.add_theme_stylebox_override(st, sb)
+	if glyph != null:
+		var ic := ShopArt.rect(glyph, (size - Vector2(glyph_px, glyph_px)) * 0.5, Vector2(glyph_px, glyph_px))
+		ic.name = "Glyph"
+		b.add_child(ic)
+	if with_sound:
+		wire_feedback(b)
+	else:
+		wire_sink(b)
+	return b
+
+
+static func _touch(size: Vector2) -> Vector2:
+	if size == Vector2.ZERO:
+		return Vector2(0, TOUCH_MIN)
+	return Vector2(maxf(size.x, TOUCH_MIN) if size.x > 0.0 else 0.0, maxf(size.y, TOUCH_MIN))
+
+
 ## Кнопка с одной иконкой. icon_px — размер картинки в проектных единицах
 ## (16 = один пиксель рисунка на единицу; 32 — вдвое крупнее).
 static func icon_button(icon: Texture2D, size: Vector2 = Vector2(28, 28), kind: int = Kind.NORMAL, icon_px: int = 16) -> Button:
@@ -100,8 +194,30 @@ static func icon_button(icon: Texture2D, size: Vector2 = Vector2(28, 28), kind: 
 	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	b.expand_icon = false
 	b.add_theme_constant_override("icon_max_width", icon_px)
-	b.custom_minimum_size = size
+	b.custom_minimum_size = _touch(size)
 	style(b, kind)
+	return b
+
+
+## Крестик «закрыть» — единственное место, где он создаётся. С parent (обычный
+## Control, не контейнер) встаёт в его правый верхний угол; без parent — для ряда
+## заголовка окна, вызывающий сам ставит его последним (справа).
+static func close_button(on_close: Callable, parent: Control = null, tip: String = "Закрыть") -> Button:
+	var b := icon_button(UiIcons.tex("close"), Vector2(CLOSE_SIZE, CLOSE_SIZE), Kind.GHOST)
+	b.name = "Close"
+	b.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	Tip.bind(b, tip)
+	b.pressed.connect(func() -> void:
+		if not Tip.swallowed():
+			on_close.call())
+	if parent != null:
+		b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		b.offset_left = -CLOSE_INSET - CLOSE_SIZE
+		b.offset_right = -CLOSE_INSET
+		var st := HudSafeArea.top((Engine.get_main_loop() as SceneTree).root)   # под вырезом/статус-баром
+		b.offset_top = CLOSE_INSET + st
+		b.offset_bottom = CLOSE_INSET + CLOSE_SIZE + st
+		parent.add_child(b)
 	return b
 
 
@@ -130,18 +246,8 @@ static func wire_sink(b: Button) -> void:
 
 
 static func _sink(b: Button, down: bool) -> void:
-	if not is_instance_valid(b) or not b.is_inside_tree() or UiAnim.reduced():
-		return
-	if b.has_meta(&"_sink_tween"):
-		var old = b.get_meta(&"_sink_tween")
-		if old is Tween and (old as Tween).is_valid():
-			(old as Tween).kill()
-	var tw := b.create_tween()
-	b.set_meta(&"_sink_tween", tw)
-	if down:
-		tw.tween_property(b, "scale", Vector2.ONE * UiAnim.TAP_SCALE, 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	else:
-		tw.tween_property(b, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if is_instance_valid(b):
+		UiAnim.press(b, down)
 
 
 ## Красная цифра в правом верхнем углу кнопки. n <= 0 — прячет значок,
@@ -158,8 +264,8 @@ static func set_badge(b: Control, n: int) -> void:
 		badge.name = BADGE_NAME
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color8(0xD0, 0x45, 0x3C)
-		sb.border_color = Color8(0x1A, 0x10, 0x0C)
+		sb.bg_color = UiTheme.DANGER
+		sb.border_color = UiTheme.INK
 		sb.set_border_width_all(1)
 		sb.set_corner_radius_all(6)
 		sb.content_margin_left = 3
@@ -175,7 +281,7 @@ static func set_badge(b: Control, n: int) -> void:
 		label = Label.new()
 		label.name = "N"
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.add_theme_font_size_override("font_size", 8)
+		label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 		label.add_theme_color_override("font_color", Color.WHITE)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -233,12 +339,3 @@ static func knob_texture(col: Color) -> Texture2D:
 					shade = col.lightened(0.35)
 				img.set_pixel(x, y, shade)
 	return ImageTexture.create_from_image(img)
-
-
-## Вызывает action при нажатии левой кнопкой/пальцем по control (затемнение за
-## шторкой: тап мимо карточки закрывает её).
-static func on_tap(c: Control, action: Callable) -> void:
-	c.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
-				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-			action.call())

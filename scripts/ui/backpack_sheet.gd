@@ -28,8 +28,8 @@ const MAX_BADGE := 999
 ## Цвета редкости: обычная, необычная, редкая, эпическая, легендарная.
 const TIER_COLORS: Array[Color] = [
 	Color8(0x75, 0x6B, 0x5E), Color8(0x6E, 0xA8, 0x5A), Color8(0x5B, 0x8F, 0xD0),
-	Color8(0xA2, 0x6B, 0xD6), Color8(0xE0, 0xA9, 0x3B)]
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+	Color8(0xA2, 0x6B, 0xD6), UiTheme.GOLD]
+const GOLD := UiTheme.GOLD
 const CARD_BG := ProgressUiKit.SHEET_BG
 const EDGE := ProgressUiKit.EDGE
 
@@ -42,6 +42,7 @@ var _weight_text: Label
 var _total_pill: HudPill
 var _eat_btn: Button
 var _drop_btn: Button
+var _unload_btn: Button   # «всё на склад» за доллары (раунд 6, PremiumUnload)
 var _empty_hint: TextureRect
 
 var _closing: bool = false   # шторка уходит (анимация): по смыслу уже закрыта
@@ -145,12 +146,12 @@ func refresh() -> void:
 	var max_kg := maxf(GameState.get_max_carry_kg(), 0.001)
 	var frac := load_kg / max_kg
 	_weight_bar.set_fraction(minf(frac, 1.0))
-	_weight_bar.fill_color = Color8(0x7F, 0xB8, 0x6B) if frac < 0.6 \
-		else (Color8(0xE0, 0xA9, 0x3B) if frac < 0.85 else Color8(0xD9, 0x4F, 0x4A))
+	_weight_bar.fill_color = UiTheme.OK if frac < 0.6 \
+		else (UiTheme.GOLD if frac < 0.85 else UiTheme.DANGER)
 	_weight_text.text = "%.1f/%.0f" % [load_kg, max_kg]
 	Tip.bind(_weight_bar, "Вес рюкзака", "%.1f из %.0f кг" % [load_kg, max_kg])
 	_total_pill.set_value(total)
-	Tip.bind(_total_pill, "К продаже", CountLabel.group_digits(total) + " монет в мастерской")
+	Tip.bind(_total_pill, "К продаже", UiFmt.full(total) + " монет в мастерской")
 	_refresh_actions()
 
 
@@ -218,12 +219,7 @@ static func tier_of(id: String) -> int:
 # ---------------------------------------------------------------------------
 
 func _build() -> void:
-	_dim = ColorRect.new()
-	_dim.color = Color(0, 0, 0, 0.6)
-	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_dim)
-	# Тап по затемнению над карточкой закрывает шторку.
-	UiBtn.on_tap(_dim, close)
+	_dim = UiTheme.scrim(self, close, UiTheme.SCRIM_SHEET)   # тап над карточкой закрывает шторку
 
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -252,24 +248,18 @@ func _build() -> void:
 	bag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(bag)
-	_weight_bar = HudBar.new().setup(Color8(0x7F, 0xB8, 0x6B), UiIcons.tex("weight"))
+	_weight_bar = HudBar.new().setup(UiTheme.OK, UiIcons.tex("weight"))
 	_weight_bar.bar_width = 84.0
 	_weight_bar.pulse_above = 1.0
 	_weight_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_weight_bar)
 	_weight_text = Label.new()
-	_weight_text.add_theme_font_size_override("font_size", 10)
-	_weight_text.add_theme_color_override("font_color", Color8(0xB4, 0xA3, 0x88))
+	_weight_text.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_weight_text.add_theme_color_override("font_color", UiTheme.TEXT_SOFT)
 	_weight_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_weight_text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_weight_text)
-	var close_btn := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 26), UiBtn.Kind.GHOST)
-	Tip.bind(close_btn, "Закрыть")
-	close_btn.pressed.connect(func():
-		if Tip.swallowed():
-			return
-		close())
-	head.add_child(close_btn)
+	head.add_child(UiBtn.close_button(close))
 
 	# --- сетка слотов ---
 	# Область — обычный Control: ScrollContainer сам раскладывает детей и
@@ -322,6 +312,13 @@ func _build() -> void:
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	foot.add_child(sp)
+	# Выгрузка на склад (раунд 6): та же карточка с ценой, что в витрине за доллары.
+	_unload_btn = UiBtn.icon_button(ShopArt.item_icon(PremiumUnload.ID), Vector2(34, 30), UiBtn.Kind.NORMAL, 22)
+	_unload_btn.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		ShopUI.open_premium_good(PremiumUnload.ID))
+	foot.add_child(_unload_btn)
 	_eat_btn = UiBtn.icon_button(UiIcons.tex("eat"), Vector2(34, 30), UiBtn.Kind.ACCENT)
 	Tip.bind(_eat_btn, "Съесть", "Голод и бодрость вернутся")
 	_eat_btn.pressed.connect(func():
@@ -371,7 +368,7 @@ static func make_tile(id: String, count: int, selected: bool = false) -> Button:
 	if count > 1:
 		var badge := Label.new()
 		badge.text = str(count) if count <= MAX_BADGE else "%d+" % MAX_BADGE
-		badge.add_theme_font_size_override("font_size", 10)
+		badge.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 		badge.add_theme_color_override("font_color", Color.WHITE)
 		badge.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 		badge.add_theme_constant_override("outline_size", 3)
@@ -392,8 +389,8 @@ static func make_tile(id: String, count: int, selected: bool = false) -> Button:
 	if hp > 0:
 		body += " · здоровье +%d%%" % hp
 	Tip.bind(b, name_ru, body,
-		("%s за штуку · всего %s" % [CountLabel.group_digits(price),
-			CountLabel.group_digits(price * count)]) if price > 0 else "Не продаётся")
+		("%s за штуку · всего %s" % [UiFmt.full(price),
+			UiFmt.full(price * count)]) if price > 0 else "Не продаётся")
 	return b
 
 
@@ -432,6 +429,11 @@ func _select(id: String) -> void:
 
 
 func _refresh_actions() -> void:
+	# Только под землёй: дома склад в двух шагах и кладётся бесплатно (ГДД п.14).
+	_unload_btn.visible = PremiumUnload.can_unload() and GameState.player_depth > 0 and not GameState.house_is_indoors
+	var g := ShopCatalog.good(PremiumUnload.ID, "dollars")
+	Tip.bind(_unload_btn, String(g.get("name_ru", "На склад")), "Вся добыча — сразу на склад дома: %d шт. Еда, аптечка и топливо остаются" \
+		% PremiumUnload.movable_count(), "%d $" % ShopCatalog.good_price(g, "dollars"))
 	var has := _selected != ""
 	_drop_btn.modulate = Color(1, 1, 1, 1.0 if has else 0.4)
 	var medkit := Healing.is_medkit(_selected)
@@ -452,10 +454,7 @@ func _build_drop_panel() -> void:
 	_drop_panel.visible = false
 	add_child(_drop_panel)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_drop_panel.add_child(dim)
+	UiTheme.scrim(_drop_panel, Callable(), UiTheme.SCRIM_SHEET)
 
 	_drop_card = PanelContainer.new()
 	_drop_card.set_anchors_preset(Control.PRESET_CENTER)
@@ -490,7 +489,7 @@ func _build_drop_panel() -> void:
 	_drop_icon.mouse_filter = Control.MOUSE_FILTER_PASS
 	title.add_child(_drop_icon)
 	_drop_count_label = Label.new()
-	_drop_count_label.add_theme_font_size_override("font_size", 14)
+	_drop_count_label.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	_drop_count_label.add_theme_color_override("font_color", GOLD)
 	_drop_count_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	title.add_child(_drop_count_label)
@@ -507,7 +506,7 @@ func _build_drop_panel() -> void:
 	_drop_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_drop_slider.custom_minimum_size = Vector2(0, 22)
-	UiBtn.style_slider(_drop_slider, Color8(0xB8, 0x5A, 0x52))
+	UiBtn.style_slider(_drop_slider, UiTheme.RED)
 	_drop_slider.value_changed.connect(_on_drop_slider_changed)
 	row.add_child(_drop_slider)
 	var plus := UiBtn.icon_button(UiIcons.tex("plus"), Vector2(26, 26))
@@ -522,7 +521,7 @@ func _build_drop_panel() -> void:
 	_drop_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_drop_field.max_length = 6
-	_drop_field.add_theme_font_size_override("font_size", 14)
+	_drop_field.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	var fsb := ProgressUiKit.box(ProgressUiKit.INSET_BG, EDGE)
 	fsb.set_content_margin_all(4)
 	_drop_field.add_theme_stylebox_override("normal", fsb)

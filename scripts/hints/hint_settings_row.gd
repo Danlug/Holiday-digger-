@@ -13,7 +13,7 @@ static func build(body: Control) -> HintSettingsRow:
 	var p := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = SettingsSheet.ROW_BG
-	sb.border_color = Color8(0x3A, 0x2E, 0x22)
+	sb.border_color = UiTheme.BORDER
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(8)
 	sb.set_content_margin_all(6)

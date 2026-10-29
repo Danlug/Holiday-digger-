@@ -2,7 +2,8 @@ extends Node
 ## test_screenshot_healing — не автотест, а инструмент глаз для лечения раунда 4:
 ## пузырь кровати с «здоровье +N%», пробуждение со вспышкой +HP, рюкзак с
 ## аптечкой (кнопка «Применить» и её подсказка), тост после аптечки, плитка и
-## карточка аптечки в лавке, карточка смерти со «скорой −200».
+## карточка аптечки в лавке, окно смерти с платой больнице (−5% монет; все причины
+## смерти — tests/test_screenshot_death).
 ##
 ##   export XDG_DATA_HOME=$PWD/.godot/xdg
 ##   xvfb-run -a -s "-screen 0 1280x1024x24" godot --path . \
@@ -10,7 +11,7 @@ extends Node
 ##       --resolution 448x960 -- /каталог [снимок ...]
 ##
 ## Снимки: bed_tip sleep_wake backpack_medkit backpack_tip medkit_toast eat_toast
-## shop_food shop_card death_card death_card_poor.
+## shop_food shop_card death_card death_card_poor death_real.
 
 var _out_dir := "/tmp/healing_shots"
 var _only: Array[String] = []
@@ -96,7 +97,7 @@ func _cleanup() -> void:
 		shop.close()
 	if _main.hud._inv_sheet.visible:
 		_main.hud.close_inventory()
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	if card.is_open():
 		card.close()
 	if GameState.house_is_indoors:
@@ -185,34 +186,32 @@ func _s_shop_card() -> void:
 
 func _death_report(coins_before: int) -> Dictionary:
 	GameState.inventory.clear()
-	GameState.black_box.clear()
 	GameState.add_item("iron_ore", 14)
 	GameState.add_item("silver", 6)
 	GameState.add_item("ruby", 1)
 	GameState.add_item("medkit", 1)
-	GameState.add_to_black_box("gold", 7)
 	GameState.max_depth_reached = maxi(GameState.max_depth_reached, 640)
 	GameState.coins = coins_before
-	var fee := mini(coins_before, Healing.death_fee_coins())
+	var fee := Healing.death_fee_for(coins_before)
 	GameState.coins -= fee
-	return DeathCard.build_report(GameState.inventory.duplicate(), 410, "fall", fee)
+	return DeathWindow.build_report(GameState.inventory.duplicate(), 410, DeathCause.make("fall", {"cells": 47}), fee)
 
 
 func _s_death_card() -> void:
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	card.open(_death_report(4280))
 	await _frames(14)
 
 
 func _s_death_card_poor() -> void:
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	card.open(_death_report(70))
 	await _frames(6)
-	Tip.show_now(card.find_child("Fee", true, false))
+	Tip.show_now(card.find_child("Hospital", true, false))
 
 
-## Настоящая смерть в игре: урон → падение героя → респавн дома → карточка
-## режиссёра «ощущений» со «скорой» (весь путь, без ручного build_report).
+## Настоящая смерть в игре: урон → респавн дома → окно смерти режиссёра
+## «ощущений» (весь путь, без ручного build_report).
 func _s_death_real() -> void:
 	StoryState.set_flag("gold_sold", true)
 	GameState.coins = 900
@@ -220,7 +219,7 @@ func _s_death_real() -> void:
 	GameState.inventory_changed.emit()
 	GameState.player_depth = 30
 	GameState.take_damage(9999.0, "fall")
-	var card: DeathCard = _main.get_node("FeelDirector").card
+	var card: DeathWindow = _main.get_node("FeelDirector").card
 	for _i in range(40):
 		if card.is_open():
 			break

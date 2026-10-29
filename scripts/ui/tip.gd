@@ -44,11 +44,11 @@ const TAP_META := &"_tip_tap"
 const ANCHOR_META := &"_tip_anchor"
 const TAP_HIDE := 6.0
 
-const COL_BG := Color8(0x17, 0x13, 0x0F, 0xF2)
-const COL_BORDER := Color8(0xE0, 0xA9, 0x3B)
-const COL_TITLE := Color8(0xF2, 0xD9, 0x9B)
-const COL_BODY := Color8(0xD8, 0xCF, 0xC0)
-const COL_EXTRA := Color8(0x9D, 0x8B, 0x73)
+const COL_BG := UiTheme.FLOAT_BG
+const COL_BORDER := UiTheme.GOLD
+const COL_TITLE := UiTheme.TEXT_HI
+const COL_BODY := UiTheme.TEXT
+const COL_EXTRA := UiTheme.MUTED
 
 static var _layer: CanvasLayer = null
 static var _panel: PanelContainer = null
@@ -350,7 +350,7 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	if _panel != null and is_instance_valid(_panel):
 		return
 	_layer = CanvasLayer.new()
-	_layer.layer = 128
+	_layer.layer = UiLayers.TIP
 	_layer.name = "TipLayer"
 	tree.root.add_child(_layer)
 	_panel = PanelContainer.new()
@@ -373,9 +373,9 @@ static func _ensure_panel(tree: SceneTree) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override("separation", 1)
 	_panel.add_child(box)
-	_title = _make_label(11, COL_TITLE)
-	_body = _make_label(10, COL_BODY)
-	_extra = _make_label(10, COL_EXTRA)
+	_title = _make_label(UiTheme.FS_LABEL, COL_TITLE)
+	_body = _make_label(UiTheme.FS_BODY, COL_BODY)
+	_extra = _make_label(UiTheme.FS_BODY, COL_EXTRA)
 	box.add_child(_title)
 	box.add_child(_body)
 	box.add_child(_extra)

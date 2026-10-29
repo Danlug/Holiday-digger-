@@ -9,8 +9,8 @@ extends Node
 ##  2. «Сброс» и перезагрузка посреди боя с боссом не оставляют ворота арены закрытыми
 ##     (BossArena.sealed — статика, переживает сцену): иначе в новой игре на дне нельзя войти.
 ##  3. Сейв и загрузка посреди боя: герой дома, монстров/босса нет, прогресс боя цел.
-##  4. Смерть в лаве за рулём бурмобиля на глубине: респавн дома, машина на парковке, инструмент
-##     снят, HUD/ввод/боевой директор живы, лут потерян по правилам, глубина и мета целы.
+##  4. Смерть в лаве за рулём бурмобиля на глубине: сразу дома с полным HP, окно смерти, машина на
+##     парковке, инструмент снят, HUD/ввод/боевой директор живы, лут потерян по правилам, глубина и мета целы.
 ##  5. Пустой бак бурмобиля на глубине: копать нельзя, но лететь вверх можно; лопата на поверхности.
 ##  6. Сейв старой схемы и мусор в ext новых подсистем: игра поднимается, подсистемы не падают.
 ##  7. «Сброс» очищает состояние всех новых подсистем (бой, техника, мета, подсказки, сюжет).
@@ -276,7 +276,6 @@ func _test_death_in_rig_lava() -> void:
 	GameState.player_depth = 3600
 	GameState.coins = 777
 	GameState.add_item("gold", 4)
-	GameState.black_box = {"diamond": 1}
 	var deaths0 := MetaState.counter("deaths")
 	p.x = 16.5
 	p.y = 3600.5
@@ -291,8 +290,11 @@ func _test_death_in_rig_lava() -> void:
 	check("лава убивает героя без костюма", not GameState.is_alive and died[0] == 1)
 	check("лут потерян, монеты целы (награды за достижения могли добавить)", not GameState.inventory.has("gold") and GameState.coins >= 777,
 		"рюкзак %s монеты %d" % [str(GameState.inventory), GameState.coins])
+	check("причина смерти — лава", String(GameState.death_cause.get("source", "")) == "lava")
 	await _frames(4)
-	check("респавн: герой жив, с полными полосками, дома", GameState.is_alive and GameState.hp >= GameState.get_max_hp() - 0.01 and p.y < 1.0)
+	# Разбор чисел 26.10: поездки нет — герой сразу дома, HP полное (владелец: «только хп полное»).
+	check("респавн: герой жив, дома, HP полное", GameState.is_alive and p.y < 1.0
+		and absf(GameState.hp - GameState.get_max_hp()) < 0.5)
 	check("машина запаркована, герой снова с киркой, а не «за рулём» под землёй",
 		GameState.current_tool != "drill_rig" and GameState.is_rig_parked(),
 		"инструмент %s парковка %s" % [GameState.current_tool, str(GameState.rig_parked_at)])
@@ -335,15 +337,20 @@ func _test_empty_rig_tank() -> void:
 	p.on_ground = true
 	GameState.player_depth = 399
 	p.hold_down = true
-	for _i in range(30):
+	# 2 с: бурмобиль сначала опускается на дно ствола (падает медленнее пешего), потом бьёт вниз
+	for _i in range(120):
 		p.physics_tick(1.0 / 60.0)
 	p.hold_down = false
-	check("в бурмобиле без топлива копать нельзя", p.digging == null and not FuelTank.has_fuel("drill_rig"))
+	# Владелец 29.10: «когда заканчивается топливо, он берётся за кирку» — пустой бак не глушит машину.
+	check("в бурмобиле без топлива копает вниз киркой: копка идёт или клетка уже вынута",
+		(p.digging != null or world.get_tile(20, 401) == TileTypes.Type.EMPTY) and not FuelTank.has_fuel("drill_rig"))
+	p.digging = null
 	p.hold_dx = -1
 	for _i in range(40):
 		p.physics_tick(1.0 / 60.0)
 	p.hold_dx = 0
-	check("упор в породу без топлива не запускает копку", p.digging == null)
+	check("упор в породу без топлива запускает копку киркой", p.digging != null or world.get_tile(19, p.cell_y()) == TileTypes.Type.EMPTY)
+	p.digging = null
 	var set_before := GameState.current_tool
 	GameState.set_current_tool("iron_pickaxe")
 	check("под землёй высадиться нельзя (бурмобиль не бросить на дне)", GameState.current_tool == set_before)

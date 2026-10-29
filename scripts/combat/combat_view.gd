@@ -47,10 +47,43 @@ func _process(dt: float) -> void:
 	_dt = dt
 	_sync_monsters()
 	_sync_boss()
-	var drawing: bool = not director.slashes.is_empty() or director.boss != null
+	_sync_projectiles()
+	var drawing: bool = not director.slashes.is_empty() or director.boss != null or not director.projectiles.is_empty()
 	if drawing or _was_drawing:
 		queue_redraw()
 	_was_drawing = drawing
+
+
+## Снаряды стрелков (раунд 5): кадр из листа fx_projectiles по виду, хвост рисует _draw.
+var _proj_sprites: Dictionary = {}
+
+
+func _sync_projectiles() -> void:
+	var live := {}
+	var sheet := MonsterSheet.get_sheet("fx_projectiles")
+	for p: Projectile in director.projectiles:
+		live[p] = true
+		var s: Sprite2D = _proj_sprites.get(p)
+		if s == null:
+			s = Sprite2D.new()
+			s.centered = true
+			s.region_enabled = true
+			s.z_index = 2
+			add_child(s)
+			_proj_sprites[p] = s
+		if sheet.texture == null:
+			s.visible = false
+			continue
+		s.visible = _fog_visible(int(floor(p.x)), int(floor(p.y)))
+		s.texture = sheet.texture
+		s.region_rect = sheet.region(p.kind, p.anim_t)
+		s.scale = Vector2.ONE / MonsterSheet.ART_SCALE
+		s.flip_h = p.vx < 0.0
+		s.position = (Vector2(p.x, p.y) * TILE).floor()
+	for p: Projectile in _proj_sprites.keys():
+		if not live.has(p):
+			(_proj_sprites[p] as Sprite2D).queue_free()
+			_proj_sprites.erase(p)
 
 
 func _fog_visible(cx: int, cy: int) -> bool:
@@ -272,6 +305,23 @@ func _draw() -> void:
 		return
 	_draw_slashes()
 	_draw_boss_hazards()
+	_draw_projectile_trails()
+
+
+## Короткий хвост за снарядом: путь виден и читается, куда он летит.
+func _draw_projectile_trails() -> void:
+	if Settings.reduce_motion:
+		return
+	for p: Projectile in director.projectiles:
+		if not _fog_visible(int(floor(p.x)), int(floor(p.y))):
+			continue
+		var tint := CombatDirector._projectile_tint(p.kind)
+		var v := Vector2(p.vx, p.vy)
+		if v.length() < 0.1:
+			continue
+		var tail := Vector2(p.x, p.y) * TILE - v.normalized() * 10.0
+		draw_line(Vector2(p.x, p.y) * TILE, tail, Color(tint, 0.55), 2.0)
+		draw_line(Vector2(p.x, p.y) * TILE, Vector2(p.x, p.y) * TILE - v.normalized() * 5.0, Color(1, 1, 1, 0.5), 1.0)
 
 
 func _draw_slashes() -> void:

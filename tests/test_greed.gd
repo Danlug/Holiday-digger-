@@ -1,7 +1,7 @@
 extends Node
 ## test_greed — режим жадности (ГДД §20.1, слова владельца раунда 4): порог и
 ## длительность по ступеням ветки «Жадность», копка с первого удара, ход и падение
-## ×7 без лишнего урона и без прохода сквозь породу, конец режима, ступень в сейве.
+## ×7 без урона от падения (владелец 27.10) и без прохода сквозь породу, конец режима, ступень в сейве.
 ## Настоящий Player на мире-полигоне (клетки задаёт тест), шаги физики — вручную.
 ##
 ## Запуск:  godot --headless --path . res://tests/test_greed.tscn
@@ -92,9 +92,9 @@ func _test_rules() -> void:
 	var at := []
 	var sec := []
 	for s in range(0, 6):
-		at.append(GreedRules.threshold(s))
+		at.append(roundi(GreedRules.threshold(s)))
 		sec.append(roundi(GreedRules.seconds(s)))
-	check("порог по ступеням 60/57/54/51/48/45 (−5…−25%%): %s" % str(at), at == [60, 57, 54, 51, 48, 45])
+	check("порог по ступеням 60/57/54/51/48/45 с работы (−5…−25%%): %s" % str(at), at == [60, 57, 54, 51, 48, 45])
 	check("длительность по ступеням 3/4/5/6/7/8 с: %s" % str(sec), sec == [3, 4, 5, 6, 7, 8])
 	check("ветка «Жадность» — 5 ступеней", GreedRules.max_stage() == 5)
 	check("скорость ×7", is_equal_approx(GreedRules.speed_mult(), 7.0))
@@ -106,21 +106,22 @@ func _test_rules() -> void:
 
 func _test_logic_by_stage() -> void:
 	var s := StreakLogic.new(5)
-	check("ступень 5: шкала 45 клеток, жадность 8 с", s.fever_at == 45 and is_equal_approx(s.greed_s, 8.0))
-	for i in range(44):
-		s.on_dug(100)
-	check("44 клетки — ещё нет", not s.in_greed())
-	check("45-я — жадность", bool(s.on_dug(100)["started"]) and s.in_greed())
+	check("ступень 5: шкала 45 с работы, жадность 8 с", is_equal_approx(s.fever_s, 45.0) and is_equal_approx(s.greed_s, 8.0))
+	s.on_dug(100)
+	s.tick(44.0, true, true)
+	check("44 с копки — ещё нет", not bool(s.on_dug(100)["started"]) and not s.in_greed())
+	s.tick(1.0, true, true)
+	check("45 с и клетка — жадность", bool(s.on_dug(100)["started"]) and s.in_greed())
 	s.tick(7.9, true, true)
 	check("7.9 с — ещё жадность", s.in_greed())
 	s.tick(0.2, false, true)
-	check("8 с — конец, серия с нуля", not s.in_greed() and s.count == 0)
+	check("8 с — конец, серия с нуля", not s.in_greed() and s.count == 0 and s.work == 0.0)
 	var t := StreakLogic.new(0)
-	for i in range(50):
-		t.on_dug(100)
+	t.on_dug(100)
+	t.tick(50.0, true, true)
 	t.set_stage(4)
-	check("купил ступень посреди серии — порог ближе, серия цела", t.count == 50 and t.fever_at == 48)
-	check("следующая клетка — сразу жадность (51 ≥ 48)", bool(t.on_dug(100)["started"]))
+	check("купил ступень посреди серии — порог ближе, шкала цела", is_equal_approx(t.work, 50.0) and is_equal_approx(t.fever_s, 48.0))
+	check("следующая клетка — сразу жадность (50 ≥ 48)", bool(t.on_dug(100)["started"]))
 
 
 func _test_first_hit() -> void:
@@ -209,20 +210,23 @@ func _fall(mult: float, h: float, dt: float = DT) -> Dictionary:
 	return out
 
 
+## Между остановками (каждые 3 клетки, владелец 27.10 — tests/test_greed_fall) падение ×7;
+## мелкий шаг кадра — чтобы отношение не съедало округление до кадра.
 func _test_speed_fall() -> void:
-	var f1 := _fall(1.0, 30.0)
-	var f7 := _fall(7.0, 30.0)
+	var f1 := _fall(1.0, 2.8, 1.0 / 240.0)
+	var f7 := _fall(7.0, 2.8, 1.0 / 240.0)
 	var k := float(f1["frames"]) / float(f7["frames"])
-	check("падение 30 кл.: обычно %d кадров, в жадности %d (×%.1f)" % [f1["frames"], f7["frames"], k],
+	check("падение 2.8 кл. (до остановки): обычно %d кадров, в жадности %d (×%.1f)" % [f1["frames"], f7["frames"], k],
 		k > 6.0 and k < 8.0)
 
 
+## Владелец 27.10: в жадности урона от падения нет (до того было «как без жадности»).
 func _test_fall_damage() -> void:
 	for h in [1.2, 4.0, 12.0, 22.0]:
 		var f1 := _fall(1.0, h)
 		var f7 := _fall(7.0, h)
-		check("падение %.0f кл.: урон в жадности %.0f = обычному %.0f" % [h, f7["dmg"], f1["dmg"]],
-			absf(float(f7["dmg"]) - float(f1["dmg"])) < 0.6)
+		check("падение %.0f кл.: в жадности урона нет (%.0f), обычно %.0f" % [h, f7["dmg"], f1["dmg"]],
+			float(f7["dmg"]) == 0.0)
 	check("клетка вниз в жадности не ранит", float(_fall(7.0, 1.2)["dmg"]) == 0.0)
 	check("12 кл. ранят как обычно (проверка, что урон вообще считается)", float(_fall(1.0, 12.0)["dmg"]) > 0.0)
 
@@ -332,10 +336,9 @@ func _test_director() -> void:
 	await get_tree().process_frame
 	d.set_process(false)
 	d.step(DT)
-	check("ступень 2: шкала 54 клетки, жадность 5 с", d.streak.fever_at == 54 and is_equal_approx(d.streak.greed_s, 5.0))
-	for i in range(54):
-		GameState.emit_event(&"dug", {"cell": Vector2i(3, FLOOR_Y + 10), "tile": TileTypes.Type.DIRT, "mineral": "", "loot": false})
-	check("54 клетки — жадность, герой ×7", d.streak.in_greed() and is_equal_approx(p.greed_mult, 7.0))
+	check("ступень 2: шкала 54 с работы, жадность 5 с", is_equal_approx(d.streak.fever_s, 54.0) and is_equal_approx(d.streak.greed_s, 5.0))
+	_fill(d)
+	check("54 с копки и клетка — жадность, герой ×7", d.streak.in_greed() and is_equal_approx(p.greed_mult, 7.0))
 	check("значок над героем создан", d.badge != null and d.badge.get_parent() == host.view_root)
 	# копаем вниз: клетка за первый удар, падение и снова копка
 	p.set_intent(0, false, true)
@@ -345,47 +348,66 @@ func _test_director() -> void:
 		d.step(DT)
 	var dug := int(round(p.y - y0))
 	check("за секунду жадности вниз прокопано %d клеток (обычно земля киркой — 1.8 с/кл.)" % dug, dug >= 3)
-	# долгое падение ×7 на 30 к/с: за кадр герой проходит до 7 клеток — туман по пути
-	# открывает режиссёр (main.gd открывает только вокруг конечной точки, как здесь)
+	# долгий подъём ×7 на топовом джетпаке на 30 к/с: за кадр герой проходит больше
+	# обзора — туман по пути открывает режиссёр (main.gd открывает только вокруг
+	# конечной точки, как здесь). До 27.10 это проверялось падением; теперь оно в
+	# жадности останавливается каждые 3 клетки (tests/test_greed_fall) и за кадр
+	# проходит меньше обзора.
 	p.set_intent(0, false, false)
 	p.digging = null
+	GameState.grant_gear("jetpack_top")
+	GameState.set_current_gear("jetpack_top")
 	p.x = 20.5
-	p.y = float(FLOOR_Y) - 80.0
+	p.y = float(FLOOR_Y) - 20.0
 	p.vy = 0.0
 	p.on_ground = false
-	d.step(0.033)
-	GameState.debug_invincible = true   # 80 клеток убили бы героя, а смерть гасит жадность — здесь проверяется туман
+	# пара кадров в воздухе без ввода: койот-окно после копки гаснет, иначе «вверх»
+	# стал бы прыжком, а тяга после прыжка взводится по настоящим часам
+	for i in range(4):
+		p.physics_tick(0.033)
+		d.step(0.033)
 	var tr := GameState.get_vision_terrain_radius()
 	var rr := GameState.get_vision_resource_radius()
 	var max_step := 0.0
-	for i in range(120):
+	var y_start: float = p.y
+	p.set_intent(0, true, false)
+	for i in range(90):
 		var y_before: float = p.y
 		p.physics_tick(0.033)
-		max_step = maxf(max_step, p.y - y_before)
+		max_step = maxf(max_step, y_before - p.y)
 		host.fog.reveal_around(p.x, p.y, tr, rr)
 		d.step(0.033)
-		if p.on_ground:
+		if p.y < float(FLOOR_Y) - 100.0:
 			break
-	GameState.debug_invincible = false
+	p.set_intent(0, false, false)
 	var dark := 0
-	for yy in range(FLOOR_Y - 78, FLOOR_Y - 1):
+	for yy in range(int(ceil(p.y)) + 1, int(floor(y_start))):
 		if host.fog.get_state(20, yy) == FogOfWar.State.BLACK:
 			dark += 1
-	check("падение ×7 (до %.1f кл. за кадр) не оставляет тёмных клеток на пути: %d" % [max_step, dark],
-		max_step > 2.0 * float(tr) and dark == 0)
+	check("подъём ×7 (до %.1f кл. за кадр, %.0f кл.) не оставляет тёмных клеток на пути: %d" % [max_step, y_start - p.y, dark],
+		max_step > 2.0 * float(tr) and y_start - p.y > 60.0 and dark == 0)
+	GameState.current_gear = ""
+	GameState.owned_gear.clear()
 	var ended := [false]
 	d.fever_ended.connect(func() -> void: ended[0] = true)
 	for i in range(int(5.0 / DT)):
 		d.step(DT)
 	check("через 5 с жадность кончилась: ×1, сигнал конца", not d.streak.in_greed() and is_equal_approx(p.greed_mult, 1.0) and ended[0])
 	# дом/смерть рвут жадность
-	for i in range(54):
-		GameState.emit_event(&"dug", {"cell": Vector2i(3, FLOOR_Y + 10), "tile": TileTypes.Type.DIRT, "mineral": "", "loot": false})
+	_fill(d)
 	check("снова жадность", d.streak.in_greed())
 	GameState.died.emit()
 	check("смерть гасит жадность и ×7", not d.streak.in_greed() and is_equal_approx(p.greed_mult, 1.0))
 	host.queue_free()
 	GameState.skill_stages.erase("greed")
+
+
+## Шкала до краёв (StreakLogic: секунды копки) и клетка-порог через шину, как у живой копки.
+func _fill(d: MechDirector) -> void:
+	var dug := {"cell": Vector2i(3, FLOOR_Y + 10), "tile": TileTypes.Type.DIRT, "mineral": "", "loot": false}
+	GameState.emit_event(&"dug", dug)
+	d.streak.tick(d.streak.fever_s, true, true)
+	GameState.emit_event(&"dug", dug)
 
 
 func _test_save_and_tree() -> void:
@@ -401,5 +423,5 @@ func _test_save_and_tree() -> void:
 	SaveSystem._apply(data)
 	check("ступень 3 пережила сейв", GameState.get_skill_stage("greed") == 3)
 	var txt := SkillTree.effect_text(Balance.get_upgrade_branch("greed"), 3)
-	check("подсказка ступени: «%s»" % txt, txt.contains("6 с") and txt.contains("51"))
+	check("подсказка ступени: «%s»" % txt, txt.contains("6 с") and txt.contains("51 с"))
 	check("у ветки есть значок", HeroIcons.skill_icon("greed") != null)

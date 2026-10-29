@@ -33,11 +33,11 @@ extends CanvasLayer
 
 signal action_requested(action: String, arg: String)
 
-const BG := Color8(0x14, 0x0F, 0x0B)
-const PANEL_BG := Color8(0x1E, 0x18, 0x11)
-const PANEL_BORDER := Color8(0x3E, 0x31, 0x25)
-const ACCENT := Color8(0xE0, 0xA9, 0x3B)
-const DIM := Color8(0x9D, 0x8B, 0x73)
+const BG := UiTheme.PANEL_DARK
+const PANEL_BG := UiTheme.CARD
+const PANEL_BORDER := UiTheme.BORDER
+const ACCENT := UiTheme.GOLD
+const DIM := UiTheme.MUTED
 
 ## Высота игрового поля дома — вся высота экрана (480) минус тонкая шапка со
 ## статами (HUD на время дома скрыт целиком, см. house_system.enter_house).
@@ -116,6 +116,7 @@ const KEY_RIGHT_D: Key = KEY_D
 const KEY_RIGHT_ARROW: Key = KEY_RIGHT
 
 var _root: Control
+var _closing := false   # интерьер уходит: слой ещё виден
 var _clock: Label
 var _day: Label
 var _bars: Dictionary = {}       # "hp"|"hunger"|"stamina" -> ColorRect (заливка)
@@ -195,7 +196,7 @@ func _ready() -> void:
 	# Выше HUD (его слой 1), но НИЖЕ экранов соседних систем (магазин 20,
 	# экран героя 10): их окна открываются из комнат дома и обязаны лечь
 	# поверх интерьера, а не под него.
-	layer = 9
+	layer = UiLayers.HOUSE
 	_ensure_structure()
 	_build_live_overlays()
 	visible = false
@@ -254,7 +255,7 @@ func _build_header() -> void:
 	cal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_day = _need(header, "Day", Label) as Label
 	_day.position = Vector2(45, 3)
-	_day.add_theme_font_size_override("font_size", 9)
+	_day.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_day.add_theme_color_override("font_color", ACCENT)
 	_day.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var clk := _need(header, "ClockIcon", TextureRect) as TextureRect
@@ -265,7 +266,7 @@ func _build_header() -> void:
 	clk.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_clock = _need(header, "Clock", Label) as Label
 	_clock.position = Vector2(83, 3)
-	_clock.add_theme_font_size_override("font_size", 9)
+	_clock.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_clock.add_theme_color_override("font_color", DIM)
 	_clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -295,9 +296,9 @@ func _build_header() -> void:
 	var bars := _need(header, "Bars", HBoxContainer) as HBoxContainer
 	bars.position = Vector2(8, 22)
 	bars.add_theme_constant_override("separation", 6)
-	_bars["hp"] = _bar_row(bars, "Hp", Color8(0xB8, 0x5A, 0x52), "res://art/ui/icon_hp.png")
+	_bars["hp"] = _bar_row(bars, "Hp", UiTheme.RED, "res://art/ui/icon_hp.png")
 	_bars["hunger"] = _bar_row(bars, "Hunger", Color8(0xC4, 0x70, 0x6A), "res://art/ui/icon_hunger.png")
-	_bars["stamina"] = _bar_row(bars, "Stamina", Color8(0x6E, 0x93, 0xA8), "res://art/ui/icon_stamina.png")
+	_bars["stamina"] = _bar_row(bars, "Stamina", UiTheme.BLUE, "res://art/ui/icon_stamina.png")
 	for id in ["hp", "hunger", "stamina"]:
 		var row: Control = (_bars[id] as Node).get_parent().get_parent()
 		_bar_icons[id] = row.get_node_or_null("Icon")
@@ -314,7 +315,7 @@ func _build_header() -> void:
 	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_notice.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_notice.add_theme_font_size_override("font_size", 9)
+	_notice.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_notice.add_theme_color_override("font_color", ACCENT)
 	_notice.add_theme_stylebox_override("normal", _box(Color(0.07, 0.055, 0.043, 0.92), ACCENT))
 	_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -508,6 +509,10 @@ func _load_hero_sheets() -> void:
 ## enter_x — доля 0..1, где герой появится в комнате (обычно дверь, из
 ## которой он вышел в предыдущей); -1 (по умолчанию) — spawn_x комнаты.
 func open(room: String, enter_x: float = -1.0) -> void:
+	GameState.emit_event("screen_opened", {"id": "house", "tab": room})   # аналитика (scripts/core/analytics.gd)
+	if not visible or _closing:
+		UiAnim.open(_root, UiAnim.Kind.FADE)
+	_closing = false
 	visible = true
 	_sleeping = false
 	# Замок сна снимается вместе с самим сном: тап посреди ролика «house_sleep»
@@ -520,13 +525,20 @@ func open(room: String, enter_x: float = -1.0) -> void:
 
 
 func close() -> void:
-	visible = false
 	_sleeping = false
 	_locked = false
 	_knock_t = -1.0
 	if _sleep_fx != null:
 		_sleep_fx.stop()
 	hide_npc()
+	if not visible or _closing:
+		return
+	# слой прячется после ухода интерьера; войдут снова посреди ухода — развернётся
+	_closing = true
+	UiAnim.close(_root, UiAnim.Kind.FADE, null, func() -> void:
+		_closing = false
+		visible = false
+		_root.visible = true)
 
 
 func go_to_room(id: String, enter_x: float = -1.0) -> void:
@@ -1320,7 +1332,7 @@ func _box(bg: Color, border: Color) -> StyleBoxFlat:
 
 
 func _style_button(b: Button) -> void:
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	b.custom_minimum_size = Vector2(0, 22)
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()

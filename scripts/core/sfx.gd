@@ -17,6 +17,7 @@ extends RefCounted
 ##   механики  : greed_start greed_end (жадность азарта, scripts/mechanics/)
 ##   мир       : quake collapse lava_hiss door phone explosion
 ##   бой       : swing hit_enemy enemy_die boss_roar hurt_armor
+##   полости   : spit (плевок стрелка) cave_unlock (все стражи мертвы — сундук отперт)
 ##   музыка    : mus_surface mus_mine_1 mus_mine_2 mus_deep mus_boss mus_story
 ##               mus_shop mus_menu
 

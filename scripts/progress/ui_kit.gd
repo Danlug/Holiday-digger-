@@ -7,18 +7,18 @@ extends RefCounted
 ## красил себя сам, вкладки выглядели бы как три разные игры. Палитра взята
 ## из hud.gd, чтобы экраны не выбивались из общего интерфейса.
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
-const DIM := Color8(0x86, 0x76, 0x60)   # было 6A5C4C: на тёмной плашке контраст ~2.7, теперь ~4
-const BORDER := Color8(0x3E, 0x31, 0x25)
-const BG := Color(0.071, 0.055, 0.043, 0.97)
+const GOLD := UiTheme.GOLD
+const MUTED := UiTheme.MUTED
+const DIM := UiTheme.DIM   # было 6A5C4C: на тёмной плашке контраст ~2.7, теперь ~4
+const BORDER := UiTheme.BORDER
+const BG := UiTheme.BG
 ## Фон полноэкранных экранов (герой, техника, хаб, снаряжение): непрозрачный, иначе сквозь
 ## него светятся полоса HUD, джойстик и тосты мира.
-const BG_SOLID := Color(0.071, 0.055, 0.043, 1.0)
-const PANEL_BG := Color(0.11, 0.09, 0.07, 1.0)
-const GREEN := Color8(0x7F, 0xB8, 0x6B)
-const RED := Color8(0xB8, 0x5A, 0x52)
-const BLUE := Color8(0x6E, 0x93, 0xA8)
+const BG_SOLID := UiTheme.BG_SOLID
+const PANEL_BG := UiTheme.PANEL
+const GREEN := UiTheme.OK
+const RED := UiTheme.RED
+const BLUE := UiTheme.BLUE
 
 
 ## --- Единый язык оформления (радиусы, рамки, тени) ---
@@ -33,16 +33,16 @@ const R_BAR := 3
 const R_TILE := 6
 const R_CARD := 9
 const R_SHEET := 12
-const EDGE := Color8(0x52, 0x40, 0x2D)      # рамка приподнятого: кнопки, шторки, окна
-const SHEET_BG := Color8(0x1A, 0x14, 0x0F)  # фон шторки и окна
-const INSET_BG := Color(0.06, 0.05, 0.04)   # «утопленное»: поля ввода, канавки
-const SHADOW := Color(0, 0, 0, 0.5)
+const EDGE := UiTheme.EDGE      # рамка приподнятого: кнопки, шторки, окна
+const SHEET_BG := UiTheme.SHEET  # фон шторки и окна
+const INSET_BG := UiTheme.INSET   # «утопленное»: поля ввода, канавки
+const SHADOW := UiTheme.SHADOW
 ## Нижняя полоса вкладок полноэкранных экранов (герой, техника, хаб, снаряжение): одна высота,
 ## в зоне большого пальца.
 const TAB_BAR_H := 30
-const CARD_BG := Color8(0x1D, 0x17, 0x12)   # карточка/плитка внутри шторки или окна
-const TEXT_HI := Color8(0xF2, 0xD9, 0x9B)   # заголовок, главное число
-const TEXT := Color8(0xD8, 0xCF, 0xC0)      # обычный светлый текст
+const CARD_BG := UiTheme.CARD   # карточка/плитка внутри шторки или окна
+const TEXT_HI := UiTheme.TEXT_HI   # заголовок, главное число
+const TEXT := UiTheme.TEXT      # обычный светлый текст
 
 
 ## Притягивает «любой» радиус к ближайшей ступени: так старые вызовы с радиусом
@@ -103,7 +103,7 @@ static func make_panel(bg: Color = PANEL_BG, border: Color = BORDER) -> PanelCon
 	return p
 
 
-static func make_label(text: String, size: int = 10, color: Color = MUTED) -> Label:
+static func make_label(text: String, size: int = UiTheme.FS_BODY, color: Color = MUTED) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
@@ -111,20 +111,11 @@ static func make_label(text: String, size: int = 10, color: Color = MUTED) -> La
 	return l
 
 
-static func make_wrapped_label(text: String, size: int = 9, color: Color = DIM) -> Label:
+static func make_wrapped_label(text: String, size: int = UiTheme.FS_SMALL, color: Color = DIM) -> Label:
 	var l := make_label(text, size, color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return l
-
-
-## Текстовая кнопка в общем стиле (приподнятая плитка UiBtn с откликом нажатия).
-static func make_button(text: String, font_size: int = 9) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", font_size)
-	UiBtn.style(b)
-	return b
 
 
 ## Горизонтальная полоска заполнения (опыт, прогресс коллекции).

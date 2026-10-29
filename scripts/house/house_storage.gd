@@ -14,9 +14,8 @@ extends RefCounted
 ## поверхность — событием: со дна шахты нельзя ни продать, ни достать со
 ## склада, это одна и та же линия.
 ##
-## Склад НЕ теряется при смерти: теряется только рюкзак (ГДД п.7). Чёрный
-## ящик он не заменяет — ящик страхует то, что ты нёс, склад хранит то, что
-## ты уже донёс.
+## Склад НЕ теряется при смерти: теряется только рюкзак (ГДД п.7) — склад
+## хранит то, что ты уже донёс.
 
 ## Комната, в которой стоит склад. Верстак там же, в двух шагах (ГДД п.14).
 const ROOM := "workshop"
@@ -77,13 +76,29 @@ static func put(id: String, amount: int) -> int:
 	return moved
 
 
-## Выгрузить весь рюкзак. Возвращает, сколько единиц переложено.
+## Припас — то, что остаётся с героем: без еды, аптечки и топлива копать дальше нельзя.
+## Еда и лекарства узнаются по category в data/minerals.json (food / medical), топливо — по id.
+static func is_supply(id: String) -> bool:
+	if id == "fuel_block" or HouseConfig.is_food(id) or Healing.is_medkit(id):
+		return true
+	return ["food", "medical"].has(String(Balance.get_mineral(id).get("category", "")))
+
+
+## Что уносят разом «Переложить всё» и премиум-выгрузка: только руды и ресурсы из
+## data/minerals.json. Припас и прочий инвентарь (батарейки и т.п.) остаются в рюкзаке —
+## по одному их всё ещё можно положить через окно количества.
+static func is_haul(id: String) -> bool:
+	return not Balance.get_mineral(id).is_empty() and not is_supply(id)
+
+
+## Выгрузить из рюкзака все руды и ресурсы. Возвращает, сколько единиц переложено.
 static func put_all() -> int:
 	if not can_access():
 		return 0
 	var moved := 0
 	for id in GameState.inventory.keys().duplicate():
-		moved += put(String(id), GameState.get_item_count(String(id)))
+		if is_haul(String(id)):
+			moved += put(String(id), GameState.get_item_count(String(id)))
 	return moved
 
 

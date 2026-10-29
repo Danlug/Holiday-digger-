@@ -111,7 +111,7 @@ func _next() -> void:
 	var is_branch: bool = _entry["kind"] == "branch"
 	Sfx.play("quest_done" if is_branch else "artifact")
 	Haptics.buzz(120 if is_branch else 60)
-	HeroUi.burst_particles(self, _card_center(), ProgressUiKit.GOLD if not is_branch else Color8(0xFF, 0xE0, 0x66),
+	HeroUi.burst_particles(self, _card_center(), ProgressUiKit.GOLD if not is_branch else UiTheme.GOLD_LIGHT,
 		36 if is_branch else 26, 130.0)
 
 	if _tween != null:
@@ -211,13 +211,13 @@ func _draw() -> void:
 		coins = Balance.get_artifact_find_coins(String(_entry.get("id", "")))
 	var items: Array = []
 	if xp > 0:
-		items.append(["ui_xp", HeroUi.short_num(xp), Color8(0x5E, 0xA8, 0xF0)])
+		items.append(["ui_xp", UiFmt.short(xp), Color8(0x5E, 0xA8, 0xF0)])
 	if coins > 0:
-		items.append(["ui_coin", HeroUi.short_num(coins), ProgressUiKit.GOLD])
+		items.append(["ui_coin", UiFmt.short(coins), ProgressUiKit.GOLD])
 	if dollars > 0:
 		items.append(["ui_dollar", str(dollars), HeroUi.OK])
 	var font := ThemeDB.fallback_font
-	var fs := 10
+	var fs := UiTheme.FS_BODY
 	var total_w := 0.0
 	for it: Array in items:
 		total_w += 16.0 + 2.0 + font.get_string_size(String(it[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 8.0

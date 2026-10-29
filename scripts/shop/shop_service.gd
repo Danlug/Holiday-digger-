@@ -95,9 +95,19 @@ static func can_buy(item: Dictionary) -> Dictionary:
 			res["reason"] = "Роликов на сегодня не осталось. За монеты — у входной двери дома."
 		return res
 	res["ok"] = false
+	# Раунд 5, слова владельца: «В огороде покупки напоминают, что покупать надо у
+	# входной двери». Про ролик здесь не говорим: на огороде он не нужен и не
+	# предлагается, путь один — к двери (ShopUI ведёт туда стрелкой).
 	res["reason"] = "Покупки за монеты — у входной двери, в прихожей." if place == PLACE_HOUSE \
-			else "Покупки за монеты — у входной двери дома. Под землёй — за ролик."
+			else "Покупки за монеты — у входной двери дома."
 	return res
+
+
+## Отказ can_buy из-за места, а не из-за лимита роликов: огород или другая
+## комната дома. Витрина отвечает на него не замком, а напоминанием «к двери».
+static func is_door_reminder(gate: Dictionary) -> bool:
+	return not bool(gate.get("ok", true)) \
+			and String(gate.get("place", "")) in [PLACE_GARDEN, PLACE_HOUSE]
 
 
 ## Платная часть удалённой покупки: «ролик» и единица лимита. Зовётся ПОСЛЕ всех
@@ -398,6 +408,8 @@ static func craft_plan(recipe_id: String, count: int) -> Dictionary:
 		room = mini(room, int(floor(free / w)) if free > 0.0 else 0)
 	plan["to_pack"] = mini(want, room)
 	plan["to_storage"] = int(plan["made"]) - int(plan["to_pack"])
+	# Штук целиком из рюкзачного сырья: печь (BronzeFurnace) кладёт их в рюкзак позже.
+	plan["pack_units"] = pack_units
 	return plan
 
 
@@ -405,12 +417,16 @@ static func craft_plan(recipe_id: String, count: int) -> Dictionary:
 ## результат. count > 1 — только у переработки (is_batch), и пачка проходит
 ## целиком или не проходит вовсе: всё проверяется до первого списания.
 ## Возвращает {ok, message, count (сколько вышло), used {id: n}, to_pack, to_storage}.
-## Без материалов не крафтит и ничего не трогает.
+## Бронза — исключение: пачка уходит в печь (count 0, queued N, timed true), готовое
+## забирается позже (BronzeFurnace.collect). Без материалов не крафтит и ничего не трогает.
 static func craft(recipe_id: String, count: int = 1) -> Dictionary:
 	var check := check_craft(recipe_id, count)
 	if not bool(check["ok"]):
 		return {"ok": false, "message": String(check["reason"]), "count": 0}
 	if is_batch(recipe_id):
+		# Бронза не мгновенная: лом уходит в печь, готовое заберётся позже (BronzeFurnace).
+		if BronzeFurnace.handles(recipe_id):
+			return BronzeFurnace.start(count)
 		return _craft_batch(recipe_id, count)
 
 	var r := ShopCatalog.recipe(recipe_id)
@@ -489,7 +505,41 @@ static func _machine_built(machine_id: String) -> bool:
 # «Больше не нужно ресурсы собирать для крафта» — шесть кирок и четыре ранца
 # берутся за монеты в магазине у входной двери. Рецептов у них нет вовсе, и
 # ворот по глубине тоже: воротами прогресса стал ценник.
+#
+# Владелец, 27.10: «Все апгрейды только по порядку. Нельзя перескочить кирку
+# или рюкзак». Без этого правила золото обучения (1000 монет) сразу шло на
+# титан мимо железа, и ценник переставал быть лесенкой. Ступень продаётся,
+# только когда предыдущая в линейке уже есть — тот же принцип, что у бура
+# (buy_drill_upgrade).
 # ---------------------------------------------------------------------------
+
+## Предыдущая ступень той же линейки (кирки — по полю line, ранцы — gear),
+## которой у игрока ещё нет; "" — ступень можно брать. Проверяется ровно
+## соседняя ступень, а не «все ниже»: сейв, где перескок уже случился (титан
+## без железа), не запирает следующую за титаном, а железо остаётся купить.
+## Бесплатная ржавая кирка считается своей (GameState.owns_tool), поэтому
+## железная — первая в продаже.
+static func missing_prev_tier(id: String) -> String:
+	var is_gear := not Balance.get_gear(id).is_empty()
+	var line: Array = Balance.get_gear_ids() if is_gear else []
+	if not is_gear:
+		var tool_line := String(Balance.get_tool(id).get("line", ""))
+		if tool_line != "":
+			line = Balance.get_tools_in_line(tool_line)
+	var i := line.find(id)
+	if i <= 0:
+		return ""
+	var prev := String(line[i - 1])
+	var have := GameState.has_gear(prev) if is_gear else GameState.owns_tool(prev)
+	return "" if have else prev
+
+
+## Отказ «сначала предыдущая ступень» для покупки и подсказки плитки.
+static func prev_tier_reason(prev: String) -> String:
+	var name_ru := Balance.get_gear_name_ru(prev) if not Balance.get_gear(prev).is_empty() \
+			else Balance.get_tool_name_ru(prev)
+	return "Сначала %s: ступени — по порядку" % name_ru.to_lower()
+
 
 ## Покупка ступени инструмента за монеты. Отказывает всему, у чего в цене
 ## есть материалы: такое собирается на верстаке, а не покупается, и продать
@@ -504,6 +554,9 @@ static func buy_tool(tool_id: String) -> Dictionary:
 		return {"ok": false, "message": "Уже есть"}
 	if Balance.tool_needs_materials(tool_id):
 		return {"ok": false, "message": "Это собирается на верстаке, а не покупается"}
+	var prev := missing_prev_tier(tool_id)
+	if prev != "":
+		return {"ok": false, "message": prev_tier_reason(prev)}
 	# Под землёй кирку теперь можно купить за ролик, а бурмобиль там бросить
 	# нельзя (решение владельца) — иначе покупка чужой кирки прямо в шахте тихо
 	# ссаживала бы героя с машины мимо единственной точки проверки
@@ -540,6 +593,9 @@ static func buy_gear(gear_id: String) -> Dictionary:
 		return {"ok": false, "message": String(gate["reason"])}
 	if GameState.has_gear(gear_id):
 		return {"ok": false, "message": "Уже есть"}
+	var prev := missing_prev_tier(gear_id)
+	if prev != "":
+		return {"ok": false, "message": prev_tier_reason(prev)}
 	var price := Balance.get_gear_cost_coins(gear_id)
 	if price <= 0:
 		return {"ok": false, "message": "Это не продаётся"}
@@ -641,6 +697,17 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 		if Balance.get_mineral_weight(item) * count > _free_weight():
 			return {"ok": false, "message": "Рюкзак не выдержит — разгрузись", "effect": ""}
 
+	# Выгрузка на склад (раунд 6): пустой рюкзак — деньги не берём.
+	if String(g.get("effect", "")) == PremiumUnload.EFFECT and not PremiumUnload.can_unload():
+		return {"ok": false, "message": "Отправлять нечего: в рюкзаке только припасы", "effect": ""}
+
+	# Подарок обучения на 200 (scripts/teleport/): часы без списания долларов, пока подарок есть.
+	if good_id == TeleportWatch.GOOD_ID and TeleportWatch.take_free():
+		var free_message := apply_effect(g)
+		_emit_bought(good_id, currency, false)
+		SaveSystem.save_game()
+		return {"ok": true, "message": free_message, "effect": String(g.get("effect", "")), "remote": false, "free": true}
+
 	var lack := "монет" if currency == "coins" else "долларов"
 	if not _can_afford(currency, price):
 		return {"ok": false, "message": "Не хватает " + lack, "effect": ""}
@@ -654,7 +721,10 @@ static func buy(good_id: String, currency: String) -> Dictionary:
 	var message := apply_effect(g)
 	_emit_bought(good_id, currency, bool(gate["needs_ad"]))
 	SaveSystem.save_game()
-	return {"ok": true, "message": message, "effect": effect, "remote": bool(gate["needs_ad"])}
+	var out := {"ok": true, "message": message, "effect": effect, "remote": bool(gate["needs_ad"])}
+	if effect == PremiumUnload.EFFECT:
+		out["unload"] = PremiumUnload.last_result()   # что улетело — витрине для «домой»
+	return out
 
 
 ## Эффект расходника применяется сразу при покупке, а не кладётся в
@@ -681,11 +751,9 @@ static func apply_effect(g: Dictionary) -> String:
 			if hp > 0:
 				parts.append("+%d%% здоровья" % hp)
 			return "%s: %s" % [name_ru, ", ".join(parts)]
-		"full_restore":
-			GameState.heal(GameState.get_max_hp())
-			GameState.set_stamina(100.0)
-			GameState.set_hunger(100.0)
-			return "Все три полоски на максимуме."
+		"premium_unload":
+			var r := PremiumUnload.unload()
+			return "На складе: +%d шт." % int(r["count"])
 		"teleport_home":
 			return "Часы сработали — ты дома."
 		"grant_item":

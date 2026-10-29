@@ -23,7 +23,7 @@ const TOOL_ICONS := {
 }
 const TOOL_TIPS := {
 	"hand_drill": ["Бак ручного бура", "Жжёт топливо за каждую прокопанную клетку. Пустой — копаешь киркой."],
-	"drill_rig": ["Бак бурмобиля", "Пустой бак — бурмобиль глохнет под землёй."],
+	"drill_rig": ["Бак бурмобиля", "Пустой бак — копаешь киркой."],
 }
 
 static var _instance: TechScreen = null
@@ -55,7 +55,7 @@ static func attach(host: Node, player: Node) -> TechScreen:
 	var layer := CanvasLayer.new()
 	layer.name = "TechLayer"
 	# 94: выше HUD и дома, ниже экрана героя (95), окна отчёта (96) и катсцен (100).
-	layer.layer = 94
+	layer.layer = UiLayers.DAILY
 	host.add_child(layer)
 	var screen := TechScreen.new()
 	screen.name = "TechScreen"
@@ -102,8 +102,8 @@ func _ready() -> void:
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.offset_left = 6
 	column.offset_right = -6
-	column.offset_top = 6
-	column.offset_bottom = -6
+	column.offset_top = UiBtn.CLOSE_ROW + HudSafeArea.top(get_viewport())
+	column.offset_bottom = -6 - HudSafeArea.bottom(get_viewport())
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
 	_content = VBoxContainer.new()
@@ -111,6 +111,7 @@ func _ready() -> void:
 	_content.add_theme_constant_override("separation", 6)
 	column.add_child(_content)
 	column.add_child(_build_tabs())   # вкладки внизу, в зоне большого пальца — как на экране героя
+	UiBtn.close_button(close, self)
 	_fx_layer = Control.new()
 	_fx_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -131,12 +132,13 @@ func _build_tabs() -> Control:
 		[TAB_WELL, TechUi.tex("icon_well"), "Скважина", "Копает сама, пока тебя нет"],
 	]
 	var bar := HeroTabButton.make_bar(specs, _tab,
-		func(key: String) -> void: open_tab(key, _station), close)
+		func(key: String) -> void: open_tab(key, _station))
 	_tab_buttons = bar.get_meta("buttons")
 	return bar
 
 
 func open_tab(tab: String, station: bool = false) -> void:
+	GameState.emit_event("screen_opened", {"id": "tech", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	_tab = tab
 	_station = station or (visible and _station and tab == TAB_TANK)
 	if not visible or _closing:
@@ -239,15 +241,6 @@ func _pips(parent: Node, total: int, filled: int, color: Color = TechUi.GOLD) ->
 		row.add_child(pip)
 
 
-func _text_button(text: String, kind: int = UiBtn.Kind.NORMAL, width: float = 40.0) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", 9)
-	b.custom_minimum_size = Vector2(width, 24)
-	UiBtn.style(b, kind)
-	return b
-
-
 ## Цена: монеты и материалы «есть/нужно» — красным то, чего не хватает.
 func _cost_row(parent: Node, cost) -> void:
 	if cost == null:
@@ -257,7 +250,7 @@ func _cost_row(parent: Node, cost) -> void:
 	var coins := TechCost.coins_of(cost)
 	if coins > 0:
 		var lack: bool = int(check["missing_coins"]) > 0
-		var c := TechUi.chip(UiIcons.tex("coin"), TechUi.short(coins), TechUi.RED if lack else TechUi.GOLD)
+		var c := TechUi.chip(UiIcons.tex("coin"), UiFmt.short(coins), TechUi.RED if lack else TechUi.GOLD)
 		Tip.bind(c, "Монеты", "Есть: %d" % GameState.coins)
 		c.mouse_filter = Control.MOUSE_FILTER_STOP
 		row.add_child(c)
@@ -319,7 +312,7 @@ func _build_tank() -> void:
 		_gauge_from = -1.0
 	else:
 		TechUi.set_fill(bar, frac, color)
-	var num := TechUi.label("%.1f/%d" % [FuelTank.fuel(_tool), int(FuelTank.capacity(_tool))], 9, Color.WHITE)
+	var num := TechUi.label("%.1f/%d" % [FuelTank.fuel(_tool), int(FuelTank.capacity(_tool))], UiTheme.FS_SMALL, Color.WHITE)
 	num.set_anchors_preset(Control.PRESET_FULL_RECT)
 	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -387,8 +380,8 @@ func _source_row(parent: Node, source: String, icon: Texture2D, have: int, allow
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
-	var one := _text_button("+1", UiBtn.Kind.NORMAL, 34)
-	var all := _text_button("", UiBtn.Kind.ACCENT, 48)
+	var one := UiBtn.text_button("+1", UiBtn.Kind.NORMAL, Vector2(34, 24))
+	var all := UiBtn.text_button("", UiBtn.Kind.ACCENT, Vector2(48, 24))
 	all.icon = UiIcons.tex("max")      # «до максимума» — значок, слова нет
 	all.add_theme_constant_override("icon_max_width", 16)
 	all.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -452,17 +445,17 @@ func _build_refinery() -> void:
 	var rate := _hbox(top, 1)
 	rate.mouse_filter = Control.MOUSE_FILTER_STOP
 	rate.add_child(TechUi.icon_rect(TechUi.item_icon_small(_raw_sel, 14), 14))
-	rate.add_child(TechUi.label(str(per), 10, TechUi.MUTED))
+	rate.add_child(TechUi.label(str(per), UiTheme.FS_BODY, TechUi.MUTED))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 14))
-	rate.add_child(TechUi.label("1", 10, TechUi.MUTED))
+	rate.add_child(TechUi.label("1", UiTheme.FS_BODY, TechUi.MUTED))
 	Tip.bind(rate, "Курс перегонки", "%s: %d шт. = 1 топливный блок" % [TechUi.item_name(_raw_sel), per])
 
 	# Превращение: сырьё -> куб -> блоки. Куб — кнопка «перегнать».
 	var conv := _hbox(v, 3)
 	var raw_ic := TechUi.icon_rect(TechUi.item_icon(_raw_sel), 24)
 	conv.add_child(raw_ic)
-	var used_lbl := TechUi.label("", 11, TechUi.MUTED)
+	var used_lbl := TechUi.label("", UiTheme.FS_LABEL, TechUi.MUTED)
 	used_lbl.custom_minimum_size = Vector2(26, 0)
 	conv.add_child(used_lbl)
 	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
@@ -474,7 +467,7 @@ func _build_refinery() -> void:
 	conv.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	var out_ic := TechUi.icon_rect(TechUi.tex("fuel_block"), 24)
 	conv.add_child(out_ic)
-	var made_lbl := TechUi.label("", 11, TechUi.GOLD)
+	var made_lbl := TechUi.label("", UiTheme.FS_LABEL, TechUi.GOLD)
 	made_lbl.custom_minimum_size = Vector2(26, 0)
 	conv.add_child(made_lbl)
 
@@ -536,7 +529,7 @@ func _raw_tile(raw: String) -> Control:
 	b.modulate = Color(1, 1, 1, 1.0 if unlocked else 0.5)
 	var held := FuelRefinery.held(raw)
 	if unlocked:
-		var n := TechUi.label("×%d" % held if held < 1000 else TechUi.short(held), 9,
+		var n := TechUi.label("×" + UiFmt.short(held), UiTheme.FS_SMALL,
 			Color.WHITE if held >= FuelRefinery.per_block(raw) else TechUi.DIM)
 		n.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 		n.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -677,7 +670,7 @@ func _flare(at: Vector2, delay: float) -> void:
 func _float_text(at: Vector2, text: String) -> void:
 	if UiAnim.reduced() or _fx_layer == null or not _fx_layer.is_inside_tree():
 		return
-	var l := TechUi.label(text, 12, TechUi.GOLD)
+	var l := TechUi.label(text, UiTheme.FS_TITLE, TechUi.GOLD)
 	l.position = at - Vector2(10, 8)
 	_fx_layer.add_child(l)
 	var tw := l.create_tween()
@@ -705,7 +698,7 @@ func _build_suit() -> void:
 	var z := Heat.zone(cur_depth)
 	Tip.bind(th, String(z.get("name_ru", "")), "Температура породы на твоей глубине", "%d °C" % int(Heat.temperature(cur_depth)))
 	hv.add_child(th)
-	hv.add_child(TechUi.label("%d°" % int(Heat.temperature(cur_depth)), 12,
+	hv.add_child(TechUi.label("%d°" % int(Heat.temperature(cur_depth)), UiTheme.FS_TITLE,
 		[TechUi.GREEN, TechUi.FIRE, TechUi.RED][lvl]))
 	var arrow := TechUi.icon_rect(TechUi.tex("icon_down"), 14)
 	hv.add_child(arrow)
@@ -827,7 +820,7 @@ func _build_well() -> void:
 	var stats := _hbox(v, 8)
 	stats.add_child(_stat_chip(UiIcons.tex("depth"), str(IdleWell.effective_depth()), "Глубина копки",
 		"До какой глубины копает скважина (рекорд героя или предел ступени)", "предел %d" % IdleWell.depth_cap()))
-	stats.add_child(_stat_chip(UiIcons.tex("coin"), TechUi.short(int(IdleWell.income_per_hour())), "Доход в час",
+	stats.add_child(_stat_chip(UiIcons.tex("coin"), UiFmt.short(int(IdleWell.income_per_hour())), "Доход в час",
 		"В монетах-эквиваленте; платит рудой на склад", "%d клеток в час" % int(IdleWell.cells_per_hour())))
 	stats.add_child(_stat_chip(TechUi.tex("icon_hourglass"), "%dч" % int(IdleWell.cap_hours()), "Офлайн-кап",
 		"Дольше этого скважина не копит — заглядывай почаще"))

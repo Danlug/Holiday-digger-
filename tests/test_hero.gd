@@ -319,7 +319,7 @@ func _test_find_records_depth() -> void:
 	add_child(finder)
 	finder.setup(null, null)
 	var artifact: Dictionary = Balance.get_artifacts_in_branch(1)[2]
-	var cell: Vector2i = ArtifactSpawn.candidate_cells(artifact, GameState.world_seed)[0]
+	var cell: Vector2i = ArtifactSpawn.cell_of(artifact, GameState.world_seed, GameState.world_ref)
 	var id := finder.claim_at(cell.x, cell.y)
 	check_eq("находка выдана", id, String(artifact["id"]))
 	check_eq("глубина находки = строка клетки", HeroData.find_depth(id), cell.y)
@@ -415,10 +415,10 @@ func _test_hero_panel() -> void:
 			wrapped += 1
 	check_eq("на вкладке героя нет переносимых абзацев", wrapped, 0)
 
-	check_eq("1234 -> 1234", HeroUi.short_num(1234), "1234")
-	check_eq("12 345 -> 12.3k", HeroUi.short_num(12345), "12.3k")
-	check_eq("10 000 -> 10k", HeroUi.short_num(10000), "10k")
-	check_eq("4 200 000 -> 4.2M", HeroUi.short_num(4200000), "4.2M")
+	check_eq("1234 -> 1234", UiFmt.short(1234), "1234")
+	check_eq("12 345 -> 12.3к", UiFmt.short(12345), "12.3к")
+	check_eq("10 000 -> 10к", UiFmt.short(10000), "10к")
+	check_eq("4 200 000 -> 4.2М", UiFmt.short(4200000), "4.2М")
 	panel.queue_free()
 
 

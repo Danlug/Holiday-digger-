@@ -9,7 +9,7 @@ extends Node
 ##       --resolution 448x960 -- /каталог [сцена ...]
 ##
 ## Первый аргумент после "--" — каталог, остальные — имена сцен (по умолчанию
-## все): base menu settings inventory drop lowhp bigmoney toasts.
+## все): base menu settings inventory drop lowhp survival bigmoney toasts.
 
 var _out_dir := "/tmp/hud_shots"
 var _only: Array[String] = []
@@ -91,6 +91,32 @@ func _ready() -> void:
 		GameState.stamina_changed.emit(GameState.stamina)
 		await _frames(30)
 		await _shot("lowhp")
+
+	# Раунд 5 (ГДД §7): значки-статусы на концах полосок голода и бодрости.
+	if _want("survival"):
+		GameState.hp = GameState.get_max_hp()
+		GameState.hp_changed.emit(GameState.hp, GameState.get_max_hp())
+		GameState.set_hunger(20.0)
+		GameState.set_stamina(18.0)
+		await _frames(30)
+		await _shot("survival_low")
+		var badge := _hud._hunger_bar.get_node_or_null("SurvivalBadge") as Control
+		if badge != null:
+			Tip.show_now(badge)
+			await _frames(4)
+			await _shot("survival_tip")
+			Tip.hide_all()
+		GameState.set_hunger(0.0)
+		GameState.set_stamina(0.0)
+		GameState._update_exhausted()
+		GameState.debug_invincible = true
+		await _frames(60)
+		await _shot("survival_empty")
+		GameState.debug_invincible = false
+		GameState.set_hunger(100.0)
+		GameState.set_stamina(100.0)
+		GameState._update_exhausted()
+		await _frames(3)
 
 	if _want("bigmoney"):
 		GameState.coins = 123456789

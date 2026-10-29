@@ -61,7 +61,7 @@ static func attach(host: Node) -> ProgressScreen:
 	# сюжетный ролик обязан перекрывать всё. Экран модальный, на весь
 	# вьюпорт — если он окажется ниже чужого прозрачного оверлея, тот съест
 	# нажатия по вкладкам, хотя на экране ничего не видно.
-	layer.layer = 95
+	layer.layer = UiLayers.HERO
 	host.add_child(layer)
 
 	var screen := ProgressScreen.new()
@@ -73,7 +73,7 @@ static func attach(host: Node) -> ProgressScreen:
 	# находят под землёй, экран при этом закрыт, а при открытом — тоже виден.
 	var card_layer := CanvasLayer.new()
 	card_layer.name = "ArtifactCardLayer"
-	card_layer.layer = 96
+	card_layer.layer = UiLayers.HERO_CARD
 	host.add_child(card_layer)
 	var card := ArtifactCard.new()
 	card.name = "ArtifactCard"
@@ -123,7 +123,7 @@ static func make_hud_button(chip: Button) -> Button:
 		chip.custom_minimum_size = Vector2(22, chip.custom_minimum_size.y)
 	else:
 		chip.text = "Герой"
-		chip.add_theme_font_size_override("font_size", 8)
+		chip.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 		for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 			var sb: StyleBox = chip.get_theme_stylebox(state)
 			if sb != null:
@@ -218,8 +218,9 @@ func _build() -> void:
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
 	content.add_theme_constant_override("margin_left", 4)
 	content.add_theme_constant_override("margin_right", 4)
-	content.add_theme_constant_override("margin_top", 4)
-	content.add_theme_constant_override("margin_bottom", TAB_BAR_H + 6)
+	var sb := HudSafeArea.bottom(get_viewport())
+	content.add_theme_constant_override("margin_top", int(UiBtn.CLOSE_ROW + HudSafeArea.top(get_viewport())))
+	content.add_theme_constant_override("margin_bottom", int(TAB_BAR_H + 6 + sb))
 	# Контейнер занимает весь вьюпорт, включая нижнюю панель вкладок по дереву:
 	# мышь выбирает самого позднего ребёнка, и без IGNORE он перехватывал
 	# нажатия по вкладкам, оставаясь при этом невидимым.
@@ -235,27 +236,19 @@ func _build() -> void:
 		content.add_child(panel)
 	(_panels[TAB_HERO] as HeroPanel).skills_requested.connect(open_tab.bind(TAB_PROGRESS))
 
-	# Нижняя панель вкладок — в зоне большого пальца. Крестик закрытия стоит
-	# в том же ряду, чтобы до него тоже тянуться не выше.
+	# Нижняя панель вкладок — в зоне большого пальца; крестик — сверху справа, как везде.
 	var bar := HBoxContainer.new()
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 4
 	bar.offset_right = -4
-	bar.offset_top = -(TAB_BAR_H + 4)
-	bar.offset_bottom = -4
+	bar.offset_top = -(TAB_BAR_H + 4 + sb)
+	bar.offset_bottom = -4 - sb
 	bar.add_theme_constant_override("separation", 3)
 	add_child(bar)
 	_add_tab_button(bar, TAB_HERO, "tab_hero", "Герой", "Портрет, характеристики и рекорды")
 	_add_tab_button(bar, TAB_PROGRESS, "tab_skills", "Навыки", "Дерево прокачки")
 	_add_tab_button(bar, TAB_MUSEUM, "tab_museum", "Музей", "Коллекция артефактов")
-	var close_button := HeroTabButton.new()
-	close_button.setup("tab_close", "Закрыть")
-	close_button.custom_minimum_size = Vector2(TAB_BAR_H, TAB_BAR_H)
-	close_button.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		close())
-	bar.add_child(close_button)
+	UiBtn.close_button(close, self)
 
 
 func _add_tab_button(parent: Control, tab: String, icon_name: String, title: String, body: String) -> void:
@@ -285,6 +278,7 @@ func _sync_tabs() -> void:
 # ---------------------------------------------------------------------------
 
 func open_tab(tab: String) -> void:
+	GameState.emit_event("screen_opened", {"id": "progress", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	var to_records := tab == TAB_RECORDS
 	if to_records:
 		tab = TAB_HERO

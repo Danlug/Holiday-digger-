@@ -37,12 +37,7 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 
-	_dim = ColorRect.new()
-	_dim.color = Color(0, 0, 0, 0.62)
-	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	_dim.gui_input.connect(_on_dim_input)
-	add_child(_dim)
+	_dim = UiTheme.scrim(self, cancel_card, UiTheme.SCRIM_SHEET)
 
 	_panel = PanelContainer.new()
 	_panel.anchor_left = 0.0
@@ -73,25 +68,25 @@ func _init() -> void:
 	side.add_theme_constant_override("separation", 4)
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
 	top.add_child(side)
-	_count_label = ShopArt.label("1", 20, Color.WHITE, HouseArt.INK, 4)
+	_count_label = ShopArt.label("1", UiTheme.FS_BIG, Color.WHITE, HouseArt.INK, 4)
 	side.add_child(_count_label)
 	var wrow := HBoxContainer.new()
 	wrow.add_theme_constant_override("separation", 3)
 	wrow.add_child(_icon(UiIcons.tex("weight"), 14))
-	_weight_label = ShopArt.label("0", 11, Color(0.82, 0.82, 0.88), HouseArt.INK, 3)
+	_weight_label = ShopArt.label("0", UiTheme.FS_LABEL, Color(0.82, 0.82, 0.88), HouseArt.INK, 3)
 	wrow.add_child(_weight_label)
 	side.add_child(wrow)
 	_limit_row = HBoxContainer.new()
 	_limit_row.add_theme_constant_override("separation", 3)
 	_limit_row.add_child(_icon(ShopArt.ui("icon_backpack"), 14))
-	_limit_label = ShopArt.label("", 11, ShopArt.COL_BAD, HouseArt.INK, 3)
+	_limit_label = ShopArt.label("", UiTheme.FS_LABEL, ShopArt.COL_BAD, HouseArt.INK, 3)
 	_limit_row.add_child(_limit_label)
 	side.add_child(_limit_row)
 
 	var srow := HBoxContainer.new()
 	srow.add_theme_constant_override("separation", 5)
 	col.add_child(srow)
-	_minus = HouseArt.button("gray", HouseArt.tex("glyph_minus"), Vector2(30, 28), 14.0)
+	_minus = UiBtn.texture_button("gray", HouseArt.tex("glyph_minus"), Vector2(30, 28), 14.0)
 	_minus.pressed.connect(func() -> void: _step(-1))
 	srow.add_child(_minus)
 	_slider = HSlider.new()
@@ -103,22 +98,24 @@ func _init() -> void:
 	_style_slider(_slider)
 	_slider.value_changed.connect(_on_slider)
 	srow.add_child(_slider)
-	_plus = HouseArt.button("gray", ShopArt.tex("glyph_plus"), Vector2(30, 28), 14.0)
+	_plus = UiBtn.texture_button("gray", ShopArt.tex("glyph_plus"), Vector2(30, 28), 14.0)
 	_plus.pressed.connect(func() -> void: _step(1))
 	srow.add_child(_plus)
 
+	# Края ряда совпадают с рядом ползунка: крестик прижат влево, как «−»,
+	# галочка растягивается до правого края, как «+» (на широком телефоне
+	# aspect=expand даёт лишнюю ширину — по центру она оставляла дыру справа).
 	var btns := HBoxContainer.new()
-	btns.alignment = BoxContainer.ALIGNMENT_CENTER
 	btns.add_theme_constant_override("separation", 6)
 	col.add_child(btns)
-	var cancel := HouseArt.button("red", ShopArt.tex("glyph_cross"), Vector2(42, 32), 18.0)
+	var cancel := UiBtn.texture_button("red", ShopArt.tex("glyph_cross"), Vector2(42, 32), 18.0)
 	cancel.pressed.connect(func() -> void:
 		if not Tip.swallowed():
 			cancel_card())
 	Tip.bind(cancel, "Отмена")
 	btns.add_child(cancel)
-	_max_btn = HouseArt.button("gold", null, Vector2(46, 32))
-	var ml := ShopArt.label("MAX", 11, Color.WHITE, Color8(0x6A, 0x3E, 0x0A), 3)
+	_max_btn = UiBtn.texture_button("gold", null, Vector2(46, 32))
+	var ml := ShopArt.label("MAX", UiTheme.FS_LABEL, Color.WHITE, UiTheme.GOLD_INK, 3)
 	ml.position = Vector2(0, 0)
 	ml.size = Vector2(46, 30)
 	ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -126,7 +123,10 @@ func _init() -> void:
 	_max_btn.add_child(ml)
 	_max_btn.pressed.connect(func() -> void: _slider.value = _max)
 	btns.add_child(_max_btn)
-	_ok = HouseArt.button("green", ShopArt.tex("glyph_check"), Vector2(80, 32), 20.0)
+	_ok = UiBtn.texture_button("green", ShopArt.tex("glyph_check"), Vector2(80, 32), 20.0)
+	_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Глиф стоит по координатам под 80 px — держим его в центре растянутой кнопки.
+	_ok.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	_ok.pressed.connect(_on_ok)
 	btns.add_child(_ok)
 
@@ -146,8 +146,8 @@ static func _icon(t: Texture2D, px: float) -> TextureRect:
 ## «язычок» вместо стандартной круглой ручки темы.
 static func _style_slider(s: HSlider) -> void:
 	var track := StyleBoxFlat.new()
-	track.bg_color = Color8(0x14, 0x10, 0x1B)
-	track.border_color = Color8(0x4A, 0x3F, 0x5C)
+	track.bg_color = UiTheme.NIGHT_DEEP
+	track.border_color = UiTheme.NIGHT_LINE
 	track.set_border_width_all(1)
 	track.set_content_margin_all(0)
 	track.content_margin_top = 3
@@ -174,6 +174,10 @@ static func _style_slider(s: HSlider) -> void:
 ## offer — словарь плитки (см. ShopTile.setup), max_amount — сколько можно
 ## переложить, count — сколько всего в источнике, limit_text — причина, по
 ## которой влезает меньше (пусто — предел только остаток).
+func _ready() -> void:
+	_panel.offset_bottom = -12.0 - HudSafeArea.bottom(get_viewport())   # над полоской «домой»
+
+
 func open(offer: Dictionary, max_amount: int, count: int, unit_weight: float, limit_text: String = "",
 		verb: String = "Готово") -> void:
 	for c in _preview_box.get_children():
@@ -263,8 +267,8 @@ func _on_slider(_v: float) -> void:
 
 func _update_numbers() -> void:
 	var n := amount()
-	_count_label.text = "%s / %s" % [ShopArt.compact(n), ShopArt.compact(_max)] if _max > 1 else ShopArt.compact(n)
-	_weight_label.text = ShopArt.compact(int(round(_unit_weight * float(n))))
+	_count_label.text = "%s / %s" % [UiFmt.short(n), UiFmt.short(_max)] if _max > 1 else UiFmt.short(n)
+	_weight_label.text = UiFmt.short(int(round(_unit_weight * float(n))))
 
 
 func _on_ok() -> void:
@@ -273,9 +277,3 @@ func _on_ok() -> void:
 	var n := amount()
 	_close()
 	confirmed.emit(n)
-
-
-func _on_dim_input(ev: InputEvent) -> void:
-	if (ev is InputEventMouseButton and ev.pressed) or (ev is InputEventScreenTouch and ev.pressed):
-		if not Tip.swallowed():
-			cancel_card()

@@ -50,6 +50,9 @@ static var reduce_motion: bool = false
 ## «не мешать»: подсказки и метки «new» молчат, ничего не теряя — что показано, помнит
 ## GameState.ext["hints"].
 static var hints_enabled: bool = true
+## Согласие на аналитику (scripts/core/analytics.gd): "unset" — ещё не спрашивали (окно согласия
+## при первом запуске), "granted" / "denied" — ответ игрока. Без "granted" не уходит ничего.
+static var analytics_consent: String = "unset"
 
 
 ## Заводит звуковые шины, если их ещё нет (первый запуск процесса — шины
@@ -144,6 +147,12 @@ static func set_hints_enabled(v: bool) -> void:
 	save()
 
 
+static func set_analytics_consent(v: String) -> void:
+	analytics_consent = v
+	save()
+	Analytics.consent_changed()
+
+
 ## Системное «меньше движения»: есть только в вебе (matchMedia); в остальных
 ## сборках остаётся false, пока игрок сам не включит в настройках.
 static func detect_system_reduce_motion() -> bool:
@@ -170,6 +179,7 @@ static func save() -> bool:
 		"haptics_enabled": haptics_enabled,
 		"reduce_motion": reduce_motion,
 		"hints_enabled": hints_enabled,
+		"analytics_consent": analytics_consent,
 	}, "\t"))
 	f.close()
 	return true
@@ -199,5 +209,8 @@ static func load_from_disk() -> bool:
 	haptics_enabled = bool(raw.get("haptics_enabled", true))
 	reduce_motion = bool(raw.get("reduce_motion", detect_system_reduce_motion()))
 	hints_enabled = bool(raw.get("hints_enabled", true))
+	analytics_consent = String(raw.get("analytics_consent", "unset"))   # нет ключа (старый файл) — ещё не спрашивали
+	if not analytics_consent in ["unset", "granted", "denied"]:
+		analytics_consent = "unset"
 	Haptics.enabled = haptics_enabled
 	return true

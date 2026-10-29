@@ -413,7 +413,7 @@ static func effect_text(branch: Dictionary, stage: int) -> String:
 			return "земля %.0f%%, ресурс %.0f%%" % [chance["earth"], chance["resource"]]
 		"greed":
 			# ветка «Жадность» (scripts/mechanics/greed_rules.gd): секунды режима и порог шкалы
-			return "жадность %d с, шкала %d кл." % [roundi(GreedRules.seconds(stage)), GreedRules.threshold(stage)]
+			return "жадность %d с, шкала %d с копки" % [roundi(GreedRules.seconds(stage)), roundi(GreedRules.threshold(stage))]
 		_:
 			return String(branch.get("notes", ""))
 
@@ -496,7 +496,7 @@ func _draw() -> void:
 		var font := ThemeDB.fallback_font
 		var txt := "%d/%d" % [stage, stages]
 		var done := stage >= stages
-		draw_string(font, Vector2(cx - 14.0, HEAD_Y + HEAD + 9.0), txt, HORIZONTAL_ALIGNMENT_CENTER, 28.0, 8,
+		draw_string(font, Vector2(cx - 14.0, HEAD_Y + HEAD + 9.0), txt, HORIZONTAL_ALIGNMENT_CENTER, 28.0, UiTheme.FS_TINY,
 			ProgressUiKit.GOLD if done else ProgressUiKit.MUTED)
 
 	if not _flash_line.is_empty():

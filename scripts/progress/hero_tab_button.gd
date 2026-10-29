@@ -35,9 +35,10 @@ func setup_tex(tex: Texture2D, tip_title: String, tip_body: String = "") -> void
 
 
 ## Нижняя полоса вкладок для любого полноэкранного экрана: значки-вкладки (золотая
-## рамка у выбранной, бейдж-число) и крестик справа. specs: [[ключ, Texture2D, заголовок,
-## описание], ...]. Кнопки лежат в bar.get_meta("buttons"): ключ -> HeroTabButton.
-static func make_bar(specs: Array, current: String, on_pick: Callable, on_close: Callable) -> HBoxContainer:
+## рамка у выбранной, бейдж-число). Крестик — сверху справа (UiBtn.close_button).
+## specs: [[ключ, Texture2D, заголовок, описание], ...]. Кнопки лежат в
+## bar.get_meta("buttons"): ключ -> HeroTabButton.
+static func make_bar(specs: Array, current: String, on_pick: Callable) -> HBoxContainer:
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 3)
 	bar.custom_minimum_size = Vector2(0, ProgressUiKit.TAB_BAR_H)
@@ -57,14 +58,6 @@ static func make_bar(specs: Array, current: String, on_pick: Callable, on_close:
 			on_pick.call(key))
 		bar.add_child(b)
 		buttons[key] = b
-	var x := HeroTabButton.new()
-	x.setup("tab_close", "Закрыть")
-	x.custom_minimum_size = Vector2(ProgressUiKit.TAB_BAR_H, ProgressUiKit.TAB_BAR_H)
-	x.pressed.connect(func() -> void:
-		if Tip.swallowed():
-			return
-		on_close.call())
-	bar.add_child(x)
 	bar.set_meta("buttons", buttons)
 	return bar
 
@@ -98,7 +91,7 @@ func _draw() -> void:
 		draw_circle(c, 5.0, badge_color)
 		var font := ThemeDB.fallback_font
 		var text := str(mini(badge, 99))
-		var fs := 8
+		var fs := UiTheme.FS_TINY
 		draw_string(font, Vector2(c.x - 6.0, c.y + font.get_ascent(fs) * 0.5 - 1.0), text,
 			HORIZONTAL_ALIGNMENT_CENTER, 12.0, fs,
 			Color(0.05, 0.12, 0.06) if badge_color.get_luminance() > 0.5 else Color.WHITE)

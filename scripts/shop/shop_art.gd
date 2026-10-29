@@ -15,9 +15,9 @@ const TIER_COLORS := [
 	Color8(0xB0, 0x70, 0xE8), Color8(0xF0, 0xB8, 0x30), Color8(0xFF, 0x62, 0x4A),
 ]
 
-const COL_GOLD := Color8(0xFF, 0xD8, 0x5A)
-const COL_GOOD := Color8(0x6F, 0xE0, 0x8A)
-const COL_BAD := Color8(0xFF, 0x6B, 0x6B)
+const COL_GOLD := UiTheme.GOLD_BRIGHT
+const COL_GOOD := UiTheme.OK_LIGHT
+const COL_BAD := UiTheme.BAD_LIGHT
 
 static var _cache: Dictionary = {}
 
@@ -74,6 +74,20 @@ static func rect(texture: Texture2D, pos: Vector2, sz: Vector2) -> TextureRect:
 ## Подпись с обводкой. Кегль и цвет — через LabelSettings, а не через
 ## add_theme_*_override: вне дерева Label запоминает минимальный размер по
 ## кеглю темы (16) и выходит вдвое выше и шире, чем нарисован.
+## Сетка плиток на всю ширину (магазин, склад): колонок столько, сколько влезает
+## (не меньше трёх), остаток ширины уходит в зазоры — справа не остаётся дыры.
+static func tile_grid(cell: float = 64.0, gap: int = 8) -> GridContainer:
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", gap)
+	grid.add_theme_constant_override("v_separation", gap)
+	grid.resized.connect(func() -> void:
+		var cols := maxi(3, int((grid.size.x + gap) / (cell + gap)))
+		grid.columns = cols
+		grid.add_theme_constant_override("h_separation", maxi(gap, int((grid.size.x - cols * cell) / (cols - 1)))))
+	return grid
+
+
 static func label(text: String, font_size: int, color: Color = Color.WHITE,
 		outline: Color = Color(0.05, 0.04, 0.08), outline_size: int = 3) -> Label:
 	var ls := LabelSettings.new()
@@ -97,37 +111,3 @@ static func tier_for(i: int, n: int) -> int:
 	if n <= 1:
 		return 0
 	return int(round(float(i) * 5.0 / float(n - 1)))
-
-
-## Короткая запись числа для бейджа на плитке: 950, 12K, 1.2M. Плитка в 64
-## точки не вмещает «1 234 567», а подсказка покажет полное число.
-static func compact(n: int) -> String:
-	var v := absi(n)
-	var minus := "-" if n < 0 else ""
-	if v < 10000:
-		return minus + str(v)
-	if v < 1000000:
-		var k := float(v) / 1000.0
-		return minus + (_trim("%.1f" % k) if k < 100.0 else str(int(k))) + "K"
-	if v < 1000000000:
-		return minus + _trim("%.2f" % (float(v) / 1000000.0)) + "M"
-	return minus + _trim("%.2f" % (float(v) / 1000000000.0)) + "B"
-
-
-static func _trim(s: String) -> String:
-	if s.contains("."):
-		s = s.rstrip("0").rstrip(".")
-	return s
-
-
-## Полное число с пробелами по три знака: 1 234 567 (для подсказок).
-static func full(n: int) -> String:
-	var s := str(absi(n))
-	var out := ""
-	var count := 0
-	for i in range(s.length() - 1, -1, -1):
-		out = s[i] + out
-		count += 1
-		if count % 3 == 0 and i > 0:
-			out = " " + out
-	return ("-" if n < 0 else "") + out

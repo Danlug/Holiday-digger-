@@ -155,10 +155,18 @@ func _test_craft_bronze() -> void:
 	var need := int(recipe["inputs"]["scrap"])
 	check("бронза плавится из металлолома 1:1 (ГДД раздел 5)", need == 1)
 
+	# С 26.10 бронза плавится в печи минуту штука (BronzeFurnace, tests/test_bronze_timer).
+	GameState.ext.erase(BronzeFurnace.KEY)
+	BronzeFurnace.override_unix = 1_800_000_000
 	GameState.inventory["scrap"] = 4
 	check("крафт прошёл", bool(ShopService.craft("bronze")["ok"]))
 	check("металлолом списан ровно по рецепту", GameState.get_item_count("scrap") == 4 - need)
-	check("бронза появилась в рюкзаке", GameState.get_item_count("bronze") == 1)
+	check("бронза не мгновенная — плавится в печи", GameState.get_item_count("bronze") == 0
+		and BronzeFurnace.queued() == 1)
+	BronzeFurnace.override_unix += BronzeFurnace.seconds_per_unit()
+	BronzeFurnace.collect()
+	check("через минуту бронза в рюкзаке", GameState.get_item_count("bronze") == 1)
+	BronzeFurnace.override_unix = -1
 
 
 ## Топливные блоки больше не делаются на верстаке (решение владельца, раунд 3:
@@ -247,7 +255,8 @@ func _test_hand_drill_from_storage() -> void:
 	check("рецепт ручного бура существует", not recipe.is_empty())
 	if recipe.is_empty():
 		return
-	check("рецепт бура: 500 железа", int(recipe["inputs"]["iron_ore"]) == 500)
+	check("рецепт бура: 400 железа (владелец, 26.10: −20%)", int(recipe["inputs"]["iron_ore"]) == 400)
+	var iron_need := int(recipe["inputs"]["iron_ore"])
 	check("рецепт бура: 2000 монет", int(recipe["coins"]) == 2000)
 
 	var total_kg := 0.0
@@ -257,10 +266,10 @@ func _test_hand_drill_from_storage() -> void:
 		total_kg > GameState.get_max_carry_kg())
 
 	# Первая ходка: принесли часть железа и сложили на склад.
-	GameState.inventory["iron_ore"] = 400
+	GameState.inventory["iron_ore"] = iron_need - 100
 	ShopService.invest("hand_drill")
 	check("сложенное ушло из рюкзака", GameState.get_item_count("iron_ore") == 0)
-	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == 400)
+	check("сложенное лежит на складе", HouseStorage.count("iron_ore") == iron_need - 100)
 	check("неполного рецепта не хватает на крафт", not ShopService.can_craft("hand_drill"))
 
 	# Вторая ходка: остальное. Лишнее железо сверх рецепта остаётся в рюкзаке —
@@ -269,7 +278,7 @@ func _test_hand_drill_from_storage() -> void:
 	GameState.inventory["bronze"] = 100
 	GameState.inventory["silver"] = 50
 	ShopService.invest("hand_drill")
-	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == 500)
+	check("на склад ушло ровно недостающее", HouseStorage.count("iron_ore") == iron_need)
 	check("излишек остался у игрока", GameState.get_item_count("iron_ore") == 50)
 
 	GameState.coins = 1999
@@ -484,6 +493,7 @@ func _test_gear_prices_and_multipliers() -> void:
 ## Покупка снимает РОВНО цену — ни монетой больше.
 func _test_buy_pickaxe_spends_exact_coins() -> void:
 	_fresh_at_door()
+	GameState.grant_tool("iron_pickaxe")   # ступени по порядку: титан — после железа
 	var price := Balance.get_tool_cost_coins("titanium_pickaxe")
 	GameState.coins = price - 1
 	check("без монет титановая кирка не покупается",
@@ -516,7 +526,7 @@ func _test_buy_pickaxe_spends_exact_coins() -> void:
 ## огород, там покупки закрыты (правило места); покупка идёт у двери, дома.
 func _test_buy_tool_cannot_dismount_rig_underground() -> void:
 	_fresh_at_door()
-	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.owned_tools = ["shovel", "iron_pickaxe", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.house_is_indoors = false
 	GameState.player_depth = 50  # под землёй
@@ -540,7 +550,7 @@ func _test_buy_tool_cannot_dismount_rig_underground() -> void:
 
 	# Дома под тем же кодом глубины — тоже можно (house_is_indoors снимает запрет).
 	_fresh_at_door()
-	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.owned_tools = ["shovel", "iron_pickaxe", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.house_is_indoors = true
 	GameState.player_depth = 50
@@ -563,9 +573,10 @@ func _test_buy_gear_spends_exact_coins() -> void:
 	check("купленный ранец сразу надет", GameState.current_gear == "backpack")
 
 	# Ступень получше надевается сама; ступень похуже — нет, иначе покупка
-	# запасного ранца пересаживала бы игрока с джетпака на пропеллеры.
-	GameState.coins = Balance.get_gear_cost_coins("jetpack")
-	check("джетпак куплен", bool(ShopService.buy_gear("jetpack")["ok"]))
+	# запасного ранца пересаживала бы игрока с джетпака на пропеллеры. Купить
+	# джетпак раньше улучшенного ранца нельзя (ступени по порядку), поэтому он
+	# выдаётся напрямую — как в старом сейве, где перескок уже случился.
+	GameState.grant_gear("jetpack")
 	check("джетпак надет сам — он быстрее", GameState.current_gear == "jetpack")
 	GameState.coins = Balance.get_gear_cost_coins("backpack_plus")
 	check("улучшенный ранец куплен", bool(ShopService.buy_gear("backpack_plus")["ok"]))

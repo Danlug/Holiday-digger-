@@ -18,7 +18,7 @@
 		"move": "сдвинуть актёра на dy пикселей за sec (герой проваливается в яму)",
 		"shake": "тряска сцены",
 		"daynight": "ускоренная смена суток: cycles раз по sec секунд",
-		"world_actor": "поставить/переставить актёра НА ЖИВУЮ КАРТУ: actor, x, y (логические координаты, как player.x/y), pose, flip, camera=true — сделать его целью камеры/тумана (см. world_walk/world_dig ниже); работает только в сценах world:true",
+		"world_actor": "поставить/переставить актёра НА ЖИВУЮ КАРТУ: actor, x, y (логические координаты, как player.x/y), pose, flip, camera=true — сделать его целью камеры/тумана (см. world_walk/world_dig ниже); land=true — встать на дно открытой клетки под собой, по центру столбца (сцена смерти: внук начинает над только что пробитым фундаментом); работает только в сценах world:true",
 		"world_walk": "актёр идёт по живой карте до x (клеток/сек по умолчанию, либо sec); camera=true — камера идёт за ним",
 		"world_dig": "актёр НАСТОЯЩЕЙ лопатой/киркой выкапывает клетку (x,y) живой карты (world.dig_cell) — sec секунд играет pose (по умолчанию dig_shovel), потом клетка исчезает и актёр шагает в неё",
 		"world_fall": "визуальный сдвиг актёра на dy КЛЕТОК (не пикселей) за sec — попытка выбраться из ямы, копки не делает",
@@ -124,8 +124,9 @@
 		},
 		"grave": {
 			"tex": "res://art/env/grave.png",
-			"scale": 2.0,
-			"y": 0.0
+			"scale": 1.5,
+			"y": 0.0,
+			"_comment": "Текстура 2 px на игровой пиксель (tools/gen_grave.py): 1.5 / ART_SCALE 3 = 0.5 — тот же размер, что у могилы во дворе (GraveSite.STONE_SCALE)."
 		},
 		"workbench": {
 			"tex": "res://art/env/workbench.png",
@@ -170,11 +171,13 @@
 		},
 		"grandma_poor": {
 			"dir": "grandma_poor",
-			"speaker": "speaker.grandma"
+			"speaker": "speaker.grandma",
+			"height": {"value": 0.92, "proposed": true, "note": "рост бабушки относительно внука и деда: все листы персонажей нарисованы одного роста, пожилой бабушке положено быть чуть ниже (ориентир 90–95%)"}
 		},
 		"grandma_rich": {
 			"dir": "grandma_rich",
-			"speaker": "speaker.grandma"
+			"speaker": "speaker.grandma",
+			"height": {"value": 0.92, "proposed": true, "note": "рост бабушки относительно внука (ориентир 90–95% его роста на экране), как у grandma_poor"}
 		},
 		"boy": {
 			"dir": "boy",
@@ -450,7 +453,7 @@
 					"tex": "res://art/env/grave.png",
 					"x": 4.0,
 					"y": 0.5,
-					"scale": 2.0
+					"scale": 1.5
 				},
 				{
 					"t": "world_actor",
@@ -598,7 +601,7 @@
 				{
 					"t": "world_walk",
 					"actor": "boy",
-					"x": 13.5,
+					"x": 12.8,
 					"sec": 1.4,
 					"arrive_pose": "idle"
 				},
@@ -622,7 +625,7 @@
 				{
 					"t": "world_walk",
 					"actor": "grandma_rich",
-					"x": 14.5,
+					"x": 15.55,
 					"sec": 1.4,
 					"arrive_pose": "idle"
 				},
@@ -681,7 +684,7 @@
 				{
 					"t": "world_walk",
 					"actor": "grandma_rich",
-					"x": 14.5,
+					"x": 15.55,
 					"sec": 1.2,
 					"arrive_pose": "idle"
 				},
@@ -804,7 +807,7 @@
 				},
 				{
 					"t": "item",
-					"icon": "res://art/ui/icon_blackbox.png",
+					"icon": "res://art/artifacts/antiquity_1.png",
 					"name": "item.dud_treasure",
 					"text": "dud_treasure.item_text"
 				},
@@ -978,6 +981,8 @@
 		{
 			"id": "death",
 			"title": "death.title",
+			"_comment": "world_exit keep: после кадра clear (дальше — спальня и мастерская) герой ждёт там, где пробил фундамент, а не на старте обучения у лестницы — иначе туман вокруг старта открывался бы только у досмотревших, не у пропустивших. Домой его ставит эффект teleport_home.",
+			"world_exit": "keep",
 			"beats": [
 				{
 					"t": "mood",
@@ -996,11 +1001,34 @@
 					"t": "world_actor",
 					"actor": "boy",
 					"pose": "dig_pick_rusty",
+					"land": true,
 					"camera": true
 				},
 				{
 					"t": "narr",
 					"text": "death.n1"
+				},
+				{
+					"t": "world_dig",
+					"actor": "boy",
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "world_dig",
+					"actor": "boy",
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "world_dig",
+					"actor": "boy",
+					"sec": 0.8,
+					"pose": "dig_pick_rusty"
+				},
+				{
+					"t": "narr",
+					"text": "death.n1b"
 				},
 				{
 					"t": "world_dig",
@@ -1351,7 +1379,7 @@
 		{
 			"id": "fuel_station",
 			"title": "fuel.title",
-			"_comment": "Решение владельца: заправка появляется ПОСЛЕ разговора с бабкой и после того, как у героя завёлся ручной бур. Заказывает её бабка, ставится она в огороде, а сделка простая: ей удобрение с торфоперегонки, ему топливные блоки.",
+			"_comment": "Решение владельца: заправка появляется ПОСЛЕ разговора с бабкой и после того, как у героя завёлся ручной бур. Никаких сделок (раунд 5): внук просит — «бабушка, пожалуйста, мне нужна заправочная станция, можно поставлю?» — бабка разрешает и присылает Роберта; станция ставится в огороде, даёт только топливные блоки.",
 			"beats": [
 				{
 					"t": "mood",

@@ -81,13 +81,13 @@ func _test_generation() -> void:
 	var seen := {}
 	var a := QuestGen.generate("daily", MONDAY, 4242, 120, seen)
 	var b := QuestGen.generate("daily", MONDAY, 4242, 120, seen)
-	# Было три; заказ владельца (раунд 3) — набор дня из пяти заданий разной сложности.
-	check("пять ежедневных заданий", a.size() == int(MetaData.quests()["daily"]["count"]) and a.size() == 5)
+	# Было три, потом пять (раунд 3); владелец 27.10: «Ежедневных миссий нужно 13».
+	check("13 ежедневных миссий", a.size() == QuestGen.count_of(MetaData.quests()["daily"]) and a.size() == 13)
 	check("генерация детерминирована от (дата, сид, ступень)", JSON.stringify(a) == JSON.stringify(b))
-	var groups := {}
+	var tpls := {}
 	for q in a:
-		groups[MetaData.template(String(q["tpl"]))["group"]] = true
-	check("задания дня из разных групп", groups.size() == a.size())
+		tpls[String(q["tpl"])] = true
+	check("миссии дня все разные", tpls.size() == a.size())
 	var differs := false
 	for d in range(1, 12):
 		if JSON.stringify(QuestGen.generate("daily", MONDAY + d, 4242, 120, seen)) != JSON.stringify(a):
@@ -95,7 +95,8 @@ func _test_generation() -> void:
 	check("в разные дни — разные наборы", differs)
 	check("другой сид — другой набор хотя бы в какой-то из дней", _seed_differs())
 	var w := QuestGen.generate("weekly", MetaClock.week_of(MONDAY), 4242, 120, seen)
-	check("два недельных задания, второе даёт доллар", w.size() == 2 and int(w[1]["reward"].get("dollars", 0)) == 1)
+	check("три недельных задания: второе даёт доллар, третье — ролики", w.size() == 3 and int(w[1]["reward"].get("dollars", 0)) == 1
+		and String(w[2]["tpl"]) == "watch_ads")
 
 	var low := QuestGen.generate("daily", MONDAY + 3, 4242, 0, seen)
 	var high := QuestGen.generate("daily", MONDAY + 3, 4242, 3000, seen)
@@ -150,8 +151,8 @@ func _test_gate_and_rollover() -> void:
 	check("до онбординга ежедневная награда закрыта", not DailyReward.can_claim())
 
 	MetaState.root()["unlocked"] = true
-	check("после онбординга задания выданы", QuestEngine.refresh() and (MetaState.sub("quests")["daily"] as Array).size() == 5
-		and (MetaState.sub("quests")["weekly"] as Array).size() == 2)
+	check("после онбординга задания выданы", QuestEngine.refresh() and (MetaState.sub("quests")["daily"] as Array).size() == 13
+		and (MetaState.sub("quests")["weekly"] as Array).size() == 3)
 	var d0 := JSON.stringify(MetaState.sub("quests")["daily"])
 	var w0 := JSON.stringify(MetaState.sub("quests")["weekly"])
 	check("повторный refresh в тот же день ничего не меняет", not QuestEngine.refresh())
@@ -303,8 +304,9 @@ func _test_claim_and_caps() -> void:
 	for i in range(3):
 		QuestEngine.claim("t:b:%d" % i)
 	check("забрали все три — «закрыл день» и бонус готов", QuestEngine.bonus_ready() and MetaState.counter("perfect_days") == 1)
-	var coins_b := GameState.coins
-	check("бонус выдаётся один раз", QuestEngine.claim_bonus()["ok"] and GameState.coins > coins_b and not QuestEngine.claim_bonus()["ok"])
+	var dollars_b := GameState.dollars
+	check("бонус выдаётся один раз (5 долларов)", QuestEngine.claim_bonus()["ok"] and GameState.dollars == dollars_b + 5
+		and not QuestEngine.claim_bonus()["ok"])
 
 
 func _test_daily_reward() -> void:
@@ -438,16 +440,16 @@ func _test_road() -> void:
 func _test_ads() -> void:
 	_fresh()
 	check("лимит «×2» дня — 1 из наших данных", MetaAds.limit(MetaAds.DAILY) == 1)
-	check("лимит «×2» заданий — 3 из наших данных", MetaAds.limit(MetaAds.QUEST) == 3)
+	check("лимит «×2» заданий — 4 из наших данных (владелец 26.10)", MetaAds.limit(MetaAds.QUEST) == 4)
 	check("существующий лимит из balance.json читается той же схемой", MetaAds.limit("small_coins") == 3)
 	var got := [0]
 	var cb := func() -> void: got[0] += 1
 	check("ролик за ×2 дня: первый раз — награда", MetaAds.request(MetaAds.DAILY, cb) and got[0] == 1)
 	check("второй раз за сутки — отказ без выдачи", not MetaAds.request(MetaAds.DAILY, cb) and got[0] == 1)
-	for i in range(3):
+	for i in range(5):
 		MetaAds.request(MetaAds.QUEST, cb)
-	check("«×2» заданий — не больше трёх в сутки", got[0] == 4 and not MetaAds.can(MetaAds.QUEST))
-	check("счёт идёт в общие дневные лимиты рекламы GameState", GameState.get_ad_uses_today(MetaAds.QUEST) == 3)
+	check("«×2» заданий — не больше четырёх в сутки", got[0] == 5 and not MetaAds.can(MetaAds.QUEST))
+	check("счёт идёт в общие дневные лимиты рекламы GameState", GameState.get_ad_uses_today(MetaAds.QUEST) == 4)
 	GameState.ad_daily_counts.clear()
 	check("после суточного сброса лимит снова открыт", MetaAds.can(MetaAds.DAILY))
 	check("точки показа есть в реестре AdManager", not AdManager.placement(MetaAds.DAILY).is_empty() and not AdManager.placement(MetaAds.QUEST).is_empty())

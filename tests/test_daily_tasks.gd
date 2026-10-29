@@ -1,8 +1,10 @@
 extends Node
 ## test_daily_tasks — ежедневные задания (заказ владельца, раунд 3) без окна:
-## местная полночь на подставных часах и поясе, набор дня из пяти слотов и
-## ориентиры владельца, события «потратил» и «поел», прогресс, награды, сундук
-## и серия дней, замена задания (бесплатная и за ролик), сохранение, кнопка HUD.
+## местная полночь на подставных часах и поясе, набор дня из 13 слотов
+## (владелец, 27.10) и ориентиры владельца, события «потратил» и «поел»,
+## прогресс, награды, сундук звёзд и серия дней, замена задания (бесплатная и за
+## ролик), сохранение, кнопка HUD. Звёзды, сундук на 5 долларов и миссии
+## «посмотри рекламу» подробно — tests/test_daily13.
 ##
 ## Запуск: godot --headless --path . res://tests/test_daily_tasks.tscn
 
@@ -91,7 +93,7 @@ func _test_local_midnight() -> void:
 	GameState.reset_progress()
 	GameState.world_seed = 4242
 	MetaState.root()["unlocked"] = true
-	check("23:59 местного — набор дня выдан", QuestEngine.refresh() and QuestEngine.daily().size() == 5)
+	check("23:59 местного — набор дня выдан (13 миссий)", QuestEngine.refresh() and QuestEngine.daily().size() == 13)
 	var d0 := JSON.stringify(QuestEngine.daily())
 	_at(MONDAY, 20.99, 3.0)
 	check("до полуночи набор тот же", not QuestEngine.refresh() and JSON.stringify(QuestEngine.daily()) == d0)
@@ -113,23 +115,26 @@ func _test_generation() -> void:
 	var dig_any_days := 0
 	var anchors := {}
 	var unique_ok := true
+	var slots: Array = MetaData.quests()["daily"]["slots"]
 	for d in range(60):
 		var set := QuestGen.generate("daily", MONDAY + d, 4242, 120, seen)
-		if set.size() != 5:
+		if set.size() != 13:
 			slots_ok = false
 		var tpls := {}
 		for i in range(set.size()):
 			var t := String(set[i]["tpl"])
-			tpls[t] = true
-			if not (pools[i] as Array).has(t):
+			# Из пула своего слота — всегда, когда в пуле было что взять (иначе — запасной путь).
+			var had := not QuestGen._pool_candidates(slots[i], "daily", 2, 120, seen, tpls).is_empty()
+			if had and not (pools[i] as Array).has(t):
 				slots_ok = false
+			tpls[t] = true
 			if ["dig_any", "sell_coins", "spend_coins", "eat"].has(t):
 				anchors[t] = int(set[i]["target"])
 		if tpls.size() != set.size():
 			unique_ok = false
 		if String(set[0]["tpl"]) == "dig_any":
 			dig_any_days += 1
-	check("пять заданий, каждое из пула своего слота", slots_ok)
+	check("13 миссий, каждая из пула своего слота, если в нём было что взять", slots_ok)
 	check("в наборе нет двух одинаковых заданий", unique_ok)
 	check("«прокопай любые клетки» — в большинстве дней (вес 6 из 7)", dig_any_days >= 40)
 	check("ориентиры владельца на средней ступени: 500 клеток, 1000 продажи, 500 трат, 3 еды",
@@ -154,20 +159,21 @@ func _test_generation() -> void:
 	check("сон дома появляется, когда игрок уже спал", got_sleep)
 
 	var set0 := QuestGen.generate("daily", MONDAY, 4242, 120, seen)
-	check("копка (трудное) платит больше заботы (лёгкое)", int(set0[0]["reward"]["coins"]) > int(set0[3]["reward"]["coins"]))
+	check("копка (трудное) платит больше заботы (лёгкое)", int(set0[0]["reward"]["coins"]) > int(set0[7]["reward"]["coins"]))
 	check("генерация детерминирована", JSON.stringify(set0) == JSON.stringify(QuestGen.generate("daily", MONDAY, 4242, 120, seen)))
 	var w := QuestGen.generate("weekly", MetaClock.week_of(MONDAY), 4242, 120, seen)
-	check("недельных по-прежнему два, второе с долларом", w.size() == 2 and int(w[1]["reward"].get("dollars", 0)) == 1)
+	check("недельных три: второе с долларом, третье — «посмотри рекламу 25 раз»", w.size() == 3
+		and int(w[1]["reward"].get("dollars", 0)) == 1 and String(w[2]["tpl"]) == "watch_ads" and int(w[2]["target"]) == 25)
 	var wk_dig := QuestGen._make("weekly", 1, 0, MetaData.template("dig_any"), MetaData.quests()["weekly"]["slots"][0],
 		MetaData.quests()["weekly"], 2, 120)
 	check("недельная копка — несколько дней ежедневной (×4)", int(wk_dig["target"]) == 2000)
-	check("ежедневные — без недельных шаблонов (уровни, «выполни N»)", _no_weekly_only())
+	check("ежедневные — без недельных шаблонов (уровни недели, «выполни N»)", _no_weekly_only())
 
 
 func _no_weekly_only() -> bool:
 	for d in range(40):
 		for q in QuestGen.generate("daily", MONDAY + d, 11, 900, {"bought": true, "slept": true}):
-			if ["level_up", "dailies_done", "pick_any"].has(String(q["tpl"])):
+			if ["level_up", "dailies_done"].has(String(q["tpl"])):
 				return false
 	return true
 
@@ -223,13 +229,16 @@ func _test_progress_and_claim() -> void:
 	for i in range(3):
 		MetaEvents.apply(&"ate", {"id": "food_bar"})
 	check("три еды закрывают «поешь 3 раза»", QuestEngine.is_done(eat))
-	check("на кнопке — три готовых к получению", QuestEngine.daily_claimable_count() == 3 and QuestEngine.daily_done_count() == 3)
-	check("доля дня для полоски кнопки — между 0.6 и 1", QuestEngine.day_fraction() >= 0.6 and QuestEngine.day_fraction() < 1.0)
+	# Копка двигает и соседние миссии (земля, глубже N…) — готовых может быть больше трёх.
+	check("на кнопке — все готовые к получению", QuestEngine.is_claimable(dig) and QuestEngine.is_claimable(spend)
+		and QuestEngine.is_claimable(eat) and QuestEngine.daily_claimable_count() == QuestEngine.daily_done_count())
+	check("звёзд пока нет: звезда — за забранную миссию", QuestEngine.stars_today() == 0 and QuestEngine.stars_needed() == 10)
 	var coins0 := GameState.coins
 	var c := QuestEngine.claim(String(dig["id"]))
 	check("забрать: монеты и опыт выданы", bool(c["ok"]) and GameState.coins == coins0 + int(dig["reward"]["coins"]))
 	check("второй раз не выдаётся", not bool(QuestEngine.claim(String(dig["id"]))["ok"]))
 	check("забранное учтено счётчиком заданий (достижения «задания»)", MetaState.counter("quests") == 1)
+	check("забрал — звезда", QuestEngine.stars_today() == 1)
 
 
 func _complete_day() -> void:
@@ -241,14 +250,15 @@ func _complete_day() -> void:
 func _test_chest_and_streak() -> void:
 	_fresh()
 	QuestEngine.refresh()
-	check("сундук закрыт, пока не забраны все пять", not QuestEngine.bonus_ready())
+	check("сундук закрыт, пока звёзд нет", not QuestEngine.bonus_ready())
 	var cfg: Dictionary = MetaData.quests()["daily"]
 	var base := int(cfg["reward"]["coins"][2])
 	_complete_day()
-	check("все пять забраны — сундук готов и на бейдже", QuestEngine.bonus_ready() and QuestEngine.daily_claimable_count() == 1)
+	check("все 13 забраны — сундук готов и на бейдже", QuestEngine.bonus_ready() and QuestEngine.daily_claimable_count() == 1
+		and MetaState.counter("perfect_days") == 1)
 	var r1 := QuestEngine.bonus_reward()
-	check("сундук первого дня: ×1.5 базы, без прибавки серии, с энергетиком", int(r1["coins"]) == int(round(base * 1.5 / 5.0)) * 5
-		and r1.has("item") and not r1.has("dollars"))
+	check("сундук первого дня: 5 долларов и энергетик, монет нет (прибавки серии ещё нет)", int(r1.get("dollars", 0)) == 5
+		and r1.has("item") and not r1.has("coins"))
 	var before := GameState.get_item_count("energy_drink")
 	var c := QuestEngine.claim_bonus()
 	check("сундук открыт: серия 1, предмет в рюкзаке", bool(c["ok"]) and int(c["streak"]) == 1 and QuestEngine.streak_now() == 1
@@ -260,7 +270,8 @@ func _test_chest_and_streak() -> void:
 	check("назавтра серия видна (1) и сундук закрыт", QuestEngine.streak_now() == 1 and not QuestEngine.bonus_ready())
 	_complete_day()
 	var r2 := QuestEngine.bonus_reward()
-	check("второй день серии: +10% к сундуку", QuestEngine.streak_if_claimed() == 2 and int(r2["coins"]) == int(round(base * 1.5 * 1.1 / 5.0)) * 5)
+	check("второй день серии: +10% от прежнего сундука (1.5 награды) монетами", QuestEngine.streak_if_claimed() == 2
+		and int(r2["coins"]) == int(round(base * 1.5 * 0.1 / 5.0)) * 5 and int(r2["dollars"]) == 5)
 	QuestEngine.claim_bonus()
 
 	_at(MONDAY + 3, 9.0)   # пропущен один день
@@ -285,11 +296,11 @@ func _test_chest_and_streak() -> void:
 	QuestEngine.refresh()
 	_complete_day()
 	var r7 := QuestEngine.bonus_reward()
-	check("седьмой день серии: доллар и потолок прибавки +50%", int(r7.get("dollars", 0)) == 1 and QuestEngine.streak_pct(7) == 50
-		and QuestEngine.streak_pct(30) == 50)
+	check("седьмой день серии: 5 + 1 доллар и потолок прибавки +50%", int(r7.get("dollars", 0)) == 6 and QuestEngine.streak_pct(7) == 50
+		and QuestEngine.streak_pct(30) == 50 and int(r7["coins"]) == int(round(base * 1.5 * 0.5 / 5.0)) * 5)
 	var d0 := GameState.dollars
 	QuestEngine.claim_bonus()
-	check("доллар выдан (в недельный потолок)", GameState.dollars == d0 + 1)
+	check("6 долларов выданы (доллар серии — в недельный потолок)", GameState.dollars == d0 + 6)
 	Achievements.evaluate()
 	check("достижение «Ни дня без задания» — за 7 дней серии", Achievements.is_done("tasks_streak_7") and not Achievements.is_done("tasks_streak_30"))
 
@@ -297,6 +308,7 @@ func _test_chest_and_streak() -> void:
 func _test_reroll() -> void:
 	_fresh()
 	QuestEngine.refresh()
+	_force(4, "dig_dirt")   # слот «порода»: камень свободен для замены копки
 	var q := _force(0, "dig_any")
 	q["progress"] = 120
 	check("одна бесплатная замена в день", QuestEngine.free_rerolls_left() == 1 and QuestEngine.can_reroll(q))
@@ -305,7 +317,9 @@ func _test_reroll() -> void:
 		old_tpls[String(x["tpl"])] = true
 	var r := QuestEngine.reroll(String(q["id"]))
 	var nq: Dictionary = r.get("quest", {})
-	check("замена: другой шаблон того же слота, прогресс с нуля", bool(r["ok"]) and bool(r["free"]) and String(nq["tpl"]) == "dig_stone"
+	# Из пула слота (камень), а если камень уже в наборе (запасной путь другого слота) — любой новый.
+	check("замена: другой шаблон того же слота, прогресс с нуля", bool(r["ok"]) and bool(r["free"])
+		and (String(nq["tpl"]) == "dig_stone" or old_tpls.has("dig_stone")) and not old_tpls.has(String(nq["tpl"]))
 		and int(nq["progress"]) == 0 and int(nq["slot"]) == 0 and QuestEngine.daily()[0] == nq)
 	check("новый id: старый quest больше не найти", QuestEngine.find(String(q["id"])).is_empty() and not QuestEngine.find(String(nq["id"])).is_empty())
 	check("бесплатная потрачена", QuestEngine.free_rerolls_left() == 0)

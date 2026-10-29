@@ -114,17 +114,20 @@ static func recipe(id: String) -> Dictionary:
 ## Бронза: ГДД раздел 5 — "бронза не добывается, плавится из металлолома,
 ## 1 металлолом = 1 бронза". Число берём из balance.json (crafting), а не
 ## из recipe в minerals.json: там лежит 5:1, и это расходится с ГДД.
+## seconds — сколько плавится одна штука: печь работает по таймеру (BronzeFurnace).
 static func _recipe_bronze() -> Dictionary:
 	var per: int = int(Balance.unwrap(Balance.balance.get("crafting", {}).get("scrap_per_bronze", 1)))
+	var secs := BronzeFurnace.seconds_per_unit()
 	return {
 		"id": "bronze",
 		"name_ru": "Бронза",
-		"desc_ru": "Плавка металлолома",
+		"desc_ru": "Плавка металлолома в печи: %s на штуку, печь работает, пока ты копаешь" % BronzeFurnace.clock_text(secs),
 		"kind": "item",
 		"output": {"id": "bronze", "count": 1},
 		"inputs": {"scrap": maxi(per, 1)},
 		"coins": 0,
 		"unlock_depth": 0,
+		"seconds": secs,
 	}
 
 

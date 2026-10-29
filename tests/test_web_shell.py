@@ -82,6 +82,11 @@ def test_stamp(html):
 		check("штамп: index.js получает ?v=<метка>", '<script src="index.js?v=20990101-0000"></script>' in out)
 		check("штамп: подмена fetch стоит ДО index.js", out.index("window.fetch = function") < out.index('src="index.js?v='))
 		check("штамп: подмена идёт и для аудио-ворклетов", "AudioWorklet.prototype.addModule" in out)
+		check("штамп: version.json с меткой лёг рядом (проверка свежести страницы)",
+			json.loads((index.parent / "version.json").read_text(encoding="utf-8")).get("build") == "20990101-0000")
+		check("штамп: страница сверяется с version.json мимо кэша и уходит на ?b=<метка>",
+			'version.json?t=' in out and 'cache: "no-store"' in out and 'searchParams.set("b"' in out)
+		check("штамп: проверка свежести стоит ДО index.js", out.index("version.json?t=") < out.index('src="index.js?v='))
 		check("штамп: manifest и иконки легли рядом с index.html",
 			all((tmp / "web" / n).exists() for n in ["manifest.webmanifest"] + build_web_shell.PWA_FILES))
 		try:
@@ -125,6 +130,15 @@ def test_mobile_contract(html):
 		("падение: кнопка «Перезагрузить»", "Перезагрузить"),
 	]:
 		check(label, needle in html)
+
+
+def test_leave_save(html):
+	# Закрыл вкладку под землёй — открыл там же (scripts/core/save_hooks.gd): у скрытой вкладки нет кадров,
+	# и движок сам не успел бы перенести сейв в IndexedDB.
+	check("уход со страницы зовёт игру: visibilitychange → hidden и pagehide → onLeave",
+		"shell.onLeave" in html and "'pagehide'" in html and "visibilityState === 'hidden'" in html)
+	check("сейв ложится в базу IDBFS движка сразу (persistFile → /userfs, FILE_DATA, папки над файлом)",
+		"shell.persistFile" in html and "'/userfs'" in html and "'FILE_DATA'" in html and "mode: 16895" in html)
 
 
 def test_manifest_and_icons():
@@ -176,6 +190,7 @@ if __name__ == "__main__":
 	test_stamp(html)
 	test_no_external_and_no_sw(html)
 	test_mobile_contract(html)
+	test_leave_save(html)
 	test_manifest_and_icons()
 	test_preset()
 	test_font()

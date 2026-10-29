@@ -2,6 +2,8 @@ class_name Haptics
 extends RefCounted
 ## Haptics — вибро-отклик (телефон; на ПК и в вебе без поддержки — тишина).
 ## Выключатель — Haptics.enabled (его привязывает экран настроек).
+## В iOS Safari (веб-сборка на iPhone) вибро нет вовсе: вибро — только добавка к звуку
+## и картинке, никогда не единственный отклик.
 
 static var enabled: bool = true
 

@@ -40,7 +40,7 @@ func setup(rid: String, anchor: Control = null) -> void:
 	var srow := HBoxContainer.new()
 	srow.add_theme_constant_override("separation", 4)
 	add_child(srow)
-	_minus = HouseArt.button("gray", HouseArt.tex("glyph_minus"), Vector2(28, ROW_H), 14.0)
+	_minus = UiBtn.texture_button("gray", HouseArt.tex("glyph_minus"), Vector2(28, ROW_H), 14.0)
 	_minus.pressed.connect(func() -> void: _step(-1))
 	srow.add_child(_minus)
 	_slider = HSlider.new()
@@ -54,11 +54,11 @@ func setup(rid: String, anchor: Control = null) -> void:
 	_slider.custom_minimum_size = Vector2(60, ROW_H)
 	HouseQtyCard._style_slider(_slider)
 	srow.add_child(_slider)
-	_plus = HouseArt.button("gray", ShopArt.tex("glyph_plus"), Vector2(28, ROW_H), 14.0)
+	_plus = UiBtn.texture_button("gray", ShopArt.tex("glyph_plus"), Vector2(28, ROW_H), 14.0)
 	_plus.pressed.connect(func() -> void: _step(1))
 	srow.add_child(_plus)
-	_max_btn = HouseArt.button("gold", null, Vector2(38, ROW_H))
-	var ml := ShopArt.label("MAX", 10, Color.WHITE, Color8(0x6A, 0x3E, 0x0A), 3)
+	_max_btn = UiBtn.texture_button("gold", null, Vector2(38, ROW_H))
+	var ml := ShopArt.label("MAX", UiTheme.FS_BODY, Color.WHITE, UiTheme.GOLD_INK, 3)
 	ml.size = Vector2(38, ROW_H - 2.0)
 	ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ml.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -134,12 +134,12 @@ func _rebuild_sum() -> void:
 		var ic := _icon(ShopArt.item_icon(String(id)), 16)
 		_sum.add_child(ic)
 		input_icons[String(id)] = ic
-		_sum.add_child(_num("−" + ShopArt.compact(total), 12, Color(0.92, 0.88, 0.8)))
-		used_parts.append("%s ×%s" % [ShopCatalog.item_name(String(id)), ShopArt.full(total)])
+		_sum.add_child(_num("−" + UiFmt.short(total), 12, Color(0.92, 0.88, 0.8)))
+		used_parts.append("%s ×%s" % [ShopCatalog.item_name(String(id)), UiFmt.full(total)])
 	_sum.add_child(_icon(ShopArt.tex("glyph_arrow"), 12))
 	var out_id := String(r["output"]["id"])
 	_sum.add_child(_icon(ShopArt.item_icon(out_id), 16))
-	_sum.add_child(_num("+" + ShopArt.compact(int(plan["made"])), 12, ShopArt.COL_GOOD))
+	_sum.add_child(_num("+" + UiFmt.short(int(plan["made"])), 12, ShopArt.COL_GOOD))
 	# Куда ляжет: значок рюкзака и/или склада с числом — мелко, это справка.
 	var where: Array = []
 	for dest in [["to_pack", "icon_backpack", "в рюкзак"], ["to_storage", "glyph_storage", "на склад"]]:
@@ -152,16 +152,20 @@ func _rebuild_sum() -> void:
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_sum.add_child(gap)
 		_sum.add_child(_icon(tex, 12))
-		_sum.add_child(_num(ShopArt.compact(k), 10, Color(0.72, 0.72, 0.8)))
-		where.append("%s %s" % [dest[2], ShopArt.full(k)])
+		_sum.add_child(_num(UiFmt.short(k), 10, Color(0.72, 0.72, 0.8)))
+		where.append("%s %s" % [dest[2], UiFmt.full(k)])
 	var coins := int(plan["coins"])
 	if coins > 0:
 		_sum.add_child(_icon(ShopArt.ui("icon_coin"), 14))
-		_sum.add_child(_num("−" + ShopArt.compact(coins), 12,
+		_sum.add_child(_num("−" + UiFmt.short(coins), 12,
 			Color.WHITE if GameState.coins >= coins or GameState.debug_free_shop else ShopArt.COL_BAD))
-		used_parts.append("монеты ×%s" % ShopArt.full(coins))
-	Tip.bind_tap(_sum, "%s ×%s" % [String(r["name_ru"]), ShopArt.full(int(plan["made"]))],
-		"Уйдёт: " + ", ".join(used_parts), "Ляжет: " + ", ".join(where), _tip_anchor)
+		used_parts.append("монеты ×%s" % UiFmt.full(coins))
+	var lands := "Ляжет: " + ", ".join(where)
+	if int(r.get("seconds", 0)) > 0:
+		# Печь бронзы (BronzeFurnace): ляжет не сразу, а по штуке в минуту.
+		lands = "Плавится %s, потом ляжет: %s" % [BronzeFurnace.clock_text(n * int(r["seconds"])), ", ".join(where)]
+	Tip.bind_tap(_sum, "%s ×%s" % [String(r["name_ru"]), UiFmt.full(int(plan["made"]))],
+		"Уйдёт: " + ", ".join(used_parts), lands, _tip_anchor)
 
 
 static func _icon(t: Texture2D, px: float) -> TextureRect:

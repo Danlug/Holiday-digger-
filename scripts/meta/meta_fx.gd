@@ -6,7 +6,7 @@ extends RefCounted
 ## без правки здесь. Собственный взрыв значков рисуется всегда — на случай, если
 ## сервиса Fx ещё нет, награда всё равно должна «взорваться» в руках.
 
-const LAYER := 98
+const LAYER := UiLayers.META_FX
 static var _overlay: Control = null
 
 
@@ -70,6 +70,8 @@ static func fly(tree: SceneTree, t: Texture2D, from: Vector2, to: Vector2, n: in
 
 
 static func _pop(parent: Control, t: Texture2D, origin: Vector2, to: Vector2, n: int, fly: bool) -> void:
+	if UiAnim.reduced():
+		return   # летящие значки — чистое движение, без них награда видна по счётчику
 	for i in range(n):
 		var spr := TextureRect.new()
 		spr.texture = t

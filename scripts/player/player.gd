@@ -30,10 +30,9 @@ signal died_in_place
 ## tool_auto_switched — тот сигнал говорит только "инструмент сменился",
 ## этот — конкретно "ты за рулём, анимация посадки доиграла".
 signal entered_rig
-## Бурмобиль без топлива глохнет прямо под землёй (копать нечем) — или
-## посадка кнопкой "В бурмобиль" отказывает без брикетов. Текст сообщения —
-## сюда, а не отдельными сигналами на каждый случай: оба говорят игроку одно
-## и то же — "нужны брикеты" — разными словами момента.
+## Посадка кнопкой "В бурмобиль" отказывает без брикетов. (Под землёй пустой
+## бак больше не глушит машину: герой копает киркой — владелец 29.10, см.
+## _tool_speed_multiplier.)
 signal rig_fuel_warning(message: String)
 ## Начался/закончился выход из бурмобиля на поверхности (проехал из-под
 ## земли) или посадка в него (кнопка у припаркованной машины) — см. блок
@@ -153,12 +152,16 @@ const HOME_X := float(WorldGen.HOUSE_X_MAX + 1) + 0.5   # 15.5
 
 const LUCK_COLOR := Color8(0xFF, 0xD8, 0x4A)
 var _luck_rng: RandomNumberGenerator = null
+var _stagger_t: float = 0.0   # часы «шатания» без сил (SurvivalRules.stagger_factor)
 
 var x: float = HOME_X
 var y: float = 0.5
 var vx: float = 0.0
 var vy: float = 0.0
 var on_ground: bool = false
+## Верхняя точка текущего полёта (y растёт вниз): с какой высоты упал — для причины
+## смерти в окне смерти («с высоты N клеток»), на урон не влияет.
+var _air_top_y: float = 0.5
 var facing: int = 1
 var anim: float = 0.0
 
@@ -185,14 +188,6 @@ var _announced_rig: bool = false
 ## отсюда узнаём момент выезда на поверхность (см. _check_rig_surface_exit),
 ## а не пересчитываем его из типа тайла каждый раз.
 var _was_underground: bool = false
-## Тост «кончилось топливо» при попытке копать без брикетов уже показан для
-## текущего удержания копки — _start_dig вызывается каждый кадр физики, пока
-## держится направление копки, и без этого флага тост эмитился бы 60 раз в
-## секунду вместо одного раза за попытку. Сбрасывается на «отпустил ввод» —
-## новая попытка снова получает своё сообщение. (Стены у устья без топлива
-## больше нет — спуск пешком разрешён всегда, посадка только кнопкой.)
-var _rig_dig_stall_warned: bool = false
-
 # --- выход/посадка в бурмобиль на поверхности (свои переменные и функции —
 # см. блок ниже — держатся отдельно от фаз копки (DIG_PHASES в
 # character_view.gd), которые параллельно правит другой агент: слияние
@@ -212,6 +207,14 @@ var frozen: bool = false       # true во время сцены смерти/к
 ## Режим жадности (ГДД §20.1, scripts/mechanics/): MechDirector ставит множитель на
 ## время режима. Больше 1 — клетка копается с первого удара, ход/полёт/падение быстрее.
 var greed_mult: float = 1.0
+## Падение в жадности (владелец 27.10, ГДД §20.1): урона нет, а каждые
+## GreedRules.fall_stop_cells() клеток полёта вниз герой на миг «зацепляется» —
+## тоннель не убьёт, но и мгновенным лифтом вниз жадность не станет.
+signal greed_fall_stopped
+var _greed_hang_left: float = 0.0   # сколько ещё висеть (реальные секунды кадра)
+var _greed_fall_dist: float = 0.0   # клеток пролетел вниз с верхней точки или прошлой остановки
+var _greed_air: bool = false        # в этом полёте была жадность: урон — только за высоту после её конца
+var _greed_top_y: float = 0.5       # верхняя точка полёта после конца жадности
 
 # --- Отклик управления и копки (ветка aaa-feel; числа — data/feel.json) ---
 # Койот-время: прыжок можно нажать на пару кадров позже схода с уступа. Буфер:
@@ -663,6 +666,7 @@ func physics_tick(dt: float) -> void:
 
 	if frozen or not GameState.is_alive:
 		vx = 0.0
+		_air_top_y = y   # сцена или телепорт двигают героя мимо полёта: высоту падения считаем заново
 		return
 
 	# Микро-пауза после разрушения тяжёлой породы: герой на миг замирает, пока
@@ -670,6 +674,8 @@ func physics_tick(dt: float) -> void:
 	if _hitstop_left > 0.0:
 		_hitstop_left -= dt
 		vx = 0.0
+		return
+	if _greed_hang_left > 0.0 and not _greed_hang(dt):
 		return
 	_feel_tick(dt)
 
@@ -679,11 +685,14 @@ func physics_tick(dt: float) -> void:
 	else:
 		_apply_intent(dt)
 
-	# Жадность ×N — N обычных шагов движения за кадр: та же траектория (и тот же
-	# урон от падения), только быстрее; столкновения проверяются на каждом шаге.
+	# Жадность ×N — N обычных шагов движения за кадр: та же траектория, только
+	# быстрее; столкновения проверяются на каждом шаге. Остановка падения —
+	# _greed_fall_tick, урона от падения в жадности нет — _land.
 	for _greed_step in maxi(1, roundi(greed_mult)):
 		_move_x(dt)
 		_move_y(dt)
+		if _greed_fall_tick(dt):
+			break
 
 	# Счётчик кадров идёт ВСЕГДА. Пока он тикал только при копке и ходьбе,
 	# покой, падение и полёт стояли на первом кадре и выглядели статикой.
@@ -913,6 +922,7 @@ func _move_y(dt: float) -> void:
 	if not on_ground:
 		var b2 := y + HH + 0.02
 		on_ground = vy == 0.0 and (_solid_at(left, b2) or _solid_at(right, b2))
+	_air_top_y = y if on_ground else minf(_air_top_y, y)
 
 
 ## Урон от падения — от СКОРОСТИ удара, а не от пройденной высоты (ГДД п.6).
@@ -927,6 +937,13 @@ func _move_y(dt: float) -> void:
 ## оба множителя 1.0, когда is_in_rig() ложь.
 func _land() -> void:
 	var v := vy
+	if greed_mult > 1.0:
+		return   # владелец 27.10: в жадности падение не ранит
+	if _greed_air:
+		# падение началось в жадности, а кончилось после неё: ранит только высота
+		# ниже точки конца жадности (или вершины, если потом взлетал) — скорость,
+		# набранная в жадности, не в счёт
+		v = minf(v, sqrt(2.0 * G * maxf(0.0, y - _greed_top_y)))
 	var dmg_mult := 1.0
 	var height_mult := 1.0
 	if is_in_rig():
@@ -935,8 +952,54 @@ func _land() -> void:
 	var dmg := roundf(Balance.get_fall_damage_from_speed(v, G, dmg_mult, height_mult))
 	if dmg < 1.0:
 		return
-	GameState.take_damage(dmg, "fall")
+	# высота для окна смерти: от верхней точки полёта, но не меньше той, что дала бы
+	# эта скорость удара (после телепорта верхняя точка бывает ниже приземления)
+	var cells := maxf(y - _air_top_y, v * v / (2.0 * G))
+	GameState.take_damage(dmg, "fall", {"cells": int(round(cells))})
 	fell.emit(dmg, v)
+
+
+## Шаг падения в жадности (зовётся после каждого из greed_mult шагов движения).
+## Отрезок копится от верхней точки — уступа, вершины прыжка, прошлой остановки;
+## под тягой ранца, на подъёме и на земле отсчёт идёт заново, поэтому подъём и
+## торможение ранцем, прыжок и копка вниз по клетке не останавливаются. Копим
+## пройденное за шаг (vy·dt — в свободном падении это ровно сдвиг _move_y), а не
+## разницу с запомненной точкой: героя, поставленного в воздух мимо физики (сцена,
+## телепорт, сейв), старая точка не остановит.
+## true — герой только что «зацепился»: остаток шагов кадра пропускается.
+func _greed_fall_tick(dt: float) -> bool:
+	if on_ground:
+		_greed_air = false
+	elif greed_mult > 1.0:
+		_greed_air = true
+		_greed_top_y = y
+	elif _greed_air:
+		_greed_top_y = minf(_greed_top_y, y)
+	if greed_mult <= 1.0 or on_ground or thrust != "" or vy <= 0.0 or GameState.debug_fly_300:
+		_greed_fall_dist = 0.0
+		return false
+	_greed_fall_dist += vy * dt
+	if _greed_fall_dist < GreedRules.fall_stop_cells():
+		return false
+	_greed_fall_dist = 0.0
+	_greed_hang_left = GreedRules.fall_stop_seconds()
+	vx = 0.0
+	vy = 0.0
+	greed_fall_stopped.emit()
+	return true
+
+
+## Кадр остановки: герой висит там, где «зацепился» (в пустой клетке — в породу он
+## не попадает). false — висит, кадр физики на этом кончается; true — отпустило
+## или игрок включает ранец: тягу остановка не держит.
+func _greed_hang(dt: float) -> bool:
+	if hold_up and has_backpack():
+		_greed_hang_left = 0.0
+		return true
+	_greed_hang_left -= dt
+	vx = 0.0
+	vy = 0.0
+	return false
 
 
 # ---------------------------------------------------------------------------
@@ -951,7 +1014,7 @@ func _jump(coyote: bool = false) -> void:
 		return
 	if _solid_at(x, y - HH - 0.1):
 		return
-	vy = -JUMP_V
+	vy = -JUMP_V * SurvivalRules.jump_velocity_factor()   # уставший прыгает ниже (ГДД §7)
 	on_ground = false
 	_coyote_left = 0.0
 	_jump_buffer_left = 0.0
@@ -1013,10 +1076,12 @@ func _apply_intent(dt: float) -> void:
 		vx = 0.0
 		return
 
-	# Обессиленный герой медленнее во всём (ГДД раздел 7). Множитель берётся
-	# из GameState, а не считается здесь, чтобы штраф нельзя было забыть
-	# применить в одном из трёх мест — ходьбе, копке или полёте.
-	var speed: float = WALK * (1.0 if on_ground else AIR_CTRL) * GameState.get_speed_multiplier()
+	# Обессиленный герой медленнее во всём (ГДД раздел 7). С раунда 5 ходьбу
+	# режут уже 25% и 10% бодрости, а без сил героя ещё и шатает
+	# (SurvivalRules, data/survival.json).
+	_stagger_t += dt
+	var speed: float = WALK * (1.0 if on_ground else AIR_CTRL) * SurvivalRules.move_factor() \
+		* SurvivalRules.stagger_factor(_stagger_t)
 	vx = float(hold_dx) * speed
 	if hold_dx != 0:
 		facing = hold_dx
@@ -1038,18 +1103,10 @@ func _apply_intent(dt: float) -> void:
 		var edge: float = (float(cx + 1) - (x + HW)) if hold_dx > 0 else ((x - HW) - float(cx))
 		if ahead != TileTypes.Type.EMPTY and edge < 0.06:
 			_start_dig(cx + hold_dx, cy)
-		else:
-			_rig_dig_stall_warned = false
 	elif hold_down:
 		var below: int = world.get_tile(cx, cy + 1) if world != null else TileTypes.Type.EMPTY
 		if below != TileTypes.Type.EMPTY:
 			_start_dig(cx, cy + 1)
-		else:
-			_rig_dig_stall_warned = false
-	else:
-		# Не держит ни направление, ни "вниз" — новая попытка копать без
-		# топлива (после этого простоя) снова получит своё сообщение.
-		_rig_dig_stall_warned = false
 
 
 ## Отменяет копку, если игрок увёл управление с копаемой клетки (см.
@@ -1084,11 +1141,17 @@ func _can_dig(type: int) -> bool:
 ## (устаревший статический прототип до Godot-версии, не собирается и не
 ## тестируется вместе с игрой: та дублировала бы это число своим, другим).
 func _tool_speed_multiplier() -> float:
-	var mult := Balance.get_tool_speed_multiplier(GameState.current_tool)
-	# Пустой бак ручного бура: бур вхолостую, герой копает лучшей киркой.
-	if GameState.current_tool == "hand_drill" and not FuelTank.has_fuel("hand_drill"):
-		mult = minf(mult, Balance.get_best_pickaxe_speed_multiplier())
-	if GameState.current_tool == "rusty_pickaxe" and rusty_pickaxe_cracked:
+	var tool_id := GameState.current_tool
+	# Пустой бак ручного бура или бурмобиля: техника вхолостую, герой копает
+	# лучшей киркой из своих (владелец 29.10: «когда заканчивается топливо, он
+	# берётся за кирку», «берёт лучшую кирку, которую имеет» — бурмобиль больше
+	# не глохнет под землёй). Кирки нет — лопатой.
+	if FuelTank.uses_fuel(tool_id) and not FuelTank.has_fuel(tool_id):
+		tool_id = _best_owned_pickaxe()
+		if tool_id.is_empty():
+			tool_id = "shovel"
+	var mult := Balance.get_tool_speed_multiplier(tool_id)
+	if tool_id == "rusty_pickaxe" and rusty_pickaxe_cracked:
 		var broken := float(Balance.unwrap(Balance.get_tool("rusty_pickaxe").get("broken_speed_multiplier", 0.75)))
 		mult *= broken
 	return maxf(mult, 0.01)
@@ -1136,18 +1199,8 @@ func _start_dig(tx: int, ty: int) -> void:
 		dig_refused_by_story.emit("garden_left_of_stairs")
 		return
 
-	# Бурмобиль без топлива глохнет под землёй: копать нечем, но идти по уже
-	# прорытому можно (решение владельца) — поэтому запрет только здесь, в
-	# начале копки, а не в физике движения.
-	if is_in_rig() and not _has_rig_fuel():
-		digging = null
-		# _start_dig зовётся каждый кадр, пока герой держит направление копки
-		# (см. _apply_intent) — без флага тост сыпался бы каждый кадр вместо
-		# одного раза за попытку (сбрасывается там же, когда ввод отпущен).
-		if not _rig_dig_stall_warned:
-			_rig_dig_stall_warned = true
-			rig_fuel_warning.emit("Бак пуст — заправься у станции")
-		return
+	# Пустой бак бурмобиля копку не останавливает: герой копает киркой
+	# (скорость — _tool_speed_multiplier, владелец 29.10).
 
 	# Запечатанный Робертом огород (уровни 1..4 вне ствола тоннеля) не
 	# копается вообще. Отказывать надо ДО удара, а не после: world.dig_cell()
@@ -1219,8 +1272,9 @@ func _start_dig(tx: int, ty: int) -> void:
 		var stage := GameState.get_skill_stage("dig_speed")
 		total = base_secs * pow(0.96, float(stage)) / _tool_speed_multiplier() \
 			/ Balance.get_global_dig_speed_multiplier()
-		# Штраф за пустую бодрость — делением, потому что здесь время, а не скорость.
-		total /= GameState.get_speed_multiplier()
+		# Штраф голода и усталости — делением, потому что здесь время, а не скорость
+		# (ГДД §7: на нуле бодрости −50% владельца, с раунда 5 — и ступени 25%/10%).
+		total /= maxf(SurvivalRules.dig_factor(), 0.05)
 		total = maxf(total, 0.05)
 		if type == TileTypes.Type.LAVA:
 			# Лава — 5 с вне зависимости от инструмента (решение владельца): цена в HP
@@ -1298,10 +1352,13 @@ func _finish_dig() -> void:
 		if weight > free_kg:
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, 0)
 		else:
+			if lucky > 1:
+				LuckJuice.arm(mineral_id)   # подбор этой находки звучит громче и всплывает крупнее (владелец 27.10)
 			GameState.add_item(mineral_id, 1)
 			dig_finished.emit(d.x, d.y, d.type, mineral_id, true, price)
 			if lucky > 1:
 				var extra := GameState.add_item(mineral_id, lucky - 1)
+				LuckJuice.disarm()
 				if extra > 0:
 					_lucky_find(d, mineral_id, extra + 1)
 
@@ -1325,18 +1382,23 @@ func _luck_roll(loot: bool) -> int:
 	if _luck_rng == null:
 		_luck_rng = RandomNumberGenerator.new()
 		_luck_rng.randomize()
-	return Balance.luck_find_multiplier(_luck_rng.randf() * 100.0, loot,
+	# Голодному везёт реже (ГДД §7, раунд 5): бросок делится на долю — шанс падает во столько же раз.
+	var hunger_luck := SurvivalRules.luck_factor()
+	if hunger_luck <= 0.0:
+		return 1
+	return Balance.luck_find_multiplier(_luck_rng.randf() * 100.0 / hunger_luck, loot,
 			GameState.get_skill_stage("luck_chance"), GameState.get_skill_stage("luck_multiplier"))
 
 
 func _lucky_find(d: Dictionary, mineral_id: String, mult: int) -> void:
 	var pos := Vector2(d.x * 32.0 + 16.0, d.y * 32.0 + 16.0)
-	Fx.float_text(pos + Vector2(0, -20), "×%d" % mult, LUCK_COLOR)
-	if not mineral_id.is_empty():
-		# Удача на земле случается часто (до 10% клеток) — ей хватит цифры, без звука.
-		Fx.burst("pickup_glint", pos, 0.9)
-		Sfx.play("pickup_rare")
-		Haptics.tap()
+	# Отклик удачи (владелец 27.10): «×N» на 20% крупнее, у руды — вспышка, толчок и наезд
+	# камеры (LuckJuice). Звук удачи — сам подбор, громче на 50% (JuiceDirector); удача на
+	# земле случается часто (до 10% клеток) — ей хватит крупной цифры.
+	# крупные «+N» над головой и «×N» над клеткой не слипаются: подпись чуть в сторону клетки
+	var side := signf(pos.x - x * 32.0)
+	Fx.float_text(pos + Vector2(5.0 * side, -20), "×%d" % mult, LUCK_COLOR, LuckJuice.icon_scale())
+	LuckJuice.moment(pos, mineral_id)
 	GameState.emit_event(&"lucky_find", {"cell": Vector2i(d.x, d.y), "mineral": mineral_id, "mult": mult})
 
 

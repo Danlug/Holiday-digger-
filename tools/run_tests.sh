@@ -46,6 +46,7 @@ run_one() {
 	# user:// (save.json, settings.json) общий на всю машину: у каждого теста свой каталог данных,
 	# иначе параллельные тесты и соседние worktree-ветки ломают друг другу сейв.
 	export XDG_DATA_HOME="$2/xdg_$n"
+	export APPDATA="$2/xdg_$n"   # то же для Windows: там Godot кладёт user:// в %APPDATA%
 	if [ "$kind" = scene ]; then
 		timeout 240 "$GODOT" --headless --path . "res://tests/$n.tscn" >"$log" 2>&1
 	else

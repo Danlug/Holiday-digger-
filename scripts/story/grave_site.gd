@@ -14,13 +14,28 @@ signal pressed
 
 const TILE := 32
 const GRAVE_X := 14.0
-## Банка с тетрадью стоит у правого края плиты; сцена diary_first рисует её
-## в той же клетке (data/story_arc.json), пока флаг diary_found не поставлен.
-const JAR_X := 14.95
 const NEAR := 0.9
+## Графика — tools/gen_grave.py: текстуры 2 px на игровой пиксель (гравировке
+## портрета нужна сетка мельче тайла), отсюда масштаб 0.5. Две картинки одного
+## размера: плита на месте (до сцены diary_first) и сдвинутая, с ямой справа.
 const STONE_TEX := "res://art/env/grave.png"
-const STONE_SCALE := 1.5
-const JAR_TEX := "res://art/story/grave_jar.png"
+const STONE_OPEN_TEX := "res://art/env/grave_open.png"
+const STONE_SCALE := 0.5
+## Банка с тетрадью стоит в яме под сдвинутой плитой (правый край grave_open);
+## сцена diary_first рисует её в той же точке (data/story_arc.json), пока флаг
+## diary_found не поставлен. Низ банки — дно ямы, на 7 px выше линии земли.
+const JAR_X := 14.6
+const JAR_TEX := "res://art/env/grave_jar.png"
+const JAR_SCALE := 0.5
+const JAR_BOTTOM_Y := 25.0
+## Самородок из концовки (ending.n6: «положил на могильную плиту») остаётся
+## лежать на плите; сцена кладёт его туда же (story_arc.json), а когда плита
+## сдвинута, самородок едет вместе с ней.
+const NUGGET_TEX := "res://art/story/prop_nugget.png"
+const NUGGET_X := 14.15
+const NUGGET_SCALE := 0.5
+const NUGGET_BOTTOM_Y := 22.0
+const NUGGET_OPEN_DX := -6.0
 const MARKER_TEX := "res://art/story/grave_marker.png"
 const ICON_DIARY := "res://art/story/icon_diary.png"
 const ICON_FLOWER := "res://art/story/icon_flower.png"
@@ -29,7 +44,10 @@ var player: Node = null
 var hud: Node = null
 
 var _stone: Sprite2D
+var _stone_closed: Texture2D
+var _stone_open: Texture2D
 var _jar: Sprite2D
+var _nugget: Sprite2D
 var _marker: Sprite2D
 var _marker_base_y: float = 0.0
 var _layer: CanvasLayer
@@ -48,18 +66,29 @@ func _ready() -> void:
 func _build_world() -> void:
 	_stone = Sprite2D.new()
 	_stone.centered = false
-	var tex: Texture2D = load(STONE_TEX)
-	_stone.texture = tex
+	_stone_closed = load(STONE_TEX)
+	_stone_open = load(STONE_OPEN_TEX) if ResourceLoader.exists(STONE_OPEN_TEX) else _stone_closed
+	_stone.texture = _stone_closed
 	_stone.scale = Vector2(STONE_SCALE, STONE_SCALE)
-	var size := tex.get_size() * STONE_SCALE
+	var size := _stone_closed.get_size() * STONE_SCALE
 	_stone.position = Vector2(GRAVE_X * TILE - size.x / 2.0, TILE - size.y)
 	add_child(_stone)
 
 	_jar = Sprite2D.new()
 	_jar.centered = false
 	_jar.texture = load(JAR_TEX)
-	_jar.position = Vector2(JAR_X * TILE - 8.0, TILE - 16.0)
+	_jar.scale = Vector2(JAR_SCALE, JAR_SCALE)
+	var jar_size := _jar.texture.get_size() * JAR_SCALE
+	_jar.position = Vector2(JAR_X * TILE - jar_size.x / 2.0, JAR_BOTTOM_Y - jar_size.y)
 	add_child(_jar)
+
+	_nugget = Sprite2D.new()
+	_nugget.centered = false
+	if ResourceLoader.exists(NUGGET_TEX):
+		_nugget.texture = load(NUGGET_TEX)
+	_nugget.scale = Vector2(NUGGET_SCALE, NUGGET_SCALE)
+	_nugget.visible = false
+	add_child(_nugget)
 
 	_marker = Sprite2D.new()
 	_marker.centered = false
@@ -72,7 +101,7 @@ func _build_world() -> void:
 func _build_button() -> void:
 	_layer = CanvasLayer.new()
 	_layer.name = "GraveHotspot"
-	_layer.layer = 8
+	_layer.layer = UiLayers.WORLD_BUBBLES
 	add_child(_layer)
 
 	_button = Button.new()
@@ -84,7 +113,7 @@ func _build_button() -> void:
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.06, 0.05, 0.04, 0.92)
-		sb.border_color = Color8(0xE0, 0xA9, 0x3B) if state == "pressed" or state == "hover" else Color8(0x3E, 0x31, 0x25)
+		sb.border_color = UiTheme.GOLD if state == "pressed" or state == "hover" else UiTheme.BORDER
 		sb.set_border_width_all(1)
 		sb.set_corner_radius_all(3)
 		sb.content_margin_top = 3
@@ -92,11 +121,12 @@ func _build_button() -> void:
 		_button.add_theme_stylebox_override(state, sb)
 	_button.visible = false
 	_button.pressed.connect(_on_pressed)
+	UiBtn.wire_sink(_button)
 	_layer.add_child(_button)
 
 	_badge = Label.new()
 	_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_badge.add_theme_font_size_override("font_size", 9)
+	_badge.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_badge.add_theme_color_override("font_color", Color.WHITE)
 	_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -104,7 +134,7 @@ func _build_button() -> void:
 	_badge.size = Vector2(14, 14)
 	_badge.position = Vector2(26, -5)
 	var bsb := StyleBoxFlat.new()
-	bsb.bg_color = Color8(0xC2, 0x1E, 0x3A)
+	bsb.bg_color = UiTheme.DANGER   # тот же красный, что у бейджа UiBtn
 	bsb.set_corner_radius_all(7)
 	_badge.add_theme_stylebox_override("normal", bsb)
 	_badge.visible = false
@@ -142,8 +172,17 @@ func _on_pressed() -> void:
 func _process(dt: float) -> void:
 	_t += dt
 	var visible_world: bool = GameState.era != "grandpa"
+	var opened := diary_found()
 	_stone.visible = visible_world
-	_jar.visible = visible_world and diary_found()
+	var want: Texture2D = _stone_open if opened else _stone_closed
+	if _stone.texture != want:
+		_stone.texture = want
+	_jar.visible = visible_world and opened
+	_nugget.visible = visible_world and _nugget.texture != null and StoryState.is_seen("ending")
+	if _nugget.visible:
+		var ns := _nugget.texture.get_size() * NUGGET_SCALE
+		var dx := NUGGET_OPEN_DX if opened else 0.0
+		_nugget.position = Vector2(NUGGET_X * TILE - ns.x / 2.0 + dx, NUGGET_BOTTOM_Y - ns.y)
 	_marker.visible = visible_world and has_news()
 	if _marker.visible:
 		_marker.position.y = _marker_base_y + sin(_t * 3.0) * 2.0

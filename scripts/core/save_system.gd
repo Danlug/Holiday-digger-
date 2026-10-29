@@ -26,6 +26,8 @@ static func has_save() -> bool:
 
 
 static func delete_save() -> void:
+	# Запись, заказанная на конец кадра до «Сброса», записала бы старый мир поверх сброшенного.
+	_pending_reason = ""
 	# Копия тоже: после «Сброса» из неё поднялась бы стёртая игра.
 	var dir := DirAccess.open("user://")
 	if dir == null:
@@ -38,6 +40,7 @@ static func delete_save() -> void:
 ## Собирает состояние GameState в plain-Dictionary, готовый к JSON.stringify.
 static func _serialize() -> Dictionary:
 	var gs := GameState
+	HeroSpot.sync_now()   # место героя под землёй — в ext на момент записи (scripts/core/hero_spot.gd)
 	return {
 		"version": SCHEMA_VERSION,
 		"saved_at_utc": Time.get_datetime_string_from_system(true),
@@ -59,10 +62,6 @@ static func _serialize() -> Dictionary:
 			"dollars": gs.dollars,
 		},
 		"inventory": gs.inventory,
-		"black_box": {
-			"tier": gs.black_box_tier,
-			"contents": gs.black_box,
-		},
 		"tool": {
 			"current_tool": gs.current_tool,
 			# Припаркованная машина — объект мира, переживает перезапуск:
@@ -101,9 +100,9 @@ static func _serialize() -> Dictionary:
 		# Робертом люк, стадия обучения, оплаченная и ещё не забранная
 		# доставка. Без этого перезапуск игры возвращает люк в непостроенное
 		# состояние и съедает оплаченный заказ.
-		# house_is_indoors намеренно НЕ сохраняется: позиция героя между
-		# сессиями и так не сохраняется (см. main.gd:_position_from_save_or_start),
-		# и запуск игры внутри дома разошёлся бы с координатами в огороде.
+		# house_is_indoors намеренно НЕ сохраняется: место героя пишется только
+		# под землёй (HeroSpot, ext["hero_spot"]), из дома запуск идёт у дома
+		# (main.gd:_position_from_save_or_start) — внутри дома он разошёлся бы с огородом.
 		"house": {
 			"room": gs.house_room,
 			"food_at_door": gs.house_food_at_door,
@@ -174,10 +173,8 @@ static func _apply(data: Dictionary) -> void:
 	gs.dollars = int(currency.get("dollars", gs.dollars))
 
 	gs.inventory = data.get("inventory", {})
-
-	var black_box: Dictionary = data.get("black_box", {})
-	gs.black_box_tier = String(black_box.get("tier", gs.black_box_tier))
-	gs.black_box = black_box.get("contents", {})
+	# Блок ящика-страховки из старых сейвов не читаем: механика убрана (решение владельца,
+	# раунд 5), положить в ящик было нельзя — он всегда пуст; следующее сохранение блок не пишет.
 
 	var tool: Dictionary = data.get("tool", {})
 	gs.current_tool = String(tool.get("current_tool", gs.current_tool))
@@ -367,6 +364,139 @@ static func save_game() -> bool:
 	return true
 
 
+static var _now_frame := -1
+
+
+## Сохранить и синхронизировать сейчас: закрытие страницы, пауза, сворачивание (SaveHooks), смерть,
+## доллары, награда сцены. reason — для журнала. Повтор в том же кадре не пишет второй раз (скрытие и
+## уход страницы приходят подряд, у скрытой вкладки кадров нет). В вебе файл сразу уходит в IndexedDB
+## (_persist_web) — штатный перенос движка опоздал бы на кадр, а у скрытой вкладки кадров нет.
+static func save_now(reason: String = "") -> bool:
+	var frame := Engine.get_process_frames()
+	if frame == _now_frame:
+		return true
+	_now_frame = frame
+	var ok := save_game()
+	if ok and OS.has_feature("web"):
+		_persist_web(reason)
+	if not ok:
+		push_warning("SaveSystem: запись «%s» не удалась" % reason)
+	return ok
+
+
+## save_now в конце текущего кадра, одна запись на кадр, сколько бы событий ни попросило:
+## смерть и респавн почти всегда в одном кадре, и одна запись ловит уже воскресшего дома героя
+## с платой и пустым рюкзаком. Для вкладки это всё ещё «сразу»: кадр движка в вебе — одна задача
+## JS, посреди неё вкладку не закрыть. Без мира (GameState без main.tscn) не пишет: такой сейв
+## затёр бы диффы мира (то же правило, что в MetaService.persist).
+static func save_at_frame_end(reason: String) -> void:
+	if not _pending_reason.is_empty():
+		return
+	_pending_reason = reason
+	_flush_pending.call_deferred()
+
+
+static var _pending_reason: String = ""
+
+
+static func _flush_pending() -> void:
+	var reason := _pending_reason
+	_pending_reason = ""
+	if reason.is_empty() or GameState.world_ref == null:   # пусто — отменена delete_save()
+		return
+	_now_frame = -1   # запись раньше в этом кадре (SaveHooks «встал») была ДО смерти — пишем заново
+	save_now(reason)
+
+
+## Движок переносит user:// в IndexedDB сам, но в начале СЛЕДУЮЩЕГО кадра после записи, а у скрытой
+## вкладки кадров нет: сейв, записанный при уходе со страницы, жил бы только в памяти, и телефон,
+## выгрузивший вкладку, унёс бы его с собой. Поэтому отдаём текст оболочке (web/shell.src.html,
+## RaskopkiShell.persistFile): она кладёт его в ту же базу тем же форматом, что и движок. Строка
+## «[raskopki] save: …» в консоли — для веб-проверок (tools/web_death_save.js).
+static func _persist_web(reason: String = "") -> void:
+	var shell = JavaScriptBridge.get_interface("RaskopkiShell")
+	if shell == null or shell.persistFile == null:
+		return
+	for path in [SAVE_PATH, "user://story.json"]:
+		if FileAccess.file_exists(path):
+			shell.persistFile(ProjectSettings.globalize_path(path), FileAccess.get_file_as_string(path))
+	print("[raskopki] save: %s" % reason)
+
+
+## Веб, один раз на старте: ускоряет штатный перенос движка. В emscripten он обходит курсором ВСЕ
+## записи базы (по задаче цикла событий на каждую, между кадрами — секунды под нагрузкой) и не зовёт
+## commit(), так что транзакция ждёт главный поток на каждый ответ — и всё это время база заперта:
+## запись смерти (save_now → persistFile оболочки) стояла за ней, и убитый через 300 мс браузер
+## терял смерть (2 из 3 прогонов, tools/web_death_save.js). Теперь база обходится один раз (сейчас) и
+## помнится, разница кладётся одной транзакцией с commit(). Кроме переноса, в базу пишет только
+## persistFile — те же файлы, что перенос и так перепишет по времени правки. Ошибка транзакции
+## стирает память — следующий перенос обойдёт базу заново. Загрузку (populate) это не трогает.
+static func install_web_sync() -> int:
+	if not OS.has_feature("web"):
+		return 0
+	var n = JavaScriptBridge.eval(_FAST_IDB_JS, false)
+	return int(n) if typeof(n) == TYPE_INT or typeof(n) == TYPE_FLOAT else 0
+
+
+const _FAST_IDB_JS := """(function () {
+	try {
+		if (typeof FS === 'undefined' || typeof IDBFS === 'undefined' || typeof GodotFS === 'undefined' || !GodotFS._idbfs) { return 0; }
+		if (IDBFS.__raskopki) { return 2; }
+		var walk = IDBFS.getRemoteSet, rec = IDBFS.reconcile;
+		var cache = {}, waiting = {};
+		IDBFS.__raskopki = { cache: cache };
+		IDBFS.getRemoteSet = function (mount, callback) {
+			var mp = mount.mountpoint;
+			if (cache[mp]) { return callback(null, cache[mp]); }
+			if (waiting[mp]) { waiting[mp].push(callback); return; }
+			waiting[mp] = [callback];
+			walk(mount, function (err, remote) {
+				var cbs = waiting[mp];
+				delete waiting[mp];
+				if (!err && remote) { cache[mp] = remote; }
+				cbs.forEach(function (cb) { cb(err, remote); });
+			});
+		};
+		IDBFS.reconcile = function (src, dst, callback) {
+			var mp = null;
+			Object.keys(cache).forEach(function (k) { if (cache[k] === dst) { mp = k; } });
+			if (src.type !== 'local' || mp === null) { return rec(src, dst, callback); }
+			var create = [], remove = [];
+			Object.keys(src.entries).forEach(function (key) {
+				var e2 = dst.entries[key];
+				if (!e2 || src.entries[key].timestamp.getTime() != e2.timestamp.getTime()) { create.push(key); }
+			});
+			Object.keys(dst.entries).forEach(function (key) { if (!src.entries[key]) { remove.push(key); } });
+			if (!create.length && !remove.length) { return callback(null); }
+			var finished = false;
+			var finish = function (err) { if (!finished) { finished = true; callback(err); } };
+			var tx, store;
+			try {
+				tx = dst.db.transaction([IDBFS.DB_STORE_NAME], 'readwrite');
+				store = tx.objectStore(IDBFS.DB_STORE_NAME);
+			} catch (e) { delete cache[mp]; return finish(e); }
+			create.sort().forEach(function (path) {
+				IDBFS.loadLocalEntry(path, function (err, entry) {
+					if (err) { return; }
+					store.put(entry, path);
+					dst.entries[path] = { timestamp: entry.timestamp };
+				});
+			});
+			remove.sort().reverse().forEach(function (path) { store.delete(path); delete dst.entries[path]; });
+			tx.oncomplete = function () { finish(null); };
+			tx.onerror = tx.onabort = function (e) {
+				delete cache[mp];
+				if (e && e.preventDefault) { e.preventDefault(); }
+				finish((e && e.target && e.target.error) || new Error('IDB transaction aborted'));
+			};
+			if (tx.commit) { tx.commit(); }
+		};
+		FS.getMounts(FS.root.mount).forEach(function (m) { if (m.type === IDBFS) { IDBFS.getRemoteSet(m, function () {}); } });
+		return 1;
+	} catch (e) { return -1; }
+})()"""
+
+
 ## Дёшево: файл начинается с «{» и кончается «}» (обрыв записи так не выглядит).
 static func _looks_complete(path: String) -> bool:
 	var f := FileAccess.open(path, FileAccess.READ)
@@ -394,6 +524,7 @@ static func _read_dict(path: String):
 
 
 static func load_game() -> bool:
+	install_web_sync()   # до первой записи: GameState._ready и main._ready оба зовут load_game
 	if not has_save():
 		return false
 	var parsed = _read_dict(SAVE_PATH)
@@ -408,6 +539,8 @@ static func load_game() -> bool:
 	var migrated := _migrate(_sanitize(parsed))
 	_apply(migrated)
 	GameState.top_up_skill_points()  # очки за уровни растут с раунда 4 — доплата старому сейву
+	PremiumUnload.migrate_legacy()  # таблетка снята с продажи (раунд 6): лежавшая в сейве — долларами назад
+	OwnerGifts.apply_on_load()  # разовые подарки уже игравшим (data/gifts.json)
 	return true
 
 
@@ -418,16 +551,16 @@ static func load_game() -> bool:
 # ---------------------------------------------------------------------------
 
 ## Блоки-словари корня сейва. ext и world свободной формы — их содержимое не трогаем.
-const _SAN_BLOCKS: Array[String] = ["survival", "progression", "currency", "black_box", "tool", "depth",
+const _SAN_BLOCKS: Array[String] = ["survival", "progression", "currency", "tool", "depth",
 	"artifacts", "time", "ads", "world", "events", "house", "economy", "ext"]
 const _SAN_FREE_BLOCKS: Array[String] = ["ext", "world"]
 ## Листья-строки; любая другая строка там, где ждут число или bool, ломает int()/bool().
-const _SAN_STRING_KEYS: Array[String] = ["current_tool", "tier", "last_reset_utc_date", "room", "current_gear"]
+const _SAN_STRING_KEYS: Array[String] = ["current_tool", "last_reset_utc_date", "room", "current_gear"]
 ## Листья, где контейнер — норма; в любом другом месте словарь или массив вместо числа ломает float()/int().
-const _SAN_CONTAINER_KEYS: Array[String] = ["skill_stages", "contents", "daily_counts", "food_at_door", "storage",
+const _SAN_CONTAINER_KEYS: Array[String] = ["skill_stages", "daily_counts", "food_at_door", "storage",
 	"collected", "completed_branches", "owned_tools", "owned_gear", "craft_invested"]
 ## Словари «ключ → число» (inventory — в корне; остальные — [блок, ключ]).
-const _SAN_COUNT_DICTS: Array = [["", "inventory"], ["progression", "skill_stages"], ["black_box", "contents"],
+const _SAN_COUNT_DICTS: Array = [["", "inventory"], ["progression", "skill_stages"],
 	["ads", "daily_counts"], ["house", "food_at_door"], ["house", "storage"]]
 ## Массивы строк / чисел.
 const _SAN_ARRAYS: Array = [["artifacts", "collected", TYPE_STRING], ["artifacts", "completed_branches", TYPE_FLOAT],

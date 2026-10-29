@@ -92,8 +92,10 @@ func _test_data() -> void:
 	check("первая ступень (постройка) без цены ступени", levels[0]["cost"] == null)
 	for key in ["capacity_blocks", "upgrade_cost"]:
 		var n = TechData.fuel()["tanks"]["hand_drill"][key]
-		check("числа бака %s помечены proposed" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", false) == true)
-	check("ступени костюма помечены proposed", TechData.heat()["suit_tiers"].get("proposed", false) == true)
+		# баки владелец утвердил на странице разбора чисел (26.10)
+		check("числа бака %s утверждены (proposed: false)" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", true) == false)
+	# владелец принял совет на странице разбора чисел (26.10): ступени костюма утверждены
+	check("ступени костюма утверждены владельцем (proposed: false)", TechData.heat()["suit_tiers"].get("proposed", true) == false)
 	check("ступени скважины помечены proposed", TechData.well()["levels"].get("proposed", false) == true)
 	check("лава — решения владельца: 3000 / 20 HP/с / 5 с",
 		Heat.lava_min_depth() == 3000 and Heat.lava_raw_dps() == 20.0 and Heat.lava_dig_seconds() == 5.0)
@@ -207,7 +209,12 @@ func _test_player_fuel() -> void:
 	GameState.owned_tools = ["shovel", "rusty_pickaxe", "iron_pickaxe", "hand_drill", "drill_rig"]
 	GameState.current_tool = "hand_drill"
 	var best := Balance.get_best_pickaxe_speed_multiplier()
-	check("пустой бак бура: копаем киркой, а не буром", is_equal_approx(p._tool_speed_multiplier(), best))
+	var own := Balance.get_tool_speed_multiplier("iron_pickaxe")
+	check("пустой бак бура: копаем лучшей своей киркой (железной ×%.1f), а не лучшей в игре (×%.1f)" % [own, best],
+		is_equal_approx(p._tool_speed_multiplier(), own) and own < best)
+	GameState.owned_tools = ["shovel", "hand_drill"]
+	check("своей кирки нет — лопатой", is_equal_approx(p._tool_speed_multiplier(), Balance.get_tool_speed_multiplier("shovel")))
+	GameState.owned_tools = ["shovel", "rusty_pickaxe", "iron_pickaxe", "hand_drill", "drill_rig"]
 	FuelTank.set_fuel("hand_drill", 1.0)
 	check("с топливом бур вдвое быстрее лучшей кирки", is_equal_approx(p._tool_speed_multiplier(), best * 2.0))
 
@@ -606,11 +613,12 @@ func _test_double_and_ads() -> void:
 	check("«×2» не трогает доллары и монеты", GameState.dollars == 0 and GameState.coins == 0)
 
 	GameState.ad_daily_counts.clear()
-	check("лимит роликов в сутки — 3", TechAds.daily_limit() == 3 and TechAds.left_today() == 3)
+	# владелец (26.10): «можно больше чуть» — 4 в сутки (было 3)
+	check("лимит роликов в сутки — 4", TechAds.daily_limit() == 4 and TechAds.left_today() == 4)
 	var results: Array = []
-	for i in range(4):
+	for i in range(5):
 		TechAds.request(func(ok: bool) -> void: results.append(ok))
-	check("три ролика дали награду, четвёртый — отказ", results == [true, true, true, false])
+	check("четыре ролика дали награду, пятый — отказ", results == [true, true, true, true, false])
 	check("осталось ноль", TechAds.left_today() == 0)
 	check("рекламная сеть не подключена: AdManager честно говорит «нет готового»", not AdManager.is_ad_ready(TechAds.PLACEMENT))
 	check("точка показа заведена в monetization.json (AdManager её знает)", not AdManager.placement(TechAds.PLACEMENT).is_empty())

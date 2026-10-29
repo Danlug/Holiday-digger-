@@ -4,8 +4,9 @@ extends VBoxContainer
 ## экране кнопку ежедневных заданий»). Стоит в левом столбике HUD под героем и
 ## кнопкой сюжетного задания — там же, где в мобильных играх живёт «квестовая»
 ## колонка: не перекрывает кошелёк, глубину, джойстик и стрелки, видна и в шахте,
-## и на поверхности. Под кнопкой — полоска дня из сегментов (по одному на
-## задание: золото — в процессе, зелёный — выполнено), на кнопке — красный бейдж
+## и на поверхности. Под кнопкой — полоска звёзд до сундука (миссий 13, на
+## 36 точках сегменты были бы по точке: зелёное — забранные звёзды, золото —
+## выполненные, но не забранные; правый край — сундук), на кнопке — красный бейдж
 ## «сколько готово забрать»; пока есть что забрать, кнопка покачивается.
 ## Новый набор дня, который ещё не открывали, отмечен звёздочкой.
 ##
@@ -94,7 +95,8 @@ func _sync() -> void:
 	if key != _state_key:
 		_state_key = key
 		_bar.queue_redraw()
-		Tip.set_text(button, "Ежедневные задания", "Выполнено: %d из %d" % [QuestEngine.daily_done_count(), QuestEngine.daily().size()],
+		Tip.set_text(button, "Ежедневные миссии", "Выполнено: %d из %d · звёзд: %d из %d до сундука" % [QuestEngine.daily_done_count(),
+			QuestEngine.daily().size(), QuestEngine.stars_today(), QuestEngine.stars_needed()],
 			"Готово забрать: %d" % n if n > 0 else "")
 
 
@@ -102,28 +104,40 @@ func _key() -> String:
 	var parts: PackedStringArray = []
 	for q in QuestEngine.daily():
 		parts.append("%d/%d/%s" % [int(q["progress"]), int(q["target"]), str(q["claimed"])])
+	parts.append(str(MetaState.sub("quests").get("bonus_claimed", false)))
 	return ",".join(parts)
 
 
-## Сегмент на задание: тёмная канавка, золотая доля прогресса, зелёный — готово.
+## Полоска звёзд до сундука: зелёное — забранные звёзды, золото — выполненные
+## миссии, которые ещё ждут «Забрать»; правый край — десятая звезда, сундук.
+## Сундук открыт — полоска целиком зелёная.
 func _draw_bar() -> void:
 	var ds := QuestEngine.daily()
 	if ds.is_empty():
 		return
 	var w := _bar.size.x
-	var gap := 1.0
-	var seg := (w - gap * float(ds.size() - 1)) / float(ds.size())
-	_bar.draw_rect(Rect2(Vector2(-1, -1), Vector2(w + 2, BAR_H + 2)), Color8(0x1A, 0x10, 0x0C))
-	for i in range(ds.size()):
-		var q: Dictionary = ds[i]
-		var x := float(i) * (seg + gap)
-		var r := Rect2(x, 0, seg, BAR_H)
-		_bar.draw_rect(r, Color(0.16, 0.13, 0.10))
-		var f := clampf(float(q["progress"]) / float(maxi(1, int(q["target"]))), 0.0, 1.0)
-		if f > 0.0:
-			var col := MetaUiKit.GREEN if f >= 1.0 else MetaUiKit.GOLD
-			_bar.draw_rect(Rect2(x, 0, seg * f, BAR_H), col)
-			_bar.draw_rect(Rect2(x, 0, seg * f, 1), col.lightened(0.35))
+	var need := maxi(1, QuestEngine.stars_needed())
+	_bar.draw_rect(Rect2(Vector2(-1, -1), Vector2(w + 2, BAR_H + 2)), UiTheme.INK)
+	_bar.draw_rect(Rect2(0, 0, w, BAR_H), Color(0.16, 0.13, 0.10))
+	var stars := QuestEngine.stars_today()
+	var done := stars
+	for q in ds:
+		if QuestEngine.is_claimable(q):
+			done += 1
+	done = mini(need, done)
+	if bool(MetaState.sub("quests").get("bonus_claimed", false)):
+		stars = need
+		done = need
+	var fd := clampf(float(done) / float(need), 0.0, 1.0)
+	var fs := clampf(float(stars) / float(need), 0.0, 1.0)
+	if fd > fs:
+		_bar.draw_rect(Rect2(0, 0, w * fd, BAR_H), MetaUiKit.GOLD)
+	if fs > 0.0:
+		_bar.draw_rect(Rect2(0, 0, w * fs, BAR_H), MetaUiKit.GREEN)
+		_bar.draw_rect(Rect2(0, 0, w * fs, 1), MetaUiKit.GREEN.lightened(0.35))
+	# Деления по звёздам: видно, что шкала считает штуки, а не проценты.
+	for i in range(1, need):
+		_bar.draw_rect(Rect2(w * float(i) / float(need) - 0.5, 0, 1, BAR_H), Color(0, 0, 0, 0.35))
 
 
 func _set_pulse(on: bool) -> void:

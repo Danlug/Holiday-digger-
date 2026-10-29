@@ -28,7 +28,7 @@ static func attach(host: Node) -> WellReport:
 		return _instance
 	var layer := CanvasLayer.new()
 	layer.name = "WellReportLayer"
-	layer.layer = 96   # выше экрана героя (95), ниже катсцен (100)
+	layer.layer = UiLayers.HERO_CARD   # выше экрана героя (95), ниже катсцен (100)
 	host.add_child(layer)
 	var w := WellReport.new()
 	w.name = "WellReport"
@@ -92,15 +92,7 @@ func close() -> void:
 
 
 func _build() -> void:
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.gui_input.connect(func(e: InputEvent) -> void:
-		var mb := e as InputEventMouseButton
-		var st := e as InputEventScreenTouch
-		if (mb != null and mb.pressed) or (st != null and st.pressed):
-			close())
-	add_child(dim)
+	UiTheme.scrim(self, close)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -148,7 +140,7 @@ func _build() -> void:
 	v.add_child(time_row)
 	time_row.add_child(TechUi.icon_rect(TechUi.tex("icon_hourglass"), 22))
 	var capped := bool(_report.get("capped", false))
-	time_row.add_child(TechUi.label(TechUi.hm(float(_report.get("seconds", 0.0))), 15,
+	time_row.add_child(TechUi.label(TechUi.hm(float(_report.get("seconds", 0.0))), UiTheme.FS_HEAD_L,
 		TechUi.RED if capped else TechUi.GOLD))
 	var secs_txt := TechUi.hm(float(_report.get("raw_seconds", _report.get("seconds", 0.0))))
 	if capped:
@@ -183,7 +175,7 @@ func _build() -> void:
 	_crate.pivot_offset = Vector2(17, 17)
 	Tip.bind(_crate, "Склад в мастерской", "Вся добыча уже лежит там", "~%d монет по цене скупки" % int(_report.get("coins_value", 0)))
 	stock.add_child(_crate)
-	_total_label = TechUi.label("+0", 14, TechUi.GREEN)
+	_total_label = TechUi.label("+0", UiTheme.FS_HEAD, TechUi.GREEN)
 	stock.add_child(_total_label)
 
 	# Кнопки: ×2 за ролик и «готово».
@@ -193,7 +185,7 @@ func _build() -> void:
 	v.add_child(buttons)
 	_double_btn = UiBtn.icon_button(TechUi.tex("icon_ad"), Vector2(86, 32), UiBtn.Kind.ACCENT, 22)
 	_double_btn.text = "×2"
-	_double_btn.add_theme_font_size_override("font_size", 14)
+	_double_btn.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	_double_btn.add_theme_color_override("font_color", TechUi.GOLD)
 	_double_btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_double_btn.add_theme_constant_override("h_separation", 6)
@@ -214,7 +206,7 @@ func _build() -> void:
 func _make_tile(id: String, count: int) -> Control:
 	var tile := PanelContainer.new()
 	tile.custom_minimum_size = Vector2(86, 62)
-	tile.add_theme_stylebox_override("panel", TechUi.box(Color8(0x24, 0x1C, 0x14), TechUi.BORDER, 6, 4))
+	tile.add_theme_stylebox_override("panel", TechUi.box(UiTheme.ROW, TechUi.BORDER, 6, 4))
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 1)
@@ -222,7 +214,7 @@ func _make_tile(id: String, count: int) -> Control:
 	var icon := TechUi.icon_rect(TechUi.item_icon(id), 32)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(icon)
-	var label := TechUi.label("×0", 13, TechUi.GOLD)
+	var label := TechUi.label("×0", UiTheme.FS_TITLE_L, TechUi.GOLD)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(label)
 	tile.mouse_filter = Control.MOUSE_FILTER_STOP

@@ -3,7 +3,7 @@ extends PanelContainer
 ## HudPill — «таблетка» кошелька: иконка и число с накруткой на тёмной
 ## полупрозрачной плашке. Название валюты и точная сумма — в подсказке (Tip).
 ##
-##   var p := HudPill.new().setup(UiIcons.tex("coin"), Color8(0xE0,0xA9,0x3B))
+##   var p := HudPill.new().setup(UiIcons.tex("coin"), UiTheme.GOLD)
 ##   p.set_value(1250)
 
 var icon_rect: TextureRect
@@ -42,7 +42,7 @@ func setup(icon: Texture2D, color: Color) -> HudPill:
 
 	count = CountLabel.new()
 	count.base_color = color
-	count.add_theme_font_size_override("font_size", 12)
+	count.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
 	count.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	count.add_theme_constant_override("outline_size", 2)
 	count.custom_minimum_size = Vector2(28, 0)

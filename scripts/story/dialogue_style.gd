@@ -3,11 +3,11 @@ extends RefCounted
 ## Общие цвета и рамки оформления диалогов и карточек сцен. Тёмный тёплый фон,
 ## золотая рамка, мягкая тень — как у экранов магазина и меты.
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_DIM := Color8(0x9C, 0x76, 0x2C)
-const TEXT := Color8(0xF2, 0xE8, 0xD0)
+const GOLD := UiTheme.GOLD
+const GOLD_DIM := UiTheme.GOLD_DIM
+const TEXT := UiTheme.CREAM
 const TEXT_NARR := Color8(0xD9, 0xCF, 0xB6)
-const MUTED := Color8(0x9D, 0x8B, 0x73)
+const MUTED := UiTheme.MUTED
 const PANEL_BG := Color(0.071, 0.055, 0.043, 0.95)
 const INK := Color(0, 0, 0, 0.55)
 

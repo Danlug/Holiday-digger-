@@ -15,7 +15,7 @@ extends Node
 ##  * соседние ступени одной лестницы (бак, костюм, скважина, снаряжение) не отличаются
 ##    по цене в монетах или в породе больше чем в десять раз;
 ##  * достижения и задания ссылаются на существующую добычу и достижимые числа;
-##  * топливо самоокупается на всех глубинах, лаву можно обойти/пройти на каждой ступени костюма.
+##  * топливо из породы — справка (пустой бак копает киркой), лаву можно обойти/пройти на каждой ступени костюма.
 ## Ничего не пишет на диск (кроме --json). Логика отчёта — в run(), тест — tests/test_progression_audit.gd.
 
 const MAX_DEPTH := 10000
@@ -612,7 +612,8 @@ func _check_quests() -> void:
 		var targets: Array = t.get("targets", [])
 		var min_tier := int(t.get("min_tier", 0))
 		var max_tier := mini(int(t.get("max_tier", targets.size() - 1)), targets.size() - 1)
-		if targets.size() < tier_depth.size():
+		# fixed_target — цель словами владельца на все ступени («посмотри рекламу 5 / 25 раз»).
+		if targets.size() < tier_depth.size() and not t.has("fixed_target"):
 			add("error", where, "целей %d, а ступеней игрока %d" % [targets.size(), tier_depth.size()])
 		if not f.has("item"):
 			continue
@@ -669,7 +670,9 @@ func _check_fuel_selfsufficiency() -> void:
 				worst_y = y
 			y += 100
 		if worst < 0.35:
-			add("warn", "топливо " + tool_id, "на глубине ~%d из породы выходит лишь %.0f%% расхода: топливо — основное занятие" % [worst_y, worst * 100.0])
+			# Не предупреждение: пустой бак копает лучшей киркой (владелец 29.10: «когда
+			# заканчивается топливо, он берётся за кирку», «с топливом всё ок»).
+			add("info", "топливо " + tool_id, "на глубине ~%d из породы выходит лишь %.0f%% расхода — дальше копает кирка" % [worst_y, worst * 100.0])
 		elif verbose:
 			add("info", "топливо " + tool_id, "худший запас топлива из породы — %.0f%% расхода на глубине ~%d" % [worst * 100.0, worst_y])
 		if FuelTank.capacities(tool_id).is_empty() or float(FuelTank.capacities(tool_id)[0]) / maxf(rate, 1e-9) < 20.0:

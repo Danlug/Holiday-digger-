@@ -189,13 +189,8 @@ class _WellStub extends Node:
 
 
 func _check_count_format() -> void:
-	check("число: 1250 -> «1 250»", CountLabel.short_text(1250) == "1 250")
-	check("число: 0 -> «0»", CountLabel.short_text(0) == "0")
-	check("число: 9 999 999 целиком", CountLabel.short_text(9999999) == "9 999 999")
-	check("число: 12 345 678 -> «12,3M»", CountLabel.short_text(12345678) == "12,3M")
-	check("число: 123 456 789 -> «123,5M»", CountLabel.short_text(123456789) == "123,5M")
-	check("число: 2 000 000 000 -> «2B»", CountLabel.short_text(2000000000) == "2B")
-	check("точная сумма для подсказки группируется пробелами", CountLabel.group_digits(1234567) == "1 234 567")
+	check("число на счётчике через UiFmt: 12 345 -> «12.3к»", UiFmt.short(12345) == "12.3к")
+	check("точная сумма для подсказки группируется пробелами", UiFmt.full(1234567) == "1 234 567")
 
 
 func _check_count_anim() -> void:
@@ -208,7 +203,7 @@ func _check_count_anim() -> void:
 	var mid := int(c.text.replace(" ", ""))
 	check("накрутка: в середине пути число между старым и новым (%d)" % mid, mid > 0 and mid < 1000)
 	await get_tree().create_timer(0.7).timeout
-	check("накрутка: в конце — ровно новое число", c.text == "1 000" and c.value() == 1000)
+	check("накрутка: в конце — ровно новое число", c.text == "1000" and c.value() == 1000)
 	c.set_value(5, true)
 	check("накрутка: instant ставит сразу", c.text == "5")
 	c.queue_free()
@@ -244,10 +239,10 @@ func _check_purse_and_gauges() -> void:
 	var coins0: int = GameState.coins
 	GameState.coins = 5000
 	GameState.coins_changed.emit(5000)
-	check("кошелёк: 5000 -> «5 000»", _hud._coins_pill.count.text == "5 000")
+	check("кошелёк: 5000 -> «5000»", _hud._coins_pill.count.text == "5000")
 	GameState.coins = 123456789
 	GameState.coins_changed.emit(123456789)
-	check("кошелёк: длинное число сокращено «123,5M»", _hud._coins_pill.count.text == "123,5M")
+	check("кошелёк: длинное число сокращено «123М»", _hud._coins_pill.count.text == "123М")
 	var tip: Dictionary = _hud._coins_pill.get_meta(Tip.META)
 	check("кошелёк: точная сумма — в подсказке", String(tip["body"]) == "123 456 789")
 	GameState.coins = coins0

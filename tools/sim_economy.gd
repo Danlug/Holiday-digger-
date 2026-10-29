@@ -123,6 +123,8 @@ func _simulate(seed_value: int) -> Dictionary:
 			s["depth"] = y
 			if s.has("mech"):
 				_mech_peek(s, world, y)
+			if String(_opt["artifacts"]) == "1":
+				_artifact_peek(s, world, y)
 			if lateral:
 				var r: int = Balance.get_vision_radius("vision", int(s["stages"].get("vision", 0)))
 				_lateral_pick(s, world, y, r)
@@ -217,15 +219,15 @@ func _dig_cell(s: Dictionary, world: WorldGen, x: int, y: int, in_shaft: bool) -
 	if MineralMap.is_loot(tile):
 		s["items"][mid] = int(s["items"].get(mid, 0)) + 1
 	if String(_opt["artifacts"]) == "1":
-		_artifact_find(s, x, y)
+		_artifact_find(s, world, x, y)
 	if s.has("mech"):
 		_mech_dug(s, world, x, y, mid, MineralMap.is_loot(tile))
 
 
 ## Находка артефакта в выкопанной клетке: монеты, опыт и награда за закрытую ветку — теми же
 ## числами, что GameState.collect_artifact.
-func _artifact_find(s: Dictionary, x: int, y: int) -> void:
-	var id := ArtifactSpawn.artifact_id_at(x, y, int(s["seed"]), Balance.artifacts.get("artifacts", []), s["artifacts"])
+func _artifact_find(s: Dictionary, world: WorldGen, x: int, y: int) -> void:
+	var id := ArtifactSpawn.artifact_id_at(x, y, int(s["seed"]), Balance.artifacts.get("artifacts", []), s["artifacts"], world)
 	if id.is_empty():
 		return
 	s["artifacts"].append(id)
@@ -334,6 +336,23 @@ func _mech_peek(s: Dictionary, world: WorldGen, y: int) -> void:
 	s["t"] += SIDE_TURN_S
 	_dig_cell(s, world, c.x, y, false)
 	s["t"] += 2.0 * float(k - 1) / 4.2
+
+
+## Шахта: артефакт лежит в породе и виден в радиусе обзора рельефа (ArtifactLayer);
+## увидел в своём ряду — прокопал к нему ход и вернулся пешком, как к сундуку.
+func _artifact_peek(s: Dictionary, world: WorldGen, y: int) -> void:
+	var r: int = Balance.get_vision_radius("vision", int(s["stages"].get("vision", 0))) + Balance.get_vision_terrain_bonus()
+	for a: Dictionary in ArtifactSpawn.artifacts_at_depth(y, Balance.artifacts.get("artifacts", [])):
+		if s["artifacts"].has(String(a.get("id", ""))):
+			continue
+		var c := ArtifactSpawn.cell_of(a, int(s["seed"]), world)
+		var k: int = absi(c.x - SHAFT_X)
+		if c.y != y or k == 0 or k > r:
+			continue
+		var side: int = signi(c.x - SHAFT_X)
+		for j in range(1, k + 1):
+			_dig_cell(s, world, SHAFT_X + side * j, y, false)   # последняя клетка — сам артефакт
+		s["t"] += SIDE_TURN_S + 2.0 * float(k - 1) / 4.2
 
 
 func _depth_milestones(s: Dictionary) -> void:

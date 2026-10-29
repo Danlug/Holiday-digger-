@@ -37,7 +37,8 @@ func _refund(bar: String, delta: float) -> void:
 	if value <= 0.0:
 		return
 
-	var rate := Balance.get_bar_depletion_rate_per_second(bar, GameState.is_digging)
+	var rate := Balance.get_bar_depletion_rate_per_second(bar, GameState.is_digging) \
+		* SurvivalRules.drain_multiplier(bar)   # тот же расход, что списал тик (раунд 5)
 	var drained := rate * 100.0 * delta
 	var saved := drained * _saved_fraction(bar, stage)
 	if saved <= 0.0:

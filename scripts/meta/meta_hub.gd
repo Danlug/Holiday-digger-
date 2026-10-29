@@ -41,7 +41,7 @@ var _closing: bool = false   # хаб гаснет (анимация): по см
 
 func _ready() -> void:
 	add_to_group("meta_hub")
-	layer = 92  # выше HUD, дома и шторок; ниже окна ежедневной награды (94) и экрана героя (95)
+	layer = UiLayers.META  # выше HUD, дома и шторок; ниже окна ежедневной награды (94) и экрана героя (95)
 	_build()
 	_root.visible = false
 	GameState.coins_changed.connect(_on_wallet_changed)
@@ -61,6 +61,7 @@ func current_tab() -> String:
 
 
 func open(tab: String = "") -> void:
+	GameState.emit_event("screen_opened", {"id": "meta_hub", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	if tab != "":
 		_tab = tab
 	_new_ach.clear()
@@ -121,27 +122,29 @@ func _build() -> void:
 	var specs: Array = []
 	for t in [TAB_TASKS, TAB_ACH, TAB_ROAD]:
 		specs.append([t, MetaUiKit.tex(TAB_ICONS[t]), TAB_TIPS[t][0], TAB_TIPS[t][1]])
-	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab, close)
+	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab)
+	var sb := HudSafeArea.bottom(get_viewport())
 	_tab_buttons = bar.get_meta("buttons")
 	for t in _tab_buttons.keys():
-		(_tab_buttons[t] as HeroTabButton).badge_color = Color8(0xD0, 0x45, 0x3C)   # красный: есть что забрать
+		(_tab_buttons[t] as HeroTabButton).badge_color = UiTheme.DANGER   # красный: есть что забрать
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 6
 	bar.offset_right = -6
-	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
-	bar.offset_bottom = -4
+	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4 + sb)
+	bar.offset_bottom = -4 - sb
 	_root.add_child(bar)
 
 	var wallet := HBoxContainer.new()
 	wallet.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	wallet.offset_left = 8
-	wallet.offset_right = -8
-	wallet.offset_top = 8
-	wallet.offset_bottom = 26
+	wallet.offset_right = -UiBtn.CLOSE_ROW
+	var st := HudSafeArea.top(get_viewport())
+	wallet.offset_top = 8 + st
+	wallet.offset_bottom = 26 + st
 	wallet.add_theme_constant_override("separation", 10)
 	_root.add_child(wallet)
 	for k in [["coins", "coin", "Монеты"], ["dollars", "dollar", "Доллары"], ["points", "star", "Очки трофеев"]]:
-		var chip := MetaUiKit.chip(MetaUiKit.tex(k[1]), "0", MetaUiKit.GOLD_LIGHT, 14, 10)
+		var chip := MetaUiKit.chip(MetaUiKit.tex(k[1]), "0", MetaUiKit.GOLD_LIGHT, 14, UiTheme.FS_BODY)
 		chip.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(chip, k[2])
 		wallet.add_child(chip)
@@ -152,11 +155,12 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 8
 	_scroll.offset_right = -8
-	_scroll.offset_top = 32
-	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
+	_scroll.offset_top = UiBtn.CLOSE_ROW + st
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + sb)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
+	UiBtn.close_button(close, _root)
 	_vbox = VBoxContainer.new()
 	_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_vbox.add_theme_constant_override("separation", 5)
@@ -207,7 +211,7 @@ func refresh() -> void:
 func _sync_wallet() -> void:
 	if _wallet_labels.is_empty():
 		return
-	(_wallet_labels["coins"] as Label).text = MetaUiKit.compact(GameState.coins)
+	(_wallet_labels["coins"] as Label).text = UiFmt.short(GameState.coins)
 	(_wallet_labels["dollars"] as Label).text = str(GameState.dollars)
 	(_wallet_labels["points"] as Label).text = str(TrophyRoad.points())
 
@@ -247,31 +251,12 @@ func _section_head(glyph: String, tip_title: String, tip_body: String, kind: Str
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(gap)
-	var chip := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 13, 9)
+	var chip := MetaUiKit.chip(MetaUiKit.tex("clock"), "", MetaUiKit.MUTED, 13, UiTheme.FS_SMALL)
 	h.add_child(chip)
 	_timers.append({"label": chip.get_child(1), "kind": kind})
 	Tip.bind(h, tip_title, tip_body)
 	h.mouse_filter = Control.MOUSE_FILTER_PASS
 	return h
-
-
-func _cta(icon_name: String, size: Vector2, color: Color, text: String = "") -> Button:
-	var b := Button.new()
-	b.icon = MetaUiKit.tex(icon_name)
-	b.text = text
-	b.add_theme_constant_override("icon_max_width", 16)
-	b.add_theme_font_size_override("font_size", 10)
-	b.custom_minimum_size = size
-	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var sb := MetaUiKit.box(color, MetaUiKit.GOLD if st == "hover" else color.lightened(0.25), 1, 5)
-		if st == "pressed":
-			sb.bg_color = color.darkened(0.2)
-		sb.set_content_margin_all(3)
-		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_color_override("font_color", Color.WHITE)
-	b.focus_mode = Control.FOCUS_NONE
-	UiBtn.wire_feedback(b)
-	return b
 
 
 # ---------------------------------------------------------------------------
@@ -288,9 +273,9 @@ func _build_tasks() -> void:
 		_vbox.add_child(lock)
 		return
 	_vbox.add_child(_section_head("calendar", "Ежедневные", "Новые задания каждый день в полночь. Справа — время до обновления.", "day"))
+	_vbox.add_child(_bonus_card())
 	for q in daily:
 		_vbox.add_child(_quest_card(q))
-	_vbox.add_child(_bonus_card())
 	var sp := Control.new()
 	sp.custom_minimum_size = Vector2(0, 4)
 	_vbox.add_child(sp)
@@ -330,7 +315,8 @@ func _quest_card(q: Dictionary) -> Control:
 		g.modulate = Color(0.55, 0.55, 0.55)
 	holder.add_child(g)
 	if claimed:
-		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 18)
+		# Забранная миссия дня — её звезда (как в окне заданий), недельная — галочка.
+		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("star" if String(q["kind"]) == "daily" else "check"), 18)
 		ck.position = Vector2(20, 20)
 		holder.add_child(ck)
 	h.add_child(holder)
@@ -343,20 +329,28 @@ func _quest_card(q: Dictionary) -> Control:
 	var bar := MetaBar.new()
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.frac = frac
-	bar.text = "%s/%s" % [MetaUiKit.compact(mini(int(q["progress"]), target)), MetaUiKit.compact(target)]
+	bar.text = "%s/%s" % [UiFmt.short(mini(int(q["progress"]), target)), UiFmt.short(target)]
 	bar.fill_color = MetaUiKit.GREEN if done else MetaUiKit.GOLD
 	mid.add_child(bar)
-	mid.add_child(MetaUiKit.reward_row(q["reward"], 12, 9))
+	# Награда с долларом (недельное) рядом с «Забрать» и «×2» не влезает в ширину
+	# экрана: ряд значков обрезается справа, а не раздвигает плитку за край
+	# (полностью она — в подсказке).
+	var rr_box := ScrollContainer.new()
+	rr_box.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	rr_box.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rr_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rr_box.add_child(MetaUiKit.reward_row(q["reward"], 12, UiTheme.FS_SMALL))
+	mid.add_child(rr_box)
 	h.add_child(mid)
 
 	var qid := String(q["id"])
 	if claimable:
-		var claim := _cta("check", Vector2(30, 34), MetaUiKit.GREEN_BTN)
+		var claim := UiBtn.fill_button(MetaUiKit.tex("check"), Vector2(30, 34), MetaUiKit.GREEN_BTN)
 		claim.pressed.connect(func() -> void: _claim_quest(qid, 1.0, claim))
 		Tip.bind(claim, "Забрать награду")
 		h.add_child(claim)
 		if MetaAds.can(MetaAds.QUEST):
-			var ad := _cta("ad", Vector2(36, 34), Color8(0x3C, 0x3A, 0x1A), "×2")
+			var ad := UiBtn.fill_button(MetaUiKit.tex("ad"), Vector2(36, 34), UiTheme.AD_BG, "×2")
 			ad.pressed.connect(func() -> void: _claim_quest_ad(qid, ad))
 			Tip.bind(ad, "Удвоить за ролик", "Монеты и опыт ×2. Доллары и очки не удваиваются.",
 				"Осталось сегодня: %d" % MetaAds.uses_left(MetaAds.QUEST))
@@ -386,12 +380,9 @@ func _claim_quest_ad(qid: String, from: Control) -> void:
 		Sfx.play("ui_deny")
 
 
+## Сундук звёзд: шкала звёзд дня (0…13, засечка на 10) и что в сундуке.
 func _bonus_card() -> Control:
 	var ds: Array = MetaState.sub("quests")["daily"]
-	var claimed_n := 0
-	for q in ds:
-		if bool(q["claimed"]):
-			claimed_n += 1
 	var ready := QuestEngine.bonus_ready()
 	var taken := bool(MetaState.sub("quests")["bonus_claimed"])
 	var card := PanelContainer.new()
@@ -403,26 +394,27 @@ func _bonus_card() -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 6)
 	card.add_child(h)
-	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("gift"), 32)
+	var ic := MetaUiKit.icon_rect(MetaUiKit.tex("chest_open" if (ready or taken) else "chest"), 32)
 	if taken:
 		ic.modulate = Color(0.55, 0.55, 0.55)
 	h.add_child(ic)
-	var pips := HBoxContainer.new()
-	pips.add_theme_constant_override("separation", 3)
-	pips.alignment = BoxContainer.ALIGNMENT_CENTER
-	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for i in range(maxi(3, ds.size())):
-		var pip := ColorRect.new()
-		pip.custom_minimum_size = Vector2(9, 9)
-		pip.color = MetaUiKit.GREEN if i < claimed_n else Color(0.18, 0.15, 0.12)
-		pips.add_child(pip)
-	h.add_child(pips)
+	var mid := VBoxContainer.new()
+	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mid.alignment = BoxContainer.ALIGNMENT_CENTER
+	mid.add_theme_constant_override("separation", 3)
+	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var track := MetaStarTrack.new()
+	track.custom_minimum_size = Vector2(0, 13)
+	track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	track.total = maxi(1, ds.size())
+	track.needed = QuestEngine.stars_needed()
+	track.stars = QuestEngine.stars_today()
+	mid.add_child(track)
 	var reward := QuestEngine.bonus_reward()
-	var rr := MetaUiKit.reward_row(reward, 12, 9)
-	rr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h.add_child(rr)
+	mid.add_child(MetaUiKit.reward_row(reward, 12, UiTheme.FS_SMALL))
+	h.add_child(mid)
 	if ready:
-		var claim := _cta("check", Vector2(30, 32), MetaUiKit.GREEN_BTN)
+		var claim := UiBtn.fill_button(MetaUiKit.tex("check"), Vector2(30, 32), MetaUiKit.GREEN_BTN)
 		claim.pressed.connect(func() -> void:
 			if Tip.swallowed():
 				return
@@ -431,11 +423,12 @@ func _bonus_card() -> Control:
 			if bool(res["ok"]):
 				MetaFx.claim(get_tree(), origin, res["reward"], true, _anchors(), true)
 				_after_claim())
-		Tip.bind(claim, "Забрать бонус дня")
+		Tip.bind(claim, "Открыть сундук звёзд")
 		h.add_child(claim)
 	elif taken:
 		h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("check"), 22))
-	Tip.bind(card, "Бонус дня", "Забери награды за все ежедневные задания — и получишь подарок.", MetaRewards.describe(reward))
+	Tip.bind(card, "Сундук звёзд", "За каждую забранную миссию дня — звезда. %d звёзд открывают сундук." % QuestEngine.stars_needed(),
+		MetaRewards.describe(reward))
 	return card
 
 
@@ -468,7 +461,7 @@ func _build_ach() -> void:
 	medal.position = Vector2(7, 7)
 	holder.add_child(medal)
 	top.add_child(holder)
-	var count := MetaUiKit.label("%d/%d" % [done, all.size()], 16, MetaUiKit.GOLD_LIGHT)
+	var count := MetaUiKit.label("%d/%d" % [done, all.size()], UiTheme.FS_HERO, MetaUiKit.GOLD_LIGHT)
 	top.add_child(count)
 	Tip.bind(top, "Достижения", "Получено из всех.", "%d из %d" % [done, all.size()])
 	top.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -497,7 +490,7 @@ func _ach_tile(a: Dictionary) -> Control:
 	t.custom_minimum_size = Vector2(ACH_W, ACH_H)
 	t.mouse_filter = Control.MOUSE_FILTER_PASS
 	var border := tcol if got else (MetaUiKit.GOLD.darkened(0.45) if started else MetaUiKit.BORDER)
-	t.add_theme_stylebox_override("panel", MetaUiKit.box(Color8(0x2C, 0x24, 0x34) if got else MetaUiKit.SLOT, border, 2 if got else 1, 4))
+	t.add_theme_stylebox_override("panel", MetaUiKit.box(UiTheme.NIGHT_HI if got else MetaUiKit.SLOT, border, 2 if got else 1, 4))
 
 	var ring := MetaRing.new()
 	ring.size = Vector2(44, 44)
@@ -521,7 +514,7 @@ func _ach_tile(a: Dictionary) -> Control:
 		var ck := MetaUiKit.icon_rect(MetaUiKit.tex("check"), 16)
 		ck.position = Vector2(30, 28)
 		t.add_child(ck)
-		var pts := MetaUiKit.chip(MetaUiKit.tex("star"), str(MetaData.points_for_tier(tier)), MetaUiKit.GOLD_LIGHT, 10, 8)
+		var pts := MetaUiKit.chip(MetaUiKit.tex("star"), str(MetaData.points_for_tier(tier)), MetaUiKit.GOLD_LIGHT, 10, UiTheme.FS_TINY)
 		pts.position = Vector2(12, 44)
 		t.add_child(pts)
 		if _new_ach.has(id):
@@ -536,7 +529,7 @@ func _ach_tile(a: Dictionary) -> Control:
 			var lk := MetaUiKit.icon_rect(MetaUiKit.tex("lock"), 16)
 			lk.position = Vector2(30, 28)
 			t.add_child(lk)
-		var n := MetaUiKit.label("%s/%s" % [MetaUiKit.compact(pr.x), MetaUiKit.compact(pr.y)], 8, MetaUiKit.MUTED)
+		var n := MetaUiKit.label("%s/%s" % [UiFmt.short(pr.x), UiFmt.short(pr.y)], UiTheme.FS_TINY, MetaUiKit.MUTED)
 		n.custom_minimum_size.x = ACH_W
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		n.position = Vector2(0, 43)
@@ -577,9 +570,9 @@ func _build_road() -> void:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 1)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(pts), MetaUiKit.GOLD_LIGHT, 20, 18))
+	col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(pts), MetaUiKit.GOLD_LIGHT, 20, UiTheme.FS_HERO_L))
 	if next >= 0:
-		col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [pts, int(steps[next]["at"])], MetaUiKit.MUTED, 10, 9))
+		col.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [pts, int(steps[next]["at"])], MetaUiKit.MUTED, 10, UiTheme.FS_SMALL))
 	top.add_child(col)
 	top.mouse_filter = Control.MOUSE_FILTER_PASS
 	Tip.bind(top, "Очки трофеев", "Копятся за достижения и выполненные задания.",
@@ -637,19 +630,19 @@ func _step_tile(i: int) -> Control:
 	t.custom_minimum_size = Vector2(STEP_W, 92)
 	t.mouse_filter = Control.MOUSE_FILTER_PASS
 	var border := MetaUiKit.GOLD if (ready or big) else MetaUiKit.BORDER
-	var bg := Color8(0x3A, 0x2C, 0x14) if ready else MetaUiKit.SLOT
+	var bg := UiTheme.GOLD_BG if ready else MetaUiKit.SLOT
 	t.add_theme_stylebox_override("panel", MetaUiKit.box(bg, border if (ready or reached or big) else MetaUiKit.BORDER, 2 if ready else 1, 4))
 
 	var icon_name := "chest" if big else ("gift" if (reward.has("item") and reward.get("coins", 0) == 0) else "coins")
 	var ic := MetaUiKit.icon_rect(MetaUiKit.tex(icon_name), 32)
 	ic.position = Vector2((STEP_W - 32) * 0.5, 6)
 	t.add_child(ic)
-	var rr := MetaUiKit.reward_row(reward, 10, 8)
+	var rr := MetaUiKit.reward_row(reward, 10, UiTheme.FS_TINY)
 	rr.position = Vector2(2, 42)
 	rr.custom_minimum_size.x = STEP_W - 4
 	rr.alignment = BoxContainer.ALIGNMENT_CENTER
 	t.add_child(rr)
-	var pill := MetaUiKit.chip(MetaUiKit.tex("star"), str(int(s["at"])), MetaUiKit.GOLD_LIGHT if reached else MetaUiKit.MUTED, 11, 9)
+	var pill := MetaUiKit.chip(MetaUiKit.tex("star"), str(int(s["at"])), MetaUiKit.GOLD_LIGHT if reached else MetaUiKit.MUTED, 11, UiTheme.FS_SMALL)
 	pill.position = Vector2(STEP_W * 0.5 - 14, 72)
 	t.add_child(pill)
 
@@ -703,12 +696,12 @@ func _next_prize_card(steps: Array, pts: int) -> Control:
 	h.add_theme_constant_override("separation", 6)
 	card.add_child(h)
 	h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("chest"), 32))
-	var rr := MetaUiKit.reward_row(steps[idx]["reward"], 13, 10)
+	var rr := MetaUiKit.reward_row(steps[idx]["reward"], 13, UiTheme.FS_BODY)
 	rr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(rr)
 	var need := maxi(0, int(steps[idx]["at"]) - pts)
 	if need > 0:
-		h.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(need), MetaUiKit.GOLD_LIGHT, 13, 11))
+		h.add_child(MetaUiKit.chip(MetaUiKit.tex("star"), str(need), MetaUiKit.GOLD_LIGHT, 13, UiTheme.FS_LABEL))
 	else:
 		h.add_child(MetaUiKit.icon_rect(MetaUiKit.tex("check"), 22))
 	Tip.bind(card, "Ближайший крупный приз", "Ступень %d" % (idx + 1),
@@ -728,7 +721,7 @@ func _road_stats() -> Control:
 		["flame", str(MetaState.counter("streak_best")), "Лучшая серия", "Дней подряд за ежедневной наградой."],
 	]
 	for it in items:
-		var chip := MetaUiKit.chip(MetaUiKit.tex(it[0]), it[1], MetaUiKit.GOLD_LIGHT, 22, 12)
+		var chip := MetaUiKit.chip(MetaUiKit.tex(it[0]), it[1], MetaUiKit.GOLD_LIGHT, 22, UiTheme.FS_TITLE)
 		chip.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(chip, it[2], it[3])
 		row.add_child(chip)

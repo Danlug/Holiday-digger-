@@ -7,7 +7,7 @@ extends Control
 
 signal confirmed
 
-const SIZE_PX := Vector2(30, 22)
+const SIZE_PX := Vector2(34, 26)   # цель нажатия ≥ 25 (44 pt)
 const HOLD_SEC := 0.6
 const DOUBLE_MS := 600
 const HINT_SEC := 2.2
@@ -53,7 +53,7 @@ func _init() -> void:
 	_hint.add_theme_stylebox_override("panel", hb)
 	_hint_label = Label.new()
 	_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	DialogueStyle.shadowed(_hint_label, 9, DialogueStyle.TEXT)
+	DialogueStyle.shadowed(_hint_label, UiTheme.FS_SMALL, DialogueStyle.TEXT)
 	_hint.add_child(_hint_label)
 	add_child(_hint)
 

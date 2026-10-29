@@ -12,12 +12,12 @@ extends CanvasLayer
 signal closed
 signal page_shown(id: String)
 
-const LAYER := 30
+const LAYER := UiLayers.PROMPTS
 const PAPER := Color8(0xE8, 0xD8, 0xB0)
 const PAPER_EDGE := Color8(0xA4, 0x83, 0x5A)
 const INK := Color8(0x2E, 0x20, 0x14)
 const NOTE := Color8(0x3C, 0x50, 0x7A)
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+const GOLD := UiTheme.GOLD
 const MARGIN_RED := Color8(0xC2, 0x5A, 0x4A)
 const PANEL_W := 200.0
 
@@ -41,7 +41,6 @@ var _prev: Button
 var _next: Button
 var _dots_row: HBoxContainer
 var _dots: Array = []
-var _tween: Tween = null
 
 
 func _init() -> void:
@@ -61,12 +60,7 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0.03, 0.02, 0.01, 0.72)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.gui_input.connect(_on_dim_input)
-	_root.add_child(dim)
+	UiTheme.scrim(_root, close_diary)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -111,7 +105,7 @@ func _build_header() -> Control:
 	row.add_child(icon)
 	var title := Label.new()
 	title.text = StoryText.get_text("diary.title")
-	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
 	title.add_theme_color_override("font_color", INK)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -138,7 +132,7 @@ func _build_body() -> Control:
 
 	_text = Label.new()
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_text.add_theme_font_size_override("font_size", 11)
+	_text.add_theme_font_size_override("font_size", UiTheme.FS_LABEL)
 	_text.add_theme_color_override("font_color", INK)
 	_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body.add_child(_text)
@@ -154,7 +148,7 @@ func _build_body() -> Control:
 	_note_row.add_child(pencil)
 	_note = Label.new()
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_note.add_theme_font_size_override("font_size", 10)
+	_note.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_note.add_theme_color_override("font_color", NOTE)
 	_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_note_row.add_child(_note)
@@ -174,7 +168,7 @@ func _build_body() -> Control:
 	_sealed_text = Label.new()
 	_sealed_text.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_sealed_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sealed_text.add_theme_font_size_override("font_size", 10)
+	_sealed_text.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_sealed_text.add_theme_color_override("font_color", INK)
 	_sealed_box.add_child(_sealed_text)
 	_body.add_child(_sealed_box)
@@ -229,6 +223,7 @@ func _icon_button(tex: Texture2D) -> Button:
 	b.add_theme_color_override("icon_normal_color", INK)
 	b.add_theme_color_override("icon_hover_color", INK)
 	b.add_theme_color_override("icon_pressed_color", INK)
+	UiBtn.wire_sink(b)
 	return b
 
 
@@ -252,6 +247,7 @@ func _arrow_button(dir: Vector2) -> Button:
 	arrow.set_dir(dir)
 	arrow.set_color(INK)
 	b.add_child(arrow)
+	UiBtn.wire_sink(b)
 	return b
 
 
@@ -331,14 +327,7 @@ func open_diary(index: int = -1) -> void:
 	_goto(default_page() if index < 0 else index, false)
 	Sfx.play("ui_open")
 	Haptics.tap()
-	if _tween != null:
-		_tween.kill()
-	_panel.pivot_offset = _panel.size / 2.0
-	_panel.scale = Vector2(0.92, 0.92)
-	_panel.modulate.a = 0.0
-	_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(_panel, "scale", Vector2.ONE, 0.2)
-	_tween.tween_property(_panel, "modulate:a", 1.0, 0.14)
+	UiAnim.open(_panel, UiAnim.Kind.POP, _root)
 
 
 func close_diary() -> void:
@@ -346,17 +335,8 @@ func close_diary() -> void:
 		return
 	is_open = false
 	Sfx.play("ui_close")
-	if _tween != null:
-		_tween.kill()
 	UiAnim.close(_panel, UiAnim.Kind.POP, _root)
 	closed.emit()
-
-
-func _on_dim_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		close_diary()
-	elif event is InputEventScreenTouch and event.pressed:
-		close_diary()
 
 
 func _flip(step: int) -> void:

@@ -337,15 +337,20 @@ func _test_empty_rig_tank() -> void:
 	p.on_ground = true
 	GameState.player_depth = 399
 	p.hold_down = true
-	for _i in range(30):
+	# 2 с: бурмобиль сначала опускается на дно ствола (падает медленнее пешего), потом бьёт вниз
+	for _i in range(120):
 		p.physics_tick(1.0 / 60.0)
 	p.hold_down = false
-	check("в бурмобиле без топлива копать нельзя", p.digging == null and not FuelTank.has_fuel("drill_rig"))
+	# Владелец 29.10: «когда заканчивается топливо, он берётся за кирку» — пустой бак не глушит машину.
+	check("в бурмобиле без топлива копает вниз киркой: копка идёт или клетка уже вынута",
+		(p.digging != null or world.get_tile(20, 401) == TileTypes.Type.EMPTY) and not FuelTank.has_fuel("drill_rig"))
+	p.digging = null
 	p.hold_dx = -1
 	for _i in range(40):
 		p.physics_tick(1.0 / 60.0)
 	p.hold_dx = 0
-	check("упор в породу без топлива не запускает копку", p.digging == null)
+	check("упор в породу без топлива запускает копку киркой", p.digging != null or world.get_tile(19, p.cell_y()) == TileTypes.Type.EMPTY)
+	p.digging = null
 	var set_before := GameState.current_tool
 	GameState.set_current_tool("iron_pickaxe")
 	check("под землёй высадиться нельзя (бурмобиль не бросить на дне)", GameState.current_tool == set_before)

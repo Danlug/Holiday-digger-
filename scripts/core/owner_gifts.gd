@@ -5,8 +5,9 @@ extends RefCounted
 ## добраться, поэтому подарок едет со сборкой: data/gifts.json.
 ##
 ## Подарок приходит при загрузке сейва (SaveSystem.load_game) один раз: id
-## забранного пишется в ext.gifts_claimed. Получают его только сейвы, записанные
-## до saved_before (UTC) — уже игравшие; новая игра сейва до этой даты не имеет.
+## забранного пишется в ext.gifts_claimed. Получают его только уже игравшие:
+## новая игра (нет сейва или сброс прогресса) сразу помечает все подарки
+## забранными (mark_all_claimed).
 
 const DATA_PATH := "res://data/gifts.json"
 const CLAIMED_KEY := "gifts_claimed"
@@ -23,13 +24,14 @@ static func gifts() -> Array:
 	return list if typeof(list) == TYPE_ARRAY else []
 
 
-## Вручает положенные подарки только что загруженному сейву; save — его словарь
-## (нужна дата записи saved_at_utc). Возвращает, сколько долларов пришло.
-static func apply_on_load(save: Dictionary) -> int:
-	var saved_at := String(save.get("saved_at_utc", ""))
+static func _claimed() -> Array:
 	var claimed = GameState.ext.get(CLAIMED_KEY, [])
-	if typeof(claimed) != TYPE_ARRAY:
-		claimed = []
+	return claimed if typeof(claimed) == TYPE_ARRAY else []
+
+
+## Вручает положенные подарки только что загруженному сейву. Возвращает, сколько долларов пришло.
+static func apply_on_load() -> int:
+	var claimed := _claimed()
 	var total := 0
 	for g in gifts():
 		if typeof(g) != TYPE_DICTIONARY:
@@ -37,15 +39,19 @@ static func apply_on_load(save: Dictionary) -> int:
 		var id := String(g.get("id", ""))
 		if id.is_empty() or claimed.has(id):
 			continue
-		# Сейв без даты — из старых сборок, то есть заведомо до подарка.
-		var before := String(g.get("saved_before", ""))
-		if not before.is_empty() and not saved_at.is_empty() and saved_at >= before:
-			continue
 		claimed.append(id)
-		var dollars := int(g.get("dollars", 0))
-		if dollars > 0:
-			total += dollars
+		total += maxi(0, int(g.get("dollars", 0)))
 	GameState.ext[CLAIMED_KEY] = claimed
 	if total > 0:
 		GameState.add_dollars(total)
 	return total
+
+
+## Новая игра: подарки уже игравшим ей не положены.
+static func mark_all_claimed() -> void:
+	var claimed := _claimed()
+	for g in gifts():
+		var id := String(g.get("id", "")) if typeof(g) == TYPE_DICTIONARY else ""
+		if not id.is_empty() and not claimed.has(id):
+			claimed.append(id)
+	GameState.ext[CLAIMED_KEY] = claimed

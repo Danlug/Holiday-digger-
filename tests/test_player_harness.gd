@@ -894,16 +894,16 @@ func _test_rig_fuel_consumption_accumulator() -> void:
 	GameState.reset_progress()
 
 
-## Под землёй без топлива бурмобиль не глохнет: герой копает киркой
-## (владелец 29.10: «когда заканчивается топливо, он берётся за кирку») —
-## копка запускается, скорость — лучшей кирки, тоста-отказа нет.
+## Под землёй без топлива бурмобиль не глохнет: герой копает лучшей своей
+## киркой (владелец 29.10: «когда заканчивается топливо, он берётся за кирку»,
+## «берёт лучшую кирку, которую имеет») — копка запускается, тоста-отказа нет.
 func _test_rig_digs_with_pickaxe_without_fuel() -> void:
 	var cell := _find_tile(TileTypes.Type.DIRT)
 	check("нашлась клетка земли для теста бурмобиля без топлива", cell.x >= 0)
 	if cell.x < 0:
 		return
 
-	GameState.owned_tools = ["shovel", "drill_rig"]
+	GameState.owned_tools = ["shovel", "iron_pickaxe", "drill_rig"]
 	GameState.current_tool = "drill_rig"
 	GameState.inventory.clear()
 	FuelTank.set_fuel("drill_rig", 0.0)  # бак пуст
@@ -929,12 +929,12 @@ func _test_rig_digs_with_pickaxe_without_fuel() -> void:
 	player.rig_fuel_warning.disconnect(cb)
 	player.hold_dx = 0
 
-	var pick := Balance.get_best_pickaxe_speed_multiplier()
+	var pick := Balance.get_tool_speed_multiplier("iron_pickaxe")
 	var rig := Balance.get_tool_speed_multiplier("drill_rig")
 	check("без топлива бурмобиль копает: копка началась или клетка уже вынута",
 		player.digging != null or world.get_tile(cell.x, cell.y) == TileTypes.Type.EMPTY)
-	check("скорость — лучшей кирки (%.2f), а не бурмобиля (%.2f)" % [pick, rig],
-		absf(player._tool_speed_multiplier() - minf(rig, pick)) < 0.001)
+	check("скорость — лучшей своей кирки (железной %.2f), а не бурмобиля (%.2f)" % [pick, rig],
+		absf(player._tool_speed_multiplier() - pick) < 0.001)
 	check("тоста-отказа «бак пуст» нет (%d)" % warnings.size(), warnings.is_empty())
 	FuelTank.set_fuel("drill_rig", 3.0)
 	check("с топливом — снова скорость бурмобиля", absf(player._tool_speed_multiplier() - rig) < 0.001)

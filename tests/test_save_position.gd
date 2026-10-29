@@ -144,6 +144,7 @@ func _ready() -> void:
 	await _test_home_cases()
 	await _test_close_hooks()
 	await _test_step_save()
+	await _test_trade_saves()
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
 	get_tree().quit(0 if failures == 0 else 1)
 
@@ -508,3 +509,45 @@ func _seed_out(dir: String) -> void:
 		DirAccess.copy_absolute(ProjectSettings.globalize_path("user://" + f), dir.path_join(f))
 	print("seed: герой %s над шахтой до %d, онбординг пройден → %s" % [c, bottom.y, dir])
 	m.free()
+
+
+## Владелец 29.10: «выложил вещи в мастерской, обновил страницу — вещи снова в инвентаре». Сделка
+## (склад, продажа, трата) пишет сейв в конце того же кадра — без автосейва и без ухода со страницы.
+func _test_trade_saves() -> void:
+	var m := await _fresh()
+	var hooks := m.get_node("SaveHooks") as SaveHooks
+	hooks._since_step = -1.0e9   # «встал на новом месте» не мешает: проверяем только сделки
+	SaveSystem.save_game()
+	GameState.add_item("iron_ore", 7)
+	GameState.house_is_indoors = true   # склад — в подвале мастерской
+	GameState.house_room = HouseStorage.ROOM
+	SaveSystem.save_game()   # рюкзак с рудой уже на диске
+	var moved := HouseStorage.put("iron_ore", 7)
+	await _frames(2)
+	var disk := _disk()
+	var inv: Dictionary = disk.get("inventory", {})
+	var storage: Dictionary = disk.get("house", {}).get("storage", {})
+	check("склад: положил %d железа — на диске склад, а не рюкзак" % moved,
+		moved == 7 and int(inv.get("iron_ore", 0)) == 0 and int(storage.get("iron_ore", 0)) == 7,
+		"рюкзак %s, склад %s" % [inv, storage])
+	HouseStorage.take("iron_ore", 3)
+	await _frames(2)
+	disk = _disk()
+	check("склад: взял 3 — на диске сразу",
+		int(disk.get("inventory", {}).get("iron_ore", 0)) == 3 and int(disk.get("house", {}).get("storage", {}).get("iron_ore", 0)) == 4)
+	GameState.coins = 500
+	SaveSystem.save_game()
+	GameState.spend_coins(120)
+	await _frames(2)
+	check("трата монет — на диске сразу", int(_disk().get("currency", {}).get("coins", -1)) == 380)
+	GameState.add_item("iron_ore", 1)
+	await _frames(2)
+	check("подбор руды сейв не пишет (это копка, а не сделка)", int(_disk().get("inventory", {}).get("iron_ore", 0)) == 3)
+	GameState.house_is_indoors = false
+	m.free()
+	await _frames(2)
+
+
+func _disk() -> Dictionary:
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string("user://save.json"))
+	return parsed if typeof(parsed) == TYPE_DICTIONARY else {}

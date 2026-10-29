@@ -209,7 +209,12 @@ func _test_player_fuel() -> void:
 	GameState.owned_tools = ["shovel", "rusty_pickaxe", "iron_pickaxe", "hand_drill", "drill_rig"]
 	GameState.current_tool = "hand_drill"
 	var best := Balance.get_best_pickaxe_speed_multiplier()
-	check("пустой бак бура: копаем киркой, а не буром", is_equal_approx(p._tool_speed_multiplier(), best))
+	var own := Balance.get_tool_speed_multiplier("iron_pickaxe")
+	check("пустой бак бура: копаем лучшей своей киркой (железной ×%.1f), а не лучшей в игре (×%.1f)" % [own, best],
+		is_equal_approx(p._tool_speed_multiplier(), own) and own < best)
+	GameState.owned_tools = ["shovel", "hand_drill"]
+	check("своей кирки нет — лопатой", is_equal_approx(p._tool_speed_multiplier(), Balance.get_tool_speed_multiplier("shovel")))
+	GameState.owned_tools = ["shovel", "rusty_pickaxe", "iron_pickaxe", "hand_drill", "drill_rig"]
 	FuelTank.set_fuel("hand_drill", 1.0)
 	check("с топливом бур вдвое быстрее лучшей кирки", is_equal_approx(p._tool_speed_multiplier(), best * 2.0))
 

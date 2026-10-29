@@ -10,11 +10,23 @@ extends Node
 ##    минуту этого не ловил: закрыл вкладку через 50 с после спуска — и спуска будто не было.
 ##  * Загрузка в воздухе: герой висит там, где был, пока игрок не тронет управление (или пока его не
 ##    сдвинет кто-то другой: сцена, телепорт, дом). Сама загрузка не роняет его и не бьёт падением.
+##  * Сделка — сразу в сейв (TRADE_EVENTS): склад, продажа, покупка, крафт, еда, сон, заправка, награды.
+##    Владелец 29.10: «выложил вещи в мастерской, обновил страницу — вещи снова в инвентаре»: склад не писал
+##    сейв вовсе, а запись при уходе со страницы браузер при обновлении может оборвать (транзакция IndexedDB
+##    из pagehide не обязана успеть). Теперь сделка пишется в том же кадре, пока страница жива.
 
 ## Запись «встал на новом месте»: браузер могут убить и без единого события (телефон выгрузил свёрнутый
 ## браузер вместе с вкладкой, закрыли окно целиком, сбой), и тогда спасает только уже лежащая запись.
 ## Герой стоит на клетке, которой нет в последнем сейве, — пишем, но не чаще раза в STEP_GAP_S: большой сейв
 ## пишется десятки миллисекунд, а пока герой копает без остановки, рывков быть не должно.
+## События GameState.game_event, после которых сейв пишется в конце кадра (SaveSystem.save_at_frame_end —
+## одна запись на кадр, сколько бы событий ни пришло: «положить всё» шлёт по событию на вещь). Частые
+## события копки (dug, picked, fuel_used) сюда не входят: их ловят «встал на новом месте» и автосейв.
+const TRADE_EVENTS: Array[StringName] = [&"stored", &"sold", &"bought", &"spent", &"crafted", &"gear_crafted",
+	&"ate", &"healed", &"slept", &"refueled", &"fuel_refined", &"food_ordered", &"food_delivered",
+	&"smelt_started", &"smelt_cancelled", &"well_collected", &"chest_opened",
+	&"cave_chest_opened", &"premium_unload", &"teleport_used", &"teleport_returned", &"ad_watched",
+	&"boss_defeated", &"cave_cleared", &"diary_page"]
 const SETTLE_S := 1.0      # ПРЕДЛОЖЕНО: сколько простоять на новом месте до записи
 const STEP_GAP_S := 10.0   # ПРЕДЛОЖЕНО: не чаще раза в столько секунд
 
@@ -44,10 +56,18 @@ func _ready() -> void:
 	process_priority = -10   # раньше main.gd: место и «висение» — до шага физики этого кадра
 	HeroSpot.bind(player)
 	_hook_web_page()
+	GameState.game_event.connect(_on_game_event)
 
 
 func _exit_tree() -> void:
 	HeroSpot.bind(null)   # статика переживает перезагрузку сцены
+	if GameState.game_event.is_connected(_on_game_event):
+		GameState.game_event.disconnect(_on_game_event)
+
+
+func _on_game_event(id: StringName, _data: Dictionary) -> void:
+	if TRADE_EVENTS.has(id):
+		SaveSystem.save_at_frame_end(String(id))
 
 
 func is_hovering() -> bool:

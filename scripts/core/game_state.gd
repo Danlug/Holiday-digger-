@@ -85,7 +85,8 @@ var _autosave_timer: Timer
 
 func _ready() -> void:
 	_check_daily_reset()
-	SaveSystem.load_game()
+	if not SaveSystem.load_game():
+		OwnerGifts.mark_all_claimed()   # новая игра: подарки уже игравшим ей не положены
 	_start_autosave_timer()
 
 
@@ -282,6 +283,7 @@ func reset_progress() -> void:
 	world_dug_cells.clear()
 	pending_earthquake = false
 	ext.clear()
+	OwnerGifts.mark_all_claimed()   # сброс — новая игра: разовые подарки не положены (data/gifts.json)
 	# Служебное состояние выживания: иначе новая игра начиналась бы «обессиленной» и
 	# с уже показанными предупреждениями (находка tests/test_save_robustness).
 	is_exhausted = false

@@ -1141,13 +1141,17 @@ func _can_dig(type: int) -> bool:
 ## (устаревший статический прототип до Godot-версии, не собирается и не
 ## тестируется вместе с игрой: та дублировала бы это число своим, другим).
 func _tool_speed_multiplier() -> float:
-	var mult := Balance.get_tool_speed_multiplier(GameState.current_tool)
+	var tool_id := GameState.current_tool
 	# Пустой бак ручного бура или бурмобиля: техника вхолостую, герой копает
-	# лучшей киркой (владелец 29.10: «когда заканчивается топливо, он берётся
-	# за кирку» — бурмобиль больше не глохнет под землёй).
-	if FuelTank.uses_fuel(GameState.current_tool) and not FuelTank.has_fuel(GameState.current_tool):
-		mult = minf(mult, Balance.get_best_pickaxe_speed_multiplier())
-	if GameState.current_tool == "rusty_pickaxe" and rusty_pickaxe_cracked:
+	# лучшей киркой из своих (владелец 29.10: «когда заканчивается топливо, он
+	# берётся за кирку», «берёт лучшую кирку, которую имеет» — бурмобиль больше
+	# не глохнет под землёй). Кирки нет — лопатой.
+	if FuelTank.uses_fuel(tool_id) and not FuelTank.has_fuel(tool_id):
+		tool_id = _best_owned_pickaxe()
+		if tool_id.is_empty():
+			tool_id = "shovel"
+	var mult := Balance.get_tool_speed_multiplier(tool_id)
+	if tool_id == "rusty_pickaxe" and rusty_pickaxe_cracked:
 		var broken := float(Balance.unwrap(Balance.get_tool("rusty_pickaxe").get("broken_speed_multiplier", 0.75)))
 		mult *= broken
 	return maxf(mult, 0.01)

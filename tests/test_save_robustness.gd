@@ -108,8 +108,11 @@ func _test_old_save_without_ext() -> void:
 	GameState.ext_set("leftover", 1)
 	check("старый сейв без ext загружается", SaveSystem.load_game())
 	check("монеты из старого сейва на месте", GameState.coins == 123)
-	check("ext после загрузки — пустой словарь, а не None и не хвост прошлой сессии",
-		typeof(GameState.ext) == TYPE_DICTIONARY and GameState.ext.is_empty(), str(GameState.ext))
+	# Единственное, что загрузка сама кладёт в ext, — отметка о разовых подарках (OwnerGifts, data/gifts.json).
+	var ext_rest: Array = GameState.ext.keys().filter(func(k): return String(k) != OwnerGifts.CLAIMED_KEY) \
+		if typeof(GameState.ext) == TYPE_DICTIONARY else ["не словарь"]
+	check("ext после загрузки — словарь без хвоста прошлой сессии (кроме отметки подарков), а не None",
+		typeof(GameState.ext) == TYPE_DICTIONARY and ext_rest.is_empty(), str(GameState.ext))
 	check("ext_get на пустом хранилище отдаёт значение по умолчанию", GameState.ext_get("probe", 7) == 7)
 	check("состояние пригодно к игре", _state_sane())
 

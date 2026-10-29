@@ -110,9 +110,15 @@ func _fuel() -> void:
 		var need := FuelTank.rate_per_cell(String(probe[1]))
 		check("глубина %d, %s: порода даёт %.3f блока на клетку при расходе %.3f — топлива хватает без отдельной добычи"
 			% [y, probe[1], blocks, need], blocks >= need * 0.95)
-	# Дальше (1100, 3000) добор нужен, но он не превращается в основное занятие: ≤ 35% копки.
-	for probe in [[1100, "drill_rig"], [3000, "drill_rig"]]:
+	# Дальше (1100, 3000) топлива из породы не хватает. На 3000 добор не превращается в основное
+	# занятие (≤ 35% копки). На 1100 уголь только начинается (владелец 27.10: с 1000 растёт с нуля),
+	# и там добор не обязателен: пустой бак копает киркой (владелец 29.10: «когда заканчивается
+	# топливо, он берётся за кирку», «с топливом всё ок»).
+	var rig_mult := Balance.get_tool_speed_multiplier("drill_rig")
+	var pick_mult := Balance.get_best_pickaxe_speed_multiplier()
+	for probe in [[1100, -1.0], [3000, 0.35]]:
 		var y := int(probe[0])
+		var limit := float(probe[1])
 		var blocks := 0.0
 		var p_fuel := 0.0
 		for d in world.ore_densities_at(y):
@@ -123,7 +129,15 @@ func _fuel() -> void:
 		var deficit := maxf(0.0, FuelTank.rate_per_cell("drill_rig") - blocks)
 		var per_cell_yield := 1.0 / per_block_coal
 		var extra := deficit / per_cell_yield / maxf(p_fuel, 0.0001)
-		check("глубина %d: добор топлива +%.0f%% копки (≤ 35%%)" % [y, extra * 100.0], extra <= 0.35)
+		if limit >= 0.0:
+			check("глубина %d: добор топлива +%.0f%% копки (≤ %.0f%%)" % [y, extra * 100.0, limit * 100.0], extra <= limit)
+		else:
+			print("  глубина %d: добор топлива +%.0f%% копки — не обязателен, пустой бак копает киркой" % [y, extra * 100.0])
+		# Без добора: клетки на топливе из породы — бурмобилем, остальные — киркой.
+		var share := clampf(blocks / FuelTank.rate_per_cell("drill_rig"), 0.0, 1.0)
+		var eff := 1.0 / (share / rig_mult + (1.0 - share) / pick_mult)
+		check("глубина %d: без добора бурмобиль на топливе из породы (%.0f%%) и кирке копает ×%.2f — не медленнее кирки ×%.2f"
+			% [y, share * 100.0, eff, pick_mult], eff >= pick_mult - 0.0001)
 
 
 func _lava() -> void:

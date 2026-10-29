@@ -452,7 +452,7 @@
 			"id": "platinum",
 			"name_ru": "Платина",
 			"category": "ore",
-			"price_coins": 350,
+			"price_coins": {"value": 450, "proposed": false, "note": "владелец (29.10): 450 монет — было 350"},
 			"depth_min": 1000,
 			"depth_max": null,
 			"density": {
@@ -467,9 +467,9 @@
 				"rise": "zero"
 			},
 			"weight_kg": {
-				"value": 4.0,
+				"value": 1.5,
 				"proposed": false,
-				"note": "вес не задан в GDD; платина — очень плотный металл"
+				"note": "владелец (29.10): 1.5 кг — было 4.0"
 			},
 			"max_stack": 99,
 			"tool_required": "hand_drill",

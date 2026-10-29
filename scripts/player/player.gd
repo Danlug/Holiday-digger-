@@ -30,10 +30,9 @@ signal died_in_place
 ## tool_auto_switched — тот сигнал говорит только "инструмент сменился",
 ## этот — конкретно "ты за рулём, анимация посадки доиграла".
 signal entered_rig
-## Бурмобиль без топлива глохнет прямо под землёй (копать нечем) — или
-## посадка кнопкой "В бурмобиль" отказывает без брикетов. Текст сообщения —
-## сюда, а не отдельными сигналами на каждый случай: оба говорят игроку одно
-## и то же — "нужны брикеты" — разными словами момента.
+## Посадка кнопкой "В бурмобиль" отказывает без брикетов. (Под землёй пустой
+## бак больше не глушит машину: герой копает киркой — владелец 29.10, см.
+## _tool_speed_multiplier.)
 signal rig_fuel_warning(message: String)
 ## Начался/закончился выход из бурмобиля на поверхности (проехал из-под
 ## земли) или посадка в него (кнопка у припаркованной машины) — см. блок
@@ -189,14 +188,6 @@ var _announced_rig: bool = false
 ## отсюда узнаём момент выезда на поверхность (см. _check_rig_surface_exit),
 ## а не пересчитываем его из типа тайла каждый раз.
 var _was_underground: bool = false
-## Тост «кончилось топливо» при попытке копать без брикетов уже показан для
-## текущего удержания копки — _start_dig вызывается каждый кадр физики, пока
-## держится направление копки, и без этого флага тост эмитился бы 60 раз в
-## секунду вместо одного раза за попытку. Сбрасывается на «отпустил ввод» —
-## новая попытка снова получает своё сообщение. (Стены у устья без топлива
-## больше нет — спуск пешком разрешён всегда, посадка только кнопкой.)
-var _rig_dig_stall_warned: bool = false
-
 # --- выход/посадка в бурмобиль на поверхности (свои переменные и функции —
 # см. блок ниже — держатся отдельно от фаз копки (DIG_PHASES в
 # character_view.gd), которые параллельно правит другой агент: слияние
@@ -1112,18 +1103,10 @@ func _apply_intent(dt: float) -> void:
 		var edge: float = (float(cx + 1) - (x + HW)) if hold_dx > 0 else ((x - HW) - float(cx))
 		if ahead != TileTypes.Type.EMPTY and edge < 0.06:
 			_start_dig(cx + hold_dx, cy)
-		else:
-			_rig_dig_stall_warned = false
 	elif hold_down:
 		var below: int = world.get_tile(cx, cy + 1) if world != null else TileTypes.Type.EMPTY
 		if below != TileTypes.Type.EMPTY:
 			_start_dig(cx, cy + 1)
-		else:
-			_rig_dig_stall_warned = false
-	else:
-		# Не держит ни направление, ни "вниз" — новая попытка копать без
-		# топлива (после этого простоя) снова получит своё сообщение.
-		_rig_dig_stall_warned = false
 
 
 ## Отменяет копку, если игрок увёл управление с копаемой клетки (см.
@@ -1159,8 +1142,10 @@ func _can_dig(type: int) -> bool:
 ## тестируется вместе с игрой: та дублировала бы это число своим, другим).
 func _tool_speed_multiplier() -> float:
 	var mult := Balance.get_tool_speed_multiplier(GameState.current_tool)
-	# Пустой бак ручного бура: бур вхолостую, герой копает лучшей киркой.
-	if GameState.current_tool == "hand_drill" and not FuelTank.has_fuel("hand_drill"):
+	# Пустой бак ручного бура или бурмобиля: техника вхолостую, герой копает
+	# лучшей киркой (владелец 29.10: «когда заканчивается топливо, он берётся
+	# за кирку» — бурмобиль больше не глохнет под землёй).
+	if FuelTank.uses_fuel(GameState.current_tool) and not FuelTank.has_fuel(GameState.current_tool):
 		mult = minf(mult, Balance.get_best_pickaxe_speed_multiplier())
 	if GameState.current_tool == "rusty_pickaxe" and rusty_pickaxe_cracked:
 		var broken := float(Balance.unwrap(Balance.get_tool("rusty_pickaxe").get("broken_speed_multiplier", 0.75)))
@@ -1210,18 +1195,8 @@ func _start_dig(tx: int, ty: int) -> void:
 		dig_refused_by_story.emit("garden_left_of_stairs")
 		return
 
-	# Бурмобиль без топлива глохнет под землёй: копать нечем, но идти по уже
-	# прорытому можно (решение владельца) — поэтому запрет только здесь, в
-	# начале копки, а не в физике движения.
-	if is_in_rig() and not _has_rig_fuel():
-		digging = null
-		# _start_dig зовётся каждый кадр, пока герой держит направление копки
-		# (см. _apply_intent) — без флага тост сыпался бы каждый кадр вместо
-		# одного раза за попытку (сбрасывается там же, когда ввод отпущен).
-		if not _rig_dig_stall_warned:
-			_rig_dig_stall_warned = true
-			rig_fuel_warning.emit("Бак пуст — заправься у станции")
-		return
+	# Пустой бак бурмобиля копку не останавливает: герой копает киркой
+	# (скорость — _tool_speed_multiplier, владелец 29.10).
 
 	# Запечатанный Робертом огород (уровни 1..4 вне ствола тоннеля) не
 	# копается вообще. Отказывать надо ДО удара, а не после: world.dig_cell()

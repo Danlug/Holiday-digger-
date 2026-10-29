@@ -49,7 +49,7 @@ func _ready() -> void:
 	_test_rig_exit_plays_all_phases_in_order()
 	_test_rig_parked_survives_save_load()
 	_test_rig_fuel_consumption_accumulator()
-	_test_rig_stalls_digging_without_fuel()
+	_test_rig_digs_with_pickaxe_without_fuel()
 	_test_teleport_home_while_in_rig_parks_it()
 	_test_teleport_home_on_foot_does_not_touch_parked_rig()
 
@@ -894,10 +894,10 @@ func _test_rig_fuel_consumption_accumulator() -> void:
 	GameState.reset_progress()
 
 
-## Под землёй без топлива бурмобиль глохнет: копка не запускается вовсе
-## (движение по уже прорытому при этом не трогается — эта проверка про
-## копку, не про ходьбу).
-func _test_rig_stalls_digging_without_fuel() -> void:
+## Под землёй без топлива бурмобиль не глохнет: герой копает киркой
+## (владелец 29.10: «когда заканчивается топливо, он берётся за кирку») —
+## копка запускается, скорость — лучшей кирки, тоста-отказа нет.
+func _test_rig_digs_with_pickaxe_without_fuel() -> void:
 	var cell := _find_tile(TileTypes.Type.DIRT)
 	check("нашлась клетка земли для теста бурмобиля без топлива", cell.x >= 0)
 	if cell.x < 0:
@@ -929,11 +929,15 @@ func _test_rig_stalls_digging_without_fuel() -> void:
 	player.rig_fuel_warning.disconnect(cb)
 	player.hold_dx = 0
 
-	check("без топлива бурмобиль клетку не берёт", world.get_tile(cell.x, cell.y) != TileTypes.Type.EMPTY)
-	check("копка даже не начинается", player.digging == null)
-	check("тост «бак пуст» пришёл", warnings.has("Бак пуст — заправься у станции"))
-	check("тост про копку без топлива не спамит каждый кадр (пришёл один раз, а не %d)" % warnings.size(),
-		warnings.size() == 1)
+	var pick := Balance.get_best_pickaxe_speed_multiplier()
+	var rig := Balance.get_tool_speed_multiplier("drill_rig")
+	check("без топлива бурмобиль копает: копка началась или клетка уже вынута",
+		player.digging != null or world.get_tile(cell.x, cell.y) == TileTypes.Type.EMPTY)
+	check("скорость — лучшей кирки (%.2f), а не бурмобиля (%.2f)" % [pick, rig],
+		absf(player._tool_speed_multiplier() - minf(rig, pick)) < 0.001)
+	check("тоста-отказа «бак пуст» нет (%d)" % warnings.size(), warnings.is_empty())
+	FuelTank.set_fuel("drill_rig", 3.0)
+	check("с топливом — снова скорость бурмобиля", absf(player._tool_speed_multiplier() - rig) < 0.001)
 
 	GameState.reset_progress()
 

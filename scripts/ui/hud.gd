@@ -1966,9 +1966,8 @@ func _on_entered_rig() -> void:
 	toast_parts([{"icon_tex": load("res://art/items/drill_rig_icon.png"), "icon_px": 24}], 1.8, "good")
 
 
-## Бурмобиль без топлива: либо не пускает в тоннель с поверхности, либо
-## глохнет прямо под землёй. Текст сообщения решает player.gd (см. player.gd:
-## _move_y и :_start_dig); на экране — топливо «0», а если надо идти на
+## Бурмобиль без топлива: посадка кнопкой «В бурмобиль» отказывает. Текст
+## сообщения решает отправитель; на экране — топливо «0», а если надо идти на
 ## верстак — ещё и значок верстака.
 func _on_rig_fuel_warning(message: String) -> void:
 	var parts: Array = [{"icon": "fuel", "text": "0", "color": UiTheme.BAD_TEXT}]

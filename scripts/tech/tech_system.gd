@@ -268,7 +268,7 @@ func _on_game_event(id: StringName, data: Dictionary) -> void:
 		Sfx.play("ui_deny")
 		Haptics.buzz(60)
 		Fx.shake(2.0, 0.15)
-		if hud != null and tool_id == "hand_drill":
+		if hud != null:
 			hud.toast("Бак пуст — копаю киркой", 2.6)
 		_warned[tool_id] = 2
 	elif FuelTank.is_low(tool_id) and not _warned.has(tool_id):

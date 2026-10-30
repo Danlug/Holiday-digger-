@@ -3,7 +3,7 @@
 	"_note": "Бой, монстры и снаряжение глубже 4000 (GDD раздел «Бой и монстры»). Все числа в этом файле придуманы агентом (в ГДД их нет) и помечены proposed на уровне раздела или записи; единицы — клетки и секунды. Править баланс здесь, не в коде.",
 	"start_depth": 4000,
 	"player": {
-		"proposed": true,
+		"proposed": false,
 		"iframes_sec": 0.5,
 		"stun_sec": 0.25,
 		"knockback_cells": 0.9,
@@ -20,14 +20,14 @@
 		"tap_enemy_radius_px": 26
 	},
 	"formula": {
-		"proposed": true,
+		"proposed": false,
 		"armor_k": 100,
 		"res_cap_pct": 75,
 		"min_damage": 1.0,
 		"note": "урон = сырой × (1 − защита/(защита+K)); у огненного и теневого ещё × (1 − сопротивление%)"
 	},
 	"scaling": {
-		"proposed": true,
+		"proposed": false,
 		"hp_per_1000": 0.1,
 		"dmg_per_1000": 0.06
 	},

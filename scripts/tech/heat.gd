@@ -80,6 +80,23 @@ static func stamina_multiplier(depth: float, tier: int = -1) -> float:
 	return minf(1.0 + per50 * excess / 50.0, cap)
 
 
+## Порог урона от жары (°C): 70 без костюма (владелец 30.10: «температура больше 70 начинает
+## делать урон»); костюм сдвигает его на свою прибавку стойкости.
+static func damage_from_c(tier: int = -1) -> float:
+	var amb: Dictionary = TechData.heat().get("ambient", {})
+	var base := float(TechData.v(amb.get("damage_from_c", 70)))
+	return base + maxf(0.0, tolerance_c(tier) - base_tolerance_c())
+
+
+## Урон жары, HP в секунду на этой глубине (0 — ниже порога).
+static func damage_per_second(depth: float, tier: int = -1) -> float:
+	var amb: Dictionary = TechData.heat().get("ambient", {})
+	var excess := temperature(depth) - damage_from_c(tier)
+	if excess <= 0.0:
+		return 0.0
+	return excess / 10.0 * float(TechData.v(amb.get("damage_hp_per_10c", 1.0)))
+
+
 ## Три уровня для значка на HUD: 0 — комфортно, 1 — припекает, 2 — печёт.
 static func felt_level(depth: float) -> int:
 	var m := stamina_multiplier(depth)

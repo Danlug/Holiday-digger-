@@ -210,10 +210,8 @@ func _test_stars_chest() -> void:
 	_claim_n(1)
 	check("10-я звезда — сундук готов и на бейдже", QuestEngine.stars_today() == 10 and QuestEngine.bonus_ready()
 		and QuestEngine.claimable_count() >= 1)
-	# Недельный потолок повторяемых долларов исчерпан — пяти долларам сундука это не мешает.
-	MetaRewards.dollars_left_this_week()
-	MetaState.sub("wk_dollars")["n"] = int(MetaData.daily()["premium_cap"]["per_week"])
-	check("потолок недели исчерпан", MetaRewards.dollars_left_this_week() == 0)
+	# Недельного потолка долларов нет (владелец 30.10) — сундук всё равно ровно 5.
+	check("потолка долларов нет", MetaRewards.dollars_left_this_week() >= MetaRewards.NO_CAP)
 	var d0 := GameState.dollars
 	var c0 := GameState.coins
 	var r := QuestEngine.claim_bonus()
@@ -291,7 +289,7 @@ func _test_panel() -> void:
 	await get_tree().process_frame
 	var p := svc.tasks
 	check("окно: 13 плиток в прокрутке", p.is_open() and p._list.get_child_count() == 13 and p._scroll != null)
-	check("шкала звёзд: 13 клеток, засечка на 10", p._track != null and p._track.total == 13 and p._track.needed == 10
+	check("шкала звёзд: 10 клеток — только до сундука (владелец 30.10)", p._track != null and p._track.total == 10 and p._track.needed == 10
 		and p._track.stars == 0)
 	check("прокрутка не выше экрана", p._scroll.custom_minimum_size.y <= get_viewport().get_visible_rect().size.y)
 	var q: Dictionary = QuestEngine.daily()[5]

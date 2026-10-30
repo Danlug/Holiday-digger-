@@ -406,9 +406,11 @@ func _bonus_card() -> Control:
 	var track := MetaStarTrack.new()
 	track.custom_minimum_size = Vector2(0, 13)
 	track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	track.total = maxi(1, ds.size())
-	track.needed = QuestEngine.stars_needed()
-	track.stars = QuestEngine.stars_today()
+	# Шкала — только до сундука (владелец 30.10: «показывай шкалу только 10 звёзд»).
+	var need := QuestEngine.stars_needed()
+	track.total = need if need > 0 else maxi(1, ds.size())
+	track.needed = need
+	track.stars = mini(QuestEngine.stars_today(), track.total)
 	mid.add_child(track)
 	var reward := QuestEngine.bonus_reward()
 	mid.add_child(MetaUiKit.reward_row(reward, 12, UiTheme.FS_SMALL))

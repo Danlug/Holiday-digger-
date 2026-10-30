@@ -228,12 +228,12 @@ func _header() -> Control:
 	Tip.bind(tm, "Новые задания", "Набор дня обновляется в полночь по твоим часам. Невзятые награды сгорают.")
 	h.add_child(tm)
 
-	# Звёзды дня числом: до сундука — «из 10», потом — «из 13».
+	# Звёзды дня числом — «из 10», и после сундука тоже (владелец 30.10: шкала только на 10 звёзд).
 	var stars := QuestEngine.stars_today()
 	var need := QuestEngine.stars_needed()
 	if need > 0:
 		var past := stars >= need or bool(MetaState.sub("quests")["bonus_claimed"])
-		var sc := MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [stars, QuestEngine.daily().size() if past else need],
+		var sc := MetaUiKit.chip(MetaUiKit.tex("star"), "%d/%d" % [mini(stars, need), need],
 			MetaUiKit.GOLD_LIGHT if past else Color.WHITE, 13, UiTheme.FS_LABEL)
 		sc.name = "StarsCount"
 		sc.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -373,7 +373,7 @@ func _reroll_button(qid: String, free: bool, placement: String) -> Button:
 # ---------------------------------------------------------------------------
 
 ## Сундук слева — он же кнопка (покачивается, когда десятая звезда получена);
-## справа шкала звёзд 0…13 с засечкой на 10, под ней — что в сундуке и «7/10».
+## справа шкала звёзд 0…10 (владелец 30.10), под ней — что в сундуке и «7/10».
 func _stars_row() -> Control:
 	var ready := QuestEngine.bonus_ready()
 	var taken := bool(MetaState.sub("quests")["bonus_claimed"])
@@ -424,14 +424,16 @@ func _stars_row() -> Control:
 	_track.name = "StarTrack"
 	_track.custom_minimum_size = Vector2(0, 14)
 	_track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_track.total = QuestEngine.daily().size()
+	# Шкала — только до сундука (владелец 30.10: «показывай шкалу только 10 звёзд,
+	# не надо показывать шкалу на 13 звёзд»); звёзды сверх десяти на ней не рисуются.
+	_track.total = need if need > 0 else QuestEngine.daily().size()
 	_track.needed = need
-	_track.stars = stars
+	_track.stars = mini(stars, _track.total)
 	var done_unclaimed := 0
 	for q in QuestEngine.daily():
 		if QuestEngine.is_claimable(q):
 			done_unclaimed += 1
-	_track.done = done_unclaimed
+	_track.done = mini(done_unclaimed, maxi(0, _track.total - _track.stars))
 	mid.add_child(_track)
 	var reward := QuestEngine.bonus_reward()
 	var rr := MetaUiKit.reward_row(reward, 11, UiTheme.FS_SMALL)

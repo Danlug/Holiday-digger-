@@ -184,7 +184,8 @@ func _depth() -> float:
 	return float(maxi(GameState.player_depth, 0))
 
 
-## Жара сверх стойкости костюма: бодрость уходит быстрее (множитель считает Heat).
+## Жара сверх стойкости костюма: бодрость уходит быстрее (множитель считает Heat); выше порога
+## урона (70 °C без костюма, владелец 30.10) — ещё и здоровье.
 func _heat_tick(dt: float) -> void:
 	if not GameState.is_alive or GameState.house_is_indoors or player.frozen:
 		return
@@ -196,6 +197,9 @@ func _heat_tick(dt: float) -> void:
 		return
 	var base := Balance.get_bar_depletion_rate_per_second("stamina", GameState.is_digging)
 	GameState.set_stamina(GameState.stamina - base * (mult - 1.0) * 100.0 * dt)
+	var dps := Heat.damage_per_second(depth)
+	if dps > 0.0:
+		GameState.take_damage(dps * dt, "heat")
 
 
 func _announce_zone(depth: float) -> void:

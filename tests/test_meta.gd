@@ -269,16 +269,16 @@ func _test_claim_and_caps() -> void:
 		not QuestEngine.claim(String(q["id"]))["ok"] and GameState.coins == coins_after_claim and GameState.dollars == 1)
 	check("забранное задание уже не на бейдже", not QuestEngine.is_claimable(q))
 
-	# Потолок долларов в неделю для повторяемых источников (premium_cap.per_week = 4).
-	var cap := int(MetaData.daily()["premium_cap"]["per_week"])
+	# Владелец 30.10: «Отмени потолок, сколько надо столько и буду давать долларов» (per_week = -1).
+	check("потолка долларов нет", int(MetaData.daily()["premium_cap"]["per_week"]) < 0)
 	var granted := 0
-	for i in range(cap + 3):
+	for i in range(12):
 		granted += int(MetaRewards.grant({"dollars": 1}, true).get("dollars", 0))
-	check("недельный потолок долларов держится", granted == cap - 1 or granted == cap)
+	check("повторяемые источники выдают все доллары (12 из 12)", granted == 12)
 	var one_off := int(MetaRewards.grant({"dollars": 2}, false).get("dollars", 0))
-	check("одноразовые доллары (достижения, дорога) в потолок не входят", one_off == 2)
-	_day(MONDAY + 7)
-	check("новая неделя — потолок сброшен", MetaRewards.dollars_left_this_week() == cap)
+	check("одноразовые доллары (достижения, дорога) — тоже целиком", one_off == 2)
+	check("подарок за вход, день 7 — 10 долларов (владелец 30.10)",
+		int((MetaData.daily()["cycle"] as Array)[6]["reward"].get("dollars", 0)) == 10)
 
 	# Награда-предмет: предмет в рюкзак, не влез — монеты вместо него.
 	var coins_before := GameState.coins
@@ -331,7 +331,7 @@ func _test_daily_reward() -> void:
 		total_coins += int(rr["reward"].get("coins", 0))
 		if i == 2:
 			check("день 3 даёт предмет (энергетик)", rr["reward"].has("item") and GameState.get_item_count("energy_drink") >= 1)
-	check("доллар — только в 7-й день", dollars_seen == 1 and GameState.dollars == 1)
+	check("доллары — только в 7-й день, 10 штук (владелец 30.10)", dollars_seen == 10 and GameState.dollars == 10)
 	check("7-й день — крупный приз", int(DailyReward.cycle()[6]["reward"]["coins"]) == 2000 and DailyReward.cycle()[6].get("grand", false))
 	check("монеты за неделю сходятся с таблицей", GameState.coins >= total_coins)
 
@@ -354,7 +354,7 @@ func _test_daily_reward() -> void:
 	check("лучшая серия помнится", MetaState.counter("streak_best") == 9)
 
 	var rx := DailyReward.reward_for(0, 0, 2.0)
-	check("«×2»: монеты и опыт удваиваются, доллары нет", int(rx["coins"]) == 300 and int(DailyReward.reward_for(6, 0, 2.0)["dollars"]) == 1
+	check("«×2»: монеты и опыт удваиваются, доллары нет", int(rx["coins"]) == 300 and int(DailyReward.reward_for(6, 0, 2.0)["dollars"]) == 10
 		and int(DailyReward.reward_for(6, 0, 2.0)["coins"]) == 4000)
 
 	# Выдача, прерванная посреди (запись раньше выдачи): после «рестарта» снова не выдать.

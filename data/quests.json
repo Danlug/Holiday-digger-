@@ -1,6 +1,7 @@
 {
  "version": 3,
  "proposed": true,
+ "_approved": ["tier_by_max_depth"],
  "_legend": "Мета-слой: ежедневные и недельные задания (ГДД §17.1–17.2). Числа — предложение агента (proposed), КРОМЕ четырёх ориентиров владельца для средней ступени (2: рекорд глубины 80–249): «прокопай 500 любых клеток», «продай на 1000 монет», «потрать 500 монет», «поешь 3 раза» — они помечены owner в owner_anchor. Набор дня строит scripts/meta/quest_gen.gd детерминированно от (местные сутки, сид мира, ступень игрока). Массивы targets — цель ДНЯ по ступеням tier_by_max_depth; недельная цель = targets × weekly_scale шаблона (по умолчанию weekly.default_scale) × scale слота. event — id шины GameState.game_event либо сигнал GameState (max_depth_changed, leveled_up). sum: пусто — +1 за событие, иначе складывается поле data[sum]. filter: mineral/item (строка или список), loot (bool), kind (dirt|stone|ore), currency, depth_min/depth_max; filter_by_tier — то же по ступеням. mode:delta у max_depth_changed — прогресс от рекорда глубины на момент выдачи. requires_seen: шаблон берётся, только когда это событие хоть раз было на шине (невыполнимое задание хуже отсутствующего). record_min/record_max — то же по рекорду глубины (монстры — с 1500). event может быть списком id (тайник и сундук полости). fixed_target {вид: цель} — цель словами владельца, без ступеней и масштаба слота. pool_only — шаблон берётся только из пула своего слота (не запасным путём). Темп, от которого посчитаны цели, — tools/sim_daily.gd (клеток в минуту и монет за клетку по поясам глубины).",
  "owner_anchor": {"tier": 2, "dig_any": 500, "sell_coins": 1000, "spend_coins": 500, "eat": 3, "_note": "слова владельца: «прокопай сегодня 500 любых тайлов, продай на 1000 монет, потрать 500 монет, поешь 3 раза» — ориентир средней ступени"},
  "tier_by_max_depth": [0, 25, 80, 250, 800, 2500],
@@ -8,19 +9,19 @@
   "count": {"value": 13, "proposed": false, "note": "владелец (27.10): «Ежедневных миссий нужно 13, за каждую миссию даётся звёздочка»"},
   "_slots_note": "13 слотов — 13 разных миссий (владелец, 27.10; было 5). pool — какие шаблоны может выпасть в слоте и с каким весом; замена задания берёт другой шаблон из того же пула. Пул пуст на этой ступени (монстры до 1500, станция до первой перегонки) — слот берёт любой подходящий шаблон дня, сначала из новой группы (fallback; false — не брать), поэтому миссий всегда 13. reroll: false — слот не заменяется. reward — множитель награды слота. Сумма множителей 6.5 = прежние пять заданий (1.5+1.0+0.8+0.6+1.1) + монеты сундука ×1.5: сундук теперь даёт доллары, а монеты и опыт дня переехали в миссии — день по монетам и опыту тот же (≈ 80% продажи за 40 минут на своей ступени, владелец 26.10).",
   "slots": [
-   {"id": "dig", "pool": {"dig_any": 6, "dig_stone": 1}, "scale": 1.0, "reward": 1.0},
-   {"id": "ore", "pool": {"dig_ore": 3, "pick_any": 1}, "scale": 1.0, "reward": 0.6},
-   {"id": "metal", "pool": {"pick_iron": 1, "pick_lead": 1, "pick_silver": 1, "pick_copper": 1, "pick_gold": 1, "pick_aluminium": 1, "pick_diamond": 1, "pick_nickel": 1, "pick_titanium": 1, "pick_platinum": 1, "pick_ruby": 1}, "scale": 1.0, "reward": 0.5},
-   {"id": "depth", "pool": {"dig_deep": 2, "depth_record": 2}, "scale": 1.0, "reward": 0.6},
-   {"id": "rock", "pool": {"dig_dirt": 2, "dig_stone": 1}, "scale": 1.0, "reward": 0.4},
-   {"id": "sell", "pool": {"sell_coins": 3, "sell_items": 1}, "scale": 1.0, "reward": 0.7},
-   {"id": "spend", "pool": {"spend_coins": 3, "buy_any": 1}, "scale": 1.0, "reward": 0.5},
-   {"id": "care", "pool": {"eat": 3, "sleep": 1}, "scale": 1.0, "reward": 0.4},
-   {"id": "home", "pool": {"store_items": 1, "craft": 1, "refuel": 1, "fuel_refine": 1}, "scale": 1.0, "reward": 0.4},
-   {"id": "treasure", "pool": {"open_chest": 2, "lucky": 1, "fever": 1}, "scale": 1.0, "reward": 0.4},
-   {"id": "hunt", "pool": {"kill_monsters": 2, "clear_cave": 1}, "scale": 1.0, "reward": 0.4},
-   {"id": "growth", "pool": {"level_up_day": 1}, "scale": 1.0, "reward": 0.3},
-   {"id": "ads", "pool": {"watch_ads": 1}, "scale": 1.0, "reward": 0.3, "fallback": false, "reroll": false}
+   {"id": "dig", "_approved": ["pool", "scale"], "pool": {"dig_any": 6, "dig_stone": 1}, "scale": 1.0, "reward": 1.0},
+   {"id": "ore", "_approved": ["pool", "scale"], "pool": {"dig_ore": 3, "pick_any": 1}, "scale": 1.0, "reward": 0.6},
+   {"id": "metal", "_approved": ["pool", "scale"], "pool": {"pick_iron": 1, "pick_lead": 1, "pick_silver": 1, "pick_copper": 1, "pick_gold": 1, "pick_aluminium": 1, "pick_diamond": 1, "pick_nickel": 1, "pick_titanium": 1, "pick_platinum": 1, "pick_ruby": 1}, "scale": 1.0, "reward": 0.5},
+   {"id": "depth", "_approved": ["pool", "scale"], "pool": {"dig_deep": 2, "depth_record": 2}, "scale": 1.0, "reward": 0.6},
+   {"id": "rock", "_approved": ["pool", "scale"], "pool": {"dig_dirt": 2, "dig_stone": 1}, "scale": 1.0, "reward": 0.4},
+   {"id": "sell", "_approved": ["pool", "scale"], "pool": {"sell_coins": 3, "sell_items": 1}, "scale": 1.0, "reward": 0.7},
+   {"id": "spend", "_approved": ["pool", "scale"], "pool": {"spend_coins": 3, "buy_any": 1}, "scale": 1.0, "reward": 0.5},
+   {"id": "care", "_approved": ["pool", "scale"], "pool": {"eat": 3, "sleep": 1}, "scale": 1.0, "reward": 0.4},
+   {"id": "home", "_approved": ["pool", "scale"], "pool": {"store_items": 1, "craft": 1, "refuel": 1, "fuel_refine": 1}, "scale": 1.0, "reward": 0.4},
+   {"id": "treasure", "_approved": ["pool", "scale"], "pool": {"open_chest": 2, "lucky": 1, "fever": 1}, "scale": 1.0, "reward": 0.4},
+   {"id": "hunt", "_approved": ["pool", "scale"], "pool": {"kill_monsters": 2, "clear_cave": 1}, "scale": 1.0, "reward": 0.4},
+   {"id": "growth", "_approved": ["pool", "scale"], "pool": {"level_up_day": 1}, "scale": 1.0, "reward": 0.3},
+   {"id": "ads", "_approved": ["pool", "scale"], "pool": {"watch_ads": 1}, "scale": 1.0, "reward": 0.3, "fallback": false, "reroll": false}
   ],
   "_reward_note": "Награда миссии = reward[ступень] × reward слота. Весь день (13 миссий, сумма множителей 6.5) ≈ 80% того, что игрок ступени зарабатывает продажей за те же ~40 минут (владелец, 26.10: «поднять пропорционально прокачке и глубине»; раньше — четверть-треть) (sim_daily: 3 · 16 · 132 · 459 · 2384 · 5948 монет в минуту игры): на нижних ступенях щедрее — там «мёртвый» первый час (ГДД §20). Сундук звёзд даёт доллары, а не монеты (владелец, 27.10).",
   "reward": {
@@ -30,7 +31,7 @@
    "xp": [80, 150, 300, 1000, 2500, 6000]
   },
   "points": 1,
-  "_approved": ["points"],
+  "_approved": ["points", "bonus_all", "streak", "reroll"],
   "_points_note": "Очко дороги трофеев за миссию — число владельца (1); миссий стало 13, поэтому дорога идёт примерно вдвое быстрее (15 очков в день вместо 7).",
   "chest": {
    "stars": {"value": 10, "proposed": false, "note": "владелец (27.10): «10 звёздочек — сундук за все выполненные дневные миссии». Звезда — за каждую забранную миссию дня; если миссий в наборе меньше 10 (старый сейв посреди дня), сундук открывают все."},

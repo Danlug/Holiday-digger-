@@ -264,6 +264,14 @@ func _test_heat() -> void:
 	check("костюм 3 гасит жару на 3000 полностью", Heat.stamina_multiplier(3000, 3) == 1.0)
 	check("костюм 1 на 3000 смягчает жару, но не убирает", Heat.stamina_multiplier(3000, 1) < 3.0 and Heat.stamina_multiplier(3000, 1) > 1.5)
 	check("ощущения: комфортно / припекает / печёт", Heat.felt_level(100) == 0 and Heat.felt_level(1500) == 1 and Heat.felt_level(3000) == 2)
+	# Владелец 30.10: «температура больше 70 начинает делать урон».
+	check("порог урона без костюма — 70 °C", Heat.damage_from_c(0) == 70.0)
+	check("до 70 °C жара здоровье не трогает (1500 — 63.5 °C)", Heat.damage_per_second(1500, 0) == 0.0)
+	check("на 2000 (85 °C) без костюма жжёт 1.5 HP/с", absf(Heat.damage_per_second(2000, 0) - 1.5) < 0.001)
+	check("костюм сдвигает порог на свою стойкость: ступень 1 — 100 °C, на 2000 урона нет",
+		Heat.damage_from_c(1) == 100.0 and Heat.damage_per_second(2000, 1) == 0.0)
+	check("на 3000 (140 °C) без костюма 7 HP/с, с костюмом 3 — 0", absf(Heat.damage_per_second(3000, 0) - 7.0) < 0.001
+		and Heat.damage_per_second(3000, 3) == 0.0)
 	var raw := Heat.lava_cell_cost_hp(0)
 	check("клетка лавы без костюма стоит 100 HP — вся полоска на старте", raw == 100.0)
 	var costs: Array = []

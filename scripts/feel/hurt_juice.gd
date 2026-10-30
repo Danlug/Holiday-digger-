@@ -15,7 +15,7 @@ extends CanvasLayer
 ##    красный фон, пока HP тает; после — те же 0.3 с и 3 с. Пульсации нет.
 ## Звук, вибро и «−N» над головой — по-прежнему JuiceDirector. Подключает FeelDirector.
 
-const QUIET_SOURCES := ["starvation", "exhaustion"]
+const QUIET_SOURCES := ["starvation", "exhaustion", "heat"]   # жара жжёт каждый кадр — тихо, как голод
 const COL := Color(0.85, 0.08, 0.1)   # тот же красный, что у прежней вспышки урона
 
 var clock: float = 0.0

@@ -3,12 +3,14 @@ extends RefCounted
 ## Выдача наград мета-слоя. Награда — {coins, dollars, xp, item:{id,count}}.
 ##
 ## Доллары (ГДД раздел 15): повторяемые источники (ежедневная награда, задания)
-## упираются в недельный потолок premium_cap.per_week; одноразовые (достижения,
-## дорога трофеев) — нет, их общий размер ограничен самим списком. Из idle
-## доллары не идут вовсе: этот класс зовут только по действию игрока.
+## упирались в недельный потолок premium_cap.per_week; владелец 30.10 потолок
+## отменил («сколько надо, столько и буду давать долларов») — per_week = -1.
+## Из idle доллары не идут вовсе: этот класс зовут только по действию игрока.
 
 ## Монет за единицу предмета, который не влез в рюкзак: награда не пропадает.
 const ITEM_FALLBACK_COINS := 50
+## «Потолка нет» (premium_cap.per_week = -1).
+const NO_CAP := 1000000
 
 
 static func normalize(r: Dictionary) -> Dictionary:
@@ -34,7 +36,9 @@ static func scaled(r: Dictionary, mult: float) -> Dictionary:
 
 ## Сколько долларов повторяемые источники ещё могут выдать на этой неделе.
 static func dollars_left_this_week() -> int:
-	var cap := int(MetaData.daily().get("premium_cap", {}).get("per_week", 0))
+	var cap := int(MetaData.daily().get("premium_cap", {}).get("per_week", -1))
+	if cap < 0:
+		return NO_CAP
 	var w := MetaState.sub("wk_dollars")
 	var week := MetaClock.week_of(MetaState.today())
 	if int(w.get("week", -1)) != week:

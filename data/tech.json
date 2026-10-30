@@ -58,7 +58,8 @@
 				"value": 1000,
 				"proposed": true,
 				"note": "перенесено из shop.json → craft.unlock_depth.fuel_block_coal вместе с рецептом: уголь встречается только с 1000 (minerals.json → coal.depth_min); до этого плитка угля на станции стоит под замком и подсказывает, что уголь будет."
-			}}
+			}},
+			{"id": "uranium", "unlock_depth": 1500, "_note": "владелец (30.10): «с урана выходит 4 блока топлива» (balance.json → fuel_consumption.fuel_blocks_per_uranium); уран встречается с 1500 (minerals.json → uranium.depth_min)"}
 		]
 	},
 
@@ -143,7 +144,7 @@
 				{"depth_cap": 5200, "cells_per_hour": 145, "cap_hours": 18, "cost": {"coins": 280000, "items": {"geocrystal": 25, "obsidian": 15}}},
 				{"depth_cap": 6500, "cells_per_hour": 170, "cap_hours": 18, "cost": {"coins": 400000, "items": {"ancient_metal": 30, "obsidian": 30}}}
 			],
-			"proposed": true,
+			"proposed": false,
 			"note": "ступени скважины. depth_cap — глубина, на которой скважина копает (min с рекордом игрока), cells_per_hour — сколько клеток породы в час скважина прокапывает (доход = клетки в час × ожидаемая выручка клетки на её глубине), cap_hours — офлайн-кап часов, cost — цена перехода НА эту ступень (материалы берутся со склада и из рюкзака). Базовая ставка и стоимость постройки — в balance.json (idle_well). Расчёт окупаемости — tools/sim_tech.py."
 		},
 		"report_min_seconds": {

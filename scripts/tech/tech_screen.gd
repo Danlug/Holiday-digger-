@@ -421,6 +421,7 @@ func _pour(source: String, amount: int, from_ctrl: Control, btn: Control) -> voi
 const RAW_TIPS := {
 	"peat": ["Торф", "Перегоняется в топливные блоки"],
 	"coal": ["Уголь", "Плотнее торфа: на блок нужно меньше"],
+	"uranium": ["Уран", "Один уран — четыре топливных блока"],
 }
 
 
@@ -430,6 +431,7 @@ func _build_refinery() -> void:
 	if not raws.has(_raw_sel) or not FuelRefinery.is_unlocked(_raw_sel):
 		_raw_sel = String(raws[0])
 	var per := FuelRefinery.per_block(_raw_sel)
+	var out := FuelRefinery.blocks_per_batch(_raw_sel)
 	var can_here := _station and FuelRefinery.station_built()
 	var card := _card()
 	card.name = "Refinery"
@@ -448,8 +450,8 @@ func _build_refinery() -> void:
 	rate.add_child(TechUi.label(str(per), UiTheme.FS_BODY, TechUi.MUTED))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("icon_arrow"), 10))
 	rate.add_child(TechUi.icon_rect(TechUi.tex("fuel_block"), 14))
-	rate.add_child(TechUi.label("1", UiTheme.FS_BODY, TechUi.MUTED))
-	Tip.bind(rate, "Курс перегонки", "%s: %d шт. = 1 топливный блок" % [TechUi.item_name(_raw_sel), per])
+	rate.add_child(TechUi.label(str(out), UiTheme.FS_BODY, TechUi.MUTED))
+	Tip.bind(rate, "Курс перегонки", "%s: %d шт. = %d топл. блок%s" % [TechUi.item_name(_raw_sel), per, out, "" if out == 1 else "а"])
 
 	# Превращение: сырьё -> куб -> блоки. Куб — кнопка «перегнать».
 	var conv := _hbox(v, 3)
@@ -504,7 +506,7 @@ func _build_refinery() -> void:
 
 	_ref = {"slider": slider, "used": used_lbl, "made": made_lbl, "still": still,
 		"raw_icon": raw_ic, "out_icon": out_ic}
-	var most := FuelRefinery.max_blocks(_raw_sel)
+	var most := FuelRefinery.max_batches(_raw_sel)   # ползунок считает перегонки (у урана одна — 4 блока)
 	# Сырья нет — ручка слева на нуле, а не «полная» на единице, которой нет.
 	slider.min_value = 1 if most > 0 else 0
 	slider.max_value = maxi(most, 1) if most > 0 else 1
@@ -557,8 +559,9 @@ func _raw_tile(raw: String) -> Control:
 	return b
 
 
+## Сколько перегонок выбрано ползунком.
 func _refine_amount() -> int:
-	var most := FuelRefinery.max_blocks(_raw_sel)
+	var most := FuelRefinery.max_batches(_raw_sel)
 	if most <= 0 or _ref.is_empty():
 		return 0
 	return clampi(int((_ref["slider"] as HSlider).value), 1, most)
@@ -569,16 +572,17 @@ func _update_refine_numbers() -> void:
 		return
 	var n := _refine_amount()
 	var per := FuelRefinery.per_block(_raw_sel)
+	var out := FuelRefinery.blocks_per_batch(_raw_sel)
 	(_ref["used"] as Label).text = "−%d" % (n * per) if n > 0 else "0"
-	(_ref["made"] as Label).text = "+%d" % n if n > 0 else "0"
+	(_ref["made"] as Label).text = "+%d" % (n * out) if n > 0 else "0"
 	(_ref["made"] as Label).add_theme_color_override("font_color", TechUi.GOLD if n > 0 else TechUi.DIM)
 	var still := _ref["still"] as Button
 	var reason := ""
 	if not _station:
 		reason = "Перегонка — у станции заправки в огороде"
 	elif n <= 0:
-		reason = "Мало: нужно %d на блок, есть %d" % [per, FuelRefinery.held(_raw_sel)]
-	Tip.bind(still, "Перегнать", "%s: уйдёт %d, блоков выйдет %d" % [TechUi.item_name(_raw_sel), n * per, n], reason)
+		reason = "Мало: нужно %d на перегонку, есть %d" % [per, FuelRefinery.held(_raw_sel)]
+	Tip.bind(still, "Перегнать", "%s: уйдёт %d, блоков выйдет %d" % [TechUi.item_name(_raw_sel), n * per, n * out], reason)
 	still.modulate = Color(1, 1, 1, 1.0 if reason == "" else 0.6)
 
 
@@ -599,7 +603,7 @@ func _on_refine_pressed() -> void:
 		if t != null and is_instance_valid(t):
 			targets[src] = t.get_global_rect().get_center()
 	var raw := _raw_sel
-	var res := FuelRefinery.refine(raw, n)
+	var res := FuelRefinery.refine(raw, n * FuelRefinery.blocks_per_batch(raw))
 	if not bool(res["ok"]):
 		_deny(still)
 		return

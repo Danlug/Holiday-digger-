@@ -25,7 +25,7 @@
 			},
 			"well": {
 				"value": 100,
-				"proposed": true,
+				"proposed": false,
 				"note": "дублирует balance.json -> idle_well.build_unlock_depth; здесь лежат глубины открытия всех рецептов разом, чтобы UI смотрел в одно место"
 			}
 		}

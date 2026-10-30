@@ -551,23 +551,28 @@
   "peat_per_fuel_block": 4,
   "coal_per_fuel_block": {
    "value": 2,
-   "proposed": true,
+   "proposed": false,
    "note": "уголь плотнее торфа"
   },
   "uranium_per_fuel_block": {
    "value": 1,
-   "proposed": true,
-   "note": "после 1500 техника переходит на уран, нужен апгрейд"
+   "proposed": false,
+   "note": "один уран на перегонку (станция, scripts/tech/fuel_refinery.gd)"
+  },
+  "fuel_blocks_per_uranium": {
+   "value": 4,
+   "proposed": false,
+   "note": "владелец (30.10): «с урана выходит 4 блока топлива» — одна перегонка урана на станции даёт 4 блока"
   },
   "blocks_per_cell": {
    "hand_drill": {
     "value": 0.03,
-    "proposed": true,
+    "proposed": false,
     "note": "33 клетки на блок. Было 0.05 (20 клеток); ветка «Техника» снизила по расчёту tools/sim_tech.py: торф даёт ~0.032 блока на клетку на глубинах 450–1000, и при 0.05 добор топлива съедал бы больше половины копки — а владелец требует, чтобы топливо не становилось основным занятием."
    },
    "drill_rig": {
     "value": 0.1,
-    "proposed": true,
+    "proposed": false,
     "note": "10 клеток на блок. Ключ был \"drill_machine\" (нигде в коде не читался) — переименован в drill_rig, чтобы совпадать с id инструмента из tools и правда читаться кодом (см. Balance.get_drill_rig_fuel_per_cell, scripts/player/player.gd:_consume_rig_fuel). Число расхода на клетку владелец не задавал; взято прежнее предложение агента без изменений."
    }
   },
@@ -599,7 +604,7 @@
   },
   "build_unlock_depth": {
    "value": 100,
-   "proposed": true,
+   "proposed": false,
    "note": "глубина открытия рецепта не задана. Та же, что у ручного бура: доход скважины считается от max_depth_reached, и на нулевой глубине она платила бы копейки."
   }
  },

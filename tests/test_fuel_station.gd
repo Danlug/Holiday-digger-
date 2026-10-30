@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_refine_from_storage_and_mixed()
 	_test_limits()
 	_test_coal_gate()
+	_test_uranium()
 	_test_station_gate()
 	_test_events()
 	_test_save_load()
@@ -70,7 +71,7 @@ func _test_ratios() -> void:
 		FuelRefinery.per_block("peat") == int(Balance.unwrap(fc["peat_per_fuel_block"])) and FuelRefinery.per_block("peat") == 4)
 	check("уголь: на блок столько, сколько в balance.json",
 		FuelRefinery.per_block("coal") == int(Balance.unwrap(fc["coal_per_fuel_block"])))
-	check("сырьё станции — торф и уголь, торф первым", FuelRefinery.inputs() == ["peat", "coal"])
+	check("сырьё станции — торф, уголь и уран (владелец 30.10), торф первым", FuelRefinery.inputs() == ["peat", "coal", "uranium"])
 	check("другое сырьё не перегоняется", not FuelRefinery.is_input("iron_ore") and FuelRefinery.max_blocks("iron_ore") == 0)
 	# Торф 0.25 кг (владелец, 27.10) — блок обязан остаться легче своих четырёх торфин и двух углей,
 	# иначе перегонка делает рюкзак тяжелее, а сырьё выгоднее носить как есть.
@@ -127,6 +128,25 @@ func _test_limits() -> void:
 	check("остаток торфа — 1", GameState.get_item_count("peat") == 1)
 	check("ноль блоков — отказ", not bool(FuelRefinery.refine("peat", 0)["ok"]))
 	check("отрицательное число — отказ", not bool(FuelRefinery.refine("peat", -3)["ok"]))
+
+
+## Владелец 30.10: «с урана выходит 4 блока топлива».
+func _test_uranium() -> void:
+	_fresh()
+	check("уран — сырьё станции: 1 уран → 4 блока",
+		FuelRefinery.is_input("uranium") and FuelRefinery.per_block("uranium") == 1 and FuelRefinery.blocks_per_batch("uranium") == 4)
+	GameState.max_depth_reached = FuelRefinery.unlock_depth("uranium") - 1
+	check("уран до своей глубины под замком", not FuelRefinery.is_unlocked("uranium"))
+	GameState.max_depth_reached = FuelRefinery.unlock_depth("uranium")
+	GameState.inventory["uranium"] = 3
+	check("3 урана — 3 перегонки, 12 блоков", FuelRefinery.max_batches("uranium") == 3 and FuelRefinery.max_blocks("uranium") == 12)
+	var r := FuelRefinery.refine("uranium", 8)
+	check("просили 8 блоков — ушло 2 урана, вышло 8 блоков",
+		bool(r["ok"]) and int(r["used"]) == 2 and int(r["made"]) == 8 and GameState.get_item_count("uranium") == 1
+		and GameState.get_item_count("fuel_block") == 8 and int(r["to_pack"]) == 8)
+	var r2 := FuelRefinery.refine("uranium", 1)
+	check("один блок не делится: перегонка урана целиком — 4 блока", bool(r2["ok"]) and int(r2["made"]) == 4 and int(r2["used"]) == 1)
+	check("урана не осталось — отказ", not bool(FuelRefinery.refine("uranium", 4)["ok"]))
 
 
 func _test_coal_gate() -> void:

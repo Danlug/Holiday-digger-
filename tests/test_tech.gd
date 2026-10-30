@@ -96,7 +96,8 @@ func _test_data() -> void:
 		check("числа бака %s утверждены (proposed: false)" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", true) == false)
 	# владелец принял совет на странице разбора чисел (26.10): ступени костюма утверждены
 	check("ступени костюма утверждены владельцем (proposed: false)", TechData.heat()["suit_tiers"].get("proposed", true) == false)
-	check("ступени скважины помечены proposed", TechData.well()["levels"].get("proposed", false) == true)
+	# владелец принял совет на странице разбора чисел (30.10): скважина «оставить»
+	check("ступени скважины утверждены владельцем (proposed: false)", TechData.well()["levels"].get("proposed", true) == false)
 	check("лава — решения владельца: 3000 / 20 HP/с / 5 с",
 		Heat.lava_min_depth() == 3000 and Heat.lava_raw_dps() == 20.0 and Heat.lava_dig_seconds() == 5.0)
 

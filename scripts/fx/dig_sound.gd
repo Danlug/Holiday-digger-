@@ -134,7 +134,7 @@ func _plan(cell: Vector2i, total: float, tool: String) -> void:
 	_cell = cell
 	_total = total
 	_n = hits_for(total, tool)
-	_period = total / float(_n)
+	_period = maxf(total / float(_n), 0.001)   # отладочная мгновенная копка: total = 0
 	_next_k = 1
 	stats["plans"] += 1
 	# Веб: копка начинается только с нажатия — это и есть жест, звук можно включать.

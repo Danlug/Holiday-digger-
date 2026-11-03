@@ -23,7 +23,7 @@ var enabled: bool = true
 ## true — звук ждёт первого ввода (веб). Для тестов можно выставить вручную.
 var require_gesture: bool = OS.has_feature("web")
 var unlocked: bool = not OS.has_feature("web")
-var stats := {"played": 0, "dropped": 0, "stolen": 0, "cooldown": 0}
+var stats := {"played": 0, "dropped": 0, "stolen": 0, "cooldown": 0, "dig": 0}
 ## Последние сыгранные id (новые в конце), не больше RECENT_MAX — для тестов и отладки.
 var recent: Array[String] = []
 const RECENT_MAX := 48
@@ -178,6 +178,11 @@ func play(id: String, pitch: float = 1.0, volume_db: float = 0.0) -> bool:
 	recent.append(id)
 	if recent.size() > RECENT_MAX:
 		recent.pop_front()
+	var is_dig := id.begins_with("dig_") or id.begins_with("break_")
+	if is_dig:
+		stats["dig"] += 1
+	if int(stats["played"]) <= 3 or (is_dig and int(stats["dig"]) <= 3):
+		_mirror_web(id)
 	if float(d["duck"]) > 0.0:
 		_duck_target = -float(d["duck"])
 		_duck_until_ms = now + int(stream.get_length() * 800.0)
@@ -448,6 +453,16 @@ func _try_unlock_now() -> void:
 		unlock()
 
 
+## Веб-оболочка видит состояние звука (window.RaskopkiShell.sfx): дымовой тест tools/smoke_web.js
+## проверяет по нему, что первая копка после загрузки уже звучит. Пишем только на разблокировке,
+## первых трёх звуках и первых трёх звуках копки — дальше это никому не нужно.
+func _mirror_web(last_id: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval("if (window.RaskopkiShell) { window.RaskopkiShell.sfx = {unlocked: %s, played: %d, dig: %d, last: '%s', t: performance.now()}; }"
+			% ["true" if unlocked else "false", int(stats["played"]), int(stats["dig"]), last_id.c_escape()])
+
+
 ## Первый жест пользователя: веб разрешает звук. Запрошенная раньше музыка
 ## включается здесь.
 func unlock() -> void:
@@ -455,6 +470,7 @@ func unlock() -> void:
 		return
 	unlocked = true
 	unlocked_changed.emit()
+	_mirror_web("")
 	if not _pending_music.is_empty():
 		var p := _pending_music
 		_pending_music = {}

@@ -229,8 +229,18 @@ const isBenign = (t) => BENIGN.some((re) => re.test(t));
 		await sleep(1200);
 		await page.keyboard.up('a');
 
+		// Звук: SfxService отдаёт оболочке {unlocked, played, dig} (window.RaskopkiShell.sfx) на первых
+		// звуках — первая копка после загрузки обязана звучать, а не ждать опроса жеста.
+		const sfxState = () => page.evaluate(() => (window.RaskopkiShell && window.RaskopkiShell.sfx) || null).catch(() => null);
+		const sfx0 = await sfxState();
 		await page.keyboard.down('s');
-		await sleep(4000);
+		await sleep(1500);
+		const sfx1 = await sfxState();
+		report.sfx = { before: sfx0, afterDig: sfx1 };
+		check('звук разблокирован и первая копка звучит (удар или осыпание сыграны)',
+			!!sfx1 && sfx1.unlocked && sfx1.dig > ((sfx0 && sfx0.dig) || 0),
+			sfx1 ? `unlocked=${sfx1.unlocked} played=${sfx1.played} dig=${sfx1.dig} last=${sfx1.last}` : 'оболочка не получила состояние звука');
+		await sleep(2500);
 		await shot('04_digging');
 		report.fps.dig = await fpsOf(2000);
 		await page.keyboard.up('s');

@@ -25,6 +25,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import wave
@@ -175,7 +176,8 @@ def header_ids():
             body = line[2:].strip()
             if ":" in body:
                 body = body.split(":", 1)[1]
-            ids += body.split()
+            # пояснения в скобках и по-русски — не id
+            ids += [t for t in body.split() if re.fullmatch(r"[a-z0-9_]+", t)]
     return ids
 
 

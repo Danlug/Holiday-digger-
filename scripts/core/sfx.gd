@@ -10,11 +10,13 @@ extends RefCounted
 ## Каталог событий (договорённость между ветками; новые — добавляйте сюда):
 ##   интерфейс : ui_tap ui_open ui_close ui_tab ui_toggle ui_buy ui_deny ui_slider
 ##   деньги    : coin coins_big sell
-##   копка     : dig_dirt dig_stone dig_ore dig_gold dig_hard tile_break (старые id — псевдонимы)
-##               dig_<материал>_<инструмент>: материал dirt peat stone ore gold gem hard,
-##               инструмент shovel pick drill (лопата — только dirt peat ore); dig_lava
-##               break_dirt break_peat break_stone break_ore break_gold break_gem break_hard break_lava
-##               rattle drill_loop rig_loop (см. scripts/fx/dig_sound.gd)
+##   копка     : dig_dirt dig_stone dig_ore dig_gold dig_hard tile_break (старые имена — псевдонимы новых)
+##               удар материал×инструмент (scripts/fx/dig_sound.gd, tools/audio_dig.py):
+##               dig_dirt_shovel dig_dirt_pick dig_dirt_drill dig_peat_shovel dig_peat_pick dig_peat_drill
+##               dig_stone_pick dig_stone_drill dig_ore_shovel dig_ore_pick dig_ore_drill
+##               dig_gold_pick dig_gold_drill dig_gem_pick dig_gem_drill dig_hard_pick dig_hard_drill dig_lava
+##               осыпание: break_dirt break_peat break_stone break_ore break_gold break_gem break_hard break_lava
+##               ржавая кирка и моторы: rattle drill_loop rig_loop
 ##   движение  : step step_grass step_stone jump land fly_start fly_stop fly_loop thud
 ##   герой     : hurt die respawn eat drink heal warn_low
 ##   прогресс  : pickup pickup_rare levelup skill_buy artifact quest_done reward

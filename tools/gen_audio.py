@@ -8,6 +8,9 @@
     python3 tools/gen_audio.py --only coin,dig_dirt,mus_boss
     python3 tools/gen_audio.py --check        # проверить уже собранное (швы, размер)
 
+Звуки копки описаны в tools/audio_dig.py (удар = материал × инструмент, осыпание,
+петли моторов); остальные эффекты — tools/audio_sfx.py, музыка — tools/audio_music.py.
+
 Звук — синтез на numpy (шум + огибающие, FM, пилы/квадраты, чиптюн): никаких
 сэмплов со стороны. Детерминирован (сид от имени звука): повторный запуск даёт
 те же файлы. Это заглушки уровня «программист собрал аккуратно»; если владелец
@@ -35,6 +38,7 @@ OUT = os.path.join(ROOT, "audio")
 
 import audio_dsp as D  # noqa: E402
 import audio_sfx  # noqa: E402
+import audio_dig  # noqa: E402,F401  (регистрирует звуки копки в audio_sfx.REG)
 
 BUDGET_MB = 12.0
 
@@ -82,7 +86,7 @@ def seam_report(x):
 
 # --------------------------------------------------------------------------
 
-def build_sfx(only):
+def build_sfx(only, old_sfx):
     catalog = {}
     total = 0
     for name, spec in audio_sfx.REG.items():
@@ -109,6 +113,13 @@ def build_sfx(only):
         if spec["loop"]:
             entry["loop"] = True
         catalog[name] = entry
+    # Псевдонимы: тот же файл под старым id (файлы не дублируются).
+    for alias, target in audio_sfx.ALIASES.items():
+        if only and alias not in only and target not in only:
+            continue
+        src = catalog.get(target) or old_sfx.get(target)
+        if src is not None:
+            catalog[alias] = dict(src)
     return catalog, total
 
 
@@ -218,7 +229,7 @@ def main():
                 problems.append("%s: шов" % name)
     else:
         if want_sfx:
-            cs, tot = build_sfx(only)
+            cs, tot = build_sfx(only, catalog["sfx"])
             catalog["sfx"].update(cs)
             print("эффекты: %d id, %.0f КБ" % (len(cs), tot / 1024))
         if want_music:

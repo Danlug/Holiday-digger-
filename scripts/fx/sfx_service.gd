@@ -24,6 +24,9 @@ var enabled: bool = true
 var require_gesture: bool = OS.has_feature("web")
 var unlocked: bool = not OS.has_feature("web")
 var stats := {"played": 0, "dropped": 0, "stolen": 0, "cooldown": 0}
+## Последние сыгранные id (новые в конце), не больше RECENT_MAX — для тестов и отладки.
+var recent: Array[String] = []
+const RECENT_MAX := 48
 
 var _defs: Dictionary = {}          # id -> {streams, db, pv, prio, voices, cd, duck, loop}
 var _music_defs: Dictionary = {}    # id -> {file, db} | {alias}
@@ -145,6 +148,8 @@ func active_voices() -> int:
 # ---------------------------------------------------------------------------
 
 func play(id: String, pitch: float = 1.0, volume_db: float = 0.0) -> bool:
+	if require_gesture and not unlocked:
+		_try_unlock_now()
 	if not enabled or (require_gesture and not unlocked) or Settings.sound_muted:
 		return false
 	var d: Dictionary = _defs.get(id, {})
@@ -170,10 +175,21 @@ func play(id: String, pitch: float = 1.0, volume_db: float = 0.0) -> bool:
 	_meta[idx] = {"id": id, "prio": int(d["prio"]), "t": now}
 	_last_ms[id] = now
 	stats["played"] += 1
+	recent.append(id)
+	if recent.size() > RECENT_MAX:
+		recent.pop_front()
 	if float(d["duck"]) > 0.0:
 		_duck_target = -float(d["duck"])
 		_duck_until_ms = now + int(stream.get_length() * 800.0)
 	return true
+
+
+## Последние n сыгранных id (новые в конце).
+func last_played(n: int = 8) -> Array[String]:
+	var out: Array[String] = []
+	for i in range(maxi(0, recent.size() - n), recent.size()):
+		out.append(recent[i])
+	return out
 
 
 func _pick_stream(id: String, d: Dictionary) -> AudioStream:
@@ -223,6 +239,8 @@ func _pick_voice(id: String, prio: int, cap: int) -> int:
 # ---------------------------------------------------------------------------
 
 func loop_start(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
+	if require_gesture and not unlocked:
+		_try_unlock_now()
 	if not enabled or (require_gesture and not unlocked):
 		return
 	var d: Dictionary = _defs.get(id, {})
@@ -258,6 +276,16 @@ func loop_stop(id: String, fade: float = 0.15) -> void:
 		# Если за время затухания звук включили снова, не глушим его.
 		if is_instance_valid(p) and int(p.get_meta("fade_gen", 0)) == gen:
 			p.stop())
+
+
+## Громкость и высота идущей петли без перезапуска (мотор бура под нагрузкой).
+func loop_set(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
+	var p: AudioStreamPlayer = _loops.get(id)
+	if p == null or not p.playing:
+		return
+	var d: Dictionary = _defs.get(id, {})
+	p.pitch_scale = maxf(0.05, pitch)
+	p.volume_db = float(d.get("db", 0.0)) + volume_db
 
 
 func is_looping(id: String) -> bool:
@@ -410,6 +438,13 @@ func _web_audio_running() -> bool:
 
 func _apply_audio_poll(allowed: bool) -> void:
 	if allowed:
+		unlock()
+
+
+## Первый звук игры в вебе (удар первой копки, нажатие кнопки) приходит вместе с жестом,
+## а опрос выше идёт раз в 0,25 с — проверяем прямо в момент запроса, чтобы первый удар не пропал.
+func _try_unlock_now() -> void:
+	if Input.is_anything_pressed() or _web_audio_running():
 		unlock()
 
 

@@ -182,63 +182,19 @@ def _sell(rng, v):
 
 
 # --------------------------------------------------------------------------
-# Копка: земля / камень / руда / золото / твёрдое
+# Копка — в tools/audio_dig.py (удар = материал × инструмент, осыпание, моторы).
+# Старые id остаются псевдонимами на те же файлы: их зовут чужие ветки (бой —
+# tile_break) и шапка scripts/core/sfx.gd.
 # --------------------------------------------------------------------------
 
-@sfx("dig_dirt", peak=0.8, pv=0.09, prio=1, voices=3, cd=35, variants=3)
-def _dig_dirt(rng, v):
-    thump = body(100 + 9 * v, 52, 0.13, 0.05)
-    crunch = nburst(0.15, rng, lo=140, hi=1500 + 250 * v, decay=0.04, attack=0.002)
-    crumbs = grit(0.14, rng, 7, hi=2200)
-    return mix(0.16, [(0, thump, 0.8), (0, crunch, 0.9), (0.01, crumbs, 0.45)])
-
-
-@sfx("dig_stone", peak=0.85, pv=0.08, prio=1, voices=3, cd=35, variants=3)
-def _dig_stone(rng, v):
-    click = nburst(0.05, rng, lo=1500, hi=6500, decay=0.011)
-    ring = bell(640 + 70 * v, 0.1, 0.035, ((1.0, 1.0), (2.4, 0.5)))
-    thump = body(150, 78, 0.1, 0.04)
-    chips = grit(0.12, rng, 5, hi=4500, decay=0.003)
-    return mix(0.15, [(0, click, 0.9), (0, ring, 0.35), (0, thump, 0.7), (0.012, chips, 0.4)])
-
-
-@sfx("dig_ore", peak=0.85, pv=0.08, prio=1, voices=3, cd=35, variants=3)
-def _dig_ore(rng, v):
-    crack = nburst(0.06, rng, lo=900, hi=6000, decay=0.012)
-    metal = bell(480 + 60 * v, 0.28, 0.12, METAL)
-    thump = body(130, 70, 0.1, 0.04)
-    chips = grit(0.12, rng, 6, hi=5000, decay=0.003)
-    return reverb_tail(mix(0.3, [(0, crack, 0.8), (0, metal, 0.5), (0, thump, 0.6), (0.01, chips, 0.4)]),
-                       SR, rt60=0.15, wet=0.08)
-
-
-@sfx("dig_gold", peak=0.85, pv=0.05, prio=2, voices=2, cd=50, variants=2)
-def _dig_gold(rng, v):
-    crack = nburst(0.05, rng, lo=900, hi=6000, decay=0.01)
-    thump = body(140, 75, 0.09, 0.035)
-    f = 1318.5 * (1.0 if v == 0 else 1.122)
-    b1 = bell(f, 0.5, 0.22, GLASS)
-    b2 = bell(f * 1.5, 0.55, 0.24, GLASS)
-    sp = nburst(0.4, rng, lo=6000, decay=0.12, attack=0.01) * 0.2
-    return reverb_tail(mix(0.65, [(0, crack, 0.7), (0, thump, 0.6), (0.02, b1, 0.55), (0.09, b2, 0.5), (0.04, sp, 1.0)]),
-                       SR, rt60=0.3, wet=0.12)
-
-
-@sfx("dig_hard", peak=0.9, pv=0.06, prio=2, voices=2, cd=45, variants=2)
-def _dig_hard(rng, v):
-    thump = body(88, 44, 0.16, 0.07)
-    clank = bell(340 + 40 * v, 0.3, 0.16, METAL)
-    click = nburst(0.03, rng, lo=2000, hi=8000, decay=0.006)
-    return mix(0.34, [(0, thump, 0.9), (0, clank, 0.55), (0, click, 0.7)])
-
-
-@sfx("tile_break", peak=0.85, pv=0.06, prio=2, voices=2, cd=80, variants=2)
-def _tile_break(rng, v):
-    n = int(0.5 * SR)
-    rumble = fft_filter(rng.standard_normal(n), SR, lo=80, hi=700 + 200 * v) * env_exp(n, SR, 0.16, 0.004)
-    pops = grit(0.5, rng, 14, hi=3500, decay=0.006)
-    thump = body(95, 45, 0.18, 0.08)
-    return mix(0.52, [(0, rumble, 0.9 / (np.max(np.abs(rumble)) + 1e-9)), (0, pops, 0.7), (0, thump, 0.8)])
+ALIASES = {
+    "dig_dirt": "dig_dirt_pick",
+    "dig_stone": "dig_stone_pick",
+    "dig_ore": "dig_ore_pick",
+    "dig_gold": "dig_gold_pick",
+    "dig_hard": "dig_hard_pick",
+    "tile_break": "break_stone",
+}
 
 
 # --------------------------------------------------------------------------

@@ -202,10 +202,14 @@ func _play(id: String, pitch: float, db: float) -> void:
 
 func _tick_motors(player: Node, tool: String, digging: bool, delta: float) -> void:
 	_dip = maxf(0.0, _dip - delta * 5.0)
+	# сцена (frozen) и смерть останавливают физику героя, но digging остаётся: мотор не должен выть над катсценой
 	var frozen: bool = bool(player.get("frozen")) if "frozen" in player else false
+	var active := digging and not frozen and GameState.is_alive
 
 	var drill_db := _cfg("drill_loop_db", -2.0)
-	var want_drill := tool == "hand_drill" and tool_kind(tool) == "drill" and (digging or _idle < _cfg("chain_gap_s", 0.35))
+	# между клетками (digging == null) мотор держится chain_gap_s; заморозка с незавершённой копкой — глушит
+	var want_drill := tool == "hand_drill" and tool_kind(tool) == "drill" \
+			and (active or (not digging and _idle < _cfg("chain_gap_s", 0.35)))
 	if want_drill != _drill_on:
 		_drill_on = want_drill
 		if want_drill:
@@ -227,7 +231,7 @@ func _tick_motors(player: Node, tool: String, digging: bool, delta: float) -> vo
 		else:
 			Sfx.loop_stop("rig_loop", 0.3)
 	if _rig_on:
-		var load := digging and not frozen and tool_kind(tool) == "drill"
+		var load := active and tool_kind(tool) == "drill"
 		var want_db := _cfg("rig_load_db", -6.0) if load else idle_db
 		var want_pitch := _cfg("rig_load_pitch", 1.15) if load else idle_pitch
 		_rig_db = move_toward(_rig_db, want_db, delta * (40.0 if load else 14.0))

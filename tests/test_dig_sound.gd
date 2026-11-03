@@ -270,6 +270,14 @@ func _test_motors() -> void:
 	check("пауза между клетками короче 0.35 с: мотор не глушится", rec.loops.get("drill_loop", false))
 	ds.tick(pl, 0.3)
 	check("копка кончилась: мотор затихает", not rec.loops.get("drill_loop", false))
+	# катсцена замораживает героя, digging остаётся — мотор над сценой выть не должен
+	pl.digging = {"x": 5, "y": 14, "t": 0.2, "total": 1.0, "type": TileTypes.Type.STONE}
+	pl.frozen = true
+	ds.tick(pl, 0.016)
+	check("замороженный герой с незавершённой копкой: мотор молчит", not rec.loops.get("drill_loop", false))
+	pl.frozen = false
+	pl.digging = null
+	ds.tick(pl, 0.5)
 
 	# бурмобиль
 	rec.clear()

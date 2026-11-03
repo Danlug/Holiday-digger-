@@ -17,11 +17,9 @@ extends RefCounted
 ## (усталость): бурмобиль не оглушает, моторная петля остаётся фоном.
 
 const NO_CELL := Vector2i(-99999, -99999)
-const CHAIN_GAP_S := 0.35          # пауза между клетками, в которую мотор не глушится
-const FATIGUE_DB := 4.0            # сколько теряют удары за FATIGUE_S непрерывной копки
-const FATIGUE_S := 8.0
-const RATTLE_CHANCE := 0.75
 const RECENT_MAX := 40
+## Числа сведения — data/juice.json → dig.sound (все «proposed»); имена ключей там же.
+const CFG := "dig.sound."
 
 const HARD_TILES := [
 	TileTypes.Type.FOUNDATION, TileTypes.Type.REINFORCED, TileTypes.Type.OBSIDIAN,
@@ -143,18 +141,18 @@ func _plan(cell: Vector2i, total: float, tool: String) -> void:
 	Sfx.gesture()
 	# новый заход (не продолжение серии) — лёгкий замах
 	var kind := tool_kind(tool)
-	if _idle > CHAIN_GAP_S and kind != "drill":
-		_play("swing", 1.1, -12.0)
+	if _idle > _cfg("chain_gap_s", 0.35) and kind != "drill":
+		_play("swing", 1.1, _cfg("swing_db", -12.0))
 
 
 func _strike(tile: int, tool: String, progress: float) -> void:
 	var prof := Feel.tool_profile(tool)
 	var kind := tool_kind(tool)
 	var mat := material_for(tile)
-	# к концу клетки удары чуть крепче (+2 дБ), долгая серия устаёт (до −4 дБ)
-	var db := float(prof["db"]) + 2.0 * progress - _fatigue_db()
+	# к концу клетки удары чуть крепче, долгая серия устаёт; дробь бура тише — нагрузку несёт мотор
+	var db := _strike_db(prof, kind) + _cfg("crescendo_db", 2.0) * progress - _fatigue_db()
 	_play(strike_id(mat, kind), randf_range(0.94, 1.0) * float(prof["pitch"]), db)
-	if tool == "rusty_pickaxe" and randf() < RATTLE_CHANCE:
+	if tool == "rusty_pickaxe" and randf() < _cfg("rattle_chance", 0.75):
 		_play("rattle", randf_range(0.95, 1.05), db + 1.0)
 	_dip = 1.0
 	stats["strikes"] += 1
@@ -165,17 +163,26 @@ func on_dug(tile: int, tool: String) -> void:
 	var prof := Feel.tool_profile(tool)
 	var kind := tool_kind(tool)
 	var mat := material_for(tile)
-	_play(strike_id(mat, kind), randf_range(0.9, 0.97) * float(prof["pitch"]), float(prof["db"]) + 5.0 - _fatigue_db() * 0.5)
-	_play(break_id(mat), 1.0, -_fatigue_db() * 0.5)
+	var db := _strike_db(prof, kind) + _cfg("final_db", 4.0) - _fatigue_db() * 0.5
+	_play(strike_id(mat, kind), randf_range(0.9, 0.97) * float(prof["pitch"]), db)
+	_play(break_id(mat), 1.0, _cfg("break_db", -2.0) - _fatigue_db() * 0.5)
 	if tool == "rusty_pickaxe":
-		_play("rattle", 0.95, float(prof["db"]) + 4.0)
+		_play("rattle", 0.95, db)
 	_dip = 1.0
 	_cell = NO_CELL
 	stats["breaks"] += 1
 
 
+func _strike_db(prof: Dictionary, kind: String) -> float:
+	return float(prof["db"]) + (_cfg("drill_strike_db", -4.0) if kind == "drill" else 0.0)
+
+
 func _fatigue_db() -> float:
-	return FATIGUE_DB * clampf(_busy / FATIGUE_S, 0.0, 1.0)
+	return _cfg("fatigue_db", 4.0) * clampf(_busy / maxf(_cfg("fatigue_s", 8.0), 0.1), 0.0, 1.0)
+
+
+static func _cfg(key: String, default: float) -> float:
+	return Juice.num(CFG + key, default)
 
 
 func _play(id: String, pitch: float, db: float) -> void:
@@ -193,29 +200,32 @@ func _tick_motors(player: Node, tool: String, digging: bool, delta: float) -> vo
 	_dip = maxf(0.0, _dip - delta * 5.0)
 	var frozen: bool = bool(player.get("frozen")) if "frozen" in player else false
 
-	var want_drill := tool == "hand_drill" and tool_kind(tool) == "drill" and (digging or _idle < CHAIN_GAP_S)
+	var drill_db := _cfg("drill_loop_db", -2.0)
+	var want_drill := tool == "hand_drill" and tool_kind(tool) == "drill" and (digging or _idle < _cfg("chain_gap_s", 0.35))
 	if want_drill != _drill_on:
 		_drill_on = want_drill
 		if want_drill:
-			Sfx.loop_start("drill_loop", 0.0, 1.0)
+			Sfx.loop_start("drill_loop", drill_db, 1.0)
 		else:
 			Sfx.loop_stop("drill_loop", 0.12)
 	elif _drill_on:
-		Sfx.loop_set("drill_loop", 0.0, 1.0 - 0.1 * _dip)
+		Sfx.loop_set("drill_loop", drill_db, 1.0 - 0.1 * _dip)
 
+	var idle_db := _cfg("rig_idle_db", -16.0)
+	var idle_pitch := _cfg("rig_idle_pitch", 0.85)
 	var in_rig: bool = tool == "drill_rig" and player.has_method("is_in_rig") and player.call("is_in_rig")
 	if in_rig != _rig_on:
 		_rig_on = in_rig
 		if in_rig:
-			_rig_db = -14.0
-			_rig_pitch = 0.85
+			_rig_db = idle_db
+			_rig_pitch = idle_pitch
 			Sfx.loop_start("rig_loop", _rig_db, _rig_pitch)
 		else:
 			Sfx.loop_stop("rig_loop", 0.3)
 	if _rig_on:
 		var load := digging and not frozen and tool_kind(tool) == "drill"
-		var want_db := -4.0 if load else -14.0
-		var want_pitch := 1.15 if load else 0.85
+		var want_db := _cfg("rig_load_db", -6.0) if load else idle_db
+		var want_pitch := _cfg("rig_load_pitch", 1.15) if load else idle_pitch
 		_rig_db = move_toward(_rig_db, want_db, delta * (40.0 if load else 14.0))
 		_rig_pitch = move_toward(_rig_pitch, want_pitch, delta * (1.2 if load else 0.5))
 		Sfx.loop_set("rig_loop", _rig_db, _rig_pitch * (1.0 - 0.08 * _dip))

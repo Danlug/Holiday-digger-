@@ -137,14 +137,18 @@ def strike(mat, tool, rng, v):
         parts = [(0, sc, 1.4)] + [(t0 + 0.07, s, a * soft) for t0, s, a in parts]
         return mix(dur + 0.08, parts)
     if tool == "drill":
+        # хвосты тела короче: при периоде 0.12–0.16 с долгий звон руды и золота слился бы в гул
         gr = drill_grind(rng, v)
         parts = [(0, gr, 0.75)] + [(t0 + 0.01, s, a * 0.8) for t0, s, a in parts]
-        return mix(dur + 0.02, parts)
+        out = mix(min(dur, 0.3) + 0.02, parts)
+        return out * env_exp(len(out), SR, 0.1, 0.0)
     raise ValueError(tool)
 
 
-def finish_strike(mat, x):
-    """Самоцветам, золоту и твёрдому — короткий хвост комнаты."""
+def finish_strike(mat, x, tool="pick"):
+    """Самоцветам, золоту и твёрдому — короткий хвост комнаты (буру — нет: дробь должна быть сухой)."""
+    if tool == "drill":
+        return x
     if mat in ("gold", "gem"):
         return reverb_tail(x, SR, rt60=0.3, wet=0.12)
     if mat == "hard":
@@ -164,7 +168,7 @@ def _register_strikes():
             peak = {"dirt": 0.78, "peat": 0.74, "stone": 0.84, "ore": 0.84, "gold": 0.84, "gem": 0.8, "hard": 0.9}[mat]
 
             def fn(rng, v, mat=mat, tool=tool):
-                return finish_strike(mat, strike(mat, tool, rng, v))
+                return finish_strike(mat, strike(mat, tool, rng, v), tool)
             sfx(name, peak=peak, pv=0.08, prio=prio, voices=2, cd=45, variants=3)(fn)
 
 
@@ -201,6 +205,9 @@ def tumble(rng, count, f_lo, f_hi, dur, decay, partials, spread=0.3):
     return out
 
 
+BREAK_LAG = 0.02   # осыпание начинается чуть после удара: транзиенты не складываются в один пик
+
+
 def _break_common(rng, v, lo, hi, decay, thump_f, thump_decay, gain=0.9):
     n = int(0.5 * SR)
     rumble = fft_filter(rng.standard_normal(n), SR, lo=lo, hi=hi) * env_exp(n, SR, decay, 0.004)
@@ -209,13 +216,17 @@ def _break_common(rng, v, lo, hi, decay, thump_f, thump_decay, gain=0.9):
     return [(0, rumble, gain), (0, thump, 0.85)]
 
 
+def break_mix(dur, parts):
+    return mix(dur + BREAK_LAG, [(t0 + BREAK_LAG, s, a) for t0, s, a in parts])
+
+
 @sfx("break_dirt", peak=0.8, pv=0.06, prio=2, voices=2, cd=60, variants=2)
 def _break_dirt(rng, v):
     parts = _break_common(rng, v, 80, 650 + 150 * v, 0.14, 92, 0.07, gain=0.8)
     parts.append((0.0, grit(0.4, rng, 11, hi=2300, decay=0.005), 0.5))
     soft = nburst(0.3, rng, lo=200, hi=1200, decay=0.09, attack=0.02)
     parts.append((0.03, soft, 0.35))
-    return mix(0.45, parts)
+    return break_mix(0.45, parts)
 
 
 @sfx("break_peat", peak=0.74, pv=0.06, prio=2, voices=2, cd=60, variants=2)
@@ -225,7 +236,7 @@ def _break_peat(rng, v):
     dry = nburst(0.32, rng, lo=500, hi=3200, decay=0.08, attack=0.005)
     parts.append((0.0, dry, 0.7))
     parts.append((0, body(170, 95, 0.1, 0.04), 0.35))
-    return mix(0.48, parts)
+    return break_mix(0.48, parts)
 
 
 @sfx("break_stone", peak=0.86, pv=0.06, prio=2, voices=2, cd=80, variants=2)
@@ -233,7 +244,7 @@ def _break_stone(rng, v):
     parts = _break_common(rng, v, 80, 700 + 200 * v, 0.16, 95, 0.08)
     parts.append((0, grit(0.5, rng, 14, hi=3500, decay=0.006), 0.6))
     parts.append((0.02, tumble(rng, 5, 480, 950, 0.5, 0.03, ((1.0, 1.0), (2.4, 0.4))), 0.45))
-    return mix(0.52, parts)
+    return break_mix(0.52, parts)
 
 
 @sfx("break_ore", peak=0.86, pv=0.06, prio=2, voices=2, cd=80, variants=2)
@@ -241,7 +252,7 @@ def _break_ore(rng, v):
     parts = _break_common(rng, v, 80, 600 + 150 * v, 0.14, 100, 0.07)
     parts.append((0, grit(0.4, rng, 10, hi=4000, decay=0.004), 0.5))
     parts.append((0.02, tumble(rng, 4, 560, 1100, 0.5, 0.07, METAL), 0.5))
-    return reverb_tail(mix(0.55, parts), SR, rt60=0.18, wet=0.08)
+    return reverb_tail(break_mix(0.55, parts), SR, rt60=0.18, wet=0.08)
 
 
 @sfx("break_gold", peak=0.86, pv=0.04, prio=2, voices=2, cd=100, variants=2)
@@ -249,7 +260,7 @@ def _break_gold(rng, v):
     parts = _break_common(rng, v, 90, 500, 0.12, 105, 0.06, gain=0.7)
     parts.append((0.02, tumble(rng, 4, 1318, 2100, 0.55, 0.12, GLASS, spread=0.32), 0.3))
     parts.append((0.03, nburst(0.45, rng, lo=6000, decay=0.14, attack=0.02), 0.22))
-    return reverb_tail(mix(0.6, parts), SR, rt60=0.3, wet=0.12)
+    return reverb_tail(break_mix(0.6, parts), SR, rt60=0.3, wet=0.12)
 
 
 @sfx("break_gem", peak=0.84, pv=0.04, prio=2, voices=2, cd=100, variants=2)
@@ -260,7 +271,7 @@ def _break_gem(rng, v):
     parts.append((0, grit(0.3, rng, 10, hi=6000, decay=0.003), 0.4))
     parts.append((0.01, tumble(rng, 6, 2093, 3900 + 300 * v, 0.6, 0.11, GLASS, spread=0.35), 0.32))
     parts.append((0.02, nburst(0.5, rng, lo=6500, decay=0.18, attack=0.02), 0.3))
-    return reverb_tail(mix(0.65, parts), SR, rt60=0.4, wet=0.14)
+    return reverb_tail(break_mix(0.65, parts), SR, rt60=0.4, wet=0.14)
 
 
 @sfx("break_hard", peak=0.9, pv=0.04, prio=2, voices=2, cd=100, variants=2)
@@ -269,7 +280,7 @@ def _break_hard(rng, v):
     parts.append((0, body(52, 26, 0.35, 0.16), 0.9))
     parts.append((0, grit(0.55, rng, 12, hi=3000, decay=0.006), 0.5))
     parts.append((0.03, tumble(rng, 4, 300, 620, 0.6, 0.06, METAL, spread=0.3), 0.45))
-    return reverb_tail(mix(0.7, parts), SR, rt60=0.4, wet=0.12)
+    return reverb_tail(break_mix(0.7, parts), SR, rt60=0.4, wet=0.12)
 
 
 @sfx("break_lava", peak=0.78, pv=0.04, prio=2, voices=1, cd=150)
@@ -282,7 +293,7 @@ def _break_lava(rng, v):
     parts = [(0, hiss, 0.7), (0.0, body(260, 90, 0.2, 0.08, 1.5), 0.6)]
     for i in range(4):
         parts.append((0.05 + 0.11 * i, body(420 - 50 * i, 180, 0.08, 0.03, 1.5), 0.3))
-    return mix(0.62, parts)
+    return break_mix(0.62, parts)
 
 
 # --------------------------------------------------------------------------

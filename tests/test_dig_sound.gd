@@ -157,12 +157,13 @@ func _test_rhythm() -> void:
 	check("удары тише финала (профиль кирки −7 дБ)", rec.last_db("dig_stone_pick") < -3.0)
 	check("удары к концу клетки крепче первых", rec.first_db("dig_stone_pick") < rec.last_db("dig_stone_pick"))
 	check("без ржавой кирки дребезга нет", rec.count("rattle") == 0)
+	var regular_db := rec.last_db("dig_stone_pick")
 	rec.clear()
 	ds.on_dug(TileTypes.Type.STONE, "iron_pickaxe")
 	pl.digging = null
 	ds.tick(pl, 0.016)
-	check("финал: удар громче рядовых + осыпание камня", rec.count("dig_stone_pick") == 1 and rec.count("break_stone") == 1
-			and rec.last_db("dig_stone_pick") > -3.0)
+	check("финал: удар громче рядовых на 2+ дБ + осыпание камня", rec.count("dig_stone_pick") == 1 and rec.count("break_stone") == 1
+			and rec.last_db("dig_stone_pick") > regular_db + 2.0)
 	check("последние id доступны (%s)" % str(ds.recent.slice(-2)), ds.recent.slice(-2) == ["dig_stone_pick", "break_stone"])
 
 	# ржавая кирка дребезжит

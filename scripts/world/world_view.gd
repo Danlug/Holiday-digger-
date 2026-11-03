@@ -132,6 +132,11 @@ func _ready() -> void:
 	fog_fade = FogFade.new()
 	fog_fade.name = "FogFade"
 	_overlay.add_child(fog_fade)
+	# искры на самоцветах и золоте (scripts/world/ore_sparkle.gd, зона ore-look): в overlay — поверх тайлов
+	var sparkle := OreSparkle.new()
+	sparkle.name = "OreSparkle"
+	sparkle.world_view = self
+	_overlay.add_child(sparkle)
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
 
@@ -439,6 +444,11 @@ func glow_cells() -> Array:
 			if g != 0:
 				_glow_list.append(Vector3i(_slot_wx[si], _slot_wy[si], g))
 	return _glow_list
+
+
+## Окно камеры в клетках (как нарисовано в прошлый render) — для слоёв поверх мира (искры руды).
+func window_rect() -> Rect2i:
+	return Rect2i(_win_x, _win_y, _pool_cols, _pool_rows) if _win_ok else Rect2i()
 
 
 ## Смена кадра лавы: трогаем только спрайты, где сейчас лава (их единицы), и только раз в такт.

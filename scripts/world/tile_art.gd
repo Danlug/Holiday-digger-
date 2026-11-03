@@ -135,21 +135,44 @@ static func lava_texture(wx: int, wy: int, tick: int) -> Texture2D:
 ## и руды пересведены к тону пояса, чтобы руда не читалась заплаткой на фоне.
 static func texture_for(type: int, wx: int, wy: int) -> Texture2D:
 	var file: String
+	var base := ""
 	if type == TileTypes.Type.DIRT:
 		file = DIRT_FILES[dirt_variant(wx, wy)]
 	elif type == TileTypes.Type.LAVA:
 		file = lava_file(wx, wy)
 	else:
 		file = String(_tile_to_file.get(type, ""))
+		if file.begins_with("ore_"):
+			var v := ore_variant(wx, wy)
+			if v > 0:
+				base = file
+				file += "_%d" % (v + 1)
 	if file.is_empty():
 		return null
 	if wy >= 1000:
 		var belt := Biomes.index_at_cell(wx, wy)
 		if belt > 0:
 			var t := _belt_tile(belt, file)
+			if t == null and not base.is_empty():
+				t = _belt_tile(belt, base)
 			if t != null:
 				return t
-	return _load(file)
+	var tex := _load(file)
+	if tex == null and not base.is_empty():
+		tex = _load(base)   # вариантов нет на диске (старая сборка графики) — базовый тайл
+	return tex
+
+
+## Варианты тайла руды (ore_x, ore_x_2, ore_x_3 — tools/gen_tiles_deep.py): та же залежь, другая раскладка
+## кусков. Какой у клетки — по мировым координатам (хеш иной, чем у земли, чтобы не совпадать с её узором);
+## генерация мира не меняется, соседние клетки одной руды не повторяют рисунок.
+const ORE_VARIANTS := 3
+
+
+static func ore_variant(wx: int, wy: int) -> int:
+	var h: int = ((wx * 2246822519) ^ (wy * 3266489917) ^ 0x5bd1e995) & 0xFFFFFFFF
+	h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
+	return (h >> 8) % ORE_VARIANTS
 
 
 ## Поясная вырезка из атласа или null (атласа нет / такого имени нет — вызывающий

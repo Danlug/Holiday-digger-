@@ -40,6 +40,7 @@ var _mode_btns: Dictionary = {}
 var _lang_btns: Dictionary = {}
 var _last_tick_ms: int = 0
 var _hints_row: HintSettingsRow = null
+var _about_btn: Button = null
 var _closing: bool = false   # шторка уходит (анимация): по смыслу уже закрыта
 
 
@@ -57,6 +58,7 @@ func is_open() -> bool:
 func open() -> void:
 	refresh()
 	_closing = false
+	_card.offset_top = 22.0 + HudSafeArea.top(get_viewport())   # шапка шторки — под вырезом телефона
 	visible = true
 	Sfx.play("ui_open")
 	UiAnim.open(_card, UiAnim.Kind.SHEET, self)
@@ -64,6 +66,8 @@ func open() -> void:
 
 func close() -> void:
 	var was := visible and not _closing
+	if AboutCard.is_open_any():
+		AboutCard.instance().close()
 	if was:
 		Sfx.play("ui_close")
 		_closing = true
@@ -332,3 +336,19 @@ func _build_restore_row(body: Control) -> void:
 		IAPManager.restore_purchases()
 		restore_pressed.emit())
 	row.add_child(b)
+	# «О игре» (AboutCard): версия, сборка, политика — в том же ряду, чтобы шторка не росла.
+	_about_btn = UiBtn.icon_button(UiIcons.tex("info"), Vector2(0, BTN_H))
+	_about_btn.name = "About"
+	_about_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	Tip.bind(_about_btn, "О игре", AboutCard.version_text())
+	_about_btn.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		open_about())
+	row.add_child(_about_btn)
+
+
+## Окно «О игре» поверх шторки (scripts/ui/about_card.gd).
+func open_about() -> AboutCard:
+	GameState.emit_event("screen_opened", {"id": "about"})   # аналитика (scripts/core/analytics.gd)
+	return AboutCard.open_in(self)

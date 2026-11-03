@@ -54,6 +54,9 @@ var current_cam: Vector2 = Vector2.ZERO  # выставляет main.gd кажд
 
 # --- узлы ---
 var _gauges_box: Control
+var _stage: Control            # игровая часть HUD над полосой (product-polish: нижняя безопасная зона)
+var _strip_root: Control       # подложка нижней полосы: тянется до края экрана под полоску «домой»
+var _strip_row: HBoxContainer  # ряд кнопок полосы: встаёт над полоской «домой»
 const HUD_MARGIN := 8.0   # поле верхних кластеров от края; сверху к нему прибавляется вырез телефона
 const PILL_W := 78.0    # ширина таблеток кошелька (монеты, доллары, вес)
 const GAUGE_W := 62.0   # ширина полоски: правее остаётся место кошельку
@@ -244,6 +247,7 @@ func _build_ui() -> void:
 	stage.set_anchors_preset(Control.PRESET_FULL_RECT)
 	stage.offset_bottom = -STRIP_H
 	add_child(stage)
+	_stage = stage
 
 	_vignette = HpVignette.new()
 	_vignette.name = "HpVignette"
@@ -886,6 +890,7 @@ func _build_strip() -> void:
 	root.offset_top = -STRIP_H
 	root.offset_bottom = 0
 	add_child(root)
+	_strip_root = root
 
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = UiTheme.PANEL_DARK
@@ -906,6 +911,7 @@ func _build_strip() -> void:
 	strip.offset_bottom = -1
 	strip.add_theme_constant_override("separation", 3)
 	root.add_child(strip)
+	_strip_row = strip
 
 	# Систем стало пять, и каждая честно попросила себе кнопку — в ряду
 	# шириной 224 их девять, а нужно им около 315. Ряд делится по тому,
@@ -1084,8 +1090,9 @@ func _place_more_panel() -> void:
 	var sz := _more_panel.get_combined_minimum_size()
 	_more_panel.offset_right = -4.0
 	_more_panel.offset_left = -4.0 - sz.x
-	_more_panel.offset_bottom = -STRIP_H - 2.0
-	_more_panel.offset_top = -STRIP_H - 2.0 - sz.y
+	var safe_bottom := HudSafeArea.bottom(get_viewport())   # над полоской «домой»
+	_more_panel.offset_bottom = -STRIP_H - 2.0 - safe_bottom
+	_more_panel.offset_top = -STRIP_H - 2.0 - sz.y - safe_bottom
 	_more_panel.pivot_offset = sz
 
 
@@ -1424,7 +1431,17 @@ func _update_layout() -> void:
 	_purse_box.offset_top = HUD_MARGIN + safe_top
 	stick_r =maxf(STICK_R_MIN, vp.x * STICK_FRACTION)
 	knob_r = stick_r * 0.39
-	stage_rect = Rect2(0, 0, vp.x, vp.y - STRIP_H)
+	# Нижняя безопасная зона (полоска «домой» iPhone): ряд кнопок полосы и всё игровое — над ней,
+	# подложка полосы тянется до края экрана, чтобы под полоской не просвечивал мир (product-polish).
+	var safe_bottom := HudSafeArea.bottom(get_viewport())
+	if _strip_root != null:
+		_strip_root.offset_top = -STRIP_H - safe_bottom
+		_strip_row.offset_bottom = -1 - safe_bottom
+	if _stage != null:
+		_stage.offset_bottom = -STRIP_H - safe_bottom
+	if _windows_stage != null:
+		_windows_stage.offset_bottom = -STRIP_H - safe_bottom
+	stage_rect = Rect2(0, 0, vp.x, vp.y - STRIP_H - safe_bottom)
 	_stick.custom_minimum_size = Vector2(stick_r * 2, stick_r * 2)
 	_stick.size = Vector2(stick_r * 2, stick_r * 2)
 	_knob.custom_minimum_size = Vector2(knob_r * 2, knob_r * 2)

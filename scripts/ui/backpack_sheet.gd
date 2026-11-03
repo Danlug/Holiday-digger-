@@ -79,6 +79,7 @@ func is_open() -> bool:
 func open() -> void:
 	refresh()
 	_closing = false
+	_card.offset_top = 22.0 + HudSafeArea.top(get_viewport())   # шапка шторки — под вырезом телефона
 	visible = true
 	Sfx.play("ui_open")
 	UiAnim.open(_card, UiAnim.Kind.SHEET, self)

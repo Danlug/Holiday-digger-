@@ -124,6 +124,9 @@ func _build() -> void:
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Окно почти во весь экран: центрируем внутри безопасной зоны телефона (вырез, полоска «домой»).
+	center.offset_top = HudSafeArea.top(get_viewport())
+	center.offset_bottom = -HudSafeArea.bottom(get_viewport())
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(center)
 

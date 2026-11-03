@@ -228,7 +228,9 @@ func _ensure_structure() -> void:
 func _build_header() -> void:
 	var header := _need(_root, "Header", Panel) as Panel
 	header.anchor_right = 1.0
-	header.offset_bottom = HEADER_HEIGHT
+	# Шапка — под вырезом телефона (HudSafeArea, product-polish); сцена ниже сдвигается так же (_build_stage).
+	header.offset_top = HudSafeArea.top(get_viewport())
+	header.offset_bottom = HEADER_HEIGHT + header.offset_top
 	header.add_theme_stylebox_override("panel", _box(PANEL_BG, PANEL_BORDER))
 
 	# Старое слово «ДОМ» из прежней сцены: теперь это значок.
@@ -350,7 +352,7 @@ func _build_stage() -> void:
 	_stage = _need(_root, "Stage", Control) as Control
 	_stage.anchor_right = 1.0
 	_stage.anchor_bottom = 1.0
-	_stage.offset_top = HEADER_HEIGHT
+	_stage.offset_top = HEADER_HEIGHT + HudSafeArea.top(get_viewport())   # под шапкой, сдвинутой вырезом
 	_stage.clip_contents = true
 	# Тап по самому фону ничего не делает — ходьба только с кнопок ◀/▶ и
 	# клавиатуры (решение по аналогии с шахтой: там тоже не тапом ходят).
@@ -392,10 +394,11 @@ func _build_walk_buttons() -> void:
 	_style_button(_walk_left_btn)
 	_walk_left_btn.anchor_top = 1.0
 	_walk_left_btn.anchor_bottom = 1.0
+	var safe_bottom := HudSafeArea.bottom(get_viewport())   # кнопки хода — над полоской «домой»
 	_walk_left_btn.offset_left = 6
 	_walk_left_btn.offset_right = 44
-	_walk_left_btn.offset_top = -40
-	_walk_left_btn.offset_bottom = -6
+	_walk_left_btn.offset_top = -40 - safe_bottom
+	_walk_left_btn.offset_bottom = -6 - safe_bottom
 	_arrow_icon(_walk_left_btn, Vector2.LEFT)
 
 	_walk_right_btn = _need(_stage, "WalkRight", Button) as Button
@@ -406,8 +409,8 @@ func _build_walk_buttons() -> void:
 	_walk_right_btn.anchor_bottom = 1.0
 	_walk_right_btn.offset_left = -44
 	_walk_right_btn.offset_right = -6
-	_walk_right_btn.offset_top = -40
-	_walk_right_btn.offset_bottom = -6
+	_walk_right_btn.offset_top = -40 - safe_bottom
+	_walk_right_btn.offset_bottom = -6 - safe_bottom
 	_arrow_icon(_walk_right_btn, Vector2.RIGHT)
 
 

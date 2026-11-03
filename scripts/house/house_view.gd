@@ -422,7 +422,10 @@ func _arrow_icon(btn: Button, dir: Vector2) -> void:
 	# класса выше. ArrowIcon рисует стрелку сам — подписи кнопке не нужны.
 	btn.text = ""
 	var icon := _need(btn, "Arrow", ArrowIcon) as ArrowIcon
-	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Якоря у иконки обычные (верхний левый угол): растягивающие (их хранит снятая scenes/house.tscn)
+	# вместе с явным size в кадре сборки дают предупреждение движка «size will be overridden after
+	# _ready()» на каждую кнопку (product-polish: чистая консоль), а размер и так держит синхронизация ниже.
+	icon.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	# Анкоры одни, без явного size, кнопку не догоняют: в момент этого вызова
 	# (внутри _ready() дома, той же сборки узлов) у btn ещё не было ни одного
 	# ресайза — Control пересчитывает прямоугольник ребёнка по анкорам НА

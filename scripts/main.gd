@@ -115,6 +115,7 @@ func _ready() -> void:
 	hud.name = "HUD"
 	canvas.add_child(hud)
 	hud.set_player(player)
+	SplashScreen.attach(self)  # заставка старта: логотип поверх сборки сцены, затем проявление (scripts/ui/splash_screen.gd)
 
 	var loaded_dead := not GameState.is_alive   # до респавна: умерший встаёт дома, а не там, где упал
 	# Сейв мёртвым (вкладку закрыли в кадр смерти, до записи респавна) — тот же респавн, что

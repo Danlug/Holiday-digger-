@@ -42,5 +42,6 @@ const META_FX := 98       # искры наград
 const CUTSCENE := 100     # катсцена
 const CONSENT := 110      # окно согласия на аналитику: над всем, кроме Tip
 const TIP := 128          # подсказка Tip — над всем
+const SPLASH := 200       # заставка старта (SplashScreen): над всем, включая Tip, пока игра проявляется
 ## Группа слоёв HUD_WIDGETS: HUD прячет их вместе с собой (диалог сюжета, дом), см. hud.gd
 const WIDGETS_GROUP := &"hud_widget_layer"

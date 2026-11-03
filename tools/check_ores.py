@@ -72,8 +72,8 @@ def collect():
     ref_lab = np.mean([gtd.rgb2lab(d).reshape(-1, 3).mean(0) for d in dirt], axis=0)
     out = {}
     for name in gtd.ATLAS_NAMES:
-        if not name.startswith("ore_"):
-            continue
+        if not name.startswith("ore_") or gtd.split_variant(name)[1] > 0:
+            continue   # варианты раскладки (ore_x_2, ore_x_3) — та же палитра, меряем только базовый тайл
         if name in gtd.SPRITES:
             img = gtd.SPRITES[name]().upscale()
             a = np.array(img, dtype=np.float64)

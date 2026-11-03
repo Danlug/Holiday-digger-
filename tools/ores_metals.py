@@ -454,22 +454,40 @@ _SILVER_CHUNKS = (
 )
 
 
-def _silver_pic(k, ox, oy, tones=None, base=3.0, gain=2.2):
+def _silver_pic(k, ox, oy, tones=None, base=3.0, gain=2.2, chunks=None):
     p = Pic()
-    for pts in _SILVER_CHUNKS:
+    for pts in (chunks or _SILVER_CHUNKS):
         q = [(16 + (x - 16) * k + ox, 16 + (y - 16) * k + oy) for x, y in pts]
         _facet_poly(p, q, R_SILVER, base=base, gain=gain, lo=0, hi=4, apex=(-1.6, -1.4), tones=tones or SIL_FACET)
     return p
 
 
-def silver_tile():
-    p = _silver_pic(1.0, 0, 0)
+# варианты раскладки серебра: зеркало и поворот ТОЧЕК (свет считается заново по нормалям граней, он остаётся
+# сверху-слева); у каждого — своя хромовая полоса на большом куске и свои искры
+def _mirror_x(chunks):
+    return [[(31 - x, y) for x, y in pts] for pts in chunks]
+
+
+def _mirror_y(chunks):
+    return [[(x, 31 - y) for x, y in pts] for pts in chunks]
+
+
+_SILVER_LAYOUTS = [
+    (_SILVER_CHUNKS, ((9, 22), (18, 12)), ((26, 14, 3), (5, 26, 2), (14, 6, 2))),
+    (_mirror_x([[(x + 1, y - 1) for x, y in pts] for pts in _SILVER_CHUNKS]), ((13, 21), (22, 11)), ((5, 15, 3), (26, 26, 2), (17, 5, 2))),
+    (_mirror_y([[(x + 2, y + 1) for x, y in pts] for pts in _SILVER_CHUNKS]), ((11, 20), (20, 10)), ((27, 20, 3), (6, 7, 2), (15, 27, 2))),
+]
+
+
+def silver_tile(v=0):
+    chunks, (a, b), sparks = _SILVER_LAYOUTS[v % 3]
+    p = _silver_pic(1.0, 0, 0, chunks=chunks)
     # хромовая полоса поперёк большого куска: тёмный «горизонт» и светлый блик под ним
-    p.line((9, 22), (18, 12), R_SILVER[2], clip=erode(poly(_SILVER_CHUNKS[0])))
-    p.line((10, 22), (19, 12), R_SILVER[7], clip=erode(poly(_SILVER_CHUNKS[0])))
-    p.sparkle(26, 14, 3, (255, 255, 255), (222, 236, 255))
-    p.sparkle(5, 26, 2, (255, 255, 255), (222, 236, 255))
-    p.sparkle(14, 6, 2, (255, 255, 255), (255, 255, 255))
+    big = erode(poly(chunks[0]))
+    p.line(a, b, R_SILVER[2], clip=big)
+    p.line((a[0] + 1, a[1]), (b[0] + 1, b[1]), R_SILVER[7], clip=big)
+    for i, (x, y, arm) in enumerate(sparks):
+        p.sparkle(x, y, arm, (255, 255, 255), (255, 255, 255) if i == 2 else (222, 236, 255))
     return p.sprite()
 
 
@@ -481,12 +499,20 @@ def silver_icon():
     return p.sprite(shadow=False)
 
 
-def aluminium_tile():
+_ALU_LAYOUTS = [
+    [(21.5, 12.5, 6.0, 0.22, ((18, 13), (25, 10))), (12.0, 18.5, 7.6, -0.14, ((7, 20), (16, 16))), (22.0, 23.0, 5.0, 0.38, None),
+     (8.5, 8.8, 3.8, -0.4, None)],
+    [(10.5, 10.5, 6.4, -0.2, ((7, 12), (14, 8))), (21.0, 18.0, 7.6, 0.18, ((16, 20), (26, 16))), (9.5, 23.5, 4.8, 0.35, None),
+     (25.5, 7.0, 3.6, -0.3, None)],
+    [(16.0, 9.5, 7.0, 0.1, ((11, 11), (21, 7))), (7.5, 20.0, 5.6, -0.3, ((4, 22), (11, 18))), (24.0, 23.5, 5.4, 0.25, None),
+     (27.0, 12.5, 3.4, 0.4, None)],
+]
+
+
+def aluminium_tile(v=0):
     p = Pic()
-    _plate(p, 21.5, 12.5, 6.0, 0.22, R_ALU, 2, crease=((18, 13), (25, 10)))
-    _plate(p, 12.0, 18.5, 7.6, -0.14, R_ALU, 2, crease=((7, 20), (16, 16)))
-    _plate(p, 22.0, 23.0, 5.0, 0.38, R_ALU, 2)
-    _plate(p, 8.5, 8.8, 3.8, -0.4, R_ALU, 2)
+    for cx, cy, r, rot, crease in _ALU_LAYOUTS[v % 3]:
+        _plate(p, cx, cy, r, rot, R_ALU, 2, crease=crease)
     return p.sprite()
 
 
@@ -504,9 +530,19 @@ def _plat_pic(chunks, seed):
     return p
 
 
-def platinum_tile():
-    return _plat_pic([(13.0, 16.5, 7.4, 6.2, -0.35), (23.5, 21.5, 4.6, 4.0, 0.4), (22.5, 9.0, 3.6, 3.0, 0.1),
-                      (6.5, 26.0, 2.4, 2.0, 0.3), (7.0, 7.0, 2.1, 1.8, 0.0)], 301).sprite()
+_PLAT_LAYOUTS = [
+    ([(13.0, 16.5, 7.4, 6.2, -0.35), (23.5, 21.5, 4.6, 4.0, 0.4), (22.5, 9.0, 3.6, 3.0, 0.1), (6.5, 26.0, 2.4, 2.0, 0.3),
+      (7.0, 7.0, 2.1, 1.8, 0.0)], 301),
+    ([(18.5, 11.5, 7.0, 6.0, 0.3), (8.5, 22.0, 4.8, 4.2, -0.3), (24.5, 23.5, 3.8, 3.2, 0.2), (6.0, 8.5, 2.4, 2.0, 0.0),
+      (26.5, 5.5, 2.0, 1.8, 0.0)], 321),
+    ([(12.0, 10.5, 5.6, 4.8, -0.2), (21.5, 20.5, 7.6, 6.0, 0.35), (5.5, 22.5, 3.2, 2.8, 0.1), (27.5, 10.0, 2.6, 2.2, 0.0),
+      (13.5, 27.0, 2.2, 1.9, 0.0)], 341),
+]
+
+
+def platinum_tile(v=0):
+    chunks, seed = _PLAT_LAYOUTS[v % 3]
+    return _plat_pic(chunks, seed).sprite()
 
 
 def _bead(p, cx, cy, r, rp):
@@ -520,32 +556,48 @@ def _bead(p, cx, cy, r, rp):
     p.dome(disc(cx, cy, r), rp, bounce=0.55, lo=-0.7, hi=1.1, spec_k=10, spec_thr=0.9)
 
 
-def mercury_tile():
+_MERC_LAYOUTS = [
+    # лужица (blob), крупные капли (x, y, r), мелкие бусины (x, y), блики лужицы
+    ((14.0, 23.0, 9.2, 3.9, 0.08, 21), ((11.5, 14.0, 4.9), (20.5, 16.5, 3.5), (25.5, 22.5, 2.0), (17.0, 9.5, 2.0)),
+     ((6.0, 7.5), (8.5, 9.5), (4.0, 5.0)), ((13, 22), (14, 22), (8, 23))),
+    ((18.0, 24.5, 8.6, 3.6, -0.08, 22), ((8.5, 13.5, 4.4), (16.5, 12.5, 3.2), (24.5, 15.5, 2.4), (6.0, 23.5, 1.9)),
+     ((26.0, 7.0), (28.0, 9.0), (23.5, 5.0)), ((17, 23), (18, 23), (12, 25))),
+    ((12.5, 10.5, 8.0, 3.4, 0.1, 23), ((20.5, 18.5, 4.8), (10.5, 20.0, 3.4), (26.5, 25.0, 2.2), (16.5, 26.0, 2.0)),
+     ((5.5, 25.5), (4.0, 22.5), (27.0, 6.5)), ((11, 9), (12, 9), (7, 11))),
+]
+
+
+def mercury_tile(v=0):
     p = Pic()
-    puddle = blob(14.0, 23.0, 9.2, 3.9, 0.08, 0.09, 21)
+    (cx, cy, rx, ry, rot, sd), beads, tiny, glints = _MERC_LAYOUTS[v % 3]
+    puddle = blob(cx, cy, rx, ry, rot, 0.09, sd)
     p.dome(puddle, R_MERC, relief=0.55, bounce=0.5, spec=False)
-    _bead(p, 11.5, 14.0, 4.9, R_MERC)
-    _bead(p, 20.5, 16.5, 3.5, R_MERC)
-    _bead(p, 25.5, 22.5, 2.0, R_MERC)
-    _bead(p, 17.0, 9.5, 2.0, R_MERC)
-    for (x, y, r) in ((6.0, 7.5, 1.0), (8.5, 9.5, 1.0), (4.0, 5.0, 1.0)):
+    for (x, y, r) in beads:
+        _bead(p, x, y, r, R_MERC)
+    for (x, y) in tiny:
         _bead(p, x, y, 1.0, R_MERC)
-    p.px(13, 22, R_MERC[7])
-    p.px(14, 22, R_MERC[6])
-    p.px(8, 23, R_MERC[6])
+    p.px(glints[0][0], glints[0][1], R_MERC[7])
+    p.px(glints[1][0], glints[1][1], R_MERC[6])
+    p.px(glints[2][0], glints[2][1], R_MERC[6])
     return p.sprite()
 
 
-def lead_tile():
+_LEAD_LAYOUTS = [
+    # два тяжёлых валуна (с трещиной: старт x, y, шагов) и малый камешек; рисуются от дальнего к ближнему
+    (((22.5, 8.5, 3.0, 2.6, 0.0, 33, None), (11.5, 17.5, 8.4, 7.0, -0.2, 31, (8, 13, 9)), (22.0, 20.0, 6.6, 5.6, 0.25, 32, (20, 17, 7))), 5),
+    (((8.5, 7.5, 3.0, 2.6, 0.0, 36, None), (20.0, 14.0, 8.6, 7.2, 0.2, 34, (17, 9, 9)), (9.5, 22.0, 6.4, 5.4, -0.2, 35, (7, 19, 7))), 8),
+    (((25.0, 9.0, 4.4, 3.8, 0.3, 38, (24, 7, 5)), (6.5, 11.5, 3.4, 3.0, -0.2, 39, None), (15.5, 21.0, 9.6, 6.4, 0.1, 37, (11, 17, 10))), 11),
+]
+
+
+def lead_tile(v=0):
     p = Pic()
-    a = blob(11.5, 17.5, 8.4, 7.0, -0.2, 0.10, 31, p=2.4)
-    b = blob(22.0, 20.0, 6.6, 5.6, 0.25, 0.10, 32, p=2.4)
-    c = blob(22.5, 8.5, 3.0, 2.6, 0.0, 0.10, 33)
-    p.dome(c, R_LEAD, spec=False, hi=1.3, tex=(vnoise(5, 3.0) - 0.5) * 0.35)
-    p.dome(a, R_LEAD, spec=False, hi=1.3, tex=(vnoise(6, 3.0) - 0.5) * 0.35)
-    p.dome(b, R_LEAD, spec=False, hi=1.3, tex=(vnoise(7, 3.0) - 0.5) * 0.35)
-    _crack(p, a, 8, 13, 9, R_LEAD[1], 3)
-    _crack(p, b, 20, 17, 7, R_LEAD[1], 4)
+    chunks, sd = _LEAD_LAYOUTS[v % 3]
+    for i, (cx, cy, rx, ry, rot, seed, crack) in enumerate(chunks):
+        m = blob(cx, cy, rx, ry, rot, 0.10, seed, p=2.4)
+        p.dome(m, R_LEAD, spec=False, hi=1.3, tex=(vnoise(sd + i, 3.0) - 0.5) * 0.35)
+        if crack:
+            _crack(p, m, crack[0], crack[1], crack[2], R_LEAD[1], seed)
     return p.sprite()
 
 
@@ -581,22 +633,35 @@ def _prism(p, cx, ty, r, h, rp):
     p.paint(rim & ~low, rp[7])
 
 
-def titanium_tile():
+_TITAN_LAYOUTS = [
+    [(22.0, 13.5, 4.6, 7.5), (9.0, 17.0, 4.0, 6.5), (15.5, 8.0, 6.0, 10.5)],
+    [(9.5, 8.5, 4.8, 8.0), (23.0, 15.5, 5.6, 9.5), (14.5, 19.5, 3.8, 6.0)],
+    [(7.5, 17.0, 4.2, 7.0), (25.0, 18.5, 4.4, 7.5), (16.5, 6.5, 5.4, 9.5)],
+]
+
+
+def titanium_tile(v=0):
     p = Pic()
-    _prism(p, 22.0, 13.5, 4.6, 7.5, R_TITAN)
-    _prism(p, 9.0, 17.0, 4.0, 6.5, R_TITAN)
-    _prism(p, 15.5, 8.0, 6.0, 10.5, R_TITAN)
+    for cx, ty, r, h in _TITAN_LAYOUTS[v % 3]:
+        _prism(p, cx, ty, r, h, R_TITAN)
     return p.sprite()
 
 
-def nickel_tile():
+_NICK_LAYOUTS = [
+    ([(8.5, 9.5, 3.7, 3.3), (19.0, 8.2, 3.1, 2.8), (14.5, 18.0, 5.4, 4.8), (25.0, 18.5, 3.9, 3.5), (7.0, 24.0, 3.3, 2.9)], 40),
+    ([(6.5, 7.5, 3.4, 3.0), (16.5, 9.0, 4.6, 4.0), (25.5, 14.0, 3.6, 3.2), (11.0, 19.5, 5.6, 4.9), (22.5, 25.0, 3.8, 3.3)], 70),
+    ([(20.5, 7.0, 3.9, 3.4), (8.5, 13.5, 4.8, 4.2), (17.5, 19.5, 5.6, 5.0), (27.0, 22.0, 3.2, 2.8), (7.0, 26.0, 2.9, 2.6)], 100),
+]
+
+
+def nickel_tile(v=0):
     p = Pic()
-    peb = [(8.5, 9.5, 3.7, 3.3), (19.0, 8.2, 3.1, 2.8), (14.5, 18.0, 5.4, 4.8), (25.0, 18.5, 3.9, 3.5), (7.0, 24.0, 3.3, 2.9)]
+    peb, sd = _NICK_LAYOUTS[v % 3]
     for i, (x, y, rx, ry) in enumerate(peb):
-        m = blob(x, y, rx, ry, 0.3 * i, 0.06, 40 + i, p=2.1)
+        m = blob(x, y, rx, ry, 0.3 * i, 0.06, sd + i, p=2.1)
         p.dome(m, R_NICK, spec_k=18, spec_thr=0.9)
-        _speck(p, m, R_NICK, 50 + i, 3 + int(rx), 2)
-        _speck(p, m, R_NICK, 60 + i, 2 + int(rx / 2), 6)
+        _speck(p, m, R_NICK, sd + 10 + i, 3 + int(rx), 2)
+        _speck(p, m, R_NICK, sd + 20 + i, 2 + int(rx / 2), 6)
     return p.sprite()
 
 
@@ -607,13 +672,13 @@ R_PATINA = ramp(172, 30, [20, 34, 46, 56, 64, 72, 82, 92], dh_dark=-10, dh_light
 R_GOLD = ramp(90, 98, [32, 46, 58, 67, 74, 81, 88, 95], dh_dark=-34, dh_light=4, c_dark=0.75, c_light=0.95)
 R_SCRAP = ramp(120, 12, [12, 24, 35, 45, 53, 62, 72, 84], dh_dark=-6, dh_light=6, spec=lch(97, 6, 245))
 R_RUST = ramp(50, 60, [12, 22, 32, 41, 49, 57, 66, 76], dh_dark=-14, dh_light=12)
-R_PEAT = ramp(100, 30, [2, 3, 5, 7, 9, 12, 15, 32], dh_dark=-8, dh_light=8, c_dark=0.9, c_light=0.85)
+R_PEAT = ramp(112, 40, [2, 3, 5, 7, 9, 12, 15, 32], dh_dark=-8, dh_light=8, c_dark=0.9, c_light=0.85)
 R_FIBER = ramp(70, 34, [16, 28, 40, 50, 58, 66, 74, 84], dh_dark=-8, dh_light=10)
 R_MOSS = ramp(132, 64, [5, 9, 15, 21, 28, 36, 46, 62], dh_dark=-6, dh_light=14, c_dark=0.95, c_light=0.9)
 PEAT_FIBER = lch(72, 30, 86)
 PEAT_FIBER2 = lch(54, 30, 82)
 PEAT_RIM = lch(30, 30, 86)
-R_COAL = [lch(1.5, 4, 105), lch(2.5, 5, 108), lch(4, 8, 118), lch(6.5, 8, 118), lch(9, 5, 255), lch(20, 6, 250),
+R_COAL = [lch(1.5, 5, 100), lch(2.5, 7, 100), lch(4, 10, 105), lch(6.5, 10, 105), lch(9, 4, 230), lch(20, 6, 250),
           lch(46, 8, 245), lch(74, 8, 240)]
 R_URAN = ramp(126, 92, [26, 44, 58, 69, 79, 87, 94, 99], dh_dark=22, dh_light=-8, c_dark=0.9, c_light=0.8)
 R_LITH = ramp(352, 62, [32, 46, 58, 67, 74, 81, 88, 95], dh_dark=-34, dh_light=6)
@@ -649,16 +714,28 @@ def _vein(p, p0, p1, thick, rp, seed, cutl=0.7, cutr=0.7, wob=0.9, seams=(-0.9,)
     return mask, v
 
 
-def iron_tile():
+_IRON_LAYOUTS = [
+    # жилы (p0, p1, толщина, семя): тянутся к краям клетки (к серединам сторон, углы свободны) — соседние клетки
+    # железа складываются в одну длинную жилу
+    ([((2.5, 15.5), (14.5, 4.5), 4.8, 71), ((7.0, 27.0), (27.5, 7.5), 6.0, 72), ((17.0, 29.0), (30.0, 17.5), 4.4, 73)],
+     ((24, 5), (4, 8), (27, 27), (3, 27), (12, 22), (29, 12))),
+    ([((2.0, 8.5), (20.5, 26.0), 5.4, 74), ((12.5, 2.5), (29.5, 16.5), 4.6, 75), ((19.5, 28.5), (29.5, 22.5), 3.6, 76)],
+     ((6, 24), (27, 5), (10, 4), (26, 27), (15, 13), (3, 18))),
+    ([((1.5, 18.5), (30.5, 12.0), 5.6, 77), ((5.5, 6.5), (16.5, 4.0), 3.4, 78), ((17.5, 27.0), (27.5, 24.0), 3.8, 79)],
+     ((22, 7), (4, 26), (28, 20), (10, 27), (20, 20), (26, 4))),
+]
+
+
+def iron_tile(v=0):
     p = Pic()
     glint = lch(72, 7, 250)
     glint2 = lch(58, 8, 252)
-    veins = [((4.5, 16.0), (13.5, 6.5), 4.6, 71), ((8.5, 25.0), (25.0, 8.5), 5.8, 72), ((17.5, 27.5), (28.0, 17.5), 4.2, 73)]
+    veins, specks = _IRON_LAYOUTS[v % 3]
     masks = []
     for p0, p1, th, sd in veins:
-        m, v = _vein(p, p0, p1, th, R_IRON, sd)
-        masks.append((m, v, sd))
-    rng = np.random.default_rng(5)
+        m, vv = _vein(p, p0, p1, th, R_IRON, sd)
+        masks.append((m, vv, sd))
+    rng = np.random.default_rng(5 + v)
     for m, v, sd in masks:
         inner = erode(m)
         top = inner & (v > 0.6)
@@ -674,7 +751,7 @@ def iron_tile():
             c = R_RUST[6] if rng.random() < 0.5 else R_IRON[1]
             p.px(xs[k], ys[k], c)
     # крапины ржавчины на грунте
-    for (x, y) in ((24, 5), (4, 8), (27, 27), (3, 27), (12, 22), (29, 12)):
+    for (x, y) in specks:
         if not p.solid[y, x]:
             p.px(x, y, R_RUST[5])
     return p.sprite()
@@ -691,31 +768,47 @@ def _nugget(p, cx, cy, rx, ry, rot, rp, seed, lump=0.2, harm=5, pw=2.2, patina=N
     return m
 
 
-def copper_tile():
+_COPPER_LAYOUTS = [
+    # самородки (x, y, rx, ry, поворот, семя, бугристость, порог патины или None)
+    [(21.5, 9.0, 4.2, 3.4, 0.4, 81, 0.24, 0.5), (12.5, 17.5, 7.0, 5.8, -0.4, 82, 0.22, 0.46), (23.5, 21.5, 4.8, 4.0, 0.3, 83, 0.22, 0.5),
+     (8.0, 7.5, 2.6, 2.2, 0.0, 84, 0.2, None), (7.5, 26.0, 2.7, 2.0, 0.5, 85, 0.2, 0.5)],
+    [(5.5, 10.0, 3.6, 3.0, 0.5, 86, 0.22, 0.5), (13.0, 16.0, 5.2, 4.4, 0.3, 87, 0.22, 0.46), (21.5, 20.5, 6.6, 5.2, 0.2, 88, 0.22, 0.5),
+     (27.0, 8.0, 2.8, 2.3, 0.0, 89, 0.2, None), (9.0, 26.0, 2.4, 2.0, 0.2, 90, 0.2, 0.5)],
+    [(11.0, 21.0, 7.8, 6.2, 0.15, 91, 0.22, 0.46), (22.0, 10.5, 4.6, 3.8, -0.3, 92, 0.24, 0.5), (27.0, 19.0, 3.0, 2.6, 0.4, 93, 0.2, 0.5),
+     (5.5, 9.5, 2.6, 2.2, 0.0, 94, 0.2, None), (21.0, 27.0, 2.6, 2.0, 0.3, 95, 0.2, 0.5)],
+]
+
+
+def copper_tile(v=0):
     p = Pic()
     k = dict(lo=-1.0, hi=1.2, spec_k=18)
     tx = lambda s: (vnoise(s, 2.2) - 0.5) * 0.35
-    _nugget(p, 21.5, 9.0, 4.2, 3.4, 0.4, R_COPPER, 81, 0.24, patina=0.5, tex=tx(1), **k)
-    _nugget(p, 12.5, 17.5, 7.0, 5.8, -0.4, R_COPPER, 82, 0.22, patina=0.46, tex=tx(2), **k)
-    _nugget(p, 23.5, 21.5, 4.8, 4.0, 0.3, R_COPPER, 83, 0.22, patina=0.5, tex=tx(3), **k)
-    _nugget(p, 8.0, 7.5, 2.6, 2.2, 0.0, R_COPPER, 84, 0.2, tex=tx(4), **k)
-    _nugget(p, 7.5, 26.0, 2.7, 2.0, 0.5, R_COPPER, 85, 0.2, patina=0.5, tex=tx(5), **k)
+    for i, (cx, cy, rx, ry, rot, sd, lump, pat) in enumerate(_COPPER_LAYOUTS[v % 3]):
+        _nugget(p, cx, cy, rx, ry, rot, R_COPPER, sd, lump, patina=pat, tex=tx(1 + i + v * 7), **k)
     return p.sprite()
 
 
-def gold_tile():
+_GOLD_LAYOUTS = [
+    # самородки (x, y, rx, ry, поворот, семя) и искры (x, y, луч); второй вариант — один большой кусок
+    ([(21.0, 9.5, 4.0, 3.5, 0.2, 91), (12.5, 17.0, 6.6, 5.4, -0.3, 92), (23.0, 21.5, 4.6, 3.9, 0.3, 93), (7.5, 7.5, 2.5, 2.1, 0.0, 94),
+      (5.5, 25.0, 2.3, 1.9, 0.0, 95)], ((26, 6, 3), (4, 16, 2), (14, 12, 2), (27, 27, 1))),
+    ([(9.5, 9.5, 5.4, 4.6, 0.3, 96), (20.5, 18.0, 7.6, 6.2, -0.2, 97), (27.0, 7.5, 2.8, 2.4, 0.0, 98), (6.0, 23.5, 3.2, 2.6, 0.4, 99),
+      (14.5, 27.0, 2.4, 2.0, 0.0, 100)], ((5, 5, 2), (26, 23, 3), (17, 15, 2), (10, 28, 1))),
+    ([(16.0, 8.5, 6.0, 4.6, 0.1, 101), (7.5, 19.0, 4.6, 4.0, -0.3, 102), (24.0, 24.0, 5.4, 4.4, 0.25, 103), (27.5, 13.0, 2.4, 2.0, 0.0, 104),
+      (5.5, 27.5, 2.2, 1.8, 0.0, 105)], ((22, 5, 2), (3, 15, 2), (14, 20, 3), (28, 28, 1))),
+]
+
+
+def gold_tile(v=0):
     p = Pic()
     k = dict(lo=-1.1, hi=1.2, spec_k=20, spec_thr=0.9)
-    _nugget(p, 21.0, 9.5, 4.0, 3.5, 0.2, R_GOLD, 91, 0.10, harm=3, **k)
-    _nugget(p, 12.5, 17.0, 6.6, 5.4, -0.3, R_GOLD, 92, 0.10, harm=3, **k)
-    _nugget(p, 23.0, 21.5, 4.6, 3.9, 0.3, R_GOLD, 93, 0.10, harm=3, **k)
-    _nugget(p, 7.5, 7.5, 2.5, 2.1, 0.0, R_GOLD, 94, 0.08, harm=3, **k)
-    _nugget(p, 5.5, 25.0, 2.3, 1.9, 0.0, R_GOLD, 95, 0.08, harm=3, **k)
+    nuggets, sparks = _GOLD_LAYOUTS[v % 3]
+    for cx, cy, rx, ry, rot, sd in nuggets:
+        _nugget(p, cx, cy, rx, ry, rot, R_GOLD, sd, 0.10 if rx > 3 else 0.08, harm=3, **k)
     wh = (255, 252, 214)
-    p.sparkle(26, 6, 3, wh, lch(90, 60, 90))
-    p.sparkle(4, 16, 2, wh, lch(90, 60, 90))
-    p.sparkle(14, 12, 2, wh, wh)
-    p.sparkle(27, 27, 1, wh, lch(92, 50, 92))
+    arms = (lch(90, 60, 90), lch(90, 60, 90), wh, lch(92, 50, 92))
+    for i, (x, y, arm) in enumerate(sparks):
+        p.sparkle(x, y, arm, wh, arms[i])
     return p.sprite()
 
 
@@ -731,33 +824,43 @@ def _gear(cx, cy, r_in, r_out, teeth, hole, rot=0.0):
     return m & ~disc(cx, cy, hole)
 
 
-def scrap_tile():
+_SCRAP_LAYOUTS = [
+    # сдвиг пластины (dx, dy), центр шестерни, сдвиг болта, витки проволоки
+    ((0, 0), (11.0, 11.5), (0, 0), ((6.0, 22.5), (9.0, 25.0))),
+    ((-13, -14), (21.5, 21.0), (-19, 14), ((25.5, 7.5), (27.5, 10.5))),
+    ((-2, -11), (8.5, 22.5), (-20, 8), ((23.5, 24.5), (26.5, 26.0))),
+]
+
+
+def scrap_tile(v=0):
     p = Pic()
-    rust = vnoise(61, 3.0)
-    # гнутая пластина (снизу справа): две грани со сгибом, две заклёпки
-    top = poly([(15, 22), (23, 19), (30, 21), (29, 25), (16, 26)])
-    low = poly([(16, 26), (29, 25), (28, 29), (17, 30)])
+    rust = vnoise(61 + v, 3.0)
+    (px_, py_), (gx, gy), (bx, by), wire = _SCRAP_LAYOUTS[v % 3]
+    # гнутая пластина: две грани со сгибом, две заклёпки
+    sh = lambda pts: [(x + px_, y + py_) for x, y in pts]
+    top = poly(sh([(15, 22), (23, 19), (30, 21), (29, 25), (16, 26)]))
+    low = poly(sh([(16, 26), (29, 25), (28, 29), (17, 30)]))
     p.ring(top | low, R_SCRAP[0])
     p.dome(low, R_SCRAP, outline=False, relief=0.3, R=4, spec=False, lo=-1.6, hi=0.6, alt=(erode(low) & (rust > 0.47), R_RUST))
     p.dome(top, R_SCRAP, outline=False, relief=0.35, R=5, spec=False, alt=(erode(top) & (rust > 0.43), R_RUST))
-    p.line((16, 26), (29, 25), R_SCRAP[6], clip=top | low)
-    for (x, y) in ((19, 23), (26, 23)):
+    p.line((16 + px_, 26 + py_), (29 + px_, 25 + py_), R_SCRAP[6], clip=top | low)
+    for (x, y) in ((19 + px_, 23 + py_), (26 + px_, 23 + py_)):
         p.px(x, y, R_SCRAP[0])
         p.px(x + 1, y, R_SCRAP[1])
         p.px(x, y - 1, R_SCRAP[7])
-    # шестерня (сверху слева)
-    g = _gear(11.0, 11.5, 5.2, 7.6, 8, 2.0, 0.2)
+    # шестерня
+    g = _gear(gx, gy, 5.2, 7.6, 8, 2.0, 0.2)
     p.dome(g, R_SCRAP, relief=0.7, R=4.5, spec_k=14, spec_thr=0.9, alt=(erode(g) & (rust > 0.47), R_RUST))
-    # болт (сверху справа): шестигранная головка и резьба
-    shaft = poly([(25, 9), (27, 8), (31, 15), (29, 16)])
+    # болт: шестигранная головка и резьба
+    shaft = poly([(25 + bx, 9 + by), (27 + bx, 8 + by), (31 + bx, 15 + by), (29 + bx, 16 + by)])
     p.dome(shaft, R_SCRAP, relief=0.5, spec=False)
     for k in range(3):
-        p.px(27 + k, 11 + k * 2, R_SCRAP[1])
-    head = poly(hexagon(24.0, 7.0, 3.6, 0.95, 0.3))
+        p.px(27 + k + bx, 11 + k * 2 + by, R_SCRAP[1])
+    head = poly(hexagon(24.0 + bx, 7.0 + by, 3.6, 0.95, 0.3))
     p.dome(head, R_SCRAP, relief=0.8, spec=False)
-    p.px(23, 6, R_SCRAP[7])
-    # моток проволоки (снизу слева): два перекрывающихся витка
-    for (cx, cy) in ((6.0, 22.5), (9.0, 25.0)):
+    p.px(23 + bx, 6 + by, R_SCRAP[7])
+    # моток проволоки: два перекрывающихся витка
+    for (cx, cy) in wire:
         ring = disc(cx, cy, 4.2) & ~disc(cx, cy, 2.3)
         p.dome(ring, R_SCRAP, relief=1.0, R=1.5, spec_k=10, spec_thr=0.85, alt=(erode(ring) & (rust > 0.4), R_RUST))
     return p.sprite()
@@ -789,12 +892,62 @@ def _fibers(p, mask, n, seed, rp, length=7, out=False):
             y += math.sin(ang)
 
 
-def peat_tile():
-    """Торф: комья спрессованных волокон: светлые и тёмные нити, пятна мха, торчащие корешки."""
+def _seam_mask(y0, tilt, half, seed, wob=1.2, taper=0.45):
+    """Пласт поперёк клетки (торф, уголь — слоистые породы): волнистая полоса от левого края до правого, к краям
+    тоньше (линза), так что соседние клетки той же породы складываются в один пласт, а углы остаются грунту.
+    Возвращает маску, ось пласта yc(x) и полутолщину hw(x)."""
+    rng = np.random.default_rng(seed)
+    ph = rng.uniform(0, math.tau, 3)
+    x = _XX + 0.5
+    yc = y0 + tilt * (x - 16) + wob * (0.6 * np.sin(x * 0.32 + ph[0]) + 0.4 * np.sin(x * 0.71 + ph[1]))
+    hw = half * (1.0 - taper * ((np.abs(x - 16) / 16.0) ** 2)) + 0.5 * np.sin(x * 0.5 + ph[2])
+    return (np.abs(_YY + 0.5 - yc) <= hw), yc, np.maximum(hw, 0.5)
+
+
+def _seam_paint(p, m, yc, hw, rp, seed, top_i=4, bot_i=1, layers=((-0.45, 4), (0.05, 1), (0.5, 2)), dither=0.6):
+    """Слоистая закраска пласта: верх светлее, низ темнее, вдоль оси — прерывистые прослойки."""
+    rel = (_YY + 0.5 - yc) / hw   # -1 верхняя кромка .. 1 нижняя
+    idx = np.clip(np.floor((top_i + bot_i) / 2.0 + 0.2 - rel * (top_i - bot_i) / 2.0 + _BAYER * dither), bot_i, top_i).astype(int)
+    arr = np.array(rp, dtype=np.uint8)[idx]
+    for k, (off, tone) in enumerate(layers):
+        band = m & (np.abs(rel - off) < 0.13) & (vnoise(seed + 5 + k, 3.0) > 0.33)
+        arr[band] = rp[tone]
+    p.ring(m, rp[0])
+    p.paint_arr(m, arr)
+    return rel
+
+
+_PEAT_LAYOUTS = [
+    ([(15.5, 0.10, 5.4, 211)], ((5, 9), (27, 24), (12, 26), (24, 5))),
+    ([(19.0, -0.16, 6.0, 212)], ((4, 27), (28, 7), (14, 6), (26, 28))),
+    ([(9.0, -0.08, 3.6, 213), (21.5, 0.12, 4.2, 214)], ((28, 3), (3, 16), (27, 15), (16, 29))),
+]
+
+
+def peat_tile(v=0):
+    """Торф — слоистый пласт спрессованных волокон: тёмно-оливковое тело, светлые и тёмные нити вдоль пласта,
+    мох пятнами по верхней кромке, корешки наружу."""
     p = Pic()
-    for cx, cy, rx, ry, rot, sd in ((19.5, 8.5, 4.8, 3.8, 0.3, 111), (11.0, 16.0, 7.8, 6.4, -0.25, 112),
-                                    (23.0, 21.5, 5.8, 4.8, 0.2, 113), (6.5, 26.5, 3.6, 2.8, 0.0, 114)):
-        _peat_clod(p, cx, cy, rx, ry, rot, sd)
+    seams, roots = _PEAT_LAYOUTS[v % 3]
+    for y0, tilt, half, sd in seams:
+        m, yc, hw = _seam_mask(y0, tilt, half, sd, wob=1.0)
+        rel = _seam_paint(p, m, yc, hw, R_PEAT, sd, top_i=6, bot_i=3, layers=((-0.3, 2), (0.15, 7), (0.6, 1)), dither=0.5)
+        # мох по верхней кромке: пятна, глубже к низу — реже (около трети пласта: иначе торф на грунте
+        # поясов 0–1 и 4 не проходит порог видимости check_ores — см. ГДД 15.1)
+        n = vnoise(sd + 7, 2.8) + (vnoise(sd + 9, 1.5) - 0.5) * 0.35
+        moss = m & (n > 0.34 + 0.6 * np.clip(rel + 0.3, 0, 1)) & (rel < 0.4)
+        midx = np.clip(np.floor(4.2 - rel * 1.6 + _BAYER * 0.5), 2, 6).astype(int)
+        p.paint_arr(moss, np.array(R_MOSS, dtype=np.uint8)[midx])
+        area = int(m.sum())
+        ang = math.atan(tilt)
+        _strands(p, m & ~moss, area // 45, sd + 19, R_PEAT[0], 9, ang0=ang, spread=0.25, curl=0.25)
+        _strands(p, m & ~moss, area // 60, sd + 21, PEAT_FIBER2, 8, ang0=ang, spread=0.25, curl=0.25)
+        _strands(p, m & ~moss, area // 120, sd + 22, PEAT_FIBER, 7, ang0=ang, spread=0.3, curl=0.3)
+        _strands(p, moss, max(2, area // 150), sd + 27, R_MOSS[6], 4, ang0=ang, spread=0.5, curl=0.4)
+        _hair(p, m, 10 + int(half * 2), sd + 31)
+    for (x, y) in roots:
+        if not p.solid[y, x]:
+            p.px(x, y, PEAT_RIM)
     return p.sprite()
 
 
@@ -834,21 +987,38 @@ def _coal_glints(p, masks, rp=None):
         p.px_in(inner, a[0] + 1, a[1] + 1, (rp or R_COAL)[7])
 
 
-def coal_tile():
+_COAL_LAYOUTS = [
+    # пласты (y0, наклон, полутолщина, семя), отколовшиеся глыбы (силуэт, центр), крапины
+    ([(16.0, -0.12, 4.8, 201)], [([(19, 9), (24, 8), (27, 12), (24, 15), (20, 14)], (23, 11.5))],
+     ((3, 8), (29, 24), (14, 26), (26, 5), (8, 25))),
+    ([(19.5, 0.18, 5.6, 202)], [([(5, 23), (10, 22), (12, 26), (9, 29), (5, 28)], (8, 25.5)), ([(21, 9), (25, 7), (27, 11), (24, 13)], (24, 10))],
+     ((28, 6), (4, 11), (17, 29), (12, 6))),
+    ([(9.5, 0.08, 3.4, 203), (22.5, -0.10, 3.8, 204)], [([(15, 13), (20, 12), (23, 15), (20, 19), (16, 18)], (18.5, 15.5))],
+     ((4, 28), (28, 29), (3, 4), (27, 17))),
+]
+
+
+def coal_tile(v=0):
+    """Уголь — слоистый пласт: чёрный, с прослойками, верхняя кромка ловит холодный блеск, из пласта торчат
+    отколовшиеся угловатые глыбы с глянцевыми гранями."""
     p = Pic()
-    rim = R_COAL[6]
-    chunks = [
-        ([(5, 17), (8, 11), (14, 8), (19, 11), (20, 18), (15, 22), (8, 22)], (13, 15.5)),
-        ([(20, 21), (23, 17), (28, 18), (29, 24), (25, 28), (20, 27)], (24.5, 22.5)),
-        ([(21, 6), (25, 4), (28, 8), (25, 11), (22, 10)], (24.5, 7.5)),
-        ([(4, 25), (7, 23), (10, 26), (8, 29), (5, 28)], (7, 26)),
-    ]
+    seams, chunks, specks = _COAL_LAYOUTS[v % 3]
+    for y0, tilt, half, sd in seams:
+        m, yc, hw = _seam_mask(y0, tilt, half, sd)
+        _seam_paint(p, m, yc, hw, R_COAL, sd, top_i=3, bot_i=1, layers=((-0.5, 3), (-0.05, 0), (0.45, 2)), dither=0.5)
+        # верхняя кромка — прерывистый холодный ободок, нижняя — чёрная (ободка немного: синеватые тона
+        # сдвигают средний цвет к грунту пояса «Пустота», и уголь теряет контраст)
+        top = m & ~shifted(m, 0, 1)
+        brk = vnoise(sd + 11, 2.0)
+        p.paint(top & (brk > 0.62), R_COAL[6])
+        p.paint(top & (brk <= 0.62) & (brk > 0.42), R_COAL[5])
+        p.paint(m & ~shifted(m, 0, -1), R_COAL[0])
     masks = []
-    for pts, c in chunks[::-1]:
-        masks.append((_rim_poly(p, pts, R_COAL, rim, c, base=1.05, gain=2.0, lo=1, hi=4), pts))
+    for pts, c in chunks:
+        masks.append((_rim_poly(p, pts, R_COAL, R_COAL[6], c, base=1.05, gain=2.0, lo=1, hi=4), pts))
     # блики граней: сине-белые чёрточки по освещённым рёбрам и искры в вершинах
     _coal_glints(p, masks)
-    for (x, y) in ((3, 12), (2, 21), (14, 27), (28, 13), (17, 3), (30, 29), (12, 5)):
+    for (x, y) in specks:
         if not p.solid[y, x]:
             p.px(x, y, R_COAL[4] if (x + y) % 2 else R_COAL[2])
     return p.sprite()
@@ -880,16 +1050,27 @@ def _hexcrystal(p, cx, by, w, h, tip, ang, rp, lean=0.05):
     return whole
 
 
-def uranium_tile():
+_URAN_LAYOUTS = [
+    # порода-ложе (blob) и кристаллы (cx, by, w, h, tip, угол): растут от ложа вверх, вбок или вниз (со свода)
+    ((15.5, 25.5, 9.5, 3.8, 0.0, 121), ((21.0, 26, 6.0, 8, 5.5, 0.28), (9.5, 26, 5.5, 7, 5.0, -0.34), (15.5, 27, 7.5, 12, 7.0, 0.04)),
+     ((26, 9, 2), (5, 12, 1))),
+    ((5.5, 16.0, 3.6, 9.0, 0.0, 122), ((6, 10.5, 5.5, 7, 5.0, 1.25), (6, 22.0, 5.0, 6, 4.5, 1.65), (6, 16.5, 7.0, 12, 7.0, 1.45)),
+     ((26, 24, 2), (24, 6, 1))),
+    ((23.0, 25.0, 7.0, 3.6, 0.0, 123), ((26.5, 25, 5.4, 7, 5.0, -0.2), (19.0, 25, 6.8, 10, 6.5, -0.55), (8.0, 11, 4.6, 6, 4.5, 0.4)),
+     ((5, 24, 2), (28, 9, 1))),
+]
+
+
+def uranium_tile(v=0):
     p = Pic()
-    rock = blob(15.5, 25.5, 9.5, 3.8, 0.0, 0.16, 121, 4, 2.4)
+    (cx, cy, rx, ry, rot, sd), crystals, sparks = _URAN_LAYOUTS[v % 3]
+    rock = blob(cx, cy, rx, ry, rot, 0.16, sd, 4, 2.4)
     p.dome(rock, ramp(95, 14, [8, 14, 20, 27, 33, 40, 48, 56]), spec=False, relief=0.6)
-    _hexcrystal(p, 21.0, 26, 6.0, 8, 5.5, 0.28, R_URAN)
-    _hexcrystal(p, 9.5, 26, 5.5, 7, 5.0, -0.34, R_URAN)
-    _hexcrystal(p, 15.5, 27, 7.5, 12, 7.0, 0.04, R_URAN)
+    for x, by, w, h, tip, ang in crystals:
+        _hexcrystal(p, x, by, w, h, tip, ang, R_URAN)
     wh = (250, 255, 220)
-    p.sparkle(26, 9, 2, wh, R_URAN[6])
-    p.sparkle(5, 12, 1, wh, R_URAN[6])
+    for x, y, arm in sparks:
+        p.sparkle(x, y, arm, wh, R_URAN[6])
     s = p.sprite(shadow=False)
     s.glow(R_URAN[4], 2.6, 0.46)
     return s
@@ -927,14 +1108,20 @@ def _cube(p, cx, cy, w, h, rp, rot=0.0):
     return whole
 
 
-def lithium_tile():
+_LITH_LAYOUTS = [
+    [(20.5, 5.5, 3.4, 3.6, 0.12), (9.5, 8.5, 3.2, 3.4, -0.15), (14.5, 12.0, 5.4, 5.6, 0.05), (23.5, 16.5, 4.2, 4.4, -0.1),
+     (7.5, 20.5, 3.6, 3.8, 0.2), (15.5, 21.5, 3.2, 3.4, -0.05)],
+    [(9.0, 6.0, 3.4, 3.6, 0.1), (19.5, 8.5, 5.0, 5.2, -0.1), (7.0, 15.5, 4.2, 4.4, 0.15), (24.5, 18.5, 3.6, 3.8, 0.05),
+     (14.5, 20.0, 3.8, 4.0, -0.12), (20.5, 24.0, 2.6, 2.6, 0.2)],
+    [(22.5, 4.5, 3.0, 3.2, -0.1), (12.0, 7.0, 4.4, 4.6, 0.1), (24.0, 13.0, 4.6, 4.8, 0.05), (7.5, 18.0, 3.4, 3.6, -0.15),
+     (16.0, 18.5, 4.8, 5.0, 0.08), (8.5, 25.5, 2.4, 2.4, 0.1)],
+]
+
+
+def lithium_tile(v=0):
     p = Pic()
-    _cube(p, 20.5, 5.5, 3.4, 3.6, R_LITH, 0.12)
-    _cube(p, 9.5, 8.5, 3.2, 3.4, R_LITH, -0.15)
-    _cube(p, 14.5, 12.0, 5.4, 5.6, R_LITH, 0.05)
-    _cube(p, 23.5, 16.5, 4.2, 4.4, R_LITH, -0.1)
-    _cube(p, 7.5, 20.5, 3.6, 3.8, R_LITH, 0.2)
-    _cube(p, 15.5, 21.5, 3.2, 3.4, R_LITH, -0.05)
+    for cx, cy, w, h, rot in _LITH_LAYOUTS[v % 3]:
+        _cube(p, cx, cy, w, h, R_LITH, rot)
     return p.sprite()
 
 
@@ -1086,10 +1273,26 @@ R_MOSS_I = ramp(124, 60, [6, 11, 17, 24, 32, 41, 52, 68], dh_dark=-6, dh_light=1
 
 
 def peat_icon():
+    """Значок торфа — слоистый брикет, как пласт на тайле: коричневое тело, прослойки волокон, мох на верхней
+    грани, корешки по краю (коричневее тайла: на плитке склада торф должен читаться торфом, а не кустом)."""
     p = Pic()
-    for cx, cy, rx, ry, rot, sd in ((20.0, 9.5, 5.4, 4.2, 0.3, 291), (14.0, 18.5, 10.6, 8.2, -0.2, 292),
-                                    (25.5, 24.0, 5.0, 4.0, 0.2, 293)):
-        _peat_clod(p, cx, cy, rx, ry, rot, sd, 0.5, R_PEAT_I, R_MOSS_I)
+    rp = R_PEAT_I
+    body = poly([(3, 12), (9, 8), (28, 9), (30, 14), (29, 26), (23, 29), (4, 27), (2, 20)])
+    yc = 18.0 + 0.1 * (_XX + 0.5 - 16)
+    hw = np.full((G, G), 9.5)
+    rel = _seam_paint(p, body, yc, hw, rp, 291, top_i=5, bot_i=2, layers=((-0.55, 1), (-0.15, 6), (0.25, 1), (0.65, 6)), dither=0.5)
+    n = vnoise(298, 2.6)
+    moss = body & (n > 0.45 + 0.7 * np.clip(rel + 0.5, 0, 1)) & (rel < -0.1)
+    midx = np.clip(np.floor(4.2 - rel * 1.6 + _BAYER * 0.5), 2, 6).astype(int)
+    p.paint_arr(moss, np.array(R_MOSS_I, dtype=np.uint8)[midx])
+    area = int(body.sum())
+    _strands(p, body & ~moss, area // 45, 292, rp[0], 10, ang0=0.1, spread=0.2, curl=0.2)
+    _strands(p, body & ~moss, area // 90, 293, PEAT_FIBER2, 9, ang0=0.1, spread=0.2, curl=0.25)
+    _strands(p, body & ~moss, area // 160, 294, PEAT_FIBER, 7, ang0=0.1, spread=0.3, curl=0.3)
+    _strands(p, moss, 4, 295, R_MOSS_I[6], 4, ang0=0.1, spread=0.5, curl=0.4)
+    _hair(p, body, 14, 296)
+    # фаска света по верхней кромке
+    p.paint(body & ~shifted(body, 0, 1), rp[6])
     return p.sprite(shadow=False)
 
 
@@ -1098,18 +1301,23 @@ R_COAL_I = [lch(3, 3, 250), lch(7, 4, 250), lch(12, 5, 250), lch(18, 6, 248), lc
 
 
 def coal_icon():
-    """Значок угля светлее тайла: на тёмной плитке склада нужны синеватые грани и яркая кромка."""
+    """Значок угля — слоистая глыба, как пласт на тайле (светлее тайла: на тёмной плитке склада нужны синеватые
+    прослойки и яркая кромка), рядом отколовшийся угловатый кусок с глянцевыми гранями."""
     p = Pic()
+    rp = R_COAL_I
     rim = lch(78, 12, 245)
-    chunks = [
-        ([(4, 20), (7, 12), (14, 8), (21, 11), (23, 19), (17, 25), (8, 25)], (14, 17.5)),
-        ([(21, 22), (24, 17), (30, 19), (31, 26), (27, 30), (21, 29)], (26, 24)),
-        ([(18, 5), (23, 2), (28, 6), (26, 11), (20, 10)], (23, 6.5)),
-    ]
-    masks = []
-    for pts, c in chunks[::-1]:
-        masks.append((_rim_poly(p, pts, R_COAL_I, rim, c, base=2.3, gain=2.8, lo=1, hi=6), pts))
-    _coal_glints(p, masks, R_COAL_I)
+    body = poly([(2, 13), (8, 8), (22, 7), (28, 12), (27, 24), (20, 28), (5, 27), (1, 21)])
+    yc = 17.5 + 0.06 * (_XX + 0.5 - 16)
+    hw = np.full((G, G), 10.0)
+    _seam_paint(p, body, yc, hw, rp, 301, top_i=5, bot_i=2, layers=((-0.55, 6), (-0.1, 1), (0.3, 5), (0.7, 1)), dither=0.5)
+    top = body & ~shifted(body, 0, 1)
+    p.paint(top, rim)
+    p.paint(body & ~shifted(body, 0, -1), rp[0])
+    chunk = [(21, 19), (26, 16), (31, 20), (30, 27), (25, 30), (20, 27)]
+    masks = [(_rim_poly(p, chunk, rp, rim, (25.5, 23), base=2.3, gain=2.8, lo=1, hi=6), chunk)]
+    _coal_glints(p, masks, rp)
+    p.px(6, 11, rp[7])
+    p.px(7, 11, rp[6])
     return p.sprite(shadow=False)
 
 

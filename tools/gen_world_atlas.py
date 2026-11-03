@@ -22,6 +22,7 @@ tests/test_perf.gd сверяет каждый регион атласа с ис
 """
 import glob
 import json
+import math
 import os
 import sys
 
@@ -33,6 +34,7 @@ TILES = os.path.join(ROOT, "art", "tiles")
 DEEP = os.path.join(TILES, "deep")
 CELL = 96
 PAD = 2
+# столбцов — около корня из числа клеток: атлас близок к квадрату и не упирается в предел 4096 по одной стороне
 COLS = 18
 
 
@@ -62,12 +64,13 @@ def main() -> int:
 			entries.append(("%d/%s" % (belt, name), src.crop((x, y, x + CELL, y + CELL)).convert("RGBA")))
 	entries.append(("white", Image.new("RGBA", (CELL, CELL), (255, 255, 255, 255))))
 
-	rows = (len(entries) + COLS - 1) // COLS
+	cols = max(COLS, int(math.ceil(math.sqrt(len(entries)))))
+	rows = (len(entries) + cols - 1) // cols
 	stride = CELL + 2 * PAD
-	atlas = Image.new("RGBA", (COLS * stride, rows * stride), (0, 0, 0, 255))
+	atlas = Image.new("RGBA", (cols * stride, rows * stride), (0, 0, 0, 255))
 	index = {}
 	for n, (key, im) in enumerate(entries):
-		cx, cy = (n % COLS) * stride, (n // COLS) * stride
+		cx, cy = (n % cols) * stride, (n // cols) * stride
 		# поля в PAD пикселей — повтор края клетки, чтобы ничто не просачивалось с соседа
 		arr = np.pad(np.asarray(im), ((PAD, PAD), (PAD, PAD), (0, 0)), mode="edge")
 		atlas.paste(Image.fromarray(arr), (cx, cy))
@@ -80,7 +83,7 @@ def main() -> int:
 	atlas.save(out_png, optimize=True)
 	out_json = os.path.join(TILES, "world_atlas.json")
 	with open(out_json, "w", encoding="utf-8") as f:
-		json.dump({"cell": CELL, "pad": PAD, "cols": COLS, "rows": rows, "tiles": index}, f, ensure_ascii=False, separators=(",", ":"))
+		json.dump({"cell": CELL, "pad": PAD, "cols": cols, "rows": rows, "tiles": index}, f, ensure_ascii=False, separators=(",", ":"))
 		f.write("\n")
 	print("атлас %dx%d, %d клеток -> %s (%d КБ)" % (atlas.size[0], atlas.size[1], len(entries),
 		os.path.relpath(out_png, ROOT), os.path.getsize(out_png) // 1024))

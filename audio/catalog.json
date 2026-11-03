@@ -76,6 +76,7 @@
   "break_gem": {
    "cd": 100,
    "db": 0.0,
+   "duck": 2.0,
    "files": [
     "sfx/break_gem_1.wav",
     "sfx/break_gem_2.wav"
@@ -87,6 +88,7 @@
   "break_gold": {
    "cd": 100,
    "db": 0.0,
+   "duck": 2.0,
    "files": [
     "sfx/break_gold_1.wav",
     "sfx/break_gold_2.wav"
@@ -98,6 +100,7 @@
   "break_hard": {
    "cd": 100,
    "db": 0.0,
+   "duck": 3.0,
    "files": [
     "sfx/break_hard_1.wav",
     "sfx/break_hard_2.wav"

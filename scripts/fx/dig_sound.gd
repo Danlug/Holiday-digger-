@@ -94,9 +94,12 @@ static func break_id(mat: String) -> String:
 	return "break_" + mat
 
 
-## Сколько ударов уложится в клетку длительностью total (с финальным).
-static func hits_for(total: float, tool_id: String) -> int:
-	return maxi(1, roundi(total / Feel.hit_period(tool_id)))
+## Сколько ударов уложится в клетку длительностью total (с финальным). По лаве — реже.
+static func hits_for(total: float, tool_id: String, mat: String = "") -> int:
+	var period := Feel.hit_period(tool_id)
+	if mat == "lava":
+		period *= _cfg("lava_period_mult", 1.6)
+	return maxi(1, roundi(total / period))
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +115,7 @@ func tick(player: Node, delta: float) -> bool:
 		var cell := Vector2i(int(d["x"]), int(d["y"]))
 		var total := float(d["total"])
 		if cell != _cell or not is_equal_approx(total, _total):
-			_plan(cell, total, tool)
+			_plan(cell, total, tool, material_for(int(d["type"])))
 		var t := float(d["t"])
 		if _next_k < _n and t >= float(_next_k) * _period:
 			_strike(int(d["type"]), tool, float(_next_k) / float(_n))
@@ -130,10 +133,10 @@ func tick(player: Node, delta: float) -> bool:
 	return struck
 
 
-func _plan(cell: Vector2i, total: float, tool: String) -> void:
+func _plan(cell: Vector2i, total: float, tool: String, mat: String) -> void:
 	_cell = cell
 	_total = total
-	_n = hits_for(total, tool)
+	_n = hits_for(total, tool, mat)
 	_period = maxf(total / float(_n), 0.001)   # отладочная мгновенная копка: total = 0
 	_next_k = 1
 	stats["plans"] += 1
@@ -165,7 +168,8 @@ func on_dug(tile: int, tool: String) -> void:
 	var mat := material_for(tile)
 	var db := _strike_db(prof, kind) + _cfg("final_db", 4.0) - _fatigue_db() * 0.5
 	_play(strike_id(mat, kind), randf_range(0.9, 0.97) * float(prof["pitch"]), db)
-	_play(break_id(mat), 1.0, _cfg("break_db", -2.0) - _fatigue_db() * 0.5)
+	var break_db := _cfg("break_db", -2.0) + (_cfg("drill_break_db", -5.0) if kind == "drill" else 0.0)
+	_play(break_id(mat), 1.0, break_db - _fatigue_db() * 0.5)
 	if tool == "rusty_pickaxe":
 		_play("rattle", 0.95, db)
 	_dip = 1.0

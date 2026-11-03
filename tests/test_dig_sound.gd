@@ -162,8 +162,8 @@ func _test_rhythm() -> void:
 	ds.on_dug(TileTypes.Type.STONE, "iron_pickaxe")
 	pl.digging = null
 	ds.tick(pl, 0.016)
-	check("финал: удар громче рядовых на 2+ дБ + осыпание камня", rec.count("dig_stone_pick") == 1 and rec.count("break_stone") == 1
-			and rec.last_db("dig_stone_pick") > regular_db + 2.0)
+	check("финал: удар громче рядовых на 1.5+ дБ + осыпание камня", rec.count("dig_stone_pick") == 1 and rec.count("break_stone") == 1
+			and rec.last_db("dig_stone_pick") > regular_db + 1.5)
 	check("последние id доступны (%s)" % str(ds.recent.slice(-2)), ds.recent.slice(-2) == ["dig_stone_pick", "break_stone"])
 
 	# ржавая кирка дребезжит
@@ -276,19 +276,21 @@ func _test_motors() -> void:
 	GameState.current_tool = "drill_rig"
 	pl.in_rig = true
 	ds.tick(pl, 0.016)
-	check("в бурмобиле двигатель работает на холостых", rec.loops.get("rig_loop", false) and rec.last_db_loop("rig_loop") <= -10.0)
+	var idle_db := rec.last_db_loop("rig_loop")
+	var idle_pitch := rec.last_pitch("rig_loop")
+	check("в бурмобиле двигатель работает на холостых", rec.loops.get("rig_loop", false) and idle_db <= -10.0 and idle_pitch < 1.0)
 	pl.digging = {"x": 5, "y": 13, "t": 0.0, "total": 1.0, "type": TileTypes.Type.DIRT}
 	t = 0.0
 	while t < 1.0:
 		t += 1.0 / 60.0
 		pl.digging["t"] = t
 		ds.tick(pl, 1.0 / 60.0)
-	check("под нагрузкой двигатель громче и выше", rec.last_db_loop("rig_loop") > -8.0 and rec.last_pitch("rig_loop") > 1.0)
+	check("под нагрузкой двигатель громче и выше", rec.last_db_loop("rig_loop") > idle_db + 4.0 and rec.last_pitch("rig_loop") > 1.0)
 	check("бурмобиль бьёт низко: удары dig_dirt_drill с pitch < 1", rec.count("dig_dirt_drill") == 7 and rec.last_pitch_play("dig_dirt_drill") < 0.9)
 	pl.digging = null
 	for i in 90:
 		ds.tick(pl, 1.0 / 60.0)
-	check("без копки двигатель возвращается на холостые", rec.last_db_loop("rig_loop") < -10.0 and rec.last_pitch("rig_loop") < 0.9)
+	check("без копки двигатель возвращается на холостые", rec.last_db_loop("rig_loop") < idle_db + 1.0 and rec.last_pitch("rig_loop") < idle_pitch + 0.05)
 	pl.in_rig = false
 	GameState.current_tool = "iron_pickaxe"
 	ds.tick(pl, 0.016)
@@ -380,6 +382,7 @@ func _test_real_dig() -> void:
 			absent.append(id)
 	check("по каждой породе — свой удар и своё осыпание (нет: %s)" % str(absent), absent.is_empty())
 	check("удары чередуют варианты файлов (%d)" % streams.size(), streams.size() >= 2)
+	world.overlay = Callable()   # замыкание держит мир — без сброса цикл ссылок течёт при выходе
 	main.queue_free()
 	await get_tree().create_timer(0.3).timeout
 

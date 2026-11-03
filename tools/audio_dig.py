@@ -255,7 +255,7 @@ def _break_ore(rng, v):
     return reverb_tail(break_mix(0.55, parts), SR, rt60=0.18, wet=0.08)
 
 
-@sfx("break_gold", peak=0.86, pv=0.04, prio=2, voices=2, cd=100, variants=2)
+@sfx("break_gold", peak=0.86, pv=0.04, prio=2, voices=2, cd=100, variants=2, duck=2.0)
 def _break_gold(rng, v):
     parts = _break_common(rng, v, 90, 500, 0.12, 105, 0.06, gain=0.7)
     parts.append((0.02, tumble(rng, 4, 1318, 2100, 0.55, 0.12, GLASS, spread=0.32), 0.3))
@@ -263,7 +263,7 @@ def _break_gold(rng, v):
     return reverb_tail(break_mix(0.6, parts), SR, rt60=0.3, wet=0.12)
 
 
-@sfx("break_gem", peak=0.84, pv=0.04, prio=2, voices=2, cd=100, variants=2)
+@sfx("break_gem", peak=0.84, pv=0.04, prio=2, voices=2, cd=100, variants=2, duck=2.0)
 def _break_gem(rng, v):
     # хрустальный рассып: высокие стеклянные осколки и мерцание, низа почти нет
     parts = [(0, body(160, 80, 0.1, 0.04), 0.5)]
@@ -274,7 +274,7 @@ def _break_gem(rng, v):
     return reverb_tail(break_mix(0.65, parts), SR, rt60=0.4, wet=0.14)
 
 
-@sfx("break_hard", peak=0.9, pv=0.04, prio=2, voices=2, cd=100, variants=2)
+@sfx("break_hard", peak=0.9, pv=0.04, prio=2, voices=2, cd=100, variants=2, duck=3.0)
 def _break_hard(rng, v):
     parts = _break_common(rng, v, 40, 420 + 80 * v, 0.22, 64, 0.13)
     parts.append((0, body(52, 26, 0.35, 0.16), 0.9))

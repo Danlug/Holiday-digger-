@@ -36,7 +36,6 @@ ENV = os.path.join(ROOT, "art", "env", "deep")
 T = 96            # размер тайла в пикселях текстуры (ART_SCALE 3 x 32)
 G = 32            # сетка пиксель-арта
 PAD = 2           # экструзия краёв в атласе (против просвечивания соседей)
-COLS, ROWS = 7, 6
 
 ATLAS_NAMES = (
     [f"dirt_{i}" for i in range(1, 9)] + ["stone", "empty"]
@@ -48,6 +47,26 @@ ATLAS_NAMES = (
 )
 NEW_ORES = ["ore_geocrystal", "ore_ancient_metal", "ore_obsidian", "ore_hellstone", "ore_dark_matter",
             "ore_universalium", "ore_angelstone", "ore_divine_heart"]
+
+# Варианты тайла руды против повторяемости: ore_x (вариант 0), ore_x_2, ore_x_3 — та же залежь, другая раскладка
+# кусков и сдвинутый грунт. Какой вариант у клетки, решает TileArt по мировым координатам (мир не меняется).
+VARIANTS = 3
+ORE_BASES = [n for n in ATLAS_NAMES if n.startswith("ore_")]
+ATLAS_NAMES = ATLAS_NAMES + [f"{n}_{v + 1}" for v in range(1, VARIANTS) for n in ORE_BASES]
+COLS, ROWS = 10, (len(ATLAS_NAMES) + 9) // 10
+
+
+def variant_name(base, v):
+    return base if v == 0 else f"{base}_{v + 1}"
+
+
+def split_variant(name):
+    """'ore_iron_2' -> ('ore_iron', 1); имя без суффикса варианта -> (name, 0). dirt_2 суффиксом не считается."""
+    if name.startswith("ore_") and len(name) > 2 and name[-2] == "_" and name[-1].isdigit():
+        v = int(name[-1]) - 1
+        if 1 <= v < VARIANTS:
+            return name[:-2], v
+    return name, 0
 
 # ── цвет ──────────────────────────────────────────────────────────────────
 
@@ -318,7 +337,17 @@ def _load_override(mod_name, attr):
         return {}
     return dict(getattr(m, attr, {}))
 # все руды, у которых есть спрайт, собираются поверх грунта пояса (а не режутся из авторского листа)
-NEW_ORES = [n for n in ATLAS_NAMES if n in SPRITES]
+NEW_ORES = [n for n in ATLAS_NAMES if split_variant(n)[0] in SPRITES]
+
+
+def sprite_for(name):
+    """Спрайт залежи по имени тайла с учётом варианта: fn(v), если функция принимает номер варианта, иначе fn()."""
+    import inspect
+    base, v = split_variant(name)
+    fn = SPRITES[base]
+    if v and inspect.signature(fn).parameters:
+        return fn(v)
+    return fn()
 
 
 # ── кладка руин ───────────────────────────────────────────────────────────
@@ -669,6 +698,79 @@ def compose_sprite_on(bg, sprite_img, w_feather=None):
     return bg * (1 - a) + s[..., :3] * a
 
 
+def _grow(m):
+    p = np.pad(m, 1)
+    return m | p[:-2, 1:-1] | p[2:, 1:-1] | p[1:-1, :-2] | p[1:-1, 2:]
+
+
+def _roll(m, dx, dy):
+    out = np.zeros_like(m)
+    ys, xs = np.nonzero(m)
+    ys, xs = ys + dy, xs + dx
+    ok = (ys >= 0) & (ys < G) & (xs >= 0) & (xs < G)
+    out[ys[ok], xs[ok]] = True
+    return out
+
+
+_BAYER4 = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0 - 0.5
+
+
+def embed(bg, sprite_img, seed, crumbs=True):
+    """Залежь, ВРОСШАЯ в грунт, а не наклейка на нём: грунт в клетке вокруг куска темнеет (щель и затенение),
+    гуще — справа-снизу, где кусок нависает; рядом в грунте — крошка того же минерала с тенью. Всё на сетке 32
+    (клетка сетки = 3x3 пикселя текстуры), дизеринг Байера рвёт ровный ободок."""
+    s = np.array(sprite_img, dtype=np.float64)
+    a = s[..., 3] / 255.0
+    body = a[1::3, 1::3] > 0.5
+    if not body.any():
+        return bg * (1 - a[..., None]) + s[..., :3] * a[..., None]
+    d1 = _grow(body) & ~body
+    d2 = _grow(d1) & ~body & ~d1
+    below = (_roll(body, 1, 1) | _roll(body, 0, 1) | _roll(body, 1, 0)) & ~body
+    bay = np.tile(_BAYER4, (G // 4, G // 4))
+    dark = np.zeros((G, G))
+    dark[d2] = 0.13 + 0.08 * bay[d2]
+    dark[d1] = 0.30 + 0.10 * bay[d1]
+    dark[d1 & below] = 0.48 + 0.08 * bay[d1 & below]
+    dark[d2 & _roll(below, 1, 1) & ~d1] = 0.22 + 0.08 * bay[d2 & _roll(below, 1, 1) & ~d1]
+    out = bg * (1.0 - np.kron(np.clip(dark, 0, 0.6), np.ones((3, 3)))[..., None])
+    if crumbs:
+        # крошка: цвет — тёмная половина тела залежи (не блик), 4-7 зёрен в 2-5 клетках от куска, у каждого тень
+        rng = rng_for("crumbs", seed)
+        rgb32 = s[1::3, 1::3, :3]
+        lum = rgb32 @ np.array([0.2126, 0.7152, 0.0722])
+        inner = body & ~d1
+        cand = inner if inner.sum() >= 8 else body
+        q = np.quantile(lum[cand], (0.25, 0.55))
+        pool = rgb32[cand & (lum >= q[0]) & (lum <= q[1])]
+        if len(pool) == 0:
+            pool = rgb32[cand]
+        far = _grow(_grow(_grow(d2))) & ~_grow(d2) & ~body
+        far[:2, :] = far[-2:, :] = far[:, :2] = far[:, -2:] = False
+        ys, xs = np.nonzero(far)
+        if len(ys):
+            n = int(rng.integers(4, 8))
+            for k in rng.choice(len(ys), min(n, len(ys)), replace=False):
+                y, x = int(ys[k]), int(xs[k])
+                col = pool[int(rng.integers(len(pool)))] * rng.uniform(0.85, 1.0)
+                out[y * 3:y * 3 + 3, x * 3:x * 3 + 3] = col
+                if y + 1 < G and x + 1 < G and not body[y + 1, x + 1]:
+                    out[(y + 1) * 3:(y + 1) * 3 + 3, (x + 1) * 3:(x + 1) * 3 + 3] *= 0.72
+                if rng.random() < 0.35 and x + 1 < G and not body[y, x + 1]:
+                    out[y * 3:y * 3 + 3, (x + 1) * 3:(x + 1) * 3 + 3] = col * 0.9
+    return out * (1 - a[..., None]) + s[..., :3] * a[..., None]
+
+
+# сдвиг грунта под вариантами руды (в клетках сетки): dirt_1 бесшовен по тору, поэтому сдвинутый — тот же грунт
+# с иным расположением комков, и соседние клетки одной руды не повторяют фон
+VARIANT_SHIFT = [(0, 0), (13, 7), (5, 19)]
+
+
+def variant_ground(dirt0, v):
+    dx, dy = VARIANT_SHIFT[v % len(VARIANT_SHIFT)]
+    return np.roll(np.roll(dirt0, dy * 3, axis=0), dx * 3, axis=1)
+
+
 def main():
     biomes = json.load(open(os.path.join(ROOT, "data", "world_layers.json"), encoding="utf-8"))["biomes"]["list"]
     # перерисованная земля и камень пояса 0 пишутся в art/tiles ДО чтения (дальше всё как обычно: тон поясов, руды сверху)
@@ -684,13 +786,13 @@ def main():
         p = os.path.join(TILES, n + ".png")
         if os.path.exists(p) and n not in NEW_ORES and n != "ruin_brick":
             base_tiles[n] = load(p)
-    sprites = {n: np.array(fn().upscale(), dtype=np.float64) for n, fn in SPRITES.items()}
+    sprites = {n: np.array(sprite_for(n).upscale(), dtype=np.float64) for n in NEW_ORES}
     brick0 = ruin_brick_base()
 
     # пояс 0: отдельные файлы только для нового (остальное уже в репозитории)
     for n in NEW_ORES:
         spr = Image.fromarray(sprites[n].astype(np.uint8), "RGBA")
-        save_rgb(compose_sprite_on(dirt[0], spr), os.path.join(TILES, n + ".png"))
+        save_rgb(embed(variant_ground(dirt[0], split_variant(n)[1]), spr, n), os.path.join(TILES, n + ".png"))
     save_rgb(brick0, os.path.join(TILES, "ruin_brick.png"))
     print("новые руды и кладка записаны в art/tiles/")
 
@@ -726,9 +828,9 @@ def main():
             rng = rng_for("tile", belt, name)
             if name in NEW_ORES:
                 w = np.ones((T, T))
-                bg = retone(dirt[0], w, soil, ref_lab, kc, kh)
+                bg = retone(variant_ground(dirt[0], split_variant(name)[1]), w, soil, ref_lab, kc, kh)
                 overlay(theme, bg, w, rng)
-                tile = compose_sprite_on(bg, Image.fromarray(sprites[name].astype(np.uint8), "RGBA"))
+                tile = embed(bg, Image.fromarray(sprites[name].astype(np.uint8), "RGBA"), name)
             elif name == "ruin_brick":
                 # кладка: лёгкий оттенок пояса, чтобы не торчала цветом из чужой палитры
                 lab = rgb2lab(brick0)

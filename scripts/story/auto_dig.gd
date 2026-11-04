@@ -187,7 +187,11 @@ func _process(dt: float) -> void:
 
 	_cell_time += dt
 	var target: Vector2i = _cells[_index]
-	var to := Vector2(float(target.x) + 0.5, float(target.y) - 0.5)
+	# Герой стоит НА клетке над целью той же высотой, что даёт физика
+	# (низ хитбокса на верхней кромке цели, см. player.gd:HH), а не центром
+	# клетки: ступни рисуются по низу хитбокса, и от центра он висел бы на
+	# 5 px над землёй всю автокопку, а после неё «оседал».
+	var to := Vector2(float(target.x) + 0.5, float(target.y) - _player.HH - 0.001)
 	var k: float = clampf(_cell_time / CELL_SECONDS, 0.0, 1.0)
 	if _player != null:
 		# Ведём героя к клетке и подкручиваем счётчик кадров вручную: физика

@@ -9,9 +9,9 @@ extends Node
 ##      полосе ±7 лог. px вокруг оси тела) лежит на ground_y−1 (±sole_tol);
 ##      макушка (верхний непрозрачный в полосе ±4 лог. px) даёт рост
 ##      ground_y−макушка = body_h_std±body_tol либо заявленный body_h±2;
-##   3. CharacterView кладёт линию земли каждой позы на одну и ту же высоту
-##      экрана, а ось тела — на x героя, при обоих разворотах;
-##   4. WorldActor — то же для всех актёров и поз при росте 1.0 и 0.92;
+##   3. CharacterView кладёт линию земли каждой позы на низ хитбокса героя
+##      (стоя — низ клетки), а ось тела — на x героя, при обоих разворотах;
+##   4. WorldActor — ступни на низу клетки у всех актёров и поз при росте 1.0 и 0.92;
 ##   5. классическая сцена режет широкие листы копки мальчика на 8 кадров по
 ##      192, а не показывает полосу целиком (регресс dud_treasure/workshop),
 ##      и ставит квадратные листы ровно туда же, где они стояли;
@@ -166,8 +166,8 @@ func _test_hero_view_alignment() -> void:
 			check("%s: кадр %dx%d" % [label, g.frame_w, g.frame_h],
 				spr.region_rect.size == Vector2(g.frame_w, g.frame_h), str(spr.region_rect))
 			var feet: float = spr.position.y + float(g.ground_y) / PoseAnchor.ART_SCALE
-			check("%s: линия земли на одной высоте (%.2f)" % [label, PoseAnchor.FEET_Y],
-				is_equal_approx(feet, PoseAnchor.FEET_Y), "%.2f" % feet)
+			check("%s: ступни на низу хитбокса героя (%.2f)" % [label, PoseAnchor.FEET_Y_HERO],
+				is_equal_approx(feet, PoseAnchor.FEET_Y_HERO), "%.2f" % feet)
 			var axis: float = float(g.axis_x if facing > 0 else g.frame_w - g.axis_x)
 			var body_x: float = spr.position.x + axis / PoseAnchor.ART_SCALE
 			check("%s: ось тела на x героя" % label, absf(body_x) < 0.01, "%.2f" % body_x)
@@ -194,8 +194,8 @@ func _test_world_actor_alignment() -> void:
 			var g := PoseAnchor.geom(sh.pose, sh.dir)
 			var s: float = a.height_k / PoseAnchor.ART_SCALE
 			var feet: float = spr.position.y + float(g.ground_y) * s
-			check("%s/%s%s: ступни на линии земли героя (рост %.2f)" % [sh.dir, sh.pose, " ↔" if flip else "", a.height_k],
-				is_equal_approx(feet, PoseAnchor.FEET_Y), "%.2f против %.2f" % [feet, PoseAnchor.FEET_Y])
+			check("%s/%s%s: ступни на низу клетки актёра (рост %.2f)" % [sh.dir, sh.pose, " ↔" if flip else "", a.height_k],
+				is_equal_approx(feet, PoseAnchor.FEET_Y_ACTOR), "%.2f против %.2f" % [feet, PoseAnchor.FEET_Y_ACTOR])
 			var axis: float = float(g.frame_w - g.axis_x if flip else g.axis_x)
 			check("%s/%s%s: ось тела на x актёра" % [sh.dir, sh.pose, " ↔" if flip else ""],
 				absf(spr.position.x + axis * s) < 0.01)

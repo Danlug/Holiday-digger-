@@ -18,6 +18,9 @@ const ART_SCALE := 3.0
 
 const CHAR_W := int(48 * ART_SCALE)
 const CHAR_H := int(48 * ART_SCALE)
+## Полувысота героя, под которую рисовка считалась ДО привязки к физике; теперь
+## ступни кладутся на низ хитбокса (PoseAnchor.FEET_Y_HERO), а это число
+## оставлено только для старых тестов, читавших cv.HH.
 const HH := 0.46
 
 ## Линия земли квадратного кадра 48×48: подошва героя стоит на CHAR_H - FOOT_PAD.
@@ -530,8 +533,9 @@ func _process(_dt: float) -> void:
 					(int(floor(player.anim / anim_div)) % frames if frames > 1 else 0)
 		_sprite.region_rect = Rect2(frame * fw, 0, fw, fh)
 	_sprite.flip_h = player.facing < 0
-	# Линия земли листа ложится на низ клетки, ось тела — на x героя (при
-	# развороте — зеркально): одна формула на все листы, см. PoseAnchor.
+	# Линия земли листа ложится на низ хитбокса героя (стоя — низ клетки), ось
+	# тела — на x героя (при развороте — зеркально): одна формула на все
+	# листы, см. PoseAnchor.
 	_sprite.position = PoseAnchor.sprite_position(sheet_name, "", _sprite.flip_h) \
 			+ Vector2(_stun_shake(), 0.0)
 

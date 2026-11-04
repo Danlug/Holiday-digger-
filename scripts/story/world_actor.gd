@@ -20,7 +20,6 @@ extends Node2D
 
 const TILE := 32
 const ART_SCALE := 3.0
-const HH := 0.46          # см. character_view.gd:HH
 const ANIM_DIV := 7.0     # см. character_view.gd:ANIM_DIV
 
 ## Id актёра из data/story.json → actors.<id>.dir задаёт папку
@@ -103,11 +102,11 @@ func set_pose(p_pose: String, p_flip: bool = false) -> bool:
 
 func _process(_dt: float) -> void:
 	position = Vector2(x * TILE, y * TILE)
-	# Якорь по ступням: линия земли кадра (ground_y из poses.json) ложится на
-	# клетку (x, y) так же, как у героя игрока, ось тела — на x; рост height_k
-	# меняет кадр вокруг линии земли, и ступни остаются там же, где у героя.
-	# Одна формула на всех — PoseAnchor.sprite_position.
-	_sprite.position = PoseAnchor.sprite_position(pose, _dir, flip, height_k)
+	# Якорь по ступням: точка актёра — центр клетки (x, y), линия земли кадра
+	# (ground_y из poses.json) ложится на низ этой клетки, ось тела — на x;
+	# рост height_k меняет кадр вокруг линии земли, и ступни остаются на
+	# месте. Одна формула на всех — PoseAnchor.sprite_position.
+	_sprite.position = PoseAnchor.sprite_position(pose, _dir, flip, height_k, PoseAnchor.FEET_Y_ACTOR)
 	if _frames <= 1 or _sprite.texture == null:
 		return
 	var idx: int = int(anim / ANIM_DIV) % _frames

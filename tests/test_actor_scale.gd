@@ -73,10 +73,14 @@ func _test_heights_and_feet() -> void:
 	var hero_sprite: Sprite2D = cv.get_child(0)
 	var hero_box := _bbox("res://art/character/idle.png", 144)
 	var hero_h: float = hero_box.size.y * hero_sprite.scale.y
-	# Подошва героя относительно его точки (x, y) — та же формула, что в _process.
-	var hero_feet: float = -cv.HH * cv.TILE - 16.0 + float(hero_box.end.y) / cv.ART_SCALE
+	# Подошва героя относительно его точки (x, y): низ хитбокса (зона
+	# boy-scale, бриф 6: раньше рисовка считалась от полувысоты 0,46, и герой
+	# стоял на 4,6 px ниже линии земли — «не решено» этого раздела закрыто).
+	var hero_feet: float = PoseAnchor.FEET_Y_HERO
 	check("рост героя на экране — около 40 логических px (121 px листа / 3)",
 		hero_h > 36.0 and hero_h < 44.0, "%.1f" % hero_h)
+	check("подошва героя — на низу его хитбокса (player.gd:HH)",
+		is_equal_approx(hero_feet, float(preload("res://scripts/player/player.gd").HH) * cv.TILE))
 	cv.queue_free()
 
 	var ids: Array = []
@@ -101,10 +105,11 @@ func _test_heights_and_feet() -> void:
 		var hi := ELDER_MAX if ELDERS.has(id) else SAME_MAX
 		check("%s: рост на экране %.0f%% героя (нужно %d–%d%%)" % [id, ratio * 100.0, int(lo * 100), int(hi * 100)],
 			ratio >= lo and ratio <= hi, "%.1f px против %.1f" % [h, hero_h])
-		# Ступни: низ рисунка — там же, где у героя, при любом росте.
+		# Ступни: низ рисунка — на низу клетки актёра (его точка — центр клетки),
+		# при любом росте; у героя та же кромка, только от низа его хитбокса.
 		var feet: float = spr.position.y + float(box.end.y) * spr.scale.y
-		check("%s: ступни на линии земли героя (±0.6 px)" % id, absf(feet - hero_feet) <= 0.6,
-			"%.2f против %.2f" % [feet, hero_feet])
+		check("%s: ступни на низу клетки (±0.6 px)" % id, absf(feet - PoseAnchor.FEET_Y_ACTOR) <= 0.6,
+			"%.2f против %.2f" % [feet, PoseAnchor.FEET_Y_ACTOR])
 		var world_feet: float = a.y * a.TILE + feet
 		check("%s: стоя на поверхности (y=0.5), ступни у кромки земли y=32" % id,
 			world_feet > 29.0 and world_feet < 34.0, "%.1f" % world_feet)

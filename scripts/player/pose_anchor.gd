@@ -19,11 +19,18 @@ extends RefCounted
 const PATH := "res://art/character/poses.json"
 const ART_SCALE := 3.0
 const TILE := 32.0
-const HH := 0.46
-## Линия земли на экране относительно точки персонажа (x, y в клетках × TILE):
-## та же величина, что всегда давала формула character_view.gd
-## (−HH·TILE − 16 + 138/ART_SCALE) — низ клетки минус доля пикселя.
-const FEET_Y := -HH * TILE - 16.0 + 138.0 / ART_SCALE
+## Полувысота хитбокса героя — та же, что в физике (player.gd:HH): стоя на
+## земле, низ хитбокса лежит ровно на низу клетки.
+const HERO_HH: float = preload("res://scripts/player/player.gd").HH
+## Линия ступней ГЕРОЯ относительно его точки (player.x, player.y): низ
+## хитбокса. Раньше рисовка считалась от старой полувысоты 0,46
+## (−0,46·TILE − 16 + 138/3 = 15,28), а физика давно стоит на 1/3 (10,67) —
+## подошвы уходили в землю на 4,6 px в любой позе (ГДД, house-look: «герой
+## стоит на ≈4 px ниже линии земли»).
+const FEET_Y_HERO := HERO_HH * TILE
+## Линия ступней АКТЁРА сцен (WorldActor): его точка — центр клетки
+## (y = ряд + 0,5, см. cutscene_player.gd:_world_land), ступни — на низу клетки.
+const FEET_Y_ACTOR := TILE / 2.0
 
 ## Резерв на случай отсутствия JSON: квадрат 144, земля 138, ось посередине.
 const FALLBACK_DEFAULT := {"frame_w": 144, "frame_h": 144, "ground_y": 138, "axis_x": 72}
@@ -102,10 +109,11 @@ static func frames(tex: Texture2D, pose: String, dir: String = "") -> int:
 
 
 ## Левый верхний угол Sprite2D (centered=false, scale = k/ART_SCALE)
-## относительно точки персонажа: линия земли кадра ложится на FEET_Y, ось
-## тела — на x = 0. k — рост относительно героя (бабушки 0.92), flip —
-## разворот влево.
-static func sprite_position(pose: String, dir: String = "", flip: bool = false, k: float = 1.0) -> Vector2:
+## относительно точки персонажа: линия земли кадра ложится на feet_y
+## (FEET_Y_HERO у героя, FEET_Y_ACTOR у актёров сцен), ось тела — на x = 0.
+## k — рост относительно героя (бабушки 0.92), flip — разворот влево.
+static func sprite_position(pose: String, dir: String = "", flip: bool = false, k: float = 1.0,
+		feet_y: float = FEET_Y_HERO) -> Vector2:
 	var g := geom(pose, dir)
 	var axis: float = float(g["axis_x"]) if not flip else float(g["frame_w"] - g["axis_x"])
-	return Vector2(-axis * k / ART_SCALE, FEET_Y - float(g["ground_y"]) * k / ART_SCALE)
+	return Vector2(-axis * k / ART_SCALE, feet_y - float(g["ground_y"]) * k / ART_SCALE)

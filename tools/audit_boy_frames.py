@@ -23,7 +23,9 @@ art/character/poses.json (единая линия земли и рост тел�
   python3 tools/audit_boy_frames.py --debug out.png # + лист с линиями
   python3 tools/audit_boy_frames.py --json out.json # сырые числа
   python3 tools/audit_boy_frames.py --dir boy_gear  # другой набор листов
-Код возврата 0; таблица — в stdout (Markdown).
+Код возврата 0; таблица — в stdout (Markdown). Столбец «центр лица−ось» —
+насколько середина лица отстоит от оси тела из метаданных: около нуля в
+стойке, гуляет в замахе; большое постоянное число = ось задана неверно.
 """
 
 import argparse
@@ -62,16 +64,28 @@ def load_poses():
     if not os.path.exists(POSES_JSON):
         return {}
     with open(POSES_JSON, encoding="utf-8") as f:
-        doc = json.load(f)
-    return doc.get("poses", {})
+        return json.load(f)
 
 
-def frame_geom(name, poses):
-    p = poses.get(name)
-    if p:
-        return int(p["frame_w"]), int(p["frame_h"]), int(p["ground_y"]), p
-    fw, fh, gy = FALLBACK_FRAME.get(name, DEFAULT_FRAME)
-    return fw, fh, gy, None
+def frame_geom(name, doc, sub=""):
+    """Геометрия позы — та же цепочка, что в scripts/player/pose_anchor.gd:
+    default -> poses (герой и папка boy) -> actors_common -> actors.<папка>;
+    перекраски бура с суффиксом берут базовый лист."""
+    if not doc:
+        fw, fh, gy = FALLBACK_FRAME.get(name, DEFAULT_FRAME)
+        return fw, fh, gy, fw // 2, {}
+    base = name
+    for suffix in doc.get("suffix_variants", []):
+        if name.endswith(suffix):
+            base = name[:-len(suffix)]
+            break
+    g = dict(doc.get("default", {}))
+    if sub in ("", "boy"):
+        g.update(doc.get("poses", {}).get(base, {}))
+    if sub:
+        g.update(doc.get("actors_common", {}).get(base, {}))
+    g.update(doc.get("actors", {}).get(sub, {}).get(base, {}))
+    return int(g["frame_w"]), int(g["frame_h"]), int(g["ground_y"]), int(g["axis_x"]), g
 
 
 def skin_mask(a):
@@ -181,29 +195,28 @@ def main():
     ap.add_argument("--json", default="", help="сырые числа в JSON")
     args = ap.parse_args()
 
-    poses = load_poses()
+    doc = load_poses()
     names = args.sheets.split(",") if args.sheets else SHEETS
     base = os.path.join(ROOT, "art", "character", args.dir)
-    rows = []
     raw = {}
     debug_rows = []
-    print("| лист | кадр w×h | кадров | земля (мета) | подошва | макушка | рост тела | ширина лица | центр x−ось |")
-    print("|---|---|---|---|---|---|---|---|---|")
+    print("| лист | кадр w×h | кадров | земля (мета) | подошва | макушка | рост тела | ширина лица | ось (мета) | центр лица−ось |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
     for name in names:
         path = os.path.join(base, name + ".png")
         if not os.path.exists(path):
             continue
-        fw, fh, gy, meta = frame_geom(name, poses)
+        fw, fh, gy, axis, meta = frame_geom(name, doc, args.dir)
         im, n, frames = audit_sheet(path, fw, fh)
         soles = [f["sole"] for f in frames if f]
         crowns = [f["crown"] for f in frames if f]
         bodies = [f["sole"] - f["crown"] + 1 for f in frames if f]
         faces = [f.get("face_w") for f in frames if f]
-        cxs = [round(f["cx"] - (fw - 1) / 2.0, 1) for f in frames if f]
-        print("| %s | %d×%d | %d | %d | %s | %s | %s | %s | %s |" % (
+        cxs = [round(f["cx"] - axis, 1) for f in frames if f and f.get("face")]
+        print("| %s | %d×%d | %d | %d | %s | %s | %s | %s | %d | %s |" % (
             name, fw, fh, n, gy, fmt_range(soles), fmt_range(crowns), fmt_range(bodies),
-            fmt_range(faces), fmt_range(cxs)))
-        raw[name] = {"frame_w": fw, "frame_h": fh, "ground_y": gy, "frames": frames}
+            fmt_range(faces), axis, fmt_range(cxs)))
+        raw[name] = {"frame_w": fw, "frame_h": fh, "ground_y": gy, "axis_x": axis, "frames": frames}
         if args.debug:
             debug_rows.append((name, [(name, i, im.crop((i * fw, 0, (i + 1) * fw, fh)), gy, f)
                                       for i, f in enumerate(frames)]))
@@ -234,6 +247,8 @@ def main():
                     d.line([(x, y + f["sole"]), (x + cell.width, y + f["sole"])], fill=(80, 255, 120, 255))
                     d.line([(x, y + f["crown"]), (x + cell.width, y + f["crown"])], fill=(90, 180, 255, 255))
                     d.line([(x + int(f["cx"]), y), (x + int(f["cx"]), y + cell.height)], fill=(255, 150, 255, 160))
+                    ax = raw[name]["axis_x"]
+                    d.line([(x + ax, y), (x + ax, y + cell.height)], fill=(255, 255, 255, 90))
                     if f.get("face"):
                         fx0, fy0, fx1, fy1 = f["face"]
                         d.rectangle([x + fx0, y + fy0, x + fx1, y + fy1], outline=(255, 230, 60, 255))

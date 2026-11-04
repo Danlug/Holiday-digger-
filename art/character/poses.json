@@ -1,0 +1,63 @@
+{
+	"_comment": "Единые метаданные привязки кадров героя и актёров сцен (зона boy-scale). Пиксели ТЕКСТУРЫ (art_scale=3 к логическим). frame_w/frame_h — кадр листа (лист — горизонтальная полоса кадров); ground_y — линия земли в кадре: первая строка ПОД подошвой (подошва на ground_y-1) — рисовальщик кладёт её на низ клетки; axis_x — ось тела (центр по x; при развороте зеркально frame_w-axis_x) — ложится на x персонажа; ref_frame — опорный кадр для проверки по пикселям; body_h — рост тела (ground_y − макушка) в опорном кадре там, где он намеренно не равен эталону body_h_std±body_tol; sole_tol / sole_check / crown_check — допуск и отключения проверки там, где подошвы или макушки в кадре нет (полёт, бурмобиль, лёжа); note — почему. Единственное место применения — scripts/player/pose_anchor.gd (CharacterView, WorldActor, CutscenePlayer спрашивают его); проверка — tests/test_boy_scale.gd; обмер — tools/audit_boy_frames.py. Листы art/character/*.png и art/character/boy/*.png — герой (poses; перекраски бура с суффиксом из suffix_variants берут геометрию базового листа); другие папки (actors) — сетка 144 по умолчанию, общие исключения в actors_common, свои — в actors.<папка>.",
+	"art_scale": 3,
+	"body_h_std": 121,
+	"body_tol": 4,
+	"default": {"frame_w": 144, "frame_h": 144, "ground_y": 138, "axis_x": 72, "ref_frame": 0, "sole_tol": 1},
+	"suffix_variants": ["_titanium", "_platinum", "_diamond", "_obsidian"],
+	"actors_common": {
+		"sleep": {"crown_check": false, "note": "лёжа: роста нет (все папки актёров)"}
+	},
+	"poses": {
+		"idle": {},
+		"walk": {"ref_frame": 14, "sole_tol": 6, "note": "16 кадров шага из видео: подошва гуляет 132..137 — отрыв ноги в шаге, не привязка; макушка стоит на 18..20"},
+		"fall": {"sole_tol": 2},
+		"fly": {"ref_frame": 1, "sole_tol": 7, "crown_check": false, "note": "старый лист ранца (запасной: при наличии fly_1..4 не рисуется): ноги поджаты на 6 px выше земли; якорь — голова на высоте стойки (лицо→земля 94 px, как в idle)"},
+		"fly_jet": {"sole_tol": 6, "note": "старый лист джетпака (запасной); подошва 132..138 по кадрам"},
+		"fly_1": {"frame_w": 154, "frame_h": 162, "ground_y": 156, "axis_x": 77, "ref_frame": 1, "sole_tol": 8, "crown_check": false, "note": "ранец: винт на мачте над головой; якорь — голова на высоте стойки (tools/import_packs.py), ноги болтаются 148..159"},
+		"fly_2": {"frame_w": 204, "frame_h": 165, "ground_y": 163, "axis_x": 102, "sole_tol": 4, "crown_check": false, "note": "большой винт над головой; якорь — голова на высоте стойки, подошва 159..160"},
+		"fly_3": {"frame_w": 152, "frame_h": 141, "ground_y": 129, "axis_x": 76, "ref_frame": 1, "sole_tol": 11, "crown_check": false, "note": "джетпак: ноги вытянуты носками вниз — подошва 133..139, до 10 px ниже линии земли; якорь — голова на высоте стойки (лицо→земля 93 px)"},
+		"fly_4": {"frame_w": 260, "frame_h": 136, "ground_y": 123, "axis_x": 130, "sole_check": false, "crown_check": false, "note": "топовый джетпак, горизонтальный полёт: подошвы нет, якорь — голова на высоте стойки"},
+		"dig_shovel": {"frame_w": 192, "axis_x": 96},
+		"dig_pick": {"frame_w": 192, "axis_x": 96, "ref_frame": 7, "note": "замах: макушка ходит 14..28 по кадрам (наклон), опорный — последний кадр (кирка опущена)"},
+		"dig_pick_rusty": {"frame_w": 192, "axis_x": 96, "ref_frame": 7},
+		"dig_drill_down": {},
+		"dig_drill_side": {"axis_x": 54, "body_h": 113, "note": "выпад с буром вперёд: макушка на 8 px ниже стойки (поза, не масштаб); тело в кадре на 18 px левее середины — ось задана явно, иначе герой съезжал на 6 логических px при начале бурения вбок"},
+		"dig_rig_down": {"frame_w": 240, "frame_h": 168, "ground_y": 150, "axis_x": 120, "crown_check": false, "note": "бурмобиль в 2 клетки: ось — середина машины; герой в кабине нарисован в масштабе машины (голова ~25 px против ~20 у стойки) — авторский лист, без перерисовки не лечится"},
+		"dig_rig_side": {"frame_w": 240, "frame_h": 168, "ground_y": 150, "axis_x": 120, "crown_check": false},
+		"rig_jump": {"frame_w": 240, "frame_h": 168, "ground_y": 150, "axis_x": 120, "crown_check": false},
+		"rig_fly": {"frame_w": 220, "frame_h": 220, "ground_y": 150, "axis_x": 110, "sole_tol": 2, "crown_check": false, "note": "турбина под машиной — лишняя высота кадра уходит вниз"},
+		"rig_exit": {"frame_w": 348, "frame_h": 168, "ground_y": 150, "axis_x": 174, "crown_check": false, "note": "выход из бурмобиля (фазы и темп — rig_exit.json, геометрия — здесь): в кадрах 5..7 герой стоит рядом с машиной в её масштабе (голова ~39 px) и затем сменяется стойкой — см. ГДД"},
+		"sleep": {"crown_check": false, "note": "лёжа: низ тела 137, роста нет"}
+	},
+	"actors": {
+		"boy": {
+			"walk": {"sole_tol": 2, "note": "старый лист ходьбы из 4 кадров (только сцены); подошва 136"},
+			"age_8": {"frame_w": 47, "frame_h": 128, "ground_y": 128, "axis_x": 23, "crown_check": false, "note": "развёртка возраста (intro_boy, grow): одиночные кадры 47×128, подошва на низу"},
+			"age_9": {"frame_w": 47, "frame_h": 128, "ground_y": 128, "axis_x": 23, "crown_check": false},
+			"age_10": {"frame_w": 47, "frame_h": 128, "ground_y": 128, "axis_x": 23, "crown_check": false},
+			"age_11": {"frame_w": 47, "frame_h": 128, "ground_y": 128, "axis_x": 23, "crown_check": false},
+			"age_12": {"frame_w": 47, "frame_h": 128, "ground_y": 128, "axis_x": 23, "crown_check": false},
+			"age_15": {"frame_w": 47, "frame_h": 128, "ground_y": 128, "axis_x": 23, "crown_check": false}
+		},
+		"boy_gear": {
+			"dig_shovel": {"body_h": 117, "note": "кукла, собранная из стойки (tools/import_art.py): голова чуть ниже"},
+			"dig_pick": {"crown_check": false, "note": "кирка над головой — макушку не померить"},
+			"fly": {"crown_check": false}
+		},
+		"grandpa": {
+			"dig_shovel": {"crown_check": false},
+			"dig_pick": {"crown_check": false},
+			"fly": {"crown_check": false}
+		},
+		"grandpa_gear": {
+			"dig_shovel": {"body_h": 117},
+			"dig_pick": {"crown_check": false},
+			"fly": {"crown_check": false},
+			"pose_compass": {"frame_w": 69, "frame_h": 128, "ground_y": 128, "axis_x": 34, "crown_check": false, "note": "одиночная поза с компасом, кадр 69×128"}
+		},
+		"grandma_poor": {"fly": {"crown_check": false}},
+		"grandma_rich": {"fly": {"crown_check": false}},
+		"robert": {}
+	}
+}

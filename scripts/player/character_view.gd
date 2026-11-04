@@ -18,50 +18,22 @@ const ART_SCALE := 3.0
 
 const CHAR_W := int(48 * ART_SCALE)
 const CHAR_H := int(48 * ART_SCALE)
+## Полувысота героя, под которую рисовка считалась ДО привязки к физике; теперь
+## ступни кладутся на низ хитбокса (PoseAnchor.FEET_Y_HERO), а это число
+## оставлено только для старых тестов, читавших cv.HH.
 const HH := 0.46
 
-## Линия земли внутри кадра: подошва героя стоит на CHAR_H - FOOT_PAD.
-## На этом держится вся вертикальная привязка спрайта — см. SHEET_FRAME.
+## Линия земли квадратного кадра 48×48: подошва героя стоит на CHAR_H - FOOT_PAD.
+## Для остальных листов — ground_y в art/character/poses.json (PoseAnchor).
 const GROUND_Y := int(46 * ART_SCALE)
 
-## Листы, у которых кадр не 48×48: имя листа -> [ширина, высота, линия земли].
-##
-## Бурмобиль по ГДД п.5 занимает две клетки в ширину — это 64 px, и в кадр 48
-## он не влезает. Ужимать машину нельзя: вместе с ней ужимается герой в
-## кабине, и он становится мельче героя пешком. Лишняя высота кадра уходит
-## ВНИЗ, под линию земли, — бур, копающий вниз, входит в клетку под машиной,
-## и отвал породы должен лечь именно туда.
-##
-## Ленты полёта fly_1..fly_4 — та же история, только лишнее место уходит
-## ВВЕРХ, под винты, и немного вниз, под выхлоп. Тело героя в них того же
-## размера, что в idle.png: масштаб на весь лист один, и посчитан он по росту
-## героя (см. tools/import_packs.py). Влезть в 48×48 винты не могут — у
-## большого винта один диск 66 px в поперечнике, у топового джетпака пламя
-## уносит на 43 px назад, — а ужимать под них героя нельзя: он станет мельче
-## себя же пешком. Числа берутся из печати импортёра, менять их руками не надо.
-##
-## Ряды копки инструментом (dig_pick, dig_pick_rusty, dig_shovel) — тоже
-## шире 48 px: удар о землю рисует дугу замаха и разлетающуюся породу шире
-## клетки, а ужимать замах нельзя — герой на этом кадре худеет (см.
-## tools/import_dig.py, DIG_FRAME_W). Высота и линия земли те же, что у
-## idle — лишней высоты этим наборам не нужно.
-## rig_jump/rig_fly — прыжок и полёт бурмобиля (см. tools/import_rig_jump_fly.py
-## и блок "Прыжок и полёт бурмобиля" ниже). GROUND_Y=150 у обоих — та же линия
-## земли, что у dig_rig_down/side: машина не должна прыгать по вертикали при
-## переходе копка <-> прыжок <-> полёт.
-const SHEET_FRAME := {
-	"dig_pick": [192, 144, 138],
-	"dig_pick_rusty": [192, 144, 138],
-	"dig_shovel": [192, 144, 138],
-	"dig_rig_down": [240, 168, 150],
-	"dig_rig_side": [240, 168, 150],
-	"rig_jump": [240, 168, 150],
-	"rig_fly": [220, 220, 150],
-	"fly_1": [154, 162, 156],
-	"fly_2": [204, 165, 163],
-	"fly_3": [152, 141, 129],
-	"fly_4": [260, 136, 123],
-}
+## Геометрия кадров — ширина/высота, линия земли и ось тела на лист — живёт
+## в art/character/poses.json и читается через PoseAnchor: одно место для
+## героя, актёров живой карты (world_actor.gd) и классических сцен
+## (cutscene_player.gd). Раньше здесь была своя таблица SHEET_FRAME, и три
+## рисовальщика расходились молча (зона boy-scale, бриф 6). Почему у
+## бурмобиля кадр 240×168, а у лент полёта лишняя высота уходит вверх под
+## винты — в note соответствующих записей JSON.
 
 ## Лента полёта по уровню снаряжения: 1 — ранец, 2 — улучшенный ранец,
 ## 3 — джетпак, 4 — топовый джетпак. 0 — снаряжения нет.
@@ -129,23 +101,26 @@ var _sheets: Dictionary = {}
 # ---------------------------------------------------------------------------
 # Выход/посадка в бурмобиль на поверхности (art/character/rig_exit.png +
 # .json, см. tools/import_rig_exit.py). Свой, отдельный от DIG_SHEETS/
-# SHEET_FRAME выше — те листы и фазы копки правит параллельно другой агент,
+# DIG_PHASES выше — те листы и фазы копки правит параллельно другой агент,
 # и общий кусок кода между двумя задачами усложнил бы слияние. Всё моё живёт
 # в этом блоке и в _draw_rig_transition().
 # ---------------------------------------------------------------------------
 const RIG_EXIT_SHEET_PATH := "res://art/character/rig_exit.png"
 const RIG_EXIT_META_PATH := "res://art/character/rig_exit.json"
 const RIG_EXIT_FRAMES := 7
-## Резерв на случай отсутствия JSON (тесты без art/) — тот же кадр, что
-## печатает tools/import_rig_exit.py по факту листа сейчас.
-const RIG_EXIT_GROUND_Y_FALLBACK := 150
 
 var _rig_exit_sheet: Texture2D = null
-var _rig_exit_ground_y: int = RIG_EXIT_GROUND_Y_FALLBACK
 
 ## Уровень снаряжения, выставленный снаружи. -1 значит «не выставляли» — тогда
 ## уровень спрашивается у самого героя, см. _flight_tier().
 var _tier_override: int = -1
+
+## Принудительная поза (имя листа + кадр) — витрина «все позы в ряд»
+## (tests/test_screenshot_poses.gd) и тест привязки (tests/test_boy_scale.gd):
+## состояние героя не читается, рисуется ровно названный кадр ровно той же
+## формулой привязки, что и в игре. "" — обычная отрисовка по состоянию.
+var pose_override: String = ""
+var frame_override: int = 0
 
 ## Состояние машины фаз копки (см. DIG_PHASES и _dig_frame).
 var _dig_phase: String = "none"        # "none" | "start" | "loop" | "end"
@@ -240,7 +215,7 @@ func _rig_tier_suffix() -> String:
 ## Текстура листа по имени, с подстановкой перекрашенного варианта бура, если
 ## это один из RIG_RECOLOR_SHEETS и нужный тир вообще нарезан (см. _ready).
 ## Единственная точка, где имя листа превращается в реальную Texture2D —
-## поэтому геометрия (SHEET_FRAME) и фазы (DIG_PHASES) по-прежнему считаются
+## поэтому геометрия (poses.json) и фазы (DIG_PHASES) по-прежнему считаются
 ## по БАЗОВОМУ имени листа (dig_rig_side, а не dig_rig_side_titanium): у
 ## перекрашенных вариантов та же ширина/высота кадра и те же фазы, отдельной
 ## записи под суффиксом им заводить незачем.
@@ -484,6 +459,10 @@ func _process(_dt: float) -> void:
 		return
 	position = Vector2(player.x * TILE, player.y * TILE)
 
+	if not pose_override.is_empty():
+		_draw_pose_override()
+		return
+
 	# Выход из бурмобиля на поверхности / посадка в него — свой рисунок поверх
 	# всего остального (player.rig_transition != ""), пока анимация не
 	# доиграла управление и так заблокировано, см. player.gd). Держит экран,
@@ -540,10 +519,10 @@ func _process(_dt: float) -> void:
 	else:
 		sheet_name = "walk" if player.vx != 0.0 else "idle"
 
-	var geom: Array = SHEET_FRAME.get(sheet_name, [CHAR_W, CHAR_H, GROUND_Y])
+	var geom: Dictionary = PoseAnchor.geom(sheet_name)
 	var anim_div: float = SHEET_ANIM_DIV.get(sheet_name, ANIM_DIV)
-	var fw: int = geom[0]
-	var fh: int = geom[1]
+	var fw: int = geom["frame_w"]
+	var fh: int = geom["frame_h"]
 	var tex: Texture2D = _tex_for_sheet(sheet_name)
 	if tex != null:
 		_sprite.texture = tex
@@ -554,12 +533,38 @@ func _process(_dt: float) -> void:
 					(int(floor(player.anim / anim_div)) % frames if frames > 1 else 0)
 		_sprite.region_rect = Rect2(frame * fw, 0, fw, fh)
 	_sprite.flip_h = player.facing < 0
-	# Линия земли листа должна лечь туда же, куда ложится подошва у кадра
-	# 48×48, иначе высокий кадр повиснет над землёй.
-	# Позиция — в логических точках, а текстура в ART_SCALE раз крупнее,
-	# поэтому её размеры сюда попадают делёными.
-	_sprite.position = Vector2(-fw / (2.0 * ART_SCALE) + _stun_shake(),
-			-HH * TILE - 16.0 + float(GROUND_Y - int(geom[2])) / ART_SCALE)
+	# Линия земли листа ложится на низ хитбокса героя (стоя — низ клетки), ось
+	# тела — на x героя (при развороте — зеркально): одна формула на все
+	# листы, см. PoseAnchor.
+	_sprite.position = PoseAnchor.sprite_position(sheet_name, "", _sprite.flip_h) \
+			+ Vector2(_stun_shake(), 0.0)
+
+
+## Кадр принудительной позы (pose_override) — см. объявление выше. Листы вне
+## DIG_SHEETS (sleep) подгружаются по требованию.
+func _draw_pose_override() -> void:
+	var tex: Texture2D = _tex_for_sheet(pose_override)
+	if tex == null and pose_override == "rig_exit":
+		tex = _rig_exit_sheet
+	if tex == null:
+		var path: String = "res://art/character/" + pose_override + ".png"
+		if ResourceLoader.exists(path):
+			tex = load(path)
+			_sheets[pose_override] = tex
+	if tex == null:
+		return
+	var geom: Dictionary = PoseAnchor.geom(pose_override)
+	var frames: int = PoseAnchor.frames(tex, pose_override)
+	var fw: int = geom["frame_w"]
+	_sprite.texture = tex
+	_sprite.region_rect = Rect2(clampi(frame_override, 0, frames - 1) * fw, 0, fw, geom["frame_h"])
+	_sprite.flip_h = player.facing < 0
+	_sprite.position = PoseAnchor.sprite_position(pose_override, "", _sprite.flip_h)
+
+
+func set_pose_override(sheet: String, frame: int = 0) -> void:
+	pose_override = sheet
+	frame_override = frame
 
 
 ## Стан показывается тряской, а не простоем: секунда без движения выглядит как
@@ -582,12 +587,6 @@ func _stun_shake() -> float:
 func _load_rig_exit_sheet() -> void:
 	if ResourceLoader.exists(RIG_EXIT_SHEET_PATH):
 		_rig_exit_sheet = load(RIG_EXIT_SHEET_PATH)
-	if ResourceLoader.exists(RIG_EXIT_META_PATH):
-		var f := FileAccess.open(RIG_EXIT_META_PATH, FileAccess.READ)
-		if f != null:
-			var parsed = JSON.parse_string(f.get_as_text())
-			if parsed is Dictionary and parsed.has("ground_y"):
-				_rig_exit_ground_y = int(parsed["ground_y"])
 
 
 ## Кадр листа rig_exit.png по ключу (1..7), который держит player.gd
@@ -598,13 +597,16 @@ func _draw_rig_transition() -> void:
 	if _rig_exit_sheet == null or player == null:
 		return
 	var key: int = int(player.call("rig_transition_key")) if player.has_method("rig_transition_key") else 1
-	var fw: int = int(_rig_exit_sheet.get_width() / RIG_EXIT_FRAMES)
-	var fh: int = int(_rig_exit_sheet.get_height())
+	# Геометрия кадра — из poses.json (PoseAnchor), как у остальных листов;
+	# rig_exit.json хранит фазы и темп (их читает player.gd), а его ground_y
+	# обязан совпадать с poses.json — это проверяет tests/test_boy_scale.gd.
+	var geom: Dictionary = PoseAnchor.geom("rig_exit")
+	var fw: int = geom["frame_w"]
+	var fh: int = geom["frame_h"]
 	_sprite.texture = _rig_exit_sheet
 	_sprite.region_rect = Rect2(clampi(key - 1, 0, RIG_EXIT_FRAMES - 1) * fw, 0, fw, fh)
 	# Сцена выхода всегда смотрит в одну сторону (та, куда исходно смотрел
 	# художник — герой выходит из машины лицом от тоннеля): разворот по
 	# facing её не касается, машина не разворачивается вместе с героем.
 	_sprite.flip_h = false
-	_sprite.position = Vector2(-fw / (2.0 * ART_SCALE),
-			-HH * TILE - 16.0 + float(GROUND_Y - _rig_exit_ground_y) / ART_SCALE)
+	_sprite.position = PoseAnchor.sprite_position("rig_exit")

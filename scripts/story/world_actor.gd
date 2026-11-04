@@ -11,17 +11,15 @@ extends Node2D
 ## (player.frozen=true, а x/y/anim двигает скрипт снаружи).
 ##
 ## Рисовка — тот же приём, что в scripts/player/character_view.gd: лист
-## art/character/<dir>/<pose>.png нарезан на кадры 144×144 (ART_SCALE=3
+## art/character/<dir>/<pose>.png нарезан на кадры (обычно 144×144, ART_SCALE=3
 ## поверх логических 48×48, см. tools/import_art.py), якорь — по ступням,
-## разворот — flip_h. Дед и бабка используют дефолтную линию земли (46*3=138
-## снизу кадра) — их листы, в отличие от боевых листов игрока, нарисованы
-## равномерной сеткой без штучных поправок ширины/высоты под замах инструмента.
+## разворот — flip_h. Ширина кадра, линия земли и ось тела — из единых
+## метаданных art/character/poses.json через PoseAnchor (то же место, что у
+## героя и у классических сцен): у деда и бабки сетка 144 по умолчанию, у
+## листов копки мальчика кадр 192 — записан там же, своей таблицы здесь нет.
 
 const TILE := 32
 const ART_SCALE := 3.0
-const CHAR_FRAME := 144.0
-const GROUND_Y := 138.0   # 46*ART_SCALE, см. character_view.gd:GROUND_Y
-const HH := 0.46          # см. character_view.gd:HH
 const ANIM_DIV := 7.0     # см. character_view.gd:ANIM_DIV
 
 ## Id актёра из data/story.json → actors.<id>.dir задаёт папку
@@ -43,8 +41,8 @@ var height_k: float = 1.0
 var _dir: String = ""
 var _sprite: Sprite2D
 var _frames: int = 1
-var _frame_w: float = CHAR_FRAME
-var _frame_h: float = CHAR_FRAME
+var _frame_w: float = 144.0
+var _frame_h: float = 144.0
 
 func _ready() -> void:
 	_sprite = Sprite2D.new()
@@ -75,30 +73,6 @@ func setup(id: String) -> void:
 		set_pose(pose, flip)
 
 
-## Ширина кадра листов копки шире квадратного 144 (замах инструмента и
-## разлетающаяся порода не влезают в 144×144 — та же причина, что у
-## character_view.gd:SHEET_FRAME для тех же имён поз). Проверяется ВТОРЫМ
-## заходом в set_pose(), после обычного квадратного 144 — так лист остаётся
-## квадратным там, где он и правда квадратный (у "дед"/"бабка" dig_shovel.png
-## нарезан на 144, см. ниже), и переключается на 192 только там, где 144 не
-## делит ширину листа без остатка.
-##
-## БАГ (отчёт владельца, QA-проход): лист art/character/boy/dig_pick_rusty.png
-## (и boy/dig_shovel.png, boy/dig_pick.png — тот же художник резал их шире,
-## чем art/character/grandpa/dig_shovel.png) — 1536×144, восемь кадров по 192,
-## а не по 144. 1536 не делится на 144 без остатка (в остатке 96) — старая
-## проверка молчала и отдавала ОДИН кадр на весь лист. Из-за
-## _sprite.region_enabled=true БЕЗ явного region_rect на кадр это не резало
-## спрайт в ноль (в отличие от предупреждения в _ready() про AtlasTexture) —
-## _sprite.region_rect ставился на ВЕСЬ лист 1536×144, и на экране появлялась
-## НЕОБРЕЗАННАЯ полоса из всех восьми кадров анимации подряд, сжатая в кадр
-## обычного роста персонажа. Видно это было как "второй мальчик" в сцене
-## death (world_dig, поза dig_pick_rusty) — на самом деле два СОСЕДНИХ кадра
-## одного нерезаного листа, а не два актёра (см. .qa_screenshots/
-## bug_world_actor_wide_dig_frame).
-const WIDE_DIG_FRAME_W := 192
-
-
 ## Меняет позу/разворот. Возвращает false молча (как _load_pose в
 ## cutscene_player.gd), если у актёра нет такого листа — Роберт и родители
 ## сейчас без спрайтов вообще, и сцена не должна падать, наткнувшись на них.
@@ -109,18 +83,15 @@ func set_pose(p_pose: String, p_flip: bool = false) -> bool:
 	if not ResourceLoader.exists(path):
 		return false
 	var tex: Texture2D = load(path)
-	var tex_h: int = int(round(tex.get_height()))
-	var tex_w: int = int(round(tex.get_width()))
-	_frames = 1
-	_frame_w = float(tex_w)
-	if tex_h == int(CHAR_FRAME):
-		if tex_w % int(CHAR_FRAME) == 0:
-			_frames = maxi(1, tex_w / int(CHAR_FRAME))
-			_frame_w = float(CHAR_FRAME)
-		elif tex_w % WIDE_DIG_FRAME_W == 0:
-			_frames = maxi(1, tex_w / WIDE_DIG_FRAME_W)
-			_frame_w = float(WIDE_DIG_FRAME_W)
-	_frame_h = tex.get_height()
+	# Кадр — по единым метаданным (PoseAnchor): ширина, не кратная кадру,
+	# значит одиночную позу на весь лист. БАГ прошлого QA-прохода (владелец:
+	# «второй мальчик» в сцене death) — лист boy/dig_pick_rusty.png нарезан
+	# по 192, а не по 144, и без записи о ширине кадра рисовалась вся полоса.
+	var geom: Dictionary = PoseAnchor.geom(p_pose, _dir)
+	_frames = PoseAnchor.frames(tex, p_pose, _dir)
+	_frame_w = float(geom["frame_w"]) if _frames > 1 or int(tex.get_width()) == int(geom["frame_w"]) \
+			else float(tex.get_width())
+	_frame_h = minf(float(geom["frame_h"]), tex.get_height())
 	_sprite.texture = tex
 	_sprite.region_rect = Rect2(0, 0, _frame_w, _frame_h)
 	pose = p_pose
@@ -131,16 +102,11 @@ func set_pose(p_pose: String, p_flip: bool = false) -> bool:
 
 func _process(_dt: float) -> void:
 	position = Vector2(x * TILE, y * TILE)
-	# Якорь по ступням: низ кадра (GROUND_Y от верха) ложится на клетку
-	# (x, y) так же, как у героя игрока — см. character_view.gd:_process.
-	# Центр по ширине — по РЕАЛЬНОЙ ширине текущего кадра (_frame_w), не по
-	# фиксированному CHAR_FRAME: у широких кадров копки (см. WIDE_DIG_FRAME_W
-	# выше) иначе персонаж сидел бы смещённым от клетки на разницу ширин.
-	# Рост height_k меняет кадр вокруг линии земли: верх опускается ровно на
-	# столько, на сколько кадр стал ниже, и ступни остаются там же, где у героя.
-	var s := height_k / ART_SCALE
-	_sprite.position = Vector2(-_frame_w * s / 2.0,
-		-HH * TILE - 16.0 + GROUND_Y * (1.0 / ART_SCALE - s))
+	# Якорь по ступням: точка актёра — центр клетки (x, y), линия земли кадра
+	# (ground_y из poses.json) ложится на низ этой клетки, ось тела — на x;
+	# рост height_k меняет кадр вокруг линии земли, и ступни остаются на
+	# месте. Одна формула на всех — PoseAnchor.sprite_position.
+	_sprite.position = PoseAnchor.sprite_position(pose, _dir, flip, height_k, PoseAnchor.FEET_Y_ACTOR)
 	if _frames <= 1 or _sprite.texture == null:
 		return
 	var idx: int = int(anim / ANIM_DIV) % _frames

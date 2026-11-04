@@ -38,6 +38,9 @@ const GROUND_LINE := 0.56      # доля высоты, на которой пр
 const ART_SCALE := 3.0
 const TILE := 32.0     # клетка мира в логических px — см. player.gd/world_actor.gd
 const CHAR_FRAME := int(48 * ART_SCALE)
+## Отступ линии подошв от низа стойки (px текстуры): 144 − 138, см.
+## art/character/poses.json и _place_actor.
+const STAGE_FOOT_PAD := 6.0
 const ANIM_FPS := 7.0
 const TAP_DEBOUNCE_MS := 90    # ScreenTouch и эмулированная мышь — одно касание, а не два
 
@@ -896,24 +899,28 @@ func _load_pose(id: String, pose: String, flip: bool) -> bool:
 	if path.is_empty() or not ResourceLoader.exists(path):
 		return false
 	var tex: Texture2D = load(path)
-	# Кадры считаем только для листов с обычной квадратной сеткой 144×144
-	# (idle/walk/fall/fly/fly_jet/dig_pick/dig_shovel/dig_drill_*). Бур
-	# (dig_rig_*, кадр 240×168) и одиночная поза с компасом (48×89) сетке не
-	# соответствуют — для них весь файл считается ОДНИМ кадром: неверный
-	# делитель резал бы их на кривые ломти хуже, чем показ целиком.
-	var frames: int = 1
-	if int(round(tex.get_height())) == CHAR_FRAME and int(round(tex.get_width())) % CHAR_FRAME == 0:
-		frames = maxi(1, int(round(tex.get_width() / float(CHAR_FRAME))))
+	# Нарезка на кадры — по единым метаданным привязки (PoseAnchor,
+	# art/character/poses.json): ширина кадра своя у каждой позы, а лист,
+	# ширина которого не кратна кадру (одиночная поза с компасом, возраст
+	# 47×128), — один кадр целиком. Раньше кадр считался только для
+	# квадратной сетки 144, и широкий лист копки мальчика (кадр 192, лист
+	# 1536) показывался в сценах dud_treasure/workshop ЦЕЛОЙ полосой из
+	# восьми кадров.
+	var dir := String(StoryData.actor(id).get("dir", id))
+	var geom: Dictionary = PoseAnchor.geom(pose, dir)
+	var frames: int = PoseAnchor.frames(tex, pose, dir)
 	var node: TextureRect = _actors[id].node
 	var atlas := AtlasTexture.new()
 	atlas.atlas = tex
 	var frame_w: float = tex.get_width() / float(frames)
-	atlas.region = Rect2(0, 0, frame_w, tex.get_height())
+	var frame_h: float = minf(float(geom["frame_h"]), tex.get_height())
+	atlas.region = Rect2(0, 0, frame_w, frame_h)
 	node.texture = atlas
 	node.flip_h = flip
 	_actors[id].frames = frames
 	_actors[id].frame_w = frame_w
-	_actors[id].tex_h = tex.get_height()
+	_actors[id].tex_h = frame_h
+	_actors[id].ground_y = float(geom["ground_y"])
 	_actors[id].pose = pose
 	_actors[id].flip = flip
 	return true
@@ -1125,12 +1132,16 @@ func _place_actor(id: String) -> void:
 	var w: float = a.frame_w * s / ART_SCALE
 	var h: float = a.tex_h * s / ART_SCALE
 	node.size = Vector2(w, h)
-	# Актёр стоит НА земле: низ кадра совпадает с линией земли сцены, иначе
-	# фигура висит в воздухе, и сцена перестаёт читаться как место. dx —
+	# Актёр стоит НА земле: линия земли кадра (ground_y, PoseAnchor) ложится
+	# на линию подошв сцены — STAGE_FOOT_PAD px текстуры над низом стойки,
+	# ровно туда, где всегда стояли квадратные листы (низ кадра 144 на низу
+	# стойки, подошва на 138); листы другой высоты/привязки встают туда же,
+	# а не «низом картинки», иначе фигура висит в воздухе или тонет. dx —
 	# горизонтальный сдвиг входа/выхода пешком (см. _tick_slides), поверх
 	# именованной позиции "at".
+	var ground_y: float = float(a.get("ground_y", a.tex_h - STAGE_FOOT_PAD))
 	node.position = Vector2(_fit_x(_stage_x(a.at), w) + float(a.get("dx", 0.0)),
-		_stage.size.y - h + float(a.dy))
+		_stage.size.y - (ground_y + STAGE_FOOT_PAD) * s / ART_SCALE + float(a.dy))
 
 
 ## Тикает вход/выход актёра пешком (см. _show_actor:enter / _hide_actor:exit_to).

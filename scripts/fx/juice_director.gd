@@ -19,10 +19,6 @@ const HEAVY_TILES := [
 	TileTypes.Type.UNIVERSALIUM, TileTypes.Type.ANGEL_STONE, TileTypes.Type.DIVINE_HEART,
 	TileTypes.Type.GEOCRYSTAL,
 ]
-const PRECIOUS_TILES := [
-	TileTypes.Type.GOLD_ORE, TileTypes.Type.DIAMOND, TileTypes.Type.RUBY,
-	TileTypes.Type.EMERALD, TileTypes.Type.PLATINUM_ORE,
-]
 const RARE_CATEGORIES := ["gem", "exotic", "warzone", "radioactive", "liquid_metal"]
 
 const COL_GOLD := Color("FFE066")
@@ -39,9 +35,9 @@ var story: Node = null
 var _prev_on_ground: bool = false
 var _prev_vy: float = 0.0
 var _step_dist: float = 0.0
-var _was_digging: bool = false
-var _next_hit: float = 0.0
 var _thrust_prev: String = ""
+## Звук копки: ритм ударов по длительности клетки, материал × инструмент, моторы (dig-sound).
+var dig_sound := DigSound.new()
 
 var _last_hp: float = -1.0
 var _hp_drip: float = 0.0
@@ -121,6 +117,7 @@ func _exit_tree() -> void:
 	_disconnect(GameState.survival_warning, _on_warning)
 	_disconnect(GameState.artifact_collected, _on_artifact)
 	_disconnect(GameState.coins_changed, _on_coins)
+	dig_sound.stop()
 
 
 func _disconnect(sig: Signal, c: Callable) -> void:
@@ -228,20 +225,11 @@ func _tick_player(delta: float) -> void:
 				Sfx.play("fly_stop")
 		_thrust_prev = thrust
 
-	# удары по породе, пока копка идёт
-	var d = player.digging
-	if d != null:
-		if not _was_digging:
-			_was_digging = true
-			_next_hit = Feel.hit_period(GameState.current_tool) * 0.5
-		var t: float = d["t"]
-		var total: float = d["total"]
-		if t >= _next_hit:
-			_next_hit += Feel.hit_period(GameState.current_tool)
-			if t < total - 0.12:
-				_dig_strike(d)
-	else:
-		_was_digging = false
+	# удары по породе, пока копка идёт: звук — DigSound, частицы — здесь
+	if dig_sound.tick(player, delta):
+		var d = player.digging
+		if d != null:
+			_dig_strike(d)
 
 	_prev_on_ground = on_ground
 	_prev_vy = vy
@@ -262,27 +250,12 @@ func _dig_strike(d: Dictionary) -> void:
 	var center := Vector2(float(d["x"]) * 32.0 + 16.0, float(d["y"]) * 32.0 + 16.0)
 	var toward := (Vector2(player.x, player.y) * 32.0 - center)
 	var spot := center + (toward.normalized() * 13.0 if toward.length() > 1.0 else Vector2.ZERO)
-	# высота и громкость удара зависят от инструмента: лопата глуше и выше, бур дробит, бурмобиль гудит
-	var prof := Feel.tool_profile(GameState.current_tool)
-	Sfx.play(_dig_sound(tile), randf_range(0.9, 1.0) * float(prof["pitch"]), float(prof["db"]))
 	_dig_burst(tile, spot, 0.4)
 
 
 # ---------------------------------------------------------------------------
 # Копка и добыча
 # ---------------------------------------------------------------------------
-
-func _dig_sound(tile: int) -> String:
-	if tile == TileTypes.Type.DIRT or tile == TileTypes.Type.PEAT:
-		return "dig_dirt"
-	if tile == TileTypes.Type.STONE:
-		return "dig_stone"
-	if HEAVY_TILES.has(tile):
-		return "dig_hard"
-	if PRECIOUS_TILES.has(tile):
-		return "dig_gold"
-	return "dig_ore"
-
 
 func _dig_burst(tile: int, pos: Vector2, amount: float) -> void:
 	if tile == TileTypes.Type.DIRT or tile == TileTypes.Type.PEAT:
@@ -335,7 +308,7 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 		&"dug":
 			var tile := int(data.get("tile", 0))
 			var pos: Vector2 = data.get("pos", Vector2.ZERO)
-			Sfx.play(_dig_sound(tile))
+			dig_sound.on_dug(tile, GameState.current_tool)
 			_dig_burst(tile, pos, 1.3)
 			if bool(data.get("loot", false)):
 				_magnet(tile, pos)

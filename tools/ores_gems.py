@@ -291,15 +291,21 @@ def fit_blades(params, box):
 
 # ── обсидиан: рваные острые осколки; на тёмном грунте читается ободком света по кромке ──
 
-def _obsidian(mode):
+_OBS_LAYOUTS = [
+    [(23, 27, 17, 7, 19, 1.5), (7, 27, 12, 5, -24, -1.0), (14, 29, 25, 10, -8, 1.5), (19, 30, 8, 5, 6, 0.5)],
+    [(8, 28, 18, 7, -21, -1.5), (24, 27, 11, 5, 26, 1.0), (16, 30, 24, 9, 9, -1.5), (11, 30, 7, 4, -6, 0.5)],
+    [(16, 29, 26, 9, 2, 1.0), (6, 26, 10, 5, -34, -1.0), (26, 25, 12, 6, 30, 1.0), (21, 30, 7, 4, 14, 0.5), (10, 30, 6, 4, -12, 0.0)],
+]
+
+
+def _obsidian(mode, v=0):
     cv = Cv("obsidian")
     P = {
         "deep": lch(3, 14, 328), "base": lch(8, 26, 328), "mid": lch(16, 42, 326), "lit": lch(32, 60, 324),
         "rim": lch(74, 52, 328), "rim2": lch(40, 64, 326), "glint": lch(96, 8, 316),
     }
-    blades = [(23, 27, 17, 7, 19, 1.5), (7, 27, 12, 5, -24, -1.0), (14, 29, 25, 10, -8, 1.5),
-              (19, 30, 8, 5, 6, 0.5)]
-    box = (4, 3, 28, 29) if mode == "tile" else (1, 1, 31, 31)
+    blades = _OBS_LAYOUTS[v % 3] if mode == "tile" else _OBS_LAYOUTS[0]
+    box = ((4, 3, 28, 29), (3, 4, 29, 29), (3, 5, 29, 28))[v % 3] if mode == "tile" else (1, 1, 31, 31)
     for bx, by, ln, wd, ang, sk in fit_blades(blades, box):
         b = blade(bx, by, ln, wd, ang, sk)
         sil = poly_mask([b["BL"], b["KL"], b["T"], b["KR"], b["BR"]])
@@ -318,7 +324,7 @@ def _obsidian(mode):
     return cv.sprite()
 
 
-TILES["ore_obsidian"] = lambda: _obsidian("tile")
+TILES["ore_obsidian"] = lambda v=0: _obsidian("tile", v)
 ICONS["obsidian"] = lambda: _obsidian("icon")
 
 
@@ -343,12 +349,12 @@ def _disc(cv, cx, cy, rx, ry, ang, front, tones, qlo=0.6):
             cv.put(x, y, tones[i])
 
 
-def _dark_matter(mode):
+def _dark_matter(mode, v=0):
     cv = Cv("dark_matter")
-    k = 0.92 if mode == "tile" else 1.1
-    cx, cy = 15.5, 15.5
+    k = (0.92, 0.86, 0.9)[v % 3] if mode == "tile" else 1.1
+    cx, cy = ((15.5, 15.5), (14.5, 16.5), (16.5, 14.5))[v % 3] if mode == "tile" else (15.5, 15.5)
     r = 6.8 * k
-    rx, ry, ang = 14.8 * k, 4.8 * k, -14.0
+    rx, ry, ang = 14.8 * k, 4.8 * k, (-14.0, 22.0, -38.0)[v % 3]
     ring = [lch(24, 56, 297), lch(46, 80, 295), lch(78, 42, 297), lch(97, 8, 288)]
     _disc(cv, cx, cy, rx, ry, ang, False, [tone(c, -16, 0.9) for c in ring], qlo=0.8)
     sph = [lch(1, 8, 296), lch(4, 26, 296), lch(8, 40, 296), lch(14, 52, 296)]
@@ -363,24 +369,27 @@ def _dark_matter(mode):
     for (x, y) in ((12, 12), (14, 10), (17, 13), (11, 16)):
         cv.put(x, y, tone(ring[1], -10))
     _disc(cv, cx, cy, rx, ry, ang, True, ring, qlo=0.8)
-    for (x, y) in ((4, 5), (27, 5), (28, 25), (4, 27), (16, 2), (22, 29), (2, 14), (29, 14)):
+    stars = (((4, 5), (27, 5), (28, 25), (4, 27), (16, 2), (22, 29), (2, 14), (29, 14)),
+             ((6, 3), (25, 7), (29, 22), (3, 25), (13, 2), (20, 29), (2, 11), (28, 15)),
+             ((3, 7), (28, 4), (27, 27), (6, 28), (18, 2), (12, 29), (2, 17), (29, 12)))[v % 3]
+    for (x, y) in stars:
         if cv.a[y, x, 3] == 0:
             cv.put(x, y, ring[3] if (x + y) % 3 else ring[2])
     cv.halo(lch(42, 78, 296), 2.3, 0.72)
     return cv.sprite()
 
 
-TILES["ore_dark_matter"] = lambda: _dark_matter("tile")
+TILES["ore_dark_matter"] = lambda v=0: _dark_matter("tile", v)
 ICONS["dark_matter"] = lambda: _dark_matter("icon")
 
 
 # ── вселениум: многолучевая звезда, каждый луч своего цвета радуги, белое ядро ──
 
-def _universalium(mode):
+def _universalium(mode, v=0):
     cv = Cv("universalium")
-    k = 1.0 if mode == "tile" else 1.14
-    cx, cy = 15.5, 15.5
-    turn = 11.0   # звезда повёрнута: без осевой симметрии
+    k = (1.0, 0.94, 0.96)[v % 3] if mode == "tile" else 1.14
+    cx, cy = ((15.5, 15.5), (14.5, 16.5), (16.5, 14.5))[v % 3] if mode == "tile" else (15.5, 15.5)
+    turn = (11.0, 37.0, -23.0)[v % 3]   # звезда повёрнута: без осевой симметрии; у вариантов — свой поворот
     # (угол, длина, оттенок): кардинальные лучи длинные, диагональные короткие
     rays = [(-90, 12.0, 236), (-45, 12.0, 84), (0, 13.0, 8), (45, 11.5, 64), (90, 13.0, 4), (135, 9.5, 24),
             (180, 13.0, 90), (-135, 7.0, 205)]
@@ -410,26 +419,28 @@ def _universalium(mode):
     cv.put(cx + 2.2 * k, cy + 0.3 * k, lch(92, 55, 95))
     cv.ring(core, lch(44, 56, 340))
     cv.halo(lch(88, 52, 215), 1.3, 0.36)
-    for (x, y, n) in ((4, 5, 1), (27, 26, 1), (28, 7, 0), (5, 26, 0)):
+    sparks = (((4, 5, 1), (27, 26, 1), (28, 7, 0), (5, 26, 0)), ((6, 4, 1), (26, 27, 0), (28, 9, 1), (3, 24, 0)),
+              ((5, 7, 0), (28, 25, 1), (27, 5, 1), (4, 27, 0)))[v % 3]
+    for (x, y, n) in sparks:
         if cv.a[y, x, 3] < 100:
             cv.spark(x, y, (255, 255, 255), (235, 250, 255), n)
     return cv.sprite()
 
 
-TILES["ore_universalium"] = lambda: _universalium("tile")
+TILES["ore_universalium"] = lambda v=0: _universalium("tile", v)
 ICONS["universum"] = lambda: _universalium("icon")
 
 
 # ── ангельский камень: каплевидный кристалл с крыльями-перьями и нимбом, мягкое золото-белое ──
 
-def _angelstone(mode):
+def _angelstone(mode, v=0):
     cv = Cv("angelstone")
     P = {
         "out": lch(50, 44, 68), "deep": lch(66, 40, 76), "shade": lch(80, 38, 84), "base": lch(91, 26, 92),
         "light": lch(96, 14, 96), "hi": (255, 255, 252), "gold": lch(86, 72, 88), "gold2": lch(72, 66, 78),
     }
-    sc = 0.86 if mode == "tile" else 1.08
-    ox, oy = 16.0, 16.0
+    sc = (0.86, 0.80, 0.82)[v % 3] if mode == "tile" else 1.08
+    ox, oy = ((16.0, 16.0), (14.0, 17.5), (18.0, 15.0))[v % 3] if mode == "tile" else (16.0, 16.0)
 
     def T(p):
         return (ox + (p[0] - 16) * sc, oy + (p[1] - 16) * sc)
@@ -472,13 +483,13 @@ def _angelstone(mode):
     cv.line(T((16, 16)), T((16, 26)), P["shade"])
     cv.spark(round(ox + (13 - 16) * sc), round(oy + (11 - 16) * sc), (255, 255, 255), (255, 250, 220), 1)
     cv.halo(lch(92, 62, 90), 2.6, 0.6)
-    for (x, y) in ((6, 28), (26, 27), (27, 4)):
+    for (x, y) in (((6, 28), (26, 27), (27, 4)), ((27, 26), (28, 8), (4, 6)), ((4, 27), (5, 5), (27, 28)))[v % 3]:
         if cv.a[y, x, 3] < 100:
             cv.spark(x, y, (255, 255, 255), P["gold"], 1 if (x + y) % 2 else 0)
     return cv.sprite()
 
 
-TILES["ore_angelstone"] = lambda: _angelstone("tile")
+TILES["ore_angelstone"] = lambda v=0: _angelstone("tile", v)
 ICONS["angelstone"] = lambda: _angelstone("icon")
 
 
@@ -506,32 +517,40 @@ def _brilliant(cv, cx, top, w, h, P, flip=0.0):
     return sil
 
 
-def _diamond(mode):
+_DIA_LAYOUTS = [
+    ([(8.5, 5, 9, 9, -0.5), (24, 8, 7, 7, 0.5), (15, 12, 15, 14.5, 0.0)], ((10, 15, 2), (26, 6, 0)), ((5, 24), (26, 25))),
+    ([(7, 10, 8, 8, 0.5), (23.5, 4, 10, 10, -0.5), (16, 15, 13, 12.5, 0.0)], ((24, 7, 2), (8, 11, 0)), ((27, 25), (4, 23))),
+    ([(10.5, 4, 12, 12, -0.5), (24.5, 14, 9, 9, 0.5), (9, 19, 8, 8, 0.0)], ((12, 7, 2), (25, 16, 1)), ((27, 5), (22, 27))),
+]
+
+
+def _diamond(mode, v=0):
     cv = Cv("diamond")
     P = {
         "out": lch(30, 42, 232), "deep": lch(74, 42, 204), "shade": lch(83, 38, 197), "base": lch(90, 32, 194),
         "light": lch(96, 14, 194), "hi": lch(99, 3, 200), "cyan": lch(86, 44, 192),
     }
     if mode == "tile":
-        gems = [(8.5, 5, 9, 9, -0.5), (24, 8, 7, 7, 0.5), (15, 12, 15, 14.5, 0.0)]
+        gems, sparks, crumbs = _DIA_LAYOUTS[v % 3]
     else:
         gems = [(8, 2, 11, 11, -0.5), (24.5, 6, 9, 9, 0.5), (15.5, 11, 18, 18, 0.0)]
     for cx, top, w, h, fl in gems:
         _brilliant(cv, cx, top, w, h, P, fl)
     # искры-кресты на гранях и мелкая крошка
     if mode == "tile":
-        cv.spark(10, 15, (255, 255, 255), P["hi"], 2)
-        cv.spark(26, 6, (255, 255, 255), P["hi"], 0)
-        cv.put(5, 24, P["base"])
-        cv.put(5, 25, P["deep"])
-        cv.put(26, 25, P["light"])
+        for x, y, n in sparks:
+            cv.spark(x, y, (255, 255, 255), P["hi"], n)
+        (ax, ay), (bx, by) = crumbs
+        cv.put(ax, ay, P["base"])
+        cv.put(ax, ay + 1, P["deep"])
+        cv.put(bx, by, P["light"])
     else:
         cv.spark(9, 16, (255, 255, 255), P["hi"], 2)
         cv.spark(26, 5, (255, 255, 255), P["hi"], 1)
     return cv.sprite()
 
 
-TILES["ore_diamond"] = lambda: _diamond("tile")
+TILES["ore_diamond"] = lambda v=0: _diamond("tile", v)
 ICONS["diamond"] = lambda: _diamond("icon")
 
 
@@ -587,14 +606,21 @@ def _gem_cut(cv, cx, cy, rx, ry, rot, P, n=10, pear=False):
     return mask
 
 
-def _ruby(mode):
+_RUBY_LAYOUTS = [
+    [(7.5, 8.5, 4.4, 3.0, 52, 8, True), (24.5, 25.5, 3.2, 3.0, 0, 8, False), (16.5, 17.0, 9.8, 7.4, -24, 12, False)],
+    [(23.5, 8.5, 4.6, 3.2, -40, 8, True), (7.0, 24.0, 3.4, 3.0, 0, 8, False), (14.5, 15.0, 9.2, 7.0, 20, 12, False)],
+    [(9.0, 10.0, 6.8, 5.2, -30, 10, False), (22.5, 21.0, 7.6, 5.8, 25, 10, True), (24.5, 7.0, 2.8, 2.6, 0, 8, False), (7.0, 25.5, 2.6, 2.4, 0, 8, False)],
+]
+
+
+def _ruby(mode, v=0):
     cv = Cv("ruby")
     P = {
         "out": lch(16, 44, 32), "deep": lch(25, 58, 34), "shade": lch(33, 68, 36), "base": lch(42, 74, 37),
         "light": lch(53, 76, 34), "hi": lch(70, 56, 28), "spec": lch(90, 22, 20), "reflex": lch(60, 70, 34),
     }
     if mode == "tile":
-        gems = [(7.5, 8.5, 4.4, 3.0, 52, 8, True), (24.5, 25.5, 3.2, 3.0, 0, 8, False), (16.5, 17.0, 9.8, 7.4, -24, 12, False)]
+        gems = _RUBY_LAYOUTS[v % 3]
     else:
         gems = [(6.5, 7.0, 5.0, 3.4, 52, 8, True), (26.5, 26.5, 3.8, 3.6, 0, 8, False), (16.0, 16.5, 12.0, 9.0, -24, 12, False)]
     for cx, cy, rx, ry, rot, n, pear in gems:
@@ -602,7 +628,7 @@ def _ruby(mode):
     return cv.sprite()
 
 
-TILES["ore_ruby"] = lambda: _ruby("tile")
+TILES["ore_ruby"] = lambda v=0: _ruby("tile", v)
 ICONS["ruby"] = lambda: _ruby("icon")
 
 
@@ -653,7 +679,14 @@ def _gem_step(cv, cx, cy, w, h, ang, P):
     return sil
 
 
-def _emerald(mode):
+_EMER_LAYOUTS = [
+    ([(8.5, 10, 7.5, 10.0, -24), (17.5, 16, 11.0, 15.0, 6), (8.5, 23.5, 6.0, 7.5, 14)], (25, 8, 1), (26, 25)),
+    ([(23, 10, 7.5, 10.0, 20), (12.5, 16.5, 11.0, 15.0, -8), (23.5, 23.5, 6.0, 7.5, -14)], (6, 8, 1), (5, 25)),
+    ([(9, 9, 9.0, 12.0, 10), (22.5, 14, 8.0, 11.0, -20), (13, 24, 7.0, 8.0, 30)], (27, 26, 1), (26, 5)),
+]
+
+
+def _emerald(mode, v=0):
     cv = Cv("emerald")
     P = {
         "out": lch(22, 40, 150), "deep": lch(32, 52, 152), "shade": lch(42, 62, 148), "base": lch(53, 70, 146),
@@ -661,21 +694,21 @@ def _emerald(mode):
         "reflex": lch(60, 64, 150),
     }
     if mode == "tile":
-        gems = [(8.5, 10, 7.5, 10.0, -24), (17.5, 16, 11.0, 15.0, 6), (8.5, 23.5, 6.0, 7.5, 14)]
+        gems, (sx, sy, sn), (cx_, cy_) = _EMER_LAYOUTS[v % 3]
     else:
         gems = [(8, 9, 9.0, 12.0, -24), (18, 16.5, 13.0, 18.0, 6), (8, 25, 7.0, 9.0, 14)]
     for cx, cy, w, h, ang in gems:
         _gem_step(cv, cx, cy, w, h, ang, P)
     if mode == "tile":
-        cv.spark(25, 8, P["spec"], P["hi"], 1)
-        cv.put(26, 25, P["shade"])
-        cv.put(26, 26, P["deep"])
+        cv.spark(sx, sy, P["spec"], P["hi"], sn)
+        cv.put(cx_, cy_, P["shade"])
+        cv.put(cx_, cy_ + 1, P["deep"])
     else:
         cv.spark(26, 6, P["spec"], P["hi"], 2)
     return cv.sprite()
 
 
-TILES["ore_emerald"] = lambda: _emerald("tile")
+TILES["ore_emerald"] = lambda v=0: _emerald("tile", v)
 ICONS["emerald"] = lambda: _emerald("icon")
 
 
@@ -710,19 +743,26 @@ def _prism(cv, bx, by, H, W, ang, P, tilt=0.0):
     return sil
 
 
-def _geocrystal(mode):
+_GEO_LAYOUTS = [
+    ([(24, 27, 14, 6.4, 22, 0.8), (7.5, 27, 11, 5.4, -24, -0.6), (16, 28, 22, 8.2, -4, 0.8), (11, 29, 8, 5.0, -40, 0.0), (22, 29, 7, 4.6, 36, 0.0)],
+     (4, 2, 28, 29), (14, 10)),
+    ([(8, 27, 15, 6.6, -20, -0.8), (24.5, 27, 10, 5.2, 26, 0.6), (16, 28, 20, 7.8, 6, -0.8), (21, 29, 8, 5.0, 42, 0.0), (10, 29, 7, 4.6, -38, 0.0)],
+     (3, 3, 29, 29), (18, 11)),
+    ([(16, 27, 24, 9.0, -2, 0.6), (6.5, 26, 9, 5.0, -36, -0.4), (26, 25, 11, 5.6, 32, 0.6), (11, 29, 7, 4.4, -16, 0.0), (22, 29, 6, 4.2, 18, 0.0)],
+     (3, 2, 29, 29), (13, 8)),
+]
+
+
+def _geocrystal(mode, v=0):
     cv = Cv("geocrystal")
     P = {
         "out": lch(22, 52, 32), "deep": lch(36, 80, 36), "shade": lch(48, 92, 40), "base": lch(59, 96, 46),
         "light": lch(72, 92, 58), "hi": lch(90, 56, 80), "core": lch(94, 40, 90), "white": (255, 252, 226),
     }
     # (основание x, y, высота, ширина, наклон, смещение острия): веер из центра, у ног — самая яркая точка
-    prisms = [(24, 27, 14, 6.4, 22, 0.8), (7.5, 27, 11, 5.4, -24, -0.6), (16, 28, 22, 8.2, -4, 0.8),
-              (11, 29, 8, 5.0, -40, 0.0), (22, 29, 7, 4.6, 36, 0.0)]
-    box = (4, 2, 28, 29) if mode == "tile" else (1, 0, 31, 31)
+    prisms, box, (sx, sy) = _GEO_LAYOUTS[v % 3] if mode == "tile" else (_GEO_LAYOUTS[0][0], (1, 0, 31, 31), (13, 7))
     for bx, by, H, W, ang, tl in _fit_prisms(prisms, box):
         _prism(cv, bx, by, H, W, ang, P, tl)
-    sx, sy = (14, 10) if mode == "tile" else (13, 7)
     cv.spark(sx, sy, P["white"], P["hi"], 1)
     cv.shadow()
     cv.halo(lch(72, 90, 62), 2.2, 0.62, lch(50, 84, 48))
@@ -743,7 +783,7 @@ def _fit_prisms(pts, box):
     return [(bx * s + ox, by * s + oy, H * s, W * s, ang, tl * s) for bx, by, H, W, ang, tl in pts]
 
 
-TILES["ore_geocrystal"] = lambda: _geocrystal("tile")
+TILES["ore_geocrystal"] = lambda v=0: _geocrystal("tile", v)
 ICONS["geocrystal"] = lambda: _geocrystal("icon")
 
 
@@ -772,18 +812,20 @@ def _plate(cv, pts, P, runes=True, rivets=True):
     return face
 
 
-def _ancient_metal(mode):
+def _ancient_metal(mode, v=0):
     cv = Cv("ancient_metal")
     P = {
         "out": lch(14, 24, 60), "deep": lch(26, 30, 76), "shade": lch(36, 36, 80), "base": lch(46, 40, 82),
         "light": lch(58, 42, 86), "hi": lch(74, 34, 92), "green": lch(52, 40, 158),
         "rune": lch(88, 78, 92), "rune2": lch(64, 66, 76), "bolt": lch(82, 22, 90),
     }
-    k = 0.93 if mode == "tile" else 1.1
+    k = (0.93, 0.88, 0.9)[v % 3] if mode == "tile" else 1.1
+    # варианты: вся композиция повёрнута и сдвинута (свет на плитах считается заново по кромкам)
+    turn, (ox, oy) = ((0.0, (0.0, 0.0)), (16.0, (-1.0, 1.0)), (-13.0, (1.0, -1.0)))[v % 3] if mode == "tile" else (0.0, (0.0, 0.0))
 
     def S(pts, ang=0.0, c=(16, 16)):
-        pts = rot(pts, ang, c)
-        return [(16 + (x - 16.2) * k, 16 + (y - 18.0) * k) for x, y in pts]
+        pts = rot(rot(pts, ang, c), turn, (16, 17))
+        return [(16 + ox + (x - 16.2) * k, 16 + oy + (y - 18.0) * k) for x, y in pts]
 
     # малая плита-обломок позади (справа-снизу) и большая плита впереди с отколотым углом
     _plate(cv, S([(15, 19), (27, 17), (29, 24), (18, 27)], 6), P)
@@ -812,7 +854,7 @@ def _ancient_metal(mode):
     return cv.sprite()
 
 
-TILES["ore_ancient_metal"] = lambda: _ancient_metal("tile")
+TILES["ore_ancient_metal"] = lambda v=0: _ancient_metal("tile", v)
 ICONS["ancient_metal"] = lambda: _ancient_metal("icon")
 
 
@@ -842,7 +884,29 @@ def _crack(cv, pts, P, inside):
     return wide
 
 
-def _hellstone(mode):
+def _auto_rock(pts, k=2.5):
+    """Глыба по одному силуэту: освещённая часть — к свету (верх-лево от центра), тень — от него."""
+    cx = sum(x for x, _ in pts) / len(pts)
+    cy = sum(y for _, y in pts) / len(pts)
+    lit = [(x, y) for x, y in pts if (x - cx) + (y - cy) < k] + [(cx + 0.5, cy + 0.5)]
+    dark = [(x, y) for x, y in pts if (x - cx) + (y - cy) > -k] + [(cx - 0.5, cy - 0.5)]
+    return pts, lit, dark
+
+
+_HELL_LAYOUTS = [
+    None,   # вариант 0 — силуэты с выписанными вручную светом и тенью (ниже)
+    ([[(4, 10), (11, 5), (19, 6), (24, 12), (22, 20), (14, 23), (6, 20)], [(20, 18), (27, 15), (30, 21), (27, 27), (20, 27), (17, 23)],
+      [(3, 24), (8, 22), (11, 26), (8, 30), (3, 29)]],
+     [[(10, 8), (12, 12), (9, 16), (12, 20)], [(14, 10), (19, 12), (21, 16)], [(25, 17), (24, 21), (26, 25)], [(5, 24), (8, 28)]],
+     ((16, 23), (18, 21), (14, 28), (27, 13)), ((26, 4), (7, 4), (29, 10)), (3, 14)),
+    ([[(8, 12), (14, 6), (23, 5), (28, 9), (27, 17), (21, 22), (12, 21), (7, 18)], [(4, 19), (10, 20), (13, 25), (9, 29), (3, 27)],
+      [(22, 21), (28, 20), (29, 26), (24, 28), (20, 26)]],
+     [[(17, 7), (15, 11), (18, 15), (16, 19)], [(20, 9), (24, 11), (23, 15)], [(6, 22), (9, 25), (7, 28)], [(24, 22), (26, 26)]],
+     ((13, 18), (18, 24), (5, 12), (29, 18)), ((4, 5), (27, 3), (30, 13)), (17, 3)),
+]
+
+
+def _hellstone(mode, v=0):
     cv = Cv("hellstone")
     P = {
         "out": lch(2, 16, 28), "deep": lch(3, 16, 28), "shade": lch(6, 22, 28), "base": lch(10, 30, 30),
@@ -863,13 +927,13 @@ def _hellstone(mode):
     def S(pts):
         return [(16 + (x - 16) * k, 16.5 + (y - 16.5) * k) for x, y in pts]
 
+    cracks = [[(13, 9), (14, 13), (12, 16), (14, 20), (12, 24)], [(14, 13), (18, 14), (20, 17)], [(24, 14), (23, 18), (25, 22)], [(6, 22), (8, 26)]]
+    embers, sparks, red = ((17, 10), (19, 22), (11, 27), (26, 11)), ((8, 5), (24, 6), (29, 9)), (12, 3)
+    if mode == "tile" and v % 3:
+        sil, cracks, embers, sparks, red = _HELL_LAYOUTS[v % 3]
+        rocks = [_auto_rock(q) for q in sil]
     rocks = [(S(a), S(b), S(c)) for a, b, c in rocks]
-    cracks = [S(c) for c in (
-        [(13, 9), (14, 13), (12, 16), (14, 20), (12, 24)],
-        [(14, 13), (18, 14), (20, 17)],
-        [(24, 14), (23, 18), (25, 22)],
-        [(6, 22), (8, 26)],
-    )]
+    cracks = [S(c) for c in cracks]
     masks = []
     for sil, lit, dark in rocks:
         m = poly_mask(sil)
@@ -886,17 +950,17 @@ def _hellstone(mode):
     for pts in cracks:
         _crack(cv, pts, P, union)
     # щели между глыбами и искры-угольки
-    for (x, y) in ((17, 10), (19, 22), (11, 27), (26, 11)):
+    for (x, y) in embers:
         cv.put(x, y, P["orange"])
-    for (x, y) in ((8, 5), (24, 6), (29, 9)):
+    for (x, y) in sparks:
         cv.put(x, y, P["yellow"])
-    cv.put(12, 3, P["red"])
+    cv.put(red[0], red[1], P["red"])
     cv.shadow(c=(14, 3, 2), a=150)
     cv.halo(lch(56, 92, 44), 2.2, 0.6, lch(36, 80, 36))
     return cv.sprite()
 
 
-TILES["ore_hellstone"] = lambda: _hellstone("tile")
+TILES["ore_hellstone"] = lambda v=0: _hellstone("tile", v)
 ICONS["hellstone"] = lambda: _hellstone("icon")
 
 
@@ -915,7 +979,7 @@ def _heart_mask(cx, cy, k):
     return left | right | body
 
 
-def _divine_heart(mode):
+def _divine_heart(mode, v=0):
     """Огранённое хрустальное сердце: 12 граней короны вокруг светлого стола-сердечка, золотая искра в центре,
     блик на левой доле, пульсирующий ореол из двух колец."""
     cv = Cv("divine_heart")
@@ -925,8 +989,9 @@ def _divine_heart(mode):
         "core": lch(92, 28, 4), "core2": lch(80, 54, 2),
         "gold": lch(84, 76, 88), "gold2": lch(68, 68, 80), "goldhi": lch(96, 32, 96),
     }
-    k = 0.86 if mode == "tile" else 1.06
-    cx, cy = 16.0, 16.5
+    vi = v % 3 if mode == "tile" else 0   # ниже v переиспользуется как тон грани
+    k = (0.86, 0.80, 0.82)[vi] if mode == "tile" else 1.06
+    cx, cy = ((16.0, 16.5), (14.5, 17.5), (17.5, 15.5))[vi] if mode == "tile" else (16.0, 16.5)
     m = _heart_mask(cx, cy, k)
     fy = cy - 1.0 * k
     tones = [P["deep"], P["shade"], P["base"], P["light"], P["hi"]]
@@ -962,13 +1027,13 @@ def _divine_heart(mode):
     cv.shadow()
     cv.halo(lch(66, 70, 8), 4.4, 0.5, lch(56, 66, 4))
     cv.halo(lch(78, 74, 12), 2.4, 0.78, lch(64, 70, 4))
-    for (x, y) in ((4, 5), (28, 6), (27, 26), (5, 27)):
+    for (x, y) in (((4, 5), (28, 6), (27, 26), (5, 27)), ((27, 4), (29, 24), (6, 28), (4, 8)), ((5, 4), (27, 7), (28, 27), (3, 26)))[vi]:
         if cv.a[y, x, 3] < 100:
             cv.spark(x, y, P["goldhi"], P["gold"], 1 if (x + y) % 2 == 0 else 0)
     return cv.sprite()
 
 
-TILES["ore_divine_heart"] = lambda: _divine_heart("tile")
+TILES["ore_divine_heart"] = lambda v=0: _divine_heart("tile", v)
 ICONS["divine_heart"] = lambda: _divine_heart("icon")
 
 

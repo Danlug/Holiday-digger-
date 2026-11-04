@@ -135,43 +135,35 @@ cd build/web && python3 -m http.server 8000
   `node tools/smoke_shell.js http://localhost:8000/index.html /каталог/скриншотов` (Playwright из `/opt/node-tools`: загрузка на
   середине, «нажмите», игра в портрете и на десктопе, ландшафтная плашка, мультитач, окно ошибки, нет WebGL2; на скриншоты смотреть глазами).
 
-## Сборка iOS (только на macOS — собрать на Linux невозможно)
+## Сборка iOS (`tools/export_ios.sh`; `.ipa` — только на macOS)
 
-Godot умеет **сгенерировать Xcode-проект** на любой ОС, но **скомпилировать и подписать `.ipa`** — только там, где есть `xcodebuild` и Xcode.app, то есть на macOS. На Linux команда экспорта преста `iOS` в этом репозитории целенаправленно дойдёт до стадии подготовки и остановится (нет `codesign`/`xcodebuild`) — это ожидаемо, не баг пресета.
+Godot 4.4 генерирует **Xcode-проект** на любой ОС, а **собирает и подписывает `.ipa`** только там,
+где есть Xcode, — на macOS. Проверено на Linux (2026-11-03): `tools/export_ios.sh` доходит до конца
+и оставляет `build/ios/Raskopki.xcodeproj` + `Raskopki.pck` + `PrivacyInfo.xcprivacy` с предупреждением
+«.ipa can only be built on macOS». На macOS с Xcode та же команда соберёт и `.ipa`.
+Подача в App Store и что для неё нужно от владельца — `docs/APPSTORE.md`.
 
-### Требования
+### Что уже в репозитории
+- Пресет `iOS` (`[preset.1]`): bundle id `com.danlug.holidaydigger`, iPhone, портрет
+  (из `window/handheld/orientation=1`), версия 1.0, `export_method_release=0` (App Store),
+  иконка `icons/icon_1024x1024="res://art/brand/icon-1024.png"` (остальные размеры Godot делает сам).
+- `project.godot`: `rendering/textures/vram_compression/import_etc2_astc=true` — без этого флага
+  `has_valid_project_configuration` iOS-экспорта возвращает ложь **без текста ошибки**; на веб не влияет
+  (все текстуры `compress/mode=0`).
+- Ещё одна немая причина отказа: **пустой, но заданный `XDG_DATA_HOME`** — Godot ищет шаблоны не в
+  `~/.local/share`; скрипт его снимает (тот же приём, что `env -u XDG_DATA_HOME tools/build_web.sh`).
 
-- macOS с установленным **Xcode** (актуальная версия, поддерживающая `application/min_ios_version="12.0"` из пресета — при необходимости поднять/опустить в `export_presets.cfg`).
-- Аккаунт Apple Developer (для реальной подписи и загрузки в App Store) — **App Store Team ID**.
-- Godot 4.4 с установленными iOS export-шаблонами (см. выше).
+### Шаги на macOS
+1. Godot 4.4.stable с iOS-шаблонами, Xcode 16+.
+2. `tools/export_ios.sh` → `build/ios/Raskopki.xcodeproj` (или сразу `.ipa`, если в пресете вписаны
+   `application/app_store_team_id` и профили).
+3. `open build/ios/Raskopki.xcodeproj` → Signing & Capabilities → Team (автоподпись) →
+   Product → Archive → Distribute App → App Store Connect.
 
-### Шаги
-
-1. Открыть проект в Godot на macOS: `godot --path .` (или через `Godot.app`).
-2. `Project → Export...` → выбрать пресет **iOS**.
-3. В пресете уже заполнено: портрет (наследуется из `window/handheld/orientation=1` в `project.godot` — retina/масштаб экрана обеспечивает `stretch/mode=canvas_items` + `stretch/aspect=expand`, отдельного тумблера "retina" в iOS-пресете Godot 4.4 нет — это следствие тех же настроек стретча), `application/bundle_identifier="com.danlug.holidaydigger"`, `application/targeted_device_family=1` (iPhone).
-4. Заполнить **обязательно** перед экспортом (иначе Godot откажется экспортировать с ошибкой валидации):
-   - `application/app_store_team_id` — сейчас стоит заглушка `"YOUR_TEAM_ID"`, заменить на реальный Team ID из Apple Developer.
-   - `application/code_sign_identity_debug` / `_release` — обычно `"iPhone Developer"` / `"iPhone Distribution"` (уже так стоит), но зависит от того, как называются сертификаты в вашей связке ключей (Keychain).
-   - `application/provisioning_profile_uuid_debug` / `_release` — UUID профилей из Apple Developer Portal (или используйте автоматическое управление подписью в Xcode после генерации проекта — тогда эти поля можно оставить пустыми, Xcode сам подставит).
-5. Экспортировать (кнопка Export Project либо, из терминала на macOS):
-   ```bash
-   mkdir -p build/ios
-   godot --headless --path . --export-release "iOS" build/ios/holiday_digger.ipa
-   ```
-   Godot сначала сгенерирует Xcode-проект во временную папку и вызовет `xcodebuild`/`xcrun` для архивации и экспорта `.ipa` — это и есть шаг, недоступный на Linux.
-6. Если нужна ручная сборка (например, для отладки на подключённом iPhone): открыть сгенерированный `.xcodeproj`/`.xcodeworkspace` в Xcode, выбрать команду/устройство, Product → Run.
-7. **Иконки** — в пресете сейчас не заданы (см. `НЕ ТРОГАТЬ art/**` в задании этого агента: новые PNG под `icons/*` пресета не создавались). Godot подставит свою иконку по умолчанию. Перед подачей в App Store нужно:
-   - добавить реальные иконки (`icons/icon_1024x1024`, `icons/iphone_120x120`, `icons/ipad_152x152` и т.д. — полный список ключей в `export_presets.cfg` под `[preset.1.options]`, доступные имена см. `godot --help`/документацию `EditorExportPlatformIOS`);
-   - указать их пути в `export_presets.cfg` (относительно `res://`).
-8. **App Store**: после успешной генерации `.ipa` — загрузка через Xcode Organizer или `xcrun altool`/`notarytool`/Transporter.app, требует действующего платного Apple Developer аккаунта, заполненной карточки приложения в App Store Connect (скриншоты, описание, возрастной рейтинг и т.д. — не задача этого агента).
-
-### Известные ограничения пресета на момент сдачи
-
-- `app_store_team_id` — заглушка, не настоящий Team ID.
-- Провижининг-профили не указаны (пусты) — либо заполнить вручную, либо доверить автоматическому управлению подписью в Xcode.
-- Иконки не заданы (используется дефолтная иконка Godot).
-- `min_ios_version="12.0"` — не проверялось на реальных устройствах/симуляторе (нет macOS-хоста в этой среде разработки).
+### Известные ограничения
+- `app_store_team_id` — заглушка `YOUR_TEAM_ID` (не мешает генерации проекта; Xcode подставит Team сам).
+- `min_ios_version="12.0"` — не проверялось на устройствах.
+- Покупки и ролики в сборке — заглушки без SDK (см. `docs/APPSTORE.md`, «Что ревью может завернуть»).
 
 ## Сборка Android
 

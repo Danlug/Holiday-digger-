@@ -600,6 +600,8 @@ def make_icons():
 	base = icon_base(native, 46)
 	big = base.im.resize((512, 512), Image.NEAREST)
 	big.save(OUT / "icon-512.png", optimize=True)
+	# App Store: 1024×1024, без альфы (Apple отклоняет прозрачность); 1024 кратно 64 — чистый пиксель
+	base.im.resize((1024, 1024), Image.NEAREST).convert("RGB").save(OUT / "icon-1024.png", optimize=True)
 	base.im.resize((192, 192), Image.NEAREST).save(OUT / "icon-192.png", optimize=True)
 	# apple-touch-icon: iOS сам скругляет углы и не любит прозрачность; 180 не кратно 64 — берём ресемпл
 	big.convert("RGB").resize((180, 180), Image.LANCZOS).save(OUT / "apple-touch-icon.png", optimize=True)

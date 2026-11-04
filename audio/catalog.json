@@ -62,6 +62,96 @@
    "pv": 0.03,
    "voices": 1
   },
+  "break_dirt": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/break_dirt_1.wav",
+    "sfx/break_dirt_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "break_gem": {
+   "cd": 100,
+   "db": 0.0,
+   "duck": 2.0,
+   "files": [
+    "sfx/break_gem_1.wav",
+    "sfx/break_gem_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.04,
+   "voices": 2
+  },
+  "break_gold": {
+   "cd": 100,
+   "db": 0.0,
+   "duck": 2.0,
+   "files": [
+    "sfx/break_gold_1.wav",
+    "sfx/break_gold_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.04,
+   "voices": 2
+  },
+  "break_hard": {
+   "cd": 100,
+   "db": 0.0,
+   "duck": 3.0,
+   "files": [
+    "sfx/break_hard_1.wav",
+    "sfx/break_hard_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.04,
+   "voices": 2
+  },
+  "break_lava": {
+   "cd": 150,
+   "db": 0.0,
+   "files": [
+    "sfx/break_lava.wav"
+   ],
+   "prio": 2,
+   "pv": 0.04,
+   "voices": 1
+  },
+  "break_ore": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/break_ore_1.wav",
+    "sfx/break_ore_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "break_peat": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/break_peat_1.wav",
+    "sfx/break_peat_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
+  "break_stone": {
+   "cd": 80,
+   "db": 0.0,
+   "files": [
+    "sfx/break_stone_1.wav",
+    "sfx/break_stone_2.wav"
+   ],
+   "prio": 2,
+   "pv": 0.06,
+   "voices": 2
+  },
   "coin": {
    "cd": 45,
    "db": 0.0,
@@ -107,62 +197,279 @@
    "voices": 1
   },
   "dig_dirt": {
-   "cd": 35,
+   "cd": 45,
    "db": 0.0,
    "files": [
-    "sfx/dig_dirt_1.wav",
-    "sfx/dig_dirt_2.wav",
-    "sfx/dig_dirt_3.wav"
+    "sfx/dig_dirt_pick_1.wav",
+    "sfx/dig_dirt_pick_2.wav",
+    "sfx/dig_dirt_pick_3.wav"
    ],
    "prio": 1,
-   "pv": 0.09,
-   "voices": 3
+   "pv": 0.08,
+   "voices": 2
   },
-  "dig_gold": {
-   "cd": 50,
+  "dig_dirt_drill": {
+   "cd": 45,
    "db": 0.0,
    "files": [
-    "sfx/dig_gold_1.wav",
-    "sfx/dig_gold_2.wav"
+    "sfx/dig_dirt_drill_1.wav",
+    "sfx/dig_dirt_drill_2.wav",
+    "sfx/dig_dirt_drill_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_dirt_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_dirt_pick_1.wav",
+    "sfx/dig_dirt_pick_2.wav",
+    "sfx/dig_dirt_pick_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_dirt_shovel": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_dirt_shovel_1.wav",
+    "sfx/dig_dirt_shovel_2.wav",
+    "sfx/dig_dirt_shovel_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_gem_drill": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_gem_drill_1.wav",
+    "sfx/dig_gem_drill_2.wav",
+    "sfx/dig_gem_drill_3.wav"
    ],
    "prio": 2,
-   "pv": 0.05,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_gem_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_gem_pick_1.wav",
+    "sfx/dig_gem_pick_2.wav",
+    "sfx/dig_gem_pick_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_gold": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_gold_pick_1.wav",
+    "sfx/dig_gold_pick_2.wav",
+    "sfx/dig_gold_pick_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_gold_drill": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_gold_drill_1.wav",
+    "sfx/dig_gold_drill_2.wav",
+    "sfx/dig_gold_drill_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_gold_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_gold_pick_1.wav",
+    "sfx/dig_gold_pick_2.wav",
+    "sfx/dig_gold_pick_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
    "voices": 2
   },
   "dig_hard": {
    "cd": 45,
    "db": 0.0,
    "files": [
-    "sfx/dig_hard_1.wav",
-    "sfx/dig_hard_2.wav"
+    "sfx/dig_hard_pick_1.wav",
+    "sfx/dig_hard_pick_2.wav",
+    "sfx/dig_hard_pick_3.wav"
    ],
    "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_hard_drill": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_hard_drill_1.wav",
+    "sfx/dig_hard_drill_2.wav",
+    "sfx/dig_hard_drill_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_hard_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_hard_pick_1.wav",
+    "sfx/dig_hard_pick_2.wav",
+    "sfx/dig_hard_pick_3.wav"
+   ],
+   "prio": 2,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_lava": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_lava_1.wav",
+    "sfx/dig_lava_2.wav"
+   ],
+   "prio": 1,
    "pv": 0.06,
    "voices": 2
   },
   "dig_ore": {
-   "cd": 35,
+   "cd": 45,
    "db": 0.0,
    "files": [
-    "sfx/dig_ore_1.wav",
-    "sfx/dig_ore_2.wav",
-    "sfx/dig_ore_3.wav"
+    "sfx/dig_ore_pick_1.wav",
+    "sfx/dig_ore_pick_2.wav",
+    "sfx/dig_ore_pick_3.wav"
    ],
    "prio": 1,
    "pv": 0.08,
-   "voices": 3
+   "voices": 2
+  },
+  "dig_ore_drill": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_ore_drill_1.wav",
+    "sfx/dig_ore_drill_2.wav",
+    "sfx/dig_ore_drill_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_ore_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_ore_pick_1.wav",
+    "sfx/dig_ore_pick_2.wav",
+    "sfx/dig_ore_pick_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_ore_shovel": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_ore_shovel_1.wav",
+    "sfx/dig_ore_shovel_2.wav",
+    "sfx/dig_ore_shovel_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_peat_drill": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_peat_drill_1.wav",
+    "sfx/dig_peat_drill_2.wav",
+    "sfx/dig_peat_drill_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_peat_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_peat_pick_1.wav",
+    "sfx/dig_peat_pick_2.wav",
+    "sfx/dig_peat_pick_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_peat_shovel": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_peat_shovel_1.wav",
+    "sfx/dig_peat_shovel_2.wav",
+    "sfx/dig_peat_shovel_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
   },
   "dig_stone": {
-   "cd": 35,
+   "cd": 45,
    "db": 0.0,
    "files": [
-    "sfx/dig_stone_1.wav",
-    "sfx/dig_stone_2.wav",
-    "sfx/dig_stone_3.wav"
+    "sfx/dig_stone_pick_1.wav",
+    "sfx/dig_stone_pick_2.wav",
+    "sfx/dig_stone_pick_3.wav"
    ],
    "prio": 1,
    "pv": 0.08,
-   "voices": 3
+   "voices": 2
+  },
+  "dig_stone_drill": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_stone_drill_1.wav",
+    "sfx/dig_stone_drill_2.wav",
+    "sfx/dig_stone_drill_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
+  },
+  "dig_stone_pick": {
+   "cd": 45,
+   "db": 0.0,
+   "files": [
+    "sfx/dig_stone_pick_1.wav",
+    "sfx/dig_stone_pick_2.wav",
+    "sfx/dig_stone_pick_3.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 2
   },
   "door": {
    "cd": 200,
@@ -173,6 +480,17 @@
    ],
    "prio": 1,
    "pv": 0.05,
+   "voices": 1
+  },
+  "drill_loop": {
+   "cd": 0,
+   "db": -6.0,
+   "files": [
+    "sfx/drill_loop.wav"
+   ],
+   "loop": true,
+   "prio": 0,
+   "pv": 0.0,
    "voices": 1
   },
   "drink": {
@@ -410,6 +728,17 @@
    "pv": 0.0,
    "voices": 1
   },
+  "rattle": {
+   "cd": 60,
+   "db": 0.0,
+   "files": [
+    "sfx/rattle_1.wav",
+    "sfx/rattle_2.wav"
+   ],
+   "prio": 1,
+   "pv": 0.08,
+   "voices": 1
+  },
   "respawn": {
    "cd": 400,
    "db": 0.0,
@@ -428,6 +757,17 @@
     "sfx/reward.wav"
    ],
    "prio": 3,
+   "pv": 0.0,
+   "voices": 1
+  },
+  "rig_loop": {
+   "cd": 0,
+   "db": -8.0,
+   "files": [
+    "sfx/rig_loop.wav"
+   ],
+   "loop": true,
+   "prio": 0,
    "pv": 0.0,
    "voices": 1
   },
@@ -513,8 +853,8 @@
    "cd": 80,
    "db": 0.0,
    "files": [
-    "sfx/tile_break_1.wav",
-    "sfx/tile_break_2.wav"
+    "sfx/break_stone_1.wav",
+    "sfx/break_stone_2.wav"
    ],
    "prio": 2,
    "pv": 0.06,

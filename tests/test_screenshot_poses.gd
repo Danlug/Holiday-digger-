@@ -80,7 +80,8 @@ func _ready() -> void:
 			_cell(cx, ground)
 			var stub := PoseStub.new()
 			stub.x = cx / 32.0
-			stub.y = (ground - 16.0) / 32.0
+			# Точка героя — так, чтобы низ его хитбокса (линия ступней) лёг на линию земли.
+			stub.y = (ground - PoseAnchor.FEET_Y_HERO) / 32.0
 			stub.facing = -1 if row == 1 else 1
 			_root.add_child(stub)
 			var view: Node2D = load("res://scripts/player/character_view.gd").new()
@@ -98,7 +99,7 @@ func _ready() -> void:
 		var a := WorldActor.new()
 		a.setup(dir)
 		a.x = cx / 32.0
-		a.y = (ground4 - 16.0) / 32.0
+		a.y = (ground4 - PoseAnchor.FEET_Y_ACTOR) / 32.0   # точка актёра — центр клетки
 		_root.add_child(a)
 		a.set_pose(pose, false)
 		a.anim = float(int(PoseAnchor.geom(pose, dir).get("ref_frame", 0))) * a.ANIM_DIV

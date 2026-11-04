@@ -729,10 +729,10 @@ def embed(bg, sprite_img, seed, crumbs=True):
     below = (_roll(body, 1, 1) | _roll(body, 0, 1) | _roll(body, 1, 0)) & ~body
     bay = np.tile(_BAYER4, (G // 4, G // 4))
     dark = np.zeros((G, G))
-    dark[d2] = 0.10 + 0.08 * bay[d2]
-    dark[d1] = 0.24 + 0.10 * bay[d1]
-    dark[d1 & below] = 0.40 + 0.08 * bay[d1 & below]
-    dark[d2 & _roll(below, 1, 1) & ~d1] = 0.18 + 0.08 * bay[d2 & _roll(below, 1, 1) & ~d1]
+    dark[d2] = 0.13 + 0.08 * bay[d2]
+    dark[d1] = 0.30 + 0.10 * bay[d1]
+    dark[d1 & below] = 0.48 + 0.08 * bay[d1 & below]
+    dark[d2 & _roll(below, 1, 1) & ~d1] = 0.22 + 0.08 * bay[d2 & _roll(below, 1, 1) & ~d1]
     out = bg * (1.0 - np.kron(np.clip(dark, 0, 0.6), np.ones((3, 3)))[..., None])
     if crumbs:
         # крошка: цвет — тёмная половина тела залежи (не блик), 4-7 зёрен в 2-5 клетках от куска, у каждого тень

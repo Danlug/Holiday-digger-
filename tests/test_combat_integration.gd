@@ -86,7 +86,12 @@ func _ready() -> void:
 	_place_hero(p, w, 2500)
 	director.spawner.reset()
 	_step(30 * 30)
-	check("выше 4000 монстров нет", director.monsters.is_empty())
+	# Стражи полостей-фигур (1500–3999, раунд 5) живут выше 4000 по замыслу: мир тут — из сейва/сида
+	# сцены, и полость рядом с героем то есть, то нет. Проверяем тоннельных монстров, а не стражей.
+	var tunnel := director.monsters.filter(func(m) -> bool: return String(m.cave_id) == "")
+	check("выше 4000 тоннельных монстров нет (стражей полостей: %d)" % (director.monsters.size() - tunnel.size()),
+		tunnel.is_empty())
+	director.monsters.clear()
 	check("кнопка удара не показывается на мелководье", not director.combat_ui_visible())
 
 	# --- глубже 4000: спавн по таймеру в тоннеле ---

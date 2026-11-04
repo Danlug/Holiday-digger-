@@ -100,16 +100,11 @@ func _tap(key: String) -> void:
 # ---------------------------------------------------------------------------
 
 func _test_number_format() -> void:
-	check("950 остаётся 950", ShopArt.compact(950) == "950")
-	check("9999 без сокращения", ShopArt.compact(9999) == "9999")
-	check("12345 -> 12.3K", ShopArt.compact(12345) == "12.3K")
-	check("123456 -> 123K", ShopArt.compact(123456) == "123K")
-	check("1234567 -> 1.23M", ShopArt.compact(1234567) == "1.23M")
-	check("1000000 -> 1M без хвоста нулей", ShopArt.compact(1000000) == "1M")
-	check("полное число с пробелами: 1 234 567", ShopArt.full(1234567) == "1 234 567")
-	check("полное число: 0 и 999", ShopArt.full(0) == "0" and ShopArt.full(999) == "999")
-	check("кошелёк до миллиона целиком", ShopUI.wallet_text(999999) == "999 999")
-	check("кошелёк от миллиона сжимается", ShopUI.wallet_text(1234567) == "1.23M")
+	for c in [[0, "0"], [999, "999"], [9999, "9999"], [10000, "10к"], [15300, "15.3к"],
+			[99999, "99.9к"], [123456, "123к"], [999999, "999к"], [1000000, "1М"], [1250000, "1.2М"], [-15300, "-15.3к"]]:
+		check("UiFmt.short(%d) -> «%s»" % c, UiFmt.short(c[0]) == c[1])
+	check("полное число с пробелами: 1 234 567", UiFmt.full(1234567) == "1 234 567")
+	check("полное число: 0 и 999", UiFmt.full(0) == "0" and UiFmt.full(999) == "999")
 
 
 func _test_offers_are_well_formed() -> void:
@@ -150,19 +145,26 @@ func _test_tile_states() -> void:
 	GameState.coins = 600
 	check("железная кирка за 500 при 600 монетах доступна",
 		String(_offer("picks", "tool:iron_pickaxe")["state"]) == "available")
-	check("титановая за 1500 при 600 монетах — не хватает денег",
-		String(_offer("picks", "tool:titanium_pickaxe")["state"]) == "poor")
+	check("титановая без железной заперта — ступени по порядку",
+		String(_offer("picks", "tool:titanium_pickaxe")["state"]) == "locked")
 	check("ржавая кирка (цена 0) помечена как «лежит в мастерской»",
 		String(_offer("picks", "tool:rusty_pickaxe")["state"]) in ["owned", "locked"])
 	GameState.grant_tool("iron_pickaxe")
 	var owned := _offer("picks", "tool:iron_pickaxe")
 	check("купленная кирка — состояние owned с галочкой",
 		String(owned["state"]) == "owned" and String(owned["corner"]) == "check")
+	check("титановая за 1500 при 600 монетах — не хватает денег",
+		String(_offer("picks", "tool:titanium_pickaxe")["state"]) == "poor")
 	check("цена не хватает — бейдж красный",
-		(_offer("picks", "tool:platinum_pickaxe")["pill"]["color"] as Color).r > 0.9
-		and (_offer("picks", "tool:platinum_pickaxe")["pill"]["color"] as Color).g < 0.5)
+		(_offer("picks", "tool:titanium_pickaxe")["pill"]["color"] as Color).r > 0.9
+		and (_offer("picks", "tool:titanium_pickaxe")["pill"]["color"] as Color).g < 0.5)
+	GameState.grant_tool("titanium_pickaxe")
+	GameState.grant_tool("platinum_pickaxe")
 	check("в подсказке полная цена, а не сокращённая",
 		String(_offer("picks", "tool:diamond_pickaxe")["extra"]).contains("20 000"))
+	check("через ступень — заперта, причина в подсказке",
+		String(_offer("picks", "tool:obsidian_pickaxe")["state"]) == "locked"
+		and String(_offer("picks", "tool:obsidian_pickaxe")["extra"]).begins_with("Сначала"))
 	check("бурмобиль до глубины 1000 заперт",
 		String(_offer("tech", "recipe:drill_rig")["state"]) == "locked")
 	GameState.max_depth_reached = 1500
@@ -177,7 +179,9 @@ func _test_tile_states() -> void:
 	GameState.house_is_indoors = true
 	GameState.debug_free_shop = true
 	check("при debug_free_shop даже дорогая кирка доступна",
-		String(_offer("picks", "tool:obsidian_pickaxe")["state"]) == "available")
+		String(_offer("picks", "tool:diamond_pickaxe")["state"]) == "available")
+	check("но «бесплатно» порядок ступеней не отменяет",
+		String(_offer("picks", "tool:obsidian_pickaxe")["state"]) == "locked")
 	GameState.debug_free_shop = false
 
 
@@ -257,9 +261,10 @@ func _test_recipe_card() -> void:
 	_fresh()
 	GameState.max_depth_reached = 200
 	GameState.coins = 3000
-	GameState.inventory["iron_ore"] = 500
-	GameState.inventory["silver"] = 50
-	GameState.inventory["bronze"] = 100
+	var drill_in: Dictionary = ShopCatalog.recipe("hand_drill")["inputs"]
+	GameState.inventory["iron_ore"] = int(drill_in["iron_ore"])
+	GameState.inventory["silver"] = int(drill_in["silver"])
+	GameState.inventory["bronze"] = int(drill_in["bronze"])
 	ui.open(ShopUI.TAB_TECH)
 	await _frames(1)
 	var o := _offer("tech", "recipe:hand_drill")
@@ -423,7 +428,7 @@ func _test_recipe_chips_by_tap() -> void:
 	check("тап по материалу раскрывает описание", Tip.is_pinned())
 	check("название — название предмета", Tip._title.text == ShopCatalog.item_name(String(first_input["id"])))
 	check("в описании «есть из нужно» полными числами",
-		Tip._body.text == "Есть: %s из %s" % [ShopArt.full(int(first_input["have"])), ShopArt.full(int(first_input["need"]))])
+		Tip._body.text == "Есть: %s из %s" % [UiFmt.full(int(first_input["have"])), UiFmt.full(int(first_input["need"]))])
 	check("тап по материалу ничего не собирает", not GameState.owns_tool("hand_drill") and GameState.coins == 900 and ui._card != null)
 	check("и не включает swallowed()", not Tip.swallowed())
 	_click(chips[1])
@@ -473,21 +478,21 @@ func _test_sell_flow() -> void:
 	check("по умолчанию отмечено всё", ui._selection_items().size() == 2)
 	_tap("sell:lead")
 	check("тап по плитке снимает стопку с продажи", ui._selection_items().size() == 1 and not ui._selection_items().has("lead"))
-	check("итог на кнопке пересчитан", ui._sell_label.text == ShopArt.full(gold_sum))
+	check("итог на кнопке пересчитан", ui._sell_label.text == UiFmt.short(gold_sum))
 	_tap("nosale:bronze")
 	check("нескупаемую плитку нажать безопасно", GameState.get_item_count("bronze") == 2)
 	ui._sell_btn.pressed.emit()
 	await get_tree().create_timer(1.3).timeout
 	check("продано только выбранное: монеты = сумма золота", GameState.coins == gold_sum)
 	check("золото ушло, свинец остался", GameState.get_item_count("gold") == 0 and GameState.get_item_count("lead") == 9)
-	check("в шапке итоговые монеты", ui._chips["coins"]["label"].text == ShopUI.wallet_text(gold_sum))
+	check("в шапке итоговые монеты", ui._chips["coins"]["label"].text == UiFmt.short(gold_sum))
 	check("после продажи вкладка перерисована без проданного", not ui._tiles.has("sell:gold") and ui._tiles.has("sell:lead"))
 	check("busy снят", not ui._busy)
 	# удвоение рекламой
 	GameState.coins = 0
 	GameState.next_sale_doubled = true
 	ui._render()
-	check("с роликом ×2 на кнопке удвоенная сумма", ui._sell_label.text == ShopArt.full(lead_sum * 2) and ui._sell_x2.visible)
+	check("с роликом ×2 на кнопке удвоенная сумма", ui._sell_label.text == UiFmt.short(lead_sum * 2) and ui._sell_x2.visible)
 	ui._on_sell_pressed()
 	await get_tree().create_timer(1.3).timeout
 	check("выручка удвоена", GameState.coins == lead_sum * 2 and not GameState.next_sale_doubled)
@@ -633,9 +638,11 @@ func _test_navigation() -> void:
 	check("на «Продать» панель продажи видна", ui._action.visible)
 	check("прокрутка перетаскиванием подключена", ui._scroll.get_node_or_null("DragScroll") != null)
 	ui.open(ShopUI.SCREEN_EQUIP)
-	check("на экране верстака вкладок нет, есть кнопка «готово»", not ui._nav_tabs.visible and ui._nav_done.visible)
+	check("на экране верстака нижней панели нет", not ui._nav.visible)
+	ui._close_btn.pressed.emit()
+	check("верстак закрывается крестиком сверху справа", not ui.is_open())
 	ui.open(ShopUI.TAB_FOOD)
-	check("вкладки возвращаются", ui._nav_tabs.visible and not ui._nav_done.visible)
+	check("вкладки возвращаются", ui._nav.visible and ui._nav_tabs.visible)
 	ui.close()
 	check("шторка закрывается", not ui.is_open())
 

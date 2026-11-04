@@ -1,7 +1,9 @@
 class_name ProjectsScreen
 extends CanvasLayer
 ## Экран «Проекты»: крупные постройки из материалов и цепочки их материалов.
-## Внизу — вкладки-значки проектов (бур, скважина, бурмобиль, костюм) и крестик;
+## Сверху — заголовок «Проект: Ручной бур» и строка «что это за экран» (владелец, разбор чисел 26.10:
+## «сверху сделай заголовок, а то когда ты на странице проекта — непонятно, что это»), под ним — сколько
+## проектов собрано и монеты. Внизу — вкладки-значки проектов (бур, скважина, бурмобиль, костюм) и крестик;
 ## в теле — карточка проекта (значок, общая полоска, «следить») и строки
 ## материалов: значок, полоска «есть/нужно» (рюкзак + склад), где копать
 ## (значок глубины и число, значок бура, если киркой не взять). Промежуточное
@@ -17,10 +19,13 @@ signal track_changed(id: String)
 
 const BAR_W := 92.0
 const ROW_H := 34.0
-const COL_FILL := Color8(0xE0, 0xA9, 0x3B)
-const COL_FILL_VIA := Color8(0xE0, 0xA9, 0x3B, 0x70)
-const COL_DONE := Color8(0x7F, 0xD0, 0x6B)
-const COL_TRACK := Color8(0x0E, 0x0B, 0x08)
+const COL_FILL := UiTheme.GOLD
+const COL_FILL_VIA := Color(UiTheme.GOLD, 0.44)
+const COL_DONE := UiTheme.OK_LIGHT
+const COL_TRACK := UiTheme.INSET
+const HEAD_TOP := UiBtn.CLOSE_ROW   # над шапкой — полоса крестика, как на всех экранах
+const HEAD_H := 62.0          # заголовок, подзаголовок, фишки и черта под ними
+const TITLE_SIZES := [13, 12, 11, 10]   # длинное имя проекта ужимается, а не обрезается
 
 static var _instance: ProjectsScreen = null
 
@@ -28,6 +33,9 @@ var _root: Control
 var _scroll: ScrollContainer
 var _body: VBoxContainer
 var _head: HBoxContainer
+var _title_row: HBoxContainer
+var _title_label: Label
+var _subtitle_label: Label
 var _bar: HBoxContainer
 var _tab_buttons: Dictionary = {}
 var _current := ""
@@ -56,7 +64,7 @@ static func open_for(id: String = "") -> void:
 
 func _ready() -> void:
 	_instance = self
-	layer = 93   # выше мастерской (20) и HUD, рядом с журналом и хабом наград
+	layer = UiLayers.MODAL   # выше мастерской (20) и HUD, рядом с журналом и хабом наград
 	_build()
 	_root.visible = false
 
@@ -75,6 +83,7 @@ func current() -> String:
 
 
 func open(id: String = "") -> void:
+	GameState.emit_event("screen_opened", {"id": "projects"})   # аналитика (scripts/core/analytics.gd)
 	var list := ProjectChain.ids()
 	if list.is_empty():
 		return
@@ -162,25 +171,59 @@ func _build() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bg)
 
+	var top := VBoxContainer.new()
+	top.name = "Heading"
+	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	top.offset_left = 8
+	top.offset_right = -8
+	var st := HudSafeArea.top(get_viewport())
+	top.offset_top = HEAD_TOP + st
+	top.offset_bottom = HEAD_TOP + HEAD_H + st
+	top.add_theme_constant_override("separation", 2)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(top)
+
+	_title_row = HBoxContainer.new()
+	_title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_title_row.add_theme_constant_override("separation", 5)
+	_title_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	_title_row.custom_minimum_size = Vector2(0, 18)
+	_title_label = ProgressUiKit.make_label("", TITLE_SIZES[0], ProgressUiKit.TEXT_HI)
+	_title_label.name = "Title"
+	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_title_label.add_theme_constant_override("shadow_offset_y", 1)
+	_title_row.add_child(_title_label)
+	top.add_child(_title_row)
+
+	_subtitle_label = ProgressUiKit.make_label(subheading(), UiTheme.FS_SMALL, ProgressUiKit.MUTED)
+	_subtitle_label.name = "Subtitle"
+	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(_subtitle_label)
+
 	_head = HBoxContainer.new()
-	_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_head.offset_left = 8
-	_head.offset_right = -8
-	_head.offset_top = 8
-	_head.offset_bottom = 30
 	_head.alignment = BoxContainer.ALIGNMENT_CENTER
 	_head.add_theme_constant_override("separation", 12)
-	_root.add_child(_head)
+	_head.custom_minimum_size = Vector2(0, 20)
+	top.add_child(_head)
+
+	var rule := ColorRect.new()
+	rule.color = ProgressUiKit.EDGE
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(rule)
 
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
-	_scroll.offset_top = 36
-	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
+	_scroll.offset_top = HEAD_TOP + HEAD_H + 4 + st
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + HudSafeArea.bottom(get_viewport()))
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
+	UiBtn.close_button(close, _root)
 
 	_body = VBoxContainer.new()
 	_body.custom_minimum_size = Vector2(212, 0)
@@ -196,13 +239,14 @@ func _build_tabs() -> void:
 	for id in ProjectChain.ids():
 		specs.append([String(id), ProjectChain.icon(String(id)), ProjectChain.title(String(id)),
 			"Цепочка материалов и где их копать"])
-	_bar = HeroTabButton.make_bar(specs, _current, _set_project, close)
+	_bar = HeroTabButton.make_bar(specs, _current, _set_project)
+	var sb := HudSafeArea.bottom(get_viewport())
 	_tab_buttons = _bar.get_meta("buttons")
 	_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_bar.offset_left = 6
 	_bar.offset_right = -6
-	_bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
-	_bar.offset_bottom = -4
+	_bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4 + sb)
+	_bar.offset_bottom = -4 - sb
 	_root.add_child(_bar)
 
 
@@ -232,9 +276,61 @@ func refresh() -> void:
 		_body.add_child(_coins_row(ProjectChain.coins_need(_current)))
 
 
-# --- шапка: собрано проектов, монеты ---------------------------------------------
+# --- шапка: заголовок проекта, собрано проектов, монеты --------------------------
+
+## Тексты шапки на языке игрока (data/guidance.json → screen_text); нет перевода — русские.
+static func _screen_text(key: String) -> Variant:
+	var all: Dictionary = ProjectChain.data().get("screen_text", {})
+	for code in [String(Settings.language), "ru"]:
+		var d: Dictionary = all.get(code, {})
+		if d.has(key):
+			return d[key]
+	return null
+
+
+## Имя проекта для заголовка: своё у языка (костюм — «Костюм от жары», а не имя ступени), иначе — имя
+## рецепта (balance.json/tech.json, одно место правды).
+static func project_name(id: String) -> String:
+	for code in [String(Settings.language), "ru"]:
+		var names: Dictionary = ProjectChain.data().get("screen_text", {}).get(code, {}).get("names", {})
+		if names.has(id):
+			return String(names[id])
+	return ProjectChain.title(id)
+
+
+## «Проект: Ручной бур» — что за экран и какой проект открыт.
+static func heading(id: String) -> String:
+	var fmt = _screen_text("title")
+	return (String(fmt) if fmt != null else "Проект: %s") % project_name(id)
+
+
+## Строка под заголовком: что на этом экране.
+static func subheading() -> String:
+	var t = _screen_text("subtitle")
+	return String(t) if t != null else ""
+
+
+func _fill_title() -> void:
+	if _title_label == null:
+		return
+	var text := heading(_current) if _current != "" else ""
+	_title_label.text = text
+	_subtitle_label.text = subheading()
+	# Длинное имя (костюм, «Буровая скважина» на узком экране) — шрифт поменьше, но целиком.
+	var room := maxf(_root.size.x if _root.size.x > 0.0 else get_viewport().get_visible_rect().size.x, 120.0) - 16.0
+	var font := _title_label.get_theme_font("font")
+	var size: int = TITLE_SIZES[TITLE_SIZES.size() - 1]
+	for sz: int in TITLE_SIZES:
+		if font == null or font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x <= room:
+			size = sz
+			break
+	_title_label.add_theme_font_size_override("font_size", size)
+	var tip = _screen_text("tip")
+	Tip.bind_tap(_title_row, ProjectChain.title(_current), String(tip) if tip != null else "")
+
 
 func _fill_head() -> void:
+	_fill_title()
 	for c in _head.get_children():
 		_head.remove_child(c)
 		c.queue_free()
@@ -245,7 +341,7 @@ func _fill_head() -> void:
 			built += 1
 	_chip(Guidance.tex("projects"), "%d/%d" % [built, all.size()], "Проекты",
 		"Большие постройки из материалов: бур, скважина, бурмобиль, костюм. Руду для них не продавай — копи на складе.")
-	_chip(UiIcons.tex("coin"), ShopArt.compact(GameState.coins), "Монеты", "Сколько монет у тебя сейчас.")
+	_chip(UiIcons.tex("coin"), UiFmt.short(GameState.coins), "Монеты", "Сколько монет у тебя сейчас.")
 
 
 func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
@@ -253,7 +349,7 @@ func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
 	box.add_theme_constant_override("separation", 3)
 	box.mouse_filter = Control.MOUSE_FILTER_STOP
 	box.add_child(_icon_rect(icon, 18))
-	var l := ProgressUiKit.make_label(text, 11, ProgressUiKit.TEXT_HI)
+	var l := ProgressUiKit.make_label(text, UiTheme.FS_LABEL, ProgressUiKit.TEXT_HI)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)
 	_head.add_child(box)
@@ -311,7 +407,7 @@ func _project_card(id: String) -> Control:
 	bar_row.add_theme_constant_override("separation", 4)
 	bar_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_row.add_child(_bar_ctrl(68.0, 10.0, frac, 0.0, built or ProjectChain.ready(id)))
-	var pct := ProgressUiKit.make_label("%d%%" % int(floor(frac * 100.0)), 11, ProgressUiKit.TEXT_HI)
+	var pct := ProgressUiKit.make_label("%d%%" % int(floor(frac * 100.0)), UiTheme.FS_LABEL, ProgressUiKit.TEXT_HI)
 	pct.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_row.add_child(pct)
 	mid.add_child(bar_row)
@@ -381,7 +477,7 @@ func _material_row(m: Dictionary) -> Control:
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var via_frac := clampf(float(int(m["effective"])) / maxf(1.0, float(need)), 0.0, 1.0)
 	mid.add_child(_bar_ctrl(BAR_W, 8.0, clampf(float(have) / maxf(1.0, float(need)), 0.0, 1.0), via_frac, done))
-	var nums := ProgressUiKit.make_label("%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)], 10,
+	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], UiTheme.FS_BODY,
 		COL_DONE if done else ProgressUiKit.TEXT)
 	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(nums)
@@ -395,8 +491,12 @@ func _material_row(m: Dictionary) -> Control:
 	var bag := GameState.get_item_count(id)
 	var store := HouseStorage.count(id)
 	var body := "Есть %d из %d: в рюкзаке %d, на складе %d." % [have, need, bag, store]
-	if not done and int(m["effective"]) > have:
-		body += "\nЕщё %d выйдет из сырья под рукой." % (int(m["effective"]) - have)
+	var smelting := int(m.get("smelting", 0))
+	if smelting > 0:
+		body += "\nВ печи: %d (по %s на штуку, заберётся в мастерской)." % [smelting,
+			BronzeFurnace.clock_text(BronzeFurnace.seconds_per_unit())]
+	if not done and int(m["effective"]) - smelting > have:
+		body += "\nЕщё %d выйдет из сырья под рукой." % (int(m["effective"]) - smelting - have)
 	Tip.bind_tap(p, ShopCatalog.item_name(id), body, ProjectChain.where_text(id))
 	return p
 
@@ -413,12 +513,12 @@ func _via_row(m: Dictionary, v: Dictionary) -> Control:
 	var h := _row_box(p)
 	h.add_child(_arrow(Vector2(10, 18), true))
 	h.add_child(_icon_rect(UiIcons.item_small(src, 18), 18))
-	var cnt := ProgressUiKit.make_label(ShopArt.compact(int(v["have"])), 10, ProgressUiKit.TEXT)
+	var cnt := ProgressUiKit.make_label(UiFmt.short(int(v["have"])), UiTheme.FS_BODY, ProgressUiKit.TEXT)
 	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(cnt)
 	h.add_child(_arrow(Vector2(14, 18), false))
 	h.add_child(_icon_rect(UiIcons.item_small(String(m["id"]), 16), 16))
-	var plus := ProgressUiKit.make_label("+%s" % ShopArt.compact(int(v["makes"])), 10,
+	var plus := ProgressUiKit.make_label("+%s" % UiFmt.short(int(v["makes"])), UiTheme.FS_BODY,
 		ProgressUiKit.GOLD if int(v["makes"]) > 0 else ProgressUiKit.DIM)
 	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(plus)
@@ -448,12 +548,12 @@ func _coins_row(need: int) -> Control:
 	mid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(_bar_ctrl(BAR_W, 8.0, clampf(float(have) / maxf(1.0, float(need)), 0.0, 1.0), 0.0, done))
-	var nums := ProgressUiKit.make_label("%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)], 10,
+	var nums := ProgressUiKit.make_label("%s/%s" % [UiFmt.short(have), UiFmt.short(need)], UiTheme.FS_BODY,
 		COL_DONE if done else ProgressUiKit.TEXT)
 	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(nums)
 	h.add_child(mid)
-	Tip.bind_tap(p, "Монеты", "Сборка стоит ещё и монет: %s из %s." % [ShopArt.full(mini(have, need)), ShopArt.full(need)])
+	Tip.bind_tap(p, "Монеты", "Сборка стоит ещё и монет: %s из %s." % [UiFmt.full(mini(have, need)), UiFmt.full(need)])
 	return p
 
 
@@ -470,7 +570,7 @@ func _where_chip(item: String) -> Control:
 		return box
 	box.add_child(_icon_rect(ShopArt.tex("glyph_depth"), 12))
 	var reached := GameState.max_depth_reached >= int(w["min"])
-	var l := ProgressUiKit.make_label(ShopArt.compact(int(w["best"])), 10,
+	var l := ProgressUiKit.make_label(UiFmt.short(int(w["best"])), UiTheme.FS_BODY,
 		ProgressUiKit.TEXT_HI if reached else ProgressUiKit.DIM)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)
@@ -522,7 +622,7 @@ func _mini_chip(icon: Texture2D, text: String, title: String, body: String) -> C
 	box.mouse_filter = Control.MOUSE_FILTER_STOP
 	box.add_child(_icon_rect(icon, 14))
 	if text != "":
-		var l := ProgressUiKit.make_label(text, 10, ProgressUiKit.TEXT)
+		var l := ProgressUiKit.make_label(text, UiTheme.FS_BODY, ProgressUiKit.TEXT)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(l)
 	Tip.bind_tap(box, title, body)

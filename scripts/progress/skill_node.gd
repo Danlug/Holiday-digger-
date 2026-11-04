@@ -46,8 +46,7 @@ func _init() -> void:
 
 
 func _squash(target: float) -> void:
-	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector2(target, target), 0.06)
+	UiAnim.press(self, target < 1.0, target)
 
 
 ## Сторона узла задаёт дерево по ширине колонки (веток может стать больше).
@@ -146,7 +145,7 @@ func _draw() -> void:
 			draw_texture_rect(need, b, false)
 	if number != "":
 		var font := ThemeDB.fallback_font
-		var fs := 10
+		var fs := UiTheme.FS_BODY
 		var asc := font.get_ascent(fs)
 		var h := font.get_height(fs)
 		draw_string(font, Vector2(0, (size.y - h) * 0.5 + asc), number,

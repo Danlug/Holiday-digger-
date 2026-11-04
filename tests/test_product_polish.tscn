@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://productpolish1"]
+
+[ext_resource type="Script" path="res://tests/test_product_polish.gd" id="1"]
+
+[node name="TestProductPolish" type="Node"]
+script = ExtResource("1")

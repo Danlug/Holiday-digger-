@@ -10,9 +10,9 @@ const GOLD := ProgressUiKit.GOLD
 const MUTED := ProgressUiKit.MUTED
 const DIM := ProgressUiKit.DIM
 const GREEN := ProgressUiKit.GREEN
-const RED := Color8(0xD0, 0x5A, 0x4E)
+const RED := UiTheme.DANGER
 const PANEL := ProgressUiKit.CARD_BG
-const PANEL_DARK := Color8(0x12, 0x0D, 0x0A)
+const PANEL_DARK := UiTheme.PANEL_DARK
 const BORDER := ProgressUiKit.EDGE
 const FIRE := Color8(0xF0, 0x70, 0x1E)
 
@@ -89,7 +89,7 @@ static func icon_rect(texture: Texture2D, px: float) -> TextureRect:
 	return r
 
 
-static func label(text: String, size: int = 9, color: Color = MUTED, outline: bool = true) -> Label:
+static func label(text: String, size: int = UiTheme.FS_SMALL, color: Color = MUTED, outline: bool = true) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
@@ -115,19 +115,8 @@ static func chip(texture: Texture2D, number: String, color: Color = MUTED, icon_
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(icon_rect(texture, icon_px))
-	row.add_child(label(number, 10, color))
+	row.add_child(label(number, UiTheme.FS_BODY, color))
 	return row
-
-
-## Компактная запись числа: 15000 -> «15k», 1250000 -> «1.2M».
-static func short(n: int) -> String:
-	if n >= 1000000:
-		return "%.1fM" % (float(n) / 1000000.0)
-	if n >= 10000:
-		return "%dk" % int(round(float(n) / 1000.0))
-	if n >= 1000:
-		return "%.1fk" % (float(n) / 1000.0)
-	return str(n)
 
 
 ## Длительность «5ч 12м» / «43м» — числа без слов-абзацев.

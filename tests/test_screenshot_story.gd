@@ -7,6 +7,9 @@ extends Node
 ##
 ## Первый аргумент после "--" — каталог, остальные — id сцен (по умолчанию все новые).
 ## Спец-имена: grave (могила во дворе), diary (экран дневника).
+## Префиксы: "deep:сцена" — герой на глубине 140; "pit:сцена" — герой только что
+## пробил фундамент в огороде (сцена смерти); "skip@N:сцена" — досмотреть до кадра N,
+## снять кадр посреди него и нажать «Пропустить», снять мир после сцены.
 ## Снимок делается на каждой реплике/карточке сцены, но не больше SHOTS_PER_SCENE.
 
 const SHOTS_PER_SCENE := 40
@@ -57,6 +60,23 @@ func _ready() -> void:
 
 
 func _shoot_scene(director: StoryDirector, id: String) -> void:
+	var skip_at := -1
+	var tag := ""
+	if id.begins_with("skip@"):
+		skip_at = int(id.substr(5, id.find(":") - 5))
+		tag = id.substr(0, id.find(":"))
+		id = id.substr(id.find(":") + 1)
+	# "pit:сцена" — герой стоит над только что пробитым фундаментом (x=22), как
+	# в миг, когда обучение зовёт сцену смерти.
+	if id.begins_with("pit:"):
+		id = id.substr(4)
+		director.world.unlock_pre_autodig_garden()
+		for y in range(1, director.world.foundation_y() + 1):
+			director.world.dig_cell(22, y)
+		director.player.x = 22.5
+		director.player.y = 4.5
+		for _k in 4:
+			await get_tree().process_frame
 	# "deep:сцена" — герой стоит глубоко под землёй, как в настоящей игре.
 	if id.begins_with("deep:"):
 		id = id.substr(5)
@@ -72,17 +92,27 @@ func _shoot_scene(director: StoryDirector, id: String) -> void:
 	var cs := director.cutscene
 	var shot := 0
 	var guard := 0
+	var prefix := id if tag.is_empty() else "%s_%s" % [id, tag]
 	while cs.is_playing and guard < 400:
 		guard += 1
 		await get_tree().process_frame
+		if skip_at >= 0 and cs._index > skip_at:
+			for _k in 8:
+				await get_tree().process_frame
+			_shot("%s_a_before" % prefix)
+			cs._skip_btn.confirmed.emit()
+			for _k in 30:
+				await get_tree().process_frame
+			_shot("%s_b_after" % prefix)
+			break
 		if cs._typing:
 			cs._line.visible_ratio = 1.0
 			cs._typing = false
 		if cs._waiting_tap or cs._beat_timer > 0.0:
 			for _k in 12:
 				await get_tree().process_frame
-			if shot < SHOTS_PER_SCENE:
-				_shot("%s_%02d" % [id, shot])
+			if shot < SHOTS_PER_SCENE and skip_at < 0:
+				_shot("%s_%02d" % [prefix, shot])
 				shot += 1
 			cs._waiting_tap = false
 			cs._beat_timer = 0.0
@@ -120,8 +150,21 @@ func _shoot_grave(main: Node) -> void:
 	for _k in 12:
 		await get_tree().process_frame
 	_shot("grave_diary_news")
+	# После концовки: самородок на плите (все страницы прочитаны — значка нет).
+	for id in StoryDiary.unlocked_ids():
+		StoryDiary.mark_read(id)
+	StoryState.mark_seen("ending")
+	for _k in 12:
+		await get_tree().process_frame
+	_shot("grave_ending")
+	# Ночь (22:00): читаемость плиты и гравировки под синей дымкой.
+	GameState.game_clock_hours = 16.0
+	for _k in 40:
+		await get_tree().process_frame
+	_shot("grave_night")
+	GameState.game_clock_hours = 0.0
 	player.x = 15.5
-	for _k in 6:
+	for _k in 30:
 		await get_tree().process_frame
 	_shot("grave_far")
 

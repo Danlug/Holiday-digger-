@@ -24,7 +24,7 @@ const GHOST_HOLD := 0.35
 const GHOST_SPEED := 0.9     # доля шкалы в секунду
 const RISE_SPEED := 2.5
 
-var fill_color: Color = Color8(0xD0, 0x4B, 0x4B):
+var fill_color: Color = UiTheme.DANGER:
 	set(v):
 		fill_color = v
 		queue_redraw()

@@ -12,7 +12,7 @@ var text: String = "":
 		text = t
 		queue_redraw()
 var fill_color: Color = MetaUiKit.GOLD
-var font_size: int = 8
+var font_size: int = UiTheme.FS_TINY
 
 
 func _init() -> void:

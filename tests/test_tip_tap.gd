@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_mouse_exit_keeps_pinned()
 	_test_twin_events_count_once()
 	_test_hover_and_long_press_still_work()
+	_test_long_press_then_control_hidden()
 	_test_empty_title_and_gone()
 	_test_double_bind_updates_text()
 	_test_panel_stays_first_child()
@@ -203,6 +204,22 @@ func _test_hover_and_long_press_still_work() -> void:
 	check("и не превращается в тап (описание не закреплено и не переключено)",
 		Tip.is_showing() and not Tip.is_pinned())
 	Tip.hide_all()
+	_reset()
+
+
+func _test_long_press_then_control_hidden() -> void:
+	# Кнопка пропуска катсцены: долгое нажатие (0,38 с) показало подсказку, а удержание
+	# (0,6 с) спрятало саму кнопку, пока палец ещё на экране. Отпускание невидимому
+	# Control не приходит — подсказка обязана погаснуть сама, иначе висит навсегда.
+	_reset()
+	_mouse(a, true)
+	Tip._shown_by_press = true
+	Tip.show_now(a)
+	check("долгое нажатие показало подсказку", Tip.is_showing())
+	a.hide()
+	check("кнопка спряталась под пальцем — подсказка погасла", not Tip.is_showing())
+	check("и Tip не ждёт отпускания от невидимой кнопки", not Tip._press_active and not Tip._shown_by_press)
+	a.show()
 	_reset()
 
 

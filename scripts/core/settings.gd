@@ -12,7 +12,8 @@ extends RefCounted
 ## мьют уже управляемы и сохраняются.
 
 const PATH := "user://settings.json"
-const SCHEMA_VERSION := 1
+## 2 — «меньше движения» больше не берётся у системы (владелец 30.10); значение из файла версии 1 сбрасывается.
+const SCHEMA_VERSION := 2
 
 const BUS_SFX := "SFX"
 const BUS_MUSIC := "Music"
@@ -43,13 +44,17 @@ static var language: String = "ru"
 ## без поддержки вибро всё равно молчит.
 static var haptics_enabled: bool = true
 ## «Меньше движения» — гасит лишние твины интерфейса (всплытие шторок, пульс,
-## накрутку чисел). Первое значение берём у системы, как prefers-reduced-motion
-## в вебе; дальше решает игрок.
+## накрутку чисел), тряску и наезд камеры. Выключено, пока игрок сам не включит:
+## у системы (prefers-reduced-motion) его больше не берём — владелец 30.10: «до сих
+## пор нет сотрясений и зума» (в системе с выключенной анимацией игра гасила их молча).
 static var reduce_motion: bool = false
 ## Контекстные подсказки «знакомство с системами» (scripts/hints/). Выключатель
 ## «не мешать»: подсказки и метки «new» молчат, ничего не теряя — что показано, помнит
 ## GameState.ext["hints"].
 static var hints_enabled: bool = true
+## Согласие на аналитику (scripts/core/analytics.gd): "unset" — ещё не спрашивали (окно согласия
+## при первом запуске), "granted" / "denied" — ответ игрока. Без "granted" не уходит ничего.
+static var analytics_consent: String = "unset"
 
 
 ## Заводит звуковые шины, если их ещё нет (первый запуск процесса — шины
@@ -144,13 +149,10 @@ static func set_hints_enabled(v: bool) -> void:
 	save()
 
 
-## Системное «меньше движения»: есть только в вебе (matchMedia); в остальных
-## сборках остаётся false, пока игрок сам не включит в настройках.
-static func detect_system_reduce_motion() -> bool:
-	if not OS.has_feature("web"):
-		return false
-	var v = JavaScriptBridge.eval("window.matchMedia('(prefers-reduced-motion: reduce)').matches")
-	return bool(v)
+static func set_analytics_consent(v: String) -> void:
+	analytics_consent = v
+	save()
+	Analytics.consent_changed()
 
 
 static func save() -> bool:
@@ -170,6 +172,7 @@ static func save() -> bool:
 		"haptics_enabled": haptics_enabled,
 		"reduce_motion": reduce_motion,
 		"hints_enabled": hints_enabled,
+		"analytics_consent": analytics_consent,
 	}, "\t"))
 	f.close()
 	return true
@@ -177,8 +180,8 @@ static func save() -> bool:
 
 static func load_from_disk() -> bool:
 	if not FileAccess.file_exists(PATH):
-		# Первый запуск: «меньше движения» берём у системы, вибро — включено.
-		reduce_motion = detect_system_reduce_motion()
+		# Первый запуск: «меньше движения» выключено, вибро — включено.
+		reduce_motion = false
 		Haptics.enabled = haptics_enabled
 		return false
 	var f := FileAccess.open(PATH, FileAccess.READ)
@@ -197,7 +200,11 @@ static func load_from_disk() -> bool:
 	show_vision_radius = bool(raw.get("show_vision_radius", true))
 	language = String(raw.get("language", "ru"))
 	haptics_enabled = bool(raw.get("haptics_enabled", true))
-	reduce_motion = bool(raw.get("reduce_motion", detect_system_reduce_motion()))
+	# Файл версии 1 мог унаследовать «меньше движения» от системы, а не от игрока — сбрасываем.
+	reduce_motion = bool(raw.get("reduce_motion", false)) if int(raw.get("version", 1)) >= 2 else false
 	hints_enabled = bool(raw.get("hints_enabled", true))
+	analytics_consent = String(raw.get("analytics_consent", "unset"))   # нет ключа (старый файл) — ещё не спрашивали
+	if not analytics_consent in ["unset", "granted", "denied"]:
+		analytics_consent = "unset"
 	Haptics.enabled = haptics_enabled
 	return true

@@ -22,8 +22,9 @@ signal closed
 
 const HEAD_H := 32.0
 const ACTION_H := 46.0
-const LINE_COL := Color8(0x4A, 0x3F, 0x5C)
+const LINE_COL := UiTheme.NIGHT_LINE
 
+var _safe_top := 0.0   # шапка — под вырезом/статус-баром (HudSafeArea.top)
 var _root: Control
 var _scroll: ScrollContainer
 var _list: VBoxContainer
@@ -45,12 +46,13 @@ var _put_ok := false
 
 
 func _ready() -> void:
-	layer = 12
+	layer = UiLayers.STORAGE
 	_build()
 	visible = false
 
 
 func _build() -> void:
+	_safe_top = HudSafeArea.top(get_viewport())
 	_root = Control.new()
 	_root.name = "Root"
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -58,7 +60,7 @@ func _build() -> void:
 	add_child(_root)
 
 	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color8(0x26, 0x1E, 0x30), Color8(0x14, 0x0F, 0x1B)])
+	grad.colors = PackedColorArray([UiTheme.NIGHT_TOP, UiTheme.NIGHT_DEEP])
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill_from = Vector2(0, 0)
@@ -75,8 +77,8 @@ func _build() -> void:
 
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_scroll.offset_top = HEAD_H + 2.0
-	_scroll.offset_bottom = -ACTION_H
+	_scroll.offset_top = HEAD_H + 2.0 + _safe_top
+	_scroll.offset_bottom = -ACTION_H - HudSafeArea.bottom(get_viewport())
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	var margin := MarginContainer.new()
@@ -105,37 +107,26 @@ func _build_header() -> void:
 	var line := ColorRect.new()
 	line.color = LINE_COL
 	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	line.offset_top = HEAD_H
-	line.offset_bottom = HEAD_H + 1.0
+	line.offset_top = HEAD_H + _safe_top
+	line.offset_bottom = HEAD_H + 1.0 + _safe_top
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(line)
 
 	_chip_items = _make_chip(UiIcons.tex("inventory"), 84.0, Vector2(6, 6))
 	_chip_load = _make_chip(ShopArt.ui("icon_backpack"), 78.0, Vector2(94, 6))
 
-	_close_btn = HouseArt.button("red", ShopArt.tex("glyph_cross"), Vector2(32, 24), 14.0)
-	_close_btn.anchor_left = 1.0
-	_close_btn.anchor_right = 1.0
-	_close_btn.offset_left = -38.0
-	_close_btn.offset_right = -6.0
-	_close_btn.offset_top = 4.0
-	_close_btn.offset_bottom = 28.0
-	_close_btn.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close_panel())
-	Tip.bind(_close_btn, "Закрыть")
-	_root.add_child(_close_btn)
+	_close_btn = UiBtn.close_button(close_panel, _root)
 
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	var root := Control.new()
-	root.position = pos
+	root.position = pos + Vector2(0, _safe_top)
 	root.size = Vector2(w, 20)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(HouseArt.nine("pill", 4))
 	var ic := ShopArt.rect(icon, Vector2(3, 3), Vector2(14, 14))
 	root.add_child(ic)
-	var lb := ShopArt.label("", 10)
+	var lb := ShopArt.label("", UiTheme.FS_BODY)
 	lb.position = Vector2(20, 1)
 	lb.size = Vector2(w - 24.0, 18)
 	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -148,7 +139,7 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 func _build_actions() -> void:
 	var bar := Control.new()
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bar.offset_top = -ACTION_H
+	bar.offset_top = -ACTION_H - HudSafeArea.bottom(get_viewport())
 	bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(bar)
 	var line := ColorRect.new()
@@ -157,23 +148,35 @@ func _build_actions() -> void:
 	line.offset_bottom = 1.0
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(line)
+	# Обе кнопки делят ширину поровну (как ряд окна количества), значок по центру.
 	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 10)
+	row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	row.add_theme_constant_override("separation", 6)
+	row.offset_left = 8.0
+	row.offset_right = -8.0
 	row.offset_top = 6.0
+	row.offset_bottom = 40.0
 	bar.add_child(row)
 
-	_take_btn = HouseArt.button("gold", HouseArt.tex("take_all"), Vector2(96, 34), 24.0)
+	_take_btn = UiBtn.texture_button("gold", HouseArt.tex("take_all"), Vector2(96, 34), 24.0)
 	_take_btn.pressed.connect(_on_take_all)
 	row.add_child(_take_btn)
 	_take_lock = ShopArt.rect(ShopArt.tex("glyph_lock"), Vector2(78, 16), Vector2(16, 16))
 	_take_btn.add_child(_take_lock)
-	_put_btn = HouseArt.button("green", HouseArt.tex("put_all"), Vector2(96, 34), 24.0)
+	_put_btn = UiBtn.texture_button("green", HouseArt.tex("put_all"), Vector2(96, 34), 24.0)
 	_put_btn.pressed.connect(_on_put_all)
 	row.add_child(_put_btn)
 	_put_lock = ShopArt.rect(ShopArt.tex("glyph_lock"), Vector2(78, 16), Vector2(16, 16))
 	_put_btn.add_child(_put_lock)
+	for b: Button in [_take_btn, _put_btn]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
+	for l: Control in [_take_lock, _put_lock]:
+		l.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_KEEP_SIZE)
+		l.offset_left -= 2.0
+		l.offset_right -= 2.0
+		l.offset_top += 7.0
+		l.offset_bottom += 7.0
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +184,7 @@ func _build_actions() -> void:
 # ---------------------------------------------------------------------------
 
 func open() -> void:
+	GameState.emit_event("screen_opened", {"id": "storage"})   # аналитика (scripts/core/analytics.gd)
 	visible = true
 	_signature = ""
 	_head_sig = ""
@@ -231,14 +235,14 @@ func refresh() -> void:
 		int(round(carried)), int(round(cap)), accessible, rows.size(), GameState.inventory.size()]
 	if head_sig != str(_head_sig):
 		_head_sig = head_sig
-		(_chip_items["label"] as Label).text = ShopArt.compact(HouseStorage.total_items())
+		(_chip_items["label"] as Label).text = UiFmt.short(HouseStorage.total_items())
 		Tip.bind(_chip_items["root"], "Склад", "Что лежит в мастерской. Верстак берёт материалы прямо отсюда.",
-			"%s шт · %s кг" % [ShopArt.full(HouseStorage.total_items()), ShopArt.full(int(round(HouseStorage.total_weight())))])
+			"%s шт · %s кг" % [UiFmt.full(HouseStorage.total_items()), UiFmt.full(int(round(HouseStorage.total_weight())))])
 		var load_label := _chip_load["label"] as Label
-		load_label.text = "%s/%s" % [ShopArt.compact(int(round(carried))), ShopArt.compact(int(round(cap)))]
+		load_label.text = "%s/%s" % [UiFmt.short(int(round(carried))), UiFmt.short(int(round(cap)))]
 		load_label.label_settings.font_color = ShopArt.COL_BAD if carried >= cap - 0.001 else Color.WHITE
 		Tip.bind(_chip_load["root"], "Рюкзак", "Сколько несёшь из скольки можно унести.",
-			"%s из %s кг" % [ShopArt.full(int(round(carried))), ShopArt.full(int(round(cap)))])
+			"%s из %s кг" % [UiFmt.full(int(round(carried))), UiFmt.full(int(round(cap)))])
 		_update_actions(accessible, rows)
 
 	# Список пересобирается только при изменениях: плитка, удалённая и созданная
@@ -299,10 +303,10 @@ func _offer(id: String, count: int, store: bool, accessible: bool) -> Dictionary
 		"tier": ShopItems.price_tier(Balance.get_mineral_price(id)),
 		"state": "available" if accessible else "away",
 		"title": ShopCatalog.item_name(id),
-		"body": "%s шт · %s кг" % [ShopArt.full(count), ShopArt.full(int(round(total_w)))],
+		"body": "%s шт · %s кг" % [UiFmt.full(count), UiFmt.full(int(round(total_w)))],
 		"extra": "",
-		"count_text": ShopArt.compact(count),
-		"pill": {"icon": UiIcons.tex("weight"), "text": ShopArt.compact(int(round(total_w))), "color": Color.WHITE},
+		"count_text": UiFmt.short(count),
+		"pill": {"icon": UiIcons.tex("weight"), "text": UiFmt.short(int(round(total_w))), "color": Color.WHITE},
 	}
 	if not accessible:
 		o["extra"] = HouseStorage.access_reason()
@@ -315,11 +319,7 @@ func _offer(id: String, count: int, store: bool, accessible: bool) -> Dictionary
 
 
 func _grid() -> GridContainer:
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	return grid
+	return ShopArt.tile_grid()
 
 
 func _section(icon: Texture2D, locked: bool) -> Control:
@@ -383,7 +383,7 @@ func _update_actions(accessible: bool, rows: Array) -> void:
 				can_take = true
 				break
 	_take_ok = accessible and can_take
-	_put_ok = accessible and not GameState.inventory.is_empty()
+	_put_ok = accessible and GameState.inventory.keys().any(func(id) -> bool: return HouseStorage.is_haul(String(id)))
 
 	var take_extra := reason
 	if accessible and rows.is_empty():
@@ -454,7 +454,7 @@ func _on_tile(store: bool, id: String, tile: ShopTile) -> void:
 			Tip.show_now(tile)
 			return
 		if limit < count:
-			limit_text = ShopArt.compact(limit)
+			limit_text = UiFmt.short(limit)
 	if limit == 1:
 		_move(store, id, 1, tile)
 		return
@@ -485,7 +485,7 @@ func _move(store: bool, id: String, amount: int, tile: Control) -> void:
 	Sfx.play("pickup" if store else "ui_toggle")
 	Haptics.tap()
 	ShopFx.sparkles(_root, center, ShopArt.COL_GOLD if store else ShopArt.COL_GOOD, 12, 28.0)
-	HouseArt.float_number(_root, center + Vector2(-8, -18), ("+%s" if store else "−%s") % ShopArt.compact(moved),
+	HouseArt.float_number(_root, center + Vector2(-8, -18), ("+%s" if store else "−%s") % UiFmt.short(moved),
 		ShopArt.COL_GOOD if store else ShopArt.COL_GOLD)
 	_signature = ""
 	_head_sig = ""
@@ -500,7 +500,7 @@ func _after_move(moved: int, button: Control, sound: String) -> void:
 	Haptics.tap()
 	var center := button.get_global_rect().get_center() - _root.get_global_rect().position
 	ShopFx.sparkles(_root, center, ShopArt.COL_GOLD, 16, 34.0)
-	HouseArt.float_number(_root, center + Vector2(-10, -26), "×%s" % ShopArt.compact(moved), ShopArt.COL_GOOD)
+	HouseArt.float_number(_root, center + Vector2(-10, -26), "×%s" % UiFmt.short(moved), ShopArt.COL_GOOD)
 	_signature = ""
 	_head_sig = ""
 	refresh()

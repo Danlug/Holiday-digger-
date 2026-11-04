@@ -31,7 +31,7 @@ var _hud_input_was_on := true
 
 
 func _ready() -> void:
-	layer = 92   # как хаб наград: выше HUD, дома и шторок, ниже окна дня и экрана героя
+	layer = UiLayers.META   # как хаб наград: выше HUD, дома и шторок, ниже окна дня и экрана героя
 	_build()
 	_root.visible = false
 
@@ -41,6 +41,7 @@ func is_open() -> bool:
 
 
 func open(tab: String = "") -> void:
+	GameState.emit_event("screen_opened", {"id": "journal", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	if tab != "":
 		_tab = tab
 	for k in _tab_buttons.keys():
@@ -121,9 +122,10 @@ func _build() -> void:
 	_head = HBoxContainer.new()
 	_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_head.offset_left = 8
-	_head.offset_right = -8
-	_head.offset_top = 8
-	_head.offset_bottom = 30
+	_head.offset_right = -UiBtn.CLOSE_ROW   # справа — крестик
+	var st := HudSafeArea.top(get_viewport())
+	_head.offset_top = 8 + st
+	_head.offset_bottom = 30 + st
 	_head.alignment = BoxContainer.ALIGNMENT_CENTER
 	_head.add_theme_constant_override("separation", 10)
 	_root.add_child(_head)
@@ -132,8 +134,9 @@ func _build() -> void:
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scroll.offset_left = 6
 	_scroll.offset_right = -6
-	_scroll.offset_top = 36
-	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10)
+	var sb := HudSafeArea.bottom(get_viewport())
+	_scroll.offset_top = 36 + st
+	_scroll.offset_bottom = -(ProgressUiKit.TAB_BAR_H + 10 + sb)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(_scroll)
 	DragScroll.attach(_scroll)
@@ -142,14 +145,15 @@ func _build() -> void:
 		[TAB_ORES, UiIcons.item_small("gold", 16), "Руды", "Мастерство: звёзды за добычу каждой породы"],
 		[TAB_CHESTS, Mechanics.tex("chest_gold_icon"), "Тайники", "Открытые сундуки и жадность"],
 	]
-	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab, close)
+	var bar := HeroTabButton.make_bar(specs, _tab, _set_tab)
 	_tab_buttons = bar.get_meta("buttons")
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_left = 6
 	bar.offset_right = -6
-	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4)
-	bar.offset_bottom = -4
+	bar.offset_top = -(ProgressUiKit.TAB_BAR_H + 4 + sb)
+	bar.offset_bottom = -4 - sb
 	_root.add_child(bar)
+	UiBtn.close_button(close, _root)
 
 
 func _set_tab(t: String) -> void:
@@ -199,7 +203,7 @@ func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
 	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(tr)
-	var l := ProgressUiKit.make_label(text, 11, ProgressUiKit.TEXT_HI)
+	var l := ProgressUiKit.make_label(text, UiTheme.FS_LABEL, ProgressUiKit.TEXT_HI)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(l)
 	_head.add_child(box)
@@ -211,6 +215,9 @@ func _chip(icon: Texture2D, text: String, title: String, body: String) -> void:
 func _build_ores() -> Control:
 	var grid := GridContainer.new()
 	grid.columns = COLS
+	# ScrollContainer растягивает ребёнка только с флагом EXPAND, иначе тот остаётся
+	# минимальной ширины у левого края; при aspect=expand экран шире 224 — справа дыра.
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 3)
 	grid.add_theme_constant_override("v_separation", 4)
 	for id in MasteryLogic.kinds():
@@ -219,6 +226,7 @@ func _build_ores() -> Control:
 		t.fresh = MechState.mastery_count(t.item) > 0 \
 			and MechState.stars_seen(t.item) < maxi(1, MechState.stars_granted(t.item))
 		t.custom_minimum_size = Vector2(TILE_W, TILE_H)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # колонки делят ширину поровну, плитка рисуется по центру
 		grid.add_child(t)
 		_bind_tile_tip(t, String(id))
 	return grid
@@ -252,7 +260,7 @@ func _depth_of(id: String) -> int:
 func _build_chests() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
-	v.custom_minimum_size = Vector2(212, 0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # строки во всю ширину (см. _build_ores)
 	var rows := [
 		[Mechanics.tex("chest_wood_icon"), str(MechState.opened_count("wood")), "Деревянный сундук",
 			"Лежит в породе с глубины 20. Несколько руд этой глубины, иногда еда."],
@@ -287,7 +295,7 @@ func _stat_row(icon: Texture2D, num: String, title: String, body: String) -> Con
 	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(tr)
-	var l := ProgressUiKit.make_label(num, 16, ProgressUiKit.TEXT_HI)
+	var l := ProgressUiKit.make_label(num, UiTheme.FS_HERO, ProgressUiKit.TEXT_HI)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(l)

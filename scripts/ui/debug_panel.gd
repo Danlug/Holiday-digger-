@@ -93,7 +93,7 @@ func _build() -> void:
 	_trigger.name = "DebugPanelTrigger"
 	_trigger.text = "Тест"
 	_trigger.focus_mode = Control.FOCUS_NONE
-	_trigger.add_theme_font_size_override("font_size", 9)
+	_trigger.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_trigger.tooltip_text = "Тестовая панель отладки (не для релиза)"
 	# Один угол-якорь (см. комментарий у _panel ниже): якорь и рост задаём
 	# ДО custom_minimum_size — иначе верхний край считается один раз от
@@ -114,8 +114,8 @@ func _build() -> void:
 	_panel.name = "DebugPanelToggles"
 	_panel.visible = false
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(0x1A, 0x14, 0x0F)
-	sb.border_color = Color8(0x3E, 0x31, 0x25)
+	sb.bg_color = UiTheme.SHEET
+	sb.border_color = UiTheme.BORDER
 	sb.set_border_width_all(1)
 	sb.set_content_margin_all(4)
 	_panel.add_theme_stylebox_override("panel", sb)
@@ -147,7 +147,7 @@ func _build() -> void:
 		b.text = String(t["label"])
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 9)
+		b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		b.custom_minimum_size = Vector2(48.0, 28.0)
 		b.pressed.connect(_on_toggle_pressed.bind(field))
 		toggle_row.add_child(b)
@@ -162,7 +162,7 @@ func _build() -> void:
 		var b := Button.new()
 		b.text = String(a["label"])
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 9)
+		b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		b.custom_minimum_size = Vector2(48.0, 28.0)
 		b.pressed.connect(_on_action_pressed.bind(field))
 		action_row.add_child(b)
@@ -232,7 +232,7 @@ func _refresh() -> void:
 		b.add_theme_stylebox_override("pressed", style)
 		b.add_theme_stylebox_override("hover_pressed", style)
 		b.add_theme_color_override("font_color",
-			Color8(0xE8, 0xE0, 0xD4) if on else Color8(0x9D, 0x8B, 0x73))
+			UiTheme.TEXT if on else UiTheme.MUTED)
 
 
 func _style_for(on: bool) -> StyleBoxFlat:

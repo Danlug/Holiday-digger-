@@ -41,6 +41,9 @@ var _full_warned: Dictionary = {}
 var _connected := false
 var _greed_was := false
 var _last_pos := Vector2.INF   # где герой был в прошлом кадре (клетки): туман по пути жадности
+var _hold_left := 0.0
+var _hold_cached := false
+var _fall_hooked := false   # подписка на остановки падения героя в жадности (Player.greed_fall_stopped)
 
 
 func _ready() -> void:
@@ -76,7 +79,8 @@ func _build() -> void:
 		view_root.add_child(badge)
 	var meter_layer := CanvasLayer.new()
 	meter_layer.name = "StreakLayer"
-	meter_layer.layer = 2   # рядом с HUD и значками техники, ниже шторок и экранов
+	meter_layer.layer = UiLayers.HUD_WIDGETS   # рядом с HUD и значками техники, ниже шторок и экранов
+	meter_layer.add_to_group(UiLayers.WIDGETS_GROUP)
 	add_child(meter_layer)
 	meter = StreakMeter.new()
 	meter.name = "StreakMeter"
@@ -138,9 +142,25 @@ func _process(delta: float) -> void:
 func step(dt: float) -> void:
 	if player == null or not is_instance_valid(player):
 		return
+	if not _fall_hooked and player.has_signal("greed_fall_stopped"):
+		_fall_hooked = true
+		player.connect("greed_fall_stopped", _on_greed_fall_stop)
 	streak.set_stage(GreedRules.stage())
 	var digging: bool = player.get("digging") != null
-	if streak.tick(dt, digging, _streak_allowed()):
+	var allowed := _streak_allowed()
+	# сцена посреди жадности рвёт её, как раньше (data/mechanics.json → greed._timer)
+	if streak.in_greed() and bool(player.get("frozen")):
+		allowed = false
+	var hold := false
+	if allowed and not digging and not streak.in_greed() and streak.idle > streak.gap_s:
+		_hold_left -= dt
+		if _hold_left <= 0.0:
+			_hold_left = 0.25   # поиск открытых окон обходит дерево — четыре раза в секунду хватает
+			_hold_cached = _streak_hold()
+		hold = _hold_cached
+	else:
+		_hold_left = 0.0
+	if streak.tick(dt, digging, allowed, hold):
 		if meter != null:
 			meter.on_break()
 	_sync_greed()
@@ -154,9 +174,22 @@ func step(dt: float) -> void:
 func _streak_allowed() -> bool:
 	if not MechData.gate_open() or not GameState.is_alive or GameState.house_is_indoors:
 		return false
-	if bool(player.get("frozen")):
-		return false
 	return int(player.call("cell_y")) >= streak.min_depth
+
+
+## Герой не управляется: открыт рюкзак, магазин, экран героя, окно дня, идёт
+## сцена. Шкала замирает: до 26.10 любое окно обнуляло серию (рюкзак — через
+## 2.5 с простоя, магазин и сцены — сразу), и заглянуть в рюкзак значило её потерять.
+func _streak_hold() -> bool:
+	if bool(player.get("frozen")):
+		return true
+	var tree := get_tree()
+	return tree == null or tree.paused or HintBusy._modal_open(tree) or HintBusy._cutscene_or_autodig(tree)
+
+
+## Для бота и тестов: идёт ли жадность (tests/bot_play.gd ищет этот метод).
+func is_greed_active() -> bool:
+	return streak.in_greed()
 
 
 func _on_died() -> void:
@@ -287,7 +320,11 @@ func _on_fever_started() -> void:
 	Sfx.play("greed_start")
 	Sfx.play("reward", 1.15, -6.0)
 	Haptics.buzz(90)
-	Fx.flash(Color(1.0, 0.85, 0.3, 0.24), 0.25)
+	Fx.flash(Color(1.0, 0.85, 0.3, 0.34), 0.3)
+	if meter != null:
+		meter.on_greed_start()
+	if badge != null:
+		badge.on_greed_start()
 	if player != null:
 		var head := Vector2(float(player.x) * 32.0, float(player.y) * 32.0 - 12.0)
 		Fx.burst("levelup", head, 1.0)
@@ -295,6 +332,19 @@ func _on_fever_started() -> void:
 	Feel.punch(0.03)
 	GameState.emit_event(&"fever_started", {"seconds": streak.greed_s, "stage": streak.stage})
 	fever_started.emit()
+
+
+## Герой «зацепился» в падении (владелец 27.10): облачко и искра у ног, лёгкий стук
+## подошвы о стенку — без тостов и слов, отклик короче самой остановки.
+func _on_greed_fall_stop() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var feet := Vector2(float(player.x) * 32.0, (float(player.y) + 0.33) * 32.0)
+	# пыль в обе стороны — подошвы чиркнули по стенкам шахты, искра — цвет жадности
+	Fx.burst("land_dust_l", feet + Vector2(-4, 0), 0.6)
+	Fx.burst("land_dust_r", feet + Vector2(4, 0), 0.6)
+	Fx.burst("spark", feet, 0.8, COL_GOLD)
+	Sfx.play("step_stone", 1.25, -7.0)
 
 
 func _on_fever_ended() -> void:

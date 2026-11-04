@@ -78,7 +78,7 @@ func _build() -> void:
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_sub.add_theme_constant_override("line_spacing", 4)
-	DialogueStyle.shadowed(_sub, 11, SUB_COLOR)
+	DialogueStyle.shadowed(_sub, UiTheme.FS_LABEL, SUB_COLOR)
 	_col.add_child(_sub)
 
 	_orn_bot = _make_ornament()

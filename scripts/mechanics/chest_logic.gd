@@ -114,11 +114,26 @@ static func pick_tier(world_seed: int, band: int, y: int) -> String:
 	return String(tiers[tiers.size() - 1].get("id", "wood"))
 
 
+## Запись ступени: обычные (tiers, их разыгрывает pick_tier) и назначаемые явно
+## (extra_tiers — сундук полости-фигуры, раунд 5).
 static func tier_row(tier: String) -> Dictionary:
 	for t in MechData.section("chests").get("tiers", []):
 		if String(t.get("id", "")) == tier:
 			return t
+	for t in MechData.section("chests").get("extra_tiers", []):
+		if String(t.get("id", "")) == tier:
+			return t
 	return {}
+
+
+## Ценность ступени в «клетках» на глубине y: value_cells плюс value_per_1000 за
+## каждую 1000 ниже y_min ступени (у тайников нуль — их ценность не зависит от глубины).
+static func tier_value_cells(row: Dictionary, y: int) -> float:
+	var base := float(MechData.value(row.get("value_cells", 20), 20))
+	var per := float(MechData.value(row.get("value_per_1000", 0), 0))
+	if per <= 0.0:
+		return base
+	return base + per * maxf(0.0, float(y - int(row.get("y_min", 0)))) / 1000.0
 
 
 ## Добыча сундука: {tier, items: {id: n}, xp: int}. Детерминирована от сида и
@@ -137,14 +152,24 @@ static func roll_loot(world: WorldGen, world_seed: int, cell: Vector2i, tier: St
 	var lo := int(limits[0])
 	var hi := int(limits[limits.size() - 1])
 	var spread := MechData.num("chests", "value_spread", 0.25)
-	var target := float(MechData.value(row.get("value_cells", 20), 20)) * cell_value(world, cell.y) \
+	var target := tier_value_cells(row, cell.y) * cell_value(world, cell.y) \
 		* rng.randf_range(1.0 - spread, 1.0 + spread)
+	# владелец (26.10): «важно, чтобы в сундуке не было больше 60 кг руды» — столько
+	# держит рюкзак. Самоцвет золотого сундука — тоже руда: место под него оставляем заранее.
+	var max_kg := MechData.num("chests", "max_ore_kg", 60.0)
+	var gem := _gem_for(cell.y) if bool(row.get("gem", false)) else {}
+	if not gem.is_empty():
+		var gem_kg := Balance.get_mineral_weight(String(gem["id"]))
+		if gem_kg > 0.0:
+			gem["count"] = clampi(int(gem["count"]), 1, maxi(1, int(floor(max_kg / gem_kg))))
+		max_kg -= gem_kg * int(gem["count"])
 	if not pool.is_empty():
 		var total := 0.0
 		for p in pool:
 			total += float(p["w"])
 		var cap := target * (1.0 + spread)
 		var got := 0.0
+		var got_kg := 0.0
 		var n := 0
 		var misses := 0
 		# тянем руду, пока ценность не набрана; штуку, с которой сундук перевалил бы
@@ -154,11 +179,13 @@ static func roll_loot(world: WorldGen, world_seed: int, cell: Vector2i, tier: St
 		while n < hi and (n < lo or got < target) and misses < 6:
 			var pick := _draw(pool, total, rng)
 			var price := float(pick["price"])
-			if got + price > cap:
+			var kg := Balance.get_mineral_weight(String(pick["id"]))
+			if got + price > cap or got_kg + kg > max_kg:
 				misses += 1
 				continue
 			items[pick["id"]] = int(items.get(pick["id"], 0)) + 1
 			got += price
+			got_kg += kg
 			n += 1
 		if n == 0:
 			# всё в породе дороже ценности сундука: одна штука самого дешёвого
@@ -167,10 +194,8 @@ static func roll_loot(world: WorldGen, world_seed: int, cell: Vector2i, tier: St
 				if float(p["price"]) < float(cheap["price"]):
 					cheap = p
 			items[cheap["id"]] = 1
-	if bool(row.get("gem", false)):
-		var gem := _gem_for(cell.y)
-		if not gem.is_empty():
-			items[gem["id"]] = int(items.get(gem["id"], 0)) + int(gem["count"])
+	if not gem.is_empty():
+		items[gem["id"]] = int(items.get(gem["id"], 0)) + int(gem["count"])
 	var xp := 0.0
 	for id in items.keys():
 		xp += float(items[id]) * item_xp(String(id))
@@ -181,6 +206,16 @@ static func roll_loot(world: WorldGen, world_seed: int, cell: Vector2i, tier: St
 	var total_xp := int(round(xp * MechData.num("chests", "xp_share", 0.5))) \
 		+ int(MechData.value(row.get("xp_bonus", 0), 0))
 	return {"tier": tier, "items": items, "xp": total_xp}
+
+
+## Вес руды в добыче (еда не руда — не считается).
+static func ore_kg(items: Dictionary) -> float:
+	var kg := 0.0
+	for id in items.keys():
+		if String(id).begins_with("food_"):
+			continue
+		kg += Balance.get_mineral_weight(String(id)) * int(items[id])
+	return kg
 
 
 static func _draw(pool: Array, total: float, rng: RandomNumberGenerator) -> Dictionary:

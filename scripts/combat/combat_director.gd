@@ -34,6 +34,11 @@ var view_root: Node = null
 var cw: CombatWorld
 var spawner: MonsterSpawner
 var monsters: Array = []
+## Полости-фигуры с 1500 (раунд 5): стражи, снаряды стрелков, слой кромки и сундука.
+var caves: CaveGuards = null
+var projectiles: Array = []
+var cave_layer: Node2D = null
+var _cave_tick: float = 0.0
 var view: Node2D = null
 var ui: CanvasLayer = null
 var equip_screen: Node = null
@@ -92,6 +97,17 @@ func setup(p_host: Node) -> void:
 		view_root.add_child(view)
 	else:
 		add_child(view)
+
+	# полости-фигуры: стражи и сундук (логика), кромка и сундук (слой над тайлами, под героем)
+	caves = CaveGuards.new(world, cw)
+	if view_root != null and world != null:
+		cave_layer = load("res://scripts/world/cave_layer.gd").new()
+		cave_layer.name = "CaveLayer"
+		cave_layer.director = self
+		view_root.add_child(cave_layer)
+		var wv := view_root.get_node_or_null("WorldView")
+		if wv != null:
+			view_root.move_child(cave_layer, wv.get_index() + 1)
 
 	ui = load("res://scripts/combat/combat_hud.gd").new()
 	ui.name = "CombatHud"
@@ -196,7 +212,9 @@ func _process(delta: float) -> void:
 	_tick_boss(dt)
 	if boss == null:
 		_tick_spawn(dt)
+		_tick_caves(dt)
 	_tick_monsters(dt)
+	_tick_projectiles(dt)
 	if bool(CombatData.player_cfg("auto_attack", true)) and swing_cd <= 0.0 and _nearest_target(false) != null:
 		try_swing()
 	_tick_regen(dt)
@@ -221,9 +239,63 @@ func spawn(req: Dictionary) -> Monster:
 	m.group = int(req.get("group", 0))
 	var em: Vector2 = req.get("emerge", Vector2.ZERO)
 	m.emerge_pos = em
+	if req.has("cave_id"):
+		# страж полости: дом, поводок и агро — не уходит далеко от своего сундука
+		m.cave_id = String(req["cave_id"])
+		m.guard_index = int(req.get("index", -1))
+		m.home = req.get("home", Vector2(m.x, m.y))
+		m.leash = float(req.get("leash", 0.0))
+		m.aggro = float(req.get("aggro", m.leash))
 	monsters.append(m)
 	monster_spawned.emit(m)
 	return m
+
+
+## Стражи полостей-фигур: недостающие появляются, когда герой подходит к полости
+## (она ещё в тумане), сундук в центре открывается касанием, когда все мертвы.
+func _tick_caves(dt: float) -> void:
+	if caves == null or not spawning_enabled or player.y < float(Caves.y_min()) - 40.0:
+		return
+	_cave_tick -= dt
+	if _cave_tick > 0.0:
+		return
+	_cave_tick = 0.25
+	var hero_pos := Vector2(player.x, player.y)
+	for req in caves.spawn_requests(hero_pos, monsters):
+		spawn(req)
+	caves.tick_chest(hero_pos, host.get_node_or_null("MechDirector") if host != null else null)
+
+
+func _tick_projectiles(dt: float) -> void:
+	if projectiles.is_empty():
+		return
+	var hero := hero_info()
+	for p: Projectile in projectiles.duplicate():
+		for e in p.tick(dt, hero, cw.solid):
+			_on_projectile_event(p, e)
+		if not p.alive:
+			projectiles.erase(p)
+
+
+func _on_projectile_event(p: Projectile, e: Dictionary) -> void:
+	var pos := Vector2(p.x, p.y) * TILE
+	match String(e["type"]):
+		"hit":
+			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "projectile:" + p.kind, {"id": p.owner_id})
+			Fx.burst("spark", pos, 0.8, _projectile_tint(p.kind))
+		"break":
+			# бьётся о породу: видно и слышно, что снаряд можно переждать за выступом
+			Fx.burst("dig_stone", pos, 0.5, _projectile_tint(p.kind))
+			Sfx.play("tile_break", 1.5, -10.0)
+
+
+static func _projectile_tint(kind: String) -> Color:
+	match kind:
+		"acid":
+			return Color8(0x9A, 0xF0, 0x4A)
+		"spark":
+			return Color8(0xFF, 0xC8, 0x50)
+	return Color8(0xB0, 0xA8, 0xA0)
 
 
 func _tick_monsters(dt: float) -> void:
@@ -249,10 +321,18 @@ func _tick_monsters(dt: float) -> void:
 func _on_monster_event(m: Monster, e: Dictionary) -> void:
 	match String(e["type"]):
 		"hit":
-			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "monster:" + m.id)
+			_hurt_hero(float(e["damage"]), String(e["kind"]), int(e["dir"]), "monster:" + m.id, {"guard": m.cave_id != ""})
 		"emerge":
 			Fx.burst("dig_stone", Vector2(m.x, m.y) * TILE, 1.5)
 			Sfx.play("tile_break")
+		"shoot":
+			var p := Projectile.create(e["spec"], float(e["x"]), float(e["y"]), float(e["vx"]), float(e["vy"]),
+				float(e["damage"]), String(e["kind"]))
+			p.owner_id = m.id
+			projectiles.append(p)
+			Sfx.play("spit", randf_range(0.9, 1.1))
+			Sfx.play("swing", 0.55, -6.0)   # пока у звука нет своего id — глухой «плюх»
+			Fx.burst("poof", Vector2(p.x, p.y) * TILE, 0.4, _projectile_tint(p.kind))
 		"died":
 			_on_monster_died(m)
 
@@ -262,6 +342,8 @@ func _on_monster_died(m: Monster) -> void:
 	CombatService.note_kill(m.id)
 	GameState.add_xp(int(m.def.get("xp", 0)))
 	GameState.emit_event(&"monster_killed", {"id": m.id, "depth": int(floor(m.y)), "pos": pos})
+	if m.cave_id != "":
+		_on_guard_died(m)
 	var lost := false
 	for drop in m.def.get("drops", []):
 		if randf() > float(drop.get("chance", 1.0)):
@@ -269,12 +351,31 @@ func _on_monster_died(m: Monster) -> void:
 		var n := randi_range(int(drop.get("min", 1)), int(drop.get("max", 1)))
 		var got := GameState.add_item(String(drop["id"]), n)
 		if got > 0:
-			Fx.float_text(pos + Vector2(0, -10), "+%d %s" % [got, _short_name(String(drop["id"]))], Color8(0xF2, 0xD9, 0x9B))
+			Fx.float_text(pos + Vector2(0, -10), "+%d %s" % [got, _short_name(String(drop["id"]))], UiTheme.TEXT_HI)
 		else:
 			lost = true
 	if lost:
-		Fx.float_text(pos + Vector2(0, -22), "рюкзак полон", Color8(0xB8, 0x5A, 0x52))
+		Fx.float_text(pos + Vector2(0, -22), "рюкзак полон", UiTheme.RED)
 	monster_died.emit(m)
+
+
+## Страж полости убит: запоминается навсегда; последний — сундук отперт (звон,
+## искры у сундука, событие cave_cleared для мета-слоя и звука).
+func _on_guard_died(m: Monster) -> void:
+	CaveGuards.note_kill(m.cave_id, m.guard_index)
+	var c := Caves.cave_at(world, int(m.home.x), int(m.home.y)) if world != null else {}
+	if c.is_empty() or not CaveGuards.is_cleared(c):
+		return
+	CaveGuards.note_cleared()
+	var chest := Caves.chest_cell(c)
+	var cpos := Vector2(chest.x + 0.5, chest.y + 0.5) * TILE
+	Sfx.play("cave_unlock")
+	Sfx.play("pickup_rare", 1.2)
+	Haptics.buzz(60)
+	Fx.burst("spark", cpos, 1.4, Caves.color_of(c))
+	Fx.burst("pickup_glint", cpos, 1.0, Caves.color_of(c))
+	Fx.float_icon(cpos + Vector2(0, -22), Mechanics.tex("chest_cave_icon"), "", UiTheme.GOLD_LIGHT)
+	GameState.emit_event(&"cave_cleared", {"id": m.cave_id, "kind": String(c.kind), "depth": int(c.cy), "pos": cpos})
 
 
 static func _short_name(id: String) -> String:
@@ -389,7 +490,7 @@ func _do_swing(dir: int, st: Dictionary) -> void:
 				# ядро закрыто: удар глухо бьёт по камню, число серое
 				Sfx.play("hurt_armor", randf_range(0.8, 0.95))
 				Fx.burst("spark", bpos + Vector2(float(-dir) * 20.0, 0.0), 0.6)
-				Fx.float_text(bpos + Vector2(0, -20), str(int(round(bd))), Color8(0x9D, 0x8B, 0x73))
+				Fx.float_text(bpos + Vector2(0, -20), str(int(round(bd))), UiTheme.MUTED)
 			Haptics.tap()
 		else:
 			Sfx.play("hurt_armor", 0.7)
@@ -409,18 +510,19 @@ func _tick_slashes(dt: float) -> void:
 # Урон по герою
 # ---------------------------------------------------------------------------
 
-## raw — урон до брони; dir — сторона, куда отбросить (+1 вправо).
-func _hurt_hero(raw: float, kind: String, dir: int, source: String) -> void:
+## raw — урон до брони; dir — сторона, куда отбросить (+1 вправо). info — кто именно
+## бил (стрелок снаряда, страж полости): причина в окне смерти (DeathCause).
+func _hurt_hero(raw: float, kind: String, dir: int, source: String, info: Dictionary = {}) -> void:
 	if not GameState.is_alive or iframes > 0.0 or raw <= 0.0:
 		return
 	var st := stats()
 	var dmg := CombatService.mitigate(raw, kind, st)
 	var armored := float(st["reduction"]) >= 0.2
 	_last_hurt_ms = Time.get_ticks_msec()
-	GameState.take_damage(dmg, source)
+	GameState.take_damage(dmg, source, info)
 	hero_hurt.emit(dmg, source)
 	var pos := Vector2(player.x, player.y) * TILE
-	Fx.float_text(pos + Vector2(0, -18), "-%d" % int(round(dmg)), Color8(0xFF, 0x70, 0x70))
+	Fx.float_text(pos + Vector2(0, -18), "-%d" % int(round(dmg)), UiTheme.BAD_LIGHT)
 	if not GameState.is_alive:
 		return
 	iframes = float(CombatData.player_cfg("iframes_sec", 0.5))
@@ -607,6 +709,7 @@ func _on_game_event(id: StringName, _data: Dictionary) -> void:
 
 func _on_hero_died() -> void:
 	monsters.clear()
+	projectiles.clear()
 	iframes = 0.0
 	_kb_left = 0.0
 	if boss != null:

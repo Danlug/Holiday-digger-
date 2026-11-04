@@ -112,8 +112,9 @@ func _test_data() -> void:
 				print("  дроп без минерала: ", dr["id"])
 	check("все дропы монстров описаны в minerals.json", drops_ok)
 	check("детали монстров не продаются", not ShopCatalog.is_bought("cinder_ash") and not ShopCatalog.is_bought("hellstone"))
-	check("раздел босса, формулы, спавна помечены proposed",
-		d["boss"].get("proposed") == true and d["formula"].get("proposed") == true and d["spawn"].get("proposed") == true)
+	# Формулу урона (и героя в бою) владелец утвердил на странице разбора чисел 30.10.
+	check("раздел босса и спавна помечены proposed, формула урона утверждена",
+		d["boss"].get("proposed") == true and d["formula"].get("proposed") == false and d["spawn"].get("proposed") == true)
 	var slots := CombatData.slots()
 	check("шесть слотов: шлем, броня, оружие, щит, два аксессуара", slots.size() == 6 and slots.has("acc2"))
 

@@ -39,6 +39,8 @@ func _ready() -> void:
 	var wv = _main.world_view
 	if "lava_tick_override" in wv:
 		wv.lava_tick_override = 0
+	if "fog_fade" in wv and wv.fog_fade != null:
+		wv.fog_fade.duration = 0.0   # проявление тумана идёт по часам кадра — для сверки пикселей скачком
 	for item in _spec.split(","):
 		var parts := item.split(":")
 		var kind := parts[0]

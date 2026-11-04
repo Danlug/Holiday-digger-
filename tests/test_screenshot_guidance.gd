@@ -8,10 +8,11 @@ extends Node
 ##       res://tests/test_screenshot_guidance.tscn --rendering-driver opengl3 --resolution 448x960 \
 ##       -- /каталог [виды через запятую]
 ##
-## Виды: screen, tip, rig, hud, ready, sell, storage, card, hint. По умолчанию все.
+## Виды: screen, tip, rig, titles, en, hud, ready, sell, storage, card, hint. По умолчанию все.
+## titles — шапка «Проект: …» у каждого проекта; en — то же на английском.
 
 var _out_dir := "/tmp/guidance_shots"
-var _spec := "screen,tip,rig,hud,ready,sell,storage,card,hint"
+var _spec := "screen,tip,rig,titles,en,hud,ready,sell,storage,card,hint"
 var _main: Node2D = null
 
 
@@ -57,6 +58,10 @@ func _ready() -> void:
 	HintState.mark_seen("project_well")
 	ProjectChain.set_tracked("hand_drill", false)
 	await _wait(0.6)
+	var ms = MetaService.instance
+	if ms != null and is_instance_valid(ms) and ms.popup.is_open():
+		ms.popup.close()
+		await _wait(0.4)
 
 	if _want("screen"):
 		ProjectsScreen.open_for("hand_drill")
@@ -75,6 +80,20 @@ func _ready() -> void:
 			s2._set_project("drill_rig")
 			await _wait(0.4)
 			await _shot("03_screen_drill_rig")
+	if _want("titles") or _want("en"):
+		var s3 := ProjectsScreen.instance()
+		var langs: Array = []
+		if _want("titles"):
+			langs.append("ru")
+		if _want("en"):
+			langs.append("en")
+		for lang in langs:
+			Settings.language = lang
+			for id in ProjectChain.ids():
+				s3._set_project(String(id))
+				await _wait(0.3)
+				await _shot("11_title_%s_%s" % [lang, id])
+		Settings.language = "ru"
 	ProjectsScreen.instance().close()
 	await _wait(0.4)
 

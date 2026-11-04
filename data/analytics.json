@@ -1,0 +1,7 @@
+{
+	"_note": "Аналитика по согласию игрока (ГДД §16.1, scripts/core/analytics.gd). api_key — ПУБЛИЧНЫЙ ключ проекта PostHog (phc_…), его можно держать в сборке. Пустой ключ — события копятся в очереди на устройстве, наружу не уходит ничего. enabled_build=false выключает аналитику в сборке целиком (окна согласия тоже не будет).",
+	"enabled_build": true,
+	"host": "https://eu.i.posthog.com",
+	"api_key": "",
+	"privacy_url": "https://danlug.github.io/Holiday-digger-/privacy.html"
+}

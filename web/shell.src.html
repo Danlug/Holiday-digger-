@@ -299,6 +299,48 @@ noscript{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justi
 	});
 	document.addEventListener('visibilitychange', function () { if (!document.hidden) { resumeAudio(); } });
 
+	// ---------- сохранение при уходе со страницы
+	// Игра пишет сейв в user://, а движок переносит его в IndexedDB (IDBFS) только в начале следующего кадра.
+	// У скрытой вкладки кадров нет: сейв, сделанный при уходе, остался бы в памяти страницы, а телефон выгружает
+	// фоновые вкладки молча. Поэтому: страница скрылась или уходит → зовём игру (колбэк из onLeave, она
+	// сохраняется) → игра отдаёт текст в persistFile, и он ложится в ту же базу тем же форматом, что у IDBFS
+	// движка ({timestamp, mode, contents} по полному пути) — при следующем запуске движок поднимет его как свой.
+	var leaveHooks = [], idb = null, IDB_NAME = '/userfs', IDB_STORE = 'FILE_DATA';
+	function openIdb() {
+		if (idb || !window.indexedDB) { return; }
+		try {
+			var req = indexedDB.open(IDB_NAME);
+			req.onupgradeneeded = function (e) { e.target.transaction.abort(); }; // базы ещё нет — заводит её движок, не мы
+			req.onsuccess = function () {
+				var db = req.result;
+				if (!db.objectStoreNames.contains(IDB_STORE)) { db.close(); return; }
+				db.onversionchange = function () { db.close(); idb = null; };
+				idb = db;
+			};
+		} catch (e) { /* без IndexedDB сохраняет только сам движок */ }
+	}
+	shell.onLeave = function (cb) { leaveHooks.push(cb); openIdb(); };
+	shell.persistFile = function (path, text) {
+		if (!idb || String(path).indexOf(IDB_NAME + '/') !== 0) { return false; }
+		try {
+			var tx = idb.transaction([IDB_STORE], 'readwrite'), store = tx.objectStore(IDB_STORE), now = new Date();
+			// папки над файлом: без них движок при запуске не разложит файл и выключит сохранение целиком
+			var parts = String(path).split('/'), dir = '';
+			for (var i = 1; i < parts.length - 1; i++) {
+				dir += '/' + parts[i];
+				if (dir !== IDB_NAME) { store.put({ timestamp: now, mode: 16895 }, dir); }
+			}
+			store.put({ timestamp: now, mode: 33206, contents: new TextEncoder().encode(text) }, path);
+			if (tx.commit) { tx.commit(); }
+			return true;
+		} catch (e) { return false; }
+	};
+	function leave(reason) {
+		leaveHooks.forEach(function (cb) { try { cb(reason); } catch (e) { /* игра не ответила — сохранит автосейв */ } });
+	}
+	document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { leave('hidden'); } });
+	window.addEventListener('pagehide', function () { leave('pagehide'); });
+
 	// ---------- полноэкранный режим: только там, где есть смысл и где браузер умеет (iPhone Safari — тихо пропускаем)
 	shell.goFullscreen = function () {
 		try {

@@ -1,8 +1,9 @@
 extends Node
 ## test_screenshot_daily — не автотест, а инструмент глаз: поднимает настоящую
-## main-сцену, включает мета-слой, наполняет задания дня правдоподобным
+## main-сцену, включает мета-слой, наполняет 13 миссий дня правдоподобным
 ## прогрессом и снимает: кнопку заданий на экране (в шахте и на поверхности),
-## открытое окно, подсказку плитки, взрыв награды, готовый сундук, замену.
+## открытое окно (шкала звёзд, прокрутка вниз), подсказку плитки, взрыв награды
+## и полёт звезды, замену, сундук на 10-й звезде, открытый сундук.
 ##
 ##   XDG_DATA_HOME=$PWD/.godot/xdg xvfb-run -a -s "-screen 0 1280x1024x24" godot --path . \
 ##       res://tests/test_screenshot_daily.tscn --rendering-driver opengl3 --resolution 448x960 -- /каталог
@@ -63,9 +64,10 @@ func _ready() -> void:
 	await _shot("02_mine_button")
 
 	# 2б. Задание закрылось прямо в шахте: тост и значок летит от героя в кнопку.
-	var hunt: Dictionary = QuestEngine.daily()[4]
+	var hunt: Dictionary = QuestEngine.daily()[3]
 	hunt["progress"] = int(hunt["target"]) - 1
-	_svc._apply(StringName(String(hunt["event"])), _event_for(hunt))
+	var ev = hunt["event"]
+	_svc._apply(StringName(String(ev[0] if ev is Array else ev)), _event_for(hunt))
 	await _wait(0.3)
 	await _shot("02b_mine_quest_done_fly")
 	await _wait(0.4)
@@ -73,10 +75,15 @@ func _ready() -> void:
 	await _wait(2.4)
 	_main.player.y = 4.5
 
-	# 3. Окно заданий.
+	# 3. Окно заданий: шкала звёзд, готовое сверху; прокрутка до конца списка.
 	_svc.open_tasks()
 	await _wait(0.6)
 	await _shot("03_panel")
+	_svc.tasks._scroll.scroll_vertical = 10000
+	await _wait(0.3)
+	await _shot("03b_panel_scrolled")
+	_svc.tasks._scroll.scroll_vertical = 0
+	await _wait(0.2)
 
 	# 4. Подсказка плитки (название и описание — только в Tip).
 	Tip.show_now(_svc.tasks._list.get_child(0))
@@ -90,7 +97,9 @@ func _ready() -> void:
 		claim.pressed.emit()
 		await _wait(0.2)
 		await _shot("05_claim_burst")
-		await _wait(1.2)
+		await _wait(0.35)
+		await _shot("05b_star_fly")
+		await _wait(1.0)
 
 	# 6. Замена задания (бесплатная).
 	var rr := _find_button(_svc.tasks._list, "reroll")
@@ -99,25 +108,42 @@ func _ready() -> void:
 		await _wait(0.5)
 		await _shot("06_after_reroll")
 
-	# 7. Все задания выполнены и забраны — сундук дня готов, серия 6.
+	# 7. Десять звёзд — сундук звёзд готов (серия 6); три миссии ещё впереди.
 	var st: Dictionary = MetaState.sub("quests")["streak"]
 	st["n"] = 5
 	st["last"] = MetaState.today() - 1
 	st["best"] = 9
+	var left := 0
 	for q in QuestEngine.daily():
+		if QuestEngine.stars_today() >= 10:
+			if not bool(q["claimed"]) and left < 1:
+				q["progress"] = int(q["target"])   # одна выполнена, но не забрана
+			left += 1
+			continue
 		q["progress"] = int(q["target"])
 		if not bool(q["claimed"]):
 			QuestEngine.claim(String(q["id"]))
 	_svc.tasks.refresh()
 	await _wait(0.6)
 	await _shot("07_chest_ready")
-	var open := _find_button(_svc.tasks._box, "check")
+	Tip.show_now(_svc.tasks.find_child("StarsRow", true, false))
+	await _wait(0.25)
+	await _shot("07b_stars_tip")
+	Tip.hide_all()
+	var open := _svc.tasks.find_child("Chest", true, false) as Button
 	if open != null:
 		open.pressed.emit()
 		await _wait(0.22)
 		await _shot("08_chest_burst")
 		await _wait(1.4)
-		await _shot("09_day_done")
+		await _shot("09_chest_open")
+	for q in QuestEngine.daily():
+		q["progress"] = int(q["target"])
+		if not bool(q["claimed"]):
+			QuestEngine.claim(String(q["id"]))
+	_svc.tasks.refresh()
+	await _wait(0.5)
+	await _shot("09b_day_done")
 	_svc.tasks.close()
 	await _wait(0.5)
 	await _shot("10_button_day_done")
@@ -127,13 +153,15 @@ func _ready() -> void:
 	get_tree().quit(0)
 
 
-## Середина дня: копка 312/500, продажа готова, трата наполовину, еда 1/3.
+## Середина дня: копка 312/500, две миссии забраны, одна готова, остальное в работе.
 func _seed_progress() -> void:
 	var ds := QuestEngine.daily()
-	var fr := [0.624, 1.0, 0.5, 0.34, 0.2]
+	var fr := [0.624, 1.0, 0.5, 0.34, 0.8, 1.0, 0.4, 0.34, 1.0, 0.0, 0.5, 0.2, 0.6]
 	for i in range(ds.size()):
 		var q: Dictionary = ds[i]
 		q["progress"] = int(round(float(q["target"]) * float(fr[mini(i, fr.size() - 1)])))
+	for i in [5, 8]:
+		QuestEngine.claim(String(ds[i]["id"]))
 	QuestEngine.mark_opened()
 	_svc.after_change()
 
@@ -141,8 +169,11 @@ func _seed_progress() -> void:
 ## Подставное событие, которое двигает это задание на единицу.
 func _event_for(q: Dictionary) -> Dictionary:
 	var d := {"cell": Vector2i(5, 200), "tile": TileTypes.Type.STONE, "loot": true, "count": 1, "depth": 9999,
-		"amount": 1, "coins": 1}
+		"amount": 1, "coins": 1, "blocks": 1}
 	var f: Dictionary = q["filter"]
+	if String(f.get("kind", "")) == "dirt":
+		d["tile"] = TileTypes.Type.DIRT
+		d["loot"] = false
 	if f.has("item"):
 		d["item"] = f["item"]
 	if f.has("currency"):

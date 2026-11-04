@@ -582,6 +582,58 @@ def g_clover(img):
     sparkle(img, 27, 4, C("gold_light"))
     return img
 
+@icon
+def g_dirt(img):
+    """Миссия «выкопай N клеток земли»: ком рыхлой земли с травинкой и камешками."""
+    pts = [(4, 24), (6, 17), (11, 12), (18, 11), (24, 13), (28, 19), (27, 26), (16, 28), (7, 27)]
+    poly(img, pts, C("soil_base"))
+    poly(img, [(6, 17), (11, 12), (18, 11), (24, 13), (16, 16), (9, 19)], C("soil_light"))
+    poly(img, [(7, 27), (16, 28), (27, 26), (28, 21), (19, 24), (10, 24)], C("soil_shadow"))
+    for x, y in ((10, 21), (17, 19), (22, 23), (13, 25)):
+        rect(img, x, y, x + 1, y, C("soil_warm"))
+    rect(img, 20, 15, 21, 16, C("stone_light"))
+    line(img, [(15, 11), (14, 5)], C("grass_dark"), 1)
+    line(img, [(16, 11), (19, 6)], C("grass_field"), 1)
+    dot(img, 13, 6, C("grass_field"))
+    return img
+
+
+@icon
+def g_crate(img):
+    """Миссия «отнеси на склад»: дощатый ящик склада с железными уголками, сверху руда."""
+    rect(img, 5, 9, 27, 27, C("soil_light"))
+    for y in (9, 15, 21):
+        rect(img, 5, y, 27, y, C("soil_shadow"))
+    rect(img, 5, 9, 27, 10, C("soil_warm"))
+    line(img, [(6, 26), (26, 10)], C("soil_base"), 2)
+    rect(img, 5, 26, 27, 27, C("soil_shadow"))
+    for x, y in ((5, 9), (24, 9), (5, 24), (24, 24)):
+        rect(img, x, y, x + 3, y + 3, C("iron_tool"))
+        dot(img, x + 1, y + 1, shade(C("iron_tool"), 1.25))
+    ell(img, 12, 6, 4, 3, C("iron_base"))
+    ell(img, 11, 5, 2, 1, C("iron_light"))
+    ell(img, 20, 6, 4, 3, C("gold_base"))
+    ell(img, 19, 5, 2, 1, C("gold_light"))
+    return img
+
+
+@icon
+def g_anvil(img):
+    """Миссия «смастери или переплавь»: наковальня и молот, искры."""
+    poly(img, [(4, 13), (9, 11), (26, 11), (26, 16), (20, 17), (11, 17), (7, 15)], C("lead_base"))
+    poly(img, [(4, 13), (9, 11), (26, 11), (24, 13), (9, 13)], C("iron_tool"))
+    rect(img, 13, 17, 19, 22, C("lead_base"))
+    rect(img, 9, 22, 23, 26, shade(C("lead_base"), 0.8))
+    rect(img, 9, 22, 23, 22, C("iron_tool"))
+    line(img, [(20, 9), (27, 2)], C("wood"), 2)
+    rect(img, 15, 5, 21, 9, C("iron_tool"))
+    rect(img, 15, 5, 21, 6, shade(C("iron_tool"), 1.25))
+    sparkle(img, 9, 7, C("gold_light"))
+    dot(img, 12, 4, C("copper_light"))
+    dot(img, 26, 8, C("gold_light"))
+    return img
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     for name, fn in ICONS.items():

@@ -16,7 +16,7 @@ var _card: HouseForcedCard
 
 
 func _ready() -> void:
-	layer = 30
+	layer = UiLayers.PROMPTS
 	_card = HouseForcedCard.new()
 	_card.name = "Card"
 	add_child(_card)

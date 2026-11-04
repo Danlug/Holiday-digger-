@@ -7,8 +7,8 @@ extends RefCounted
 
 const DIR := "res://art/house_ui/"
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_BRIGHT := Color8(0xFF, 0xD8, 0x5A)
+const GOLD := UiTheme.GOLD
+const GOLD_BRIGHT := UiTheme.GOLD_BRIGHT
 const INK := Color(0.05, 0.04, 0.08)
 
 
@@ -42,35 +42,6 @@ static func nine(texture_name: String, margin: int, tint: Color = Color.WHITE,
 	return n
 
 
-## Кнопка в стиле магазина: цветной девятизонник (green/red/gold/gray) и значок.
-## Нажатие даёт звук и вибро (UiBtn), «проседание» — как у остальных кнопок.
-static func button(kind: String, glyph: Texture2D, size: Vector2, glyph_px: float = 16.0) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = size
-	b.size = size
-	b.focus_mode = Control.FOCUS_NONE
-	var texture := ShopArt.tex("btn_" + kind)
-	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
-		var sb := StyleBoxTexture.new()
-		sb.texture = texture
-		sb.texture_margin_left = 5
-		sb.texture_margin_right = 5
-		sb.texture_margin_top = 5
-		sb.texture_margin_bottom = 5
-		match st:
-			"pressed", "hover_pressed":
-				sb.modulate_color = Color(0.78, 0.78, 0.78)
-			"disabled":
-				sb.modulate_color = Color(0.45, 0.45, 0.5)
-		b.add_theme_stylebox_override(st, sb)
-	if glyph != null:
-		var ic := ShopArt.rect(glyph, (size - Vector2(glyph_px, glyph_px)) * 0.5, Vector2(glyph_px, glyph_px))
-		ic.name = "Glyph"
-		b.add_child(ic)
-	UiBtn.wire_feedback(b)
-	return b
-
-
 ## Рамка-панель магазина (тёмная с золотым верхом) для карточек и окон.
 static func panel_style(margin: int = 9) -> StyleBoxTexture:
 	var sb := StyleBoxTexture.new()
@@ -86,7 +57,7 @@ static func panel_style(margin: int = 9) -> StyleBoxTexture:
 static func float_number(host: Control, at: Vector2, text: String, color: Color, rise: float = 18.0) -> void:
 	if host == null or not host.is_inside_tree():
 		return
-	var l := ShopArt.label(text, 11, color, INK, 4)
+	var l := ShopArt.label(text, UiTheme.FS_LABEL, color, INK, 4)
 	l.position = at
 	l.z_index = 120
 	host.add_child(l)

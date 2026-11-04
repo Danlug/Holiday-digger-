@@ -70,7 +70,9 @@ func _ready() -> void:
 	check("ext восстанавливается из сейва", GameState.ext.has("probe") and int(GameState.ext["probe"]["n"]) == 7)
 	SaveSystem._apply({})
 	GameState.reset_progress()
-	check("reset_progress очищает ext", GameState.ext.is_empty())
+	# После сброса в ext только отметка разовых подарков: новой игре они не положены (OwnerGifts).
+	check("reset_progress очищает ext (остаётся только отметка подарков)",
+		not GameState.ext.has("probe") and GameState.ext.keys().all(func(k): return String(k) == OwnerGifts.CLAIMED_KEY))
 
 	# --- шина событий ---
 	var got: Array = []

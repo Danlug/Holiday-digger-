@@ -1,8 +1,10 @@
 extends Node
 ## test_screenshot_purchase — не автотест, а инструмент глаз: витрина по правилу
 ## «где можно покупать» (ГДД §15): под землёй плитки с бейджем «осталось N/3» и
-## значком ролика, без роликов и на огороде — замок и причина, у двери — как раньше.
+## значком ролика, без роликов — замок и причина, у двери — как раньше.
 ## Плитки за доллары (раунд 4) — везде как у двери: без замка, «N/3» и ролика.
+## Огород и комнаты дома (раунд 5): значок двери на монетных плитках, полоса
+## «за монеты — у входной двери» внизу и кнопка «к двери» (только огород).
 ## Нужен настоящий рендер; «родной» размер вьюпорта 224×480, вдвое крупнее
 ## читается лучше:
 ##
@@ -14,7 +16,10 @@ extends Node
 ## Сцены: door_food door_picks under_food under_picks under_premium under_card
 ## under_empty_picks under_empty_food garden_food garden_food_clean garden_picks
 ## garden_premium garden_premium_clean (_clean — плашка-причина уже погасла)
-## under_empty_premium under_premium_card (покупка за доллары в шахте без роликов).
+## under_empty_premium under_premium_card (покупка за доллары в шахте без роликов)
+## garden_tap garden_tap_end (тап по плитке «у двери»: дверь летит в полосу)
+## house_food (комната дома: полоса без кнопки «к двери»).
+## Стрелку «к двери» над миром снимает tests/test_screenshot_garden_shop.
 
 var _out_dir := "/tmp/purchase_shots"
 var _only: Array[String] = []
@@ -54,6 +59,9 @@ func _ready() -> void:
 	await _scene("garden_premium_clean", _s_garden_premium_clean)
 	await _scene("under_empty_premium", _s_under_empty_premium)
 	await _scene("under_premium_card", _s_under_premium_card)
+	await _scene("garden_tap", _s_garden_tap)
+	await _scene("garden_tap_end", _s_garden_tap_end)
+	await _scene("house_food", _s_house_food)
 	print("test_screenshot_purchase: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -186,6 +194,31 @@ func _s_under_premium_card() -> void:
 	var t: ShopTile = _ui._tiles["good:dollars:teleport_watch"]
 	_ui._on_tile_pressed(t.offer, t)
 	await _frames(6)
+
+
+## Отклик на тап снимаем с движением: дверь в полёте к полосе.
+func _s_garden_tap() -> void:
+	await _tap_door_tile(0.12)
+
+
+func _s_garden_tap_end() -> void:
+	await _tap_door_tile(0.42)
+
+
+func _tap_door_tile(sec: float) -> void:
+	_place("garden")
+	_ui.open(ShopUI.TAB_FOOD)
+	await _frames(2)
+	Settings.reduce_motion = false
+	var t: ShopTile = _ui._tiles["food:food_buldak"]
+	_ui._on_tile_pressed(t.offer, t)
+	await get_tree().create_timer(sec).timeout
+	Settings.reduce_motion = true
+
+
+func _s_house_food() -> void:
+	_place("house")
+	_ui.open(ShopUI.TAB_FOOD)
 
 
 func _frames(n: int) -> void:

@@ -139,7 +139,7 @@ func _test_mineral_data(bal) -> void:
 	_check_int("металлолом = 5 монет", bal.get_mineral_price("scrap"), 5)
 	_check_int("железо = 5 монет", bal.get_mineral_price("iron_ore"), 5)
 	_check_int("серебро = 20 монет", bal.get_mineral_price("silver"), 20)
-	_check_int("золото = 100 монет", bal.get_mineral_price("gold"), 100)
+	_check_int("золото = 200 монет (владелец 27.10)", bal.get_mineral_price("gold"), 200)
 	_check_int("алмаз = 500 монет", bal.get_mineral_price("diamond"), 500)
 
 	# золото — парабола: нет выше 100, пик 10% на 500, вечный хвост 2.5%
@@ -152,6 +152,8 @@ func _test_mineral_data(bal) -> void:
 	# торф: 5% на глубине 60 -> 20% на глубине 450 (линейный рост)
 	_check("плотность торфа на глубине 60 = 5%", bal.get_mineral_density_percent("peat", 60), 5.0, 0.01)
 	_check("плотность торфа на глубине 450 = 20%", bal.get_mineral_density_percent("peat", 450), 20.0, 0.01)
+	# вес торфа — число владельца (27.10: «торф в 4 раза легче», было 1 кг)
+	_check("вес торфа = 0.25 кг", bal.get_mineral_weight("peat"), 0.25, 0.001)
 
 
 # ---------------------------------------------------------------------------

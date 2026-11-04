@@ -48,7 +48,7 @@ func _build() -> void:
 	_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_name.autowrap_mode = TextServer.AUTOWRAP_WORD
-	DialogueStyle.shadowed(_name, 14, DialogueStyle.GOLD)
+	DialogueStyle.shadowed(_name, UiTheme.FS_HEAD, DialogueStyle.GOLD)
 	add_child(_name)
 
 	_text = Label.new()
@@ -56,7 +56,7 @@ func _build() -> void:
 	_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_text.add_theme_constant_override("line_spacing", 2)
-	DialogueStyle.shadowed(_text, 10, DialogueStyle.TEXT_NARR)
+	DialogueStyle.shadowed(_text, UiTheme.FS_BODY, DialogueStyle.TEXT_NARR)
 	add_child(_text)
 
 

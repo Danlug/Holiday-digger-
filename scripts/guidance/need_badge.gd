@@ -7,8 +7,8 @@ extends Control
 
 const SIZE := 18.0
 const COL_BG := Color(0.07, 0.055, 0.045, 0.94)
-const COL_RIM := Color8(0xE0, 0xA9, 0x3B)
-const COL_WARN := Color8(0xFF, 0x9A, 0x2E)
+const COL_RIM := UiTheme.GOLD
+const COL_WARN := UiTheme.WARN
 
 var texture: Texture2D = null:
 	set(v):

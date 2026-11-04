@@ -2,8 +2,9 @@ class_name MetaToast
 extends CanvasLayer
 ## Плашка-тост сверху: значок + название (достижение получено, задание готово).
 ## Рубрика («Достижение», «Задание готово») — не словом, а цветом рамки и малым
-## значком: слова на экране только по наведению. Пока открыт хаб заданий, тост
-## идёт снизу: сверху он закрывал бы вкладки.
+## значком: слова на экране только по наведению. Пока открыто окно, тост идёт
+## снизу, над полосой вкладок: сверху он закрывал бы шапку и крестик окна. Пока
+## открыто окно смерти, тост ждёт его закрытия.
 ## Очередь по одному: пачка достижений при включении мета-слоя не закрывает
 ## экран, а показывается по очереди — и не больше MAX_QUEUE.
 
@@ -17,7 +18,12 @@ var _from_bottom: bool = false
 
 
 func _ready() -> void:
-	layer = 97  # выше экрана героя (95), ниже катсцен (100)
+	layer = UiLayers.TOAST  # выше экрана героя (95), ниже катсцен (100)
+
+
+func _process(_delta: float) -> void:
+	if _panel != null:
+		_panel.visible = not DeathWindow.is_open_any()   # уже летящий тост прячется под окном смерти
 
 
 func show_achievement(a: Dictionary) -> void:
@@ -59,11 +65,14 @@ func _next() -> void:
 		_busy = false
 		return
 	_busy = true
+	if DeathWindow.is_open_any():   # окно смерти владеет экраном: тост ждёт
+		get_tree().create_timer(0.3).timeout.connect(_next)
+		return
 	var item: Dictionary = _queue.pop_front()
 	_build(item)
 	Sfx.play(String(item["sfx"]))
 	Haptics.tap()
-	_from_bottom = _hub_open()
+	_from_bottom = _window_open()
 	_panel.reset_size()
 	_panel.position = Vector2(_panel_x(), _off_y())
 	if UiAnim.reduced() or not is_inside_tree():
@@ -93,11 +102,14 @@ func _leave() -> void:
 		_next())
 
 
-func _hub_open() -> bool:
+func _window_open() -> bool:
 	for n in get_tree().get_nodes_in_group("meta_hub"):
 		if n.has_method("is_open") and n.is_open():
 			return true
-	return false
+	for n in get_tree().get_nodes_in_group(HintBusy.BLOCK_GROUP):   # журнал, проекты, урок
+		if (n is CanvasItem and n.is_visible_in_tree()) or (n is CanvasLayer and n.visible):
+			return true
+	return HintBusy._modal_open(get_tree())
 
 
 func _view_h() -> float:
@@ -105,7 +117,7 @@ func _view_h() -> float:
 
 
 func _rest_y() -> float:
-	return _view_h() - _panel.size.y - 12.0 if _from_bottom else 6.0
+	return _view_h() - _panel.size.y - ProgressUiKit.TAB_BAR_H - 10.0 if _from_bottom else 6.0
 
 
 func _off_y() -> float:
@@ -148,12 +160,12 @@ func _build(item: Dictionary) -> void:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(title)
 	title.add_child(MetaUiKit.icon_rect(MetaUiKit.tex(String(item["head"])), 12))
-	var name_l := MetaUiKit.label(String(item["name"]), 10, Color.WHITE)
+	var name_l := MetaUiKit.label(String(item["name"]), UiTheme.FS_BODY, Color.WHITE)
 	name_l.clip_text = true
 	name_l.custom_minimum_size.x = 100
 	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_child(name_l)
-	var rr := MetaUiKit.reward_row(item["reward"], 11, 9)
+	var rr := MetaUiKit.reward_row(item["reward"], 11, UiTheme.FS_SMALL)
 	if rr.get_child_count() > 0:
 		v.add_child(rr)
 	else:
@@ -161,5 +173,5 @@ func _build(item: Dictionary) -> void:
 
 
 func _style(frame: Color) -> StyleBoxFlat:
-	var sb := ProgressUiKit.popup_box(frame, Color8(0x1A, 0x14, 0x0F, 0xF5), 4)
+	var sb := ProgressUiKit.popup_box(frame, UiTheme.FLOAT_BG, 4)
 	return sb

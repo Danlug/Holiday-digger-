@@ -2,7 +2,7 @@ extends Node
 ## GameState — автолоад состояния игрока.
 ##
 ## Хранит HP/голод/бодрость, опыт и прокачку, валюты, инвентарь с весом и
-## стаками, чёрный ящик, текущий инструмент, максимальную глубину, собранные
+## стаками, текущий инструмент, максимальную глубину, собранные
 ## артефакты и дневные лимиты рекламы. Формулы берёт из автолоада Balance.
 ##
 ## КРИТИЧНО (см. GDD п.7, 15): дневной сброс лимитов рекламы считается по
@@ -22,7 +22,6 @@ signal skill_points_changed(available: int)
 signal coins_changed(coins: int)
 signal dollars_changed(dollars: int)
 signal inventory_changed
-signal black_box_changed
 signal artifact_collected(artifact_id: String)
 signal branch_completed(branch_num: int)
 signal tool_changed(tool_id: String)
@@ -38,6 +37,10 @@ var stamina: float = 100.0  # проценты 0..100
 var hunger: float = 100.0   # проценты 0..100
 var is_digging: bool = false  # ставится извне (player-контроллером) каждый кадр
 var is_alive: bool = true
+## Последняя смерть (окно смерти, ГДД §7): причина — DeathCause.make(источник урона),
+## потеряно — рюкзак до очистки. Не сохраняются: окно показывают сразу.
+var death_cause: Dictionary = {}
+var death_lost: Dictionary = {}
 
 # --- Прокачка ---
 var xp: int = 0
@@ -51,8 +54,6 @@ var dollars: int = 0  # премиум-валюта
 
 # --- Инвентарь ---
 var inventory: Dictionary = {}  # mineral_id:String -> count:int
-var black_box_tier: String = "base"  # base | premium | premium_plus
-var black_box: Dictionary = {}  # mineral_id:String -> count:int
 
 # --- Инструмент и прогресс ---
 var current_tool: String = "shovel"
@@ -84,7 +85,8 @@ var _autosave_timer: Timer
 
 func _ready() -> void:
 	_check_daily_reset()
-	SaveSystem.load_game()
+	if not SaveSystem.load_game():
+		OwnerGifts.mark_all_claimed()   # новая игра: подарки уже игравшим ей не положены
 	_start_autosave_timer()
 
 
@@ -110,6 +112,9 @@ func _start_autosave_timer() -> void:
 
 signal exhausted_changed(exhausted: bool)
 signal survival_warning(bar: String, severe: bool)
+## Урон по герою (после брони): source и info — как у take_damage. Голод и лава
+## приходят каплями каждый кадр — отклик (HurtJuice) сам решает, что из этого «удар».
+signal damaged(amount: float, source: String, info: Dictionary)
 
 var is_exhausted: bool = false
 # Что уже показали, чтобы не мигать красным каждый кадр. Сбрасывается, когда
@@ -121,6 +126,9 @@ var _warned: Dictionary = {}
 func _tick_survival(delta: float) -> void:
 	var stamina_rate := Balance.get_bar_depletion_rate_per_second("stamina", is_digging)
 	var hunger_rate := Balance.get_bar_depletion_rate_per_second("hunger", is_digging)
+	# Раунд 5: полоски тают быстрее базы владельца (data/survival.json, ГДД §7).
+	stamina_rate *= SurvivalRules.drain_multiplier("stamina")
+	hunger_rate *= SurvivalRules.drain_multiplier("hunger")
 
 	# Обессиленный ест больше: усталость не убивает сама, но ускоряет голод,
 	# который убивает. Штраф считается по состоянию НА НАЧАЛО кадра, иначе
@@ -139,7 +147,8 @@ func _tick_survival(delta: float) -> void:
 	# усталость мешает. Пустая бодрость сама по себе HP не трогает.
 	var drain := Balance.get_hp_drain_per_second(hunger <= 0.0, stamina <= 0.0)
 	if drain > 0.0:
-		take_damage(drain * delta, "starvation")
+		# причина в окне смерти: голод, если пуста сытость; иначе — изнеможение
+		take_damage(drain * delta, "starvation" if hunger <= 0.0 else "exhaustion")
 
 
 func _update_exhausted() -> void:
@@ -150,8 +159,8 @@ func _update_exhausted() -> void:
 	exhausted_changed.emit(now)
 
 
-## Множитель ко всем скоростям героя. Копка, ходьба и полёт спрашивают его
-## сами — так штраф нельзя забыть применить в одном из трёх мест.
+## Штраф владельца за пустую бодрость (−50%). Полёт спрашивает его сам; ходьба
+## и копка с раунда 5 — через SurvivalRules (там он же плюс ступени 25%/10%).
 func get_speed_multiplier() -> float:
 	return Balance.get_exhausted_speed_multiplier() if is_exhausted else 1.0
 
@@ -181,7 +190,10 @@ func set_hunger(value: float) -> void:
 	hunger_changed.emit(hunger)
 
 
-func take_damage(amount: float, _source: String = "") -> void:
+## source — откуда урон («fall», «lava», «starvation», «monster:<id>», «boss:<удар>»…),
+## info — подробности для причины смерти ({cells} у падения, {id} у снаряда). Добивший
+## удар становится причиной в окне смерти — её не угадывают задним числом.
+func take_damage(amount: float, source: String = "", info: Dictionary = {}) -> void:
 	if not is_alive or amount <= 0.0:
 		return
 	# Отладочный тумблер «Бессмертие» (debug_panel.gd): урон игнорируется
@@ -192,8 +204,9 @@ func take_damage(amount: float, _source: String = "") -> void:
 		return
 	hp = clamp(hp - amount, 0.0, get_max_hp())
 	hp_changed.emit(hp, get_max_hp())
+	damaged.emit(amount, source, info)
 	if hp <= 0.0:
-		die()
+		die(DeathCause.make(source, info))
 
 
 func heal(amount: float) -> void:
@@ -211,16 +224,22 @@ func get_max_hp() -> float:
 	return float(Balance.get_max_hp(get_skill_stage("hp")))
 
 
-## Смерть: теряются все минералы, кроме чёрного ящика (см. GDD раздел 7),
-## и 200 монет «скорой» (решение владельца, раунд 4; не в минус — Healing).
-func die() -> void:
+## Смерть: теряется весь рюкзак (см. GDD раздел 7) и плата больнице: 5% монет,
+## от 50 до 5000 (владелец, раунд 5; не в минус — Healing). Респавн и полоски
+## после смерти — Healing.respawn_after_death() из main.gd, окно — DeathWindow.
+func die(cause: Dictionary = {}) -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	death_cause = cause if not cause.is_empty() else DeathCause.make("")
+	death_lost = inventory.duplicate()
 	inventory.clear()
 	inventory_changed.emit()
 	Healing.charge_death_fee()
 	died.emit()
+	# Смерть — в сейв в этом же кадре, а не автосейвом раз в минуту: вкладка, закрытая следом,
+	# поднимала прошлый сейв с рюкзаком и без платы (владелец, 27.10).
+	SaveSystem.save_at_frame_end("death")
 
 
 ## Респавн дома: восстанавливает полоски выживания. Позицию героя и анимацию
@@ -244,6 +263,8 @@ func reset_progress() -> void:
 	stamina = 100.0
 	hunger = 100.0
 	is_alive = true
+	death_cause = {}
+	death_lost = {}
 	xp = 0
 	level = 1
 	skill_points_available = 0
@@ -251,7 +272,6 @@ func reset_progress() -> void:
 	coins = 0
 	dollars = 0
 	inventory.clear()
-	black_box.clear()
 	current_tool = "shovel"
 	current_gear = ""
 	rig_parked_at = Vector2i(-1, -1)
@@ -263,6 +283,7 @@ func reset_progress() -> void:
 	world_dug_cells.clear()
 	pending_earthquake = false
 	ext.clear()
+	OwnerGifts.mark_all_claimed()   # сброс — новая игра: разовые подарки не положены (data/gifts.json)
 	# Служебное состояние выживания: иначе новая игра начиналась бы «обессиленной» и
 	# с уже показанными предупреждениями (находка tests/test_save_robustness).
 	is_exhausted = false
@@ -277,7 +298,6 @@ func reset_progress() -> void:
 	coins_changed.emit(coins)
 	dollars_changed.emit(dollars)
 	inventory_changed.emit()
-	black_box_changed.emit()
 	tool_changed.emit(current_tool)
 	gear_changed.emit(current_gear)
 	max_depth_changed.emit(max_depth_reached)
@@ -426,6 +446,7 @@ func add_dollars(amount: int) -> void:
 		return
 	dollars += amount
 	dollars_changed.emit(dollars)
+	SaveSystem.save_at_frame_end("dollars")   # доллары — купленная валюта: откат закрытием вкладки нечестен
 
 
 func spend_dollars(amount: int) -> bool:
@@ -438,6 +459,7 @@ func spend_dollars(amount: int) -> bool:
 	dollars -= amount
 	dollars_changed.emit(dollars)
 	emit_event(&"spent", {"currency": "dollars", "amount": amount})
+	SaveSystem.save_at_frame_end("dollars")   # покупка за доллары — в сейв в этом же кадре
 	return true
 
 
@@ -516,49 +538,6 @@ func remove_item(id: String, count: int) -> bool:
 
 func get_item_count(id: String) -> int:
 	return int(inventory.get(id, 0))
-
-
-# --- Чёрный ящик: содержимое гарантированно возвращается при смерти ---
-
-func set_black_box_tier(tier: String) -> void:
-	black_box_tier = tier
-	black_box_changed.emit()
-
-
-func get_black_box_capacity() -> int:
-	return Balance.get_black_box_capacity(black_box_tier)
-
-
-## Кладёт count единиц mineral_id в чёрный ящик. Каждый вид минерала занимает
-## одну ячейку (клетку) ящика; клетки ящика в грузоподъёмность не входят
-## (см. GDD раздел 14). Возвращает реально добавленное количество.
-func add_to_black_box(id: String, count: int) -> int:
-	if count <= 0:
-		return 0
-	var capacity := get_black_box_capacity()
-	var current_count := int(black_box.get(id, 0))
-	if current_count == 0 and black_box.size() >= capacity:
-		return 0
-	var max_stack := Balance.get_mineral_max_stack(id)
-	var to_add: int = min(count, max(0, max_stack - current_count))
-	if to_add <= 0:
-		return 0
-	black_box[id] = current_count + to_add
-	black_box_changed.emit()
-	return to_add
-
-
-func remove_from_black_box(id: String, count: int) -> bool:
-	var current_count := int(black_box.get(id, 0))
-	if count <= 0 or current_count < count:
-		return false
-	var remaining := current_count - count
-	if remaining <= 0:
-		black_box.erase(id)
-	else:
-		black_box[id] = remaining
-	black_box_changed.emit()
-	return true
 
 
 # ---------------------------------------------------------------------------
@@ -652,7 +631,15 @@ func try_use_ad_reward(ad_id: String) -> bool:
 	if used >= limit:
 		return false
 	ad_daily_counts[ad_id] = used + 1
+	note_ad_watched(ad_id)
 	return true
+
+
+## Досмотренный ролик любой точки показа (лавка, «×2», замена задания, сон,
+## скважина, покупки из шахты) — событие шины ad_watched. На нём держатся миссии
+## «посмотри рекламу 5 / 25 раз» (ГДД §17.2). Лимит считает вызывающий.
+func note_ad_watched(ad_id: String) -> void:
+	emit_event(&"ad_watched", {"placement": ad_id})
 
 
 # ---------------------------------------------------------------------------
@@ -714,7 +701,10 @@ var ext: Dictionary = {}
 ##   sold           {coins: int, count: int}   — сделка в мастерской
 ##   bought         {id: String, currency: String} — покупка в магазине
 ##   crafted        {recipe: String, item: String, count: int, to_pack: int, to_storage: int}
-##                  — верстак (ShopService.craft); у переработки count — вся пачка с ползунка
+##                  — верстак (ShopService.craft); у переработки count — вся пачка с ползунка.
+##                  Бронза — при заборе из печи (BronzeFurnace.collect), а не при загрузке
+##   smelt_started  {recipe: String, count: int, used: Dictionary, queued: int} — лом загружен в печь
+##   smelt_cancelled {recipe: String, count: int} — очередь печи снята, лом за count штук вернулся
 ##   fuel_used / refueled {amount: float}      — топливо бура
 ##   fuel_refined   {raw: String, used: int, blocks: int, to_pack: int, to_storage: int}
 ##                  — перегонка на станции заправки (торф/уголь -> топливные блоки)
@@ -725,6 +715,8 @@ var ext: Dictionary = {}
 ##   slept          {hours: float, stamina: int, skipped: bool} — сон дома (ветка house)
 ##   food_ordered   {id: String, free: bool} / food_delivered {id: String} — заказ еды и приезд курьера
 ##   stored         {item: String, count: int, dir: String} — dir "put" на склад / "take" в рюкзак
+##                  (remote: true — выгрузка на склад издалека, scripts/shop/premium_unload.gd)
+##   premium_unload {count: int, weight: float, free: bool} — выгрузка на склад за доллары (free — первый раз в уроке)
 ##   chest_opened   {cell: Vector2i, tier: String, items: Dictionary, xp: int} — открыт тайник (scripts/mechanics)
 ##   fever_started  {seconds: float, stage: int} / fever_ended {} — жадность азарта: N секунд копка с первого удара, ход ×7, руда вдвое
 ##   mastery_star   {item: String, star: int, xp: int} — звезда мастерства породы
@@ -735,7 +727,11 @@ var ext: Dictionary = {}
 ##   ate            {id: String, hunger: float, stamina: float, hp: float} — герой поел (рюкзак или стол дома,
 ##                  HouseFood.eat/eat_now); hunger/stamina — сколько реально восстановлено, hp — вылечено HP
 ##   healed         {source: "sleep"|"medkit", hp: float} — сон или аптечка вернули HP (scripts/house/healing.gd)
-##   ambulance      {coins: int} — смерть: «скорая забрала» монеты (до 200, не в минус), перед сигналом died
+##   ad_watched     {placement: String} — досмотрен rewarded-ролик любой точки показа (note_ad_watched)
+##   screen_opened  {id: String, tab: String} — открыт экран (shop, house, storage, journal, meta_hub, progress,
+##                  projects, tech, daily_tasks, newbie_streak, backpack, settings) — для аналитики
+##   hospital       {coins: int} — смерть: плата больнице (5% монет, от 50 до 5000, не в минус), перед сигналом died;
+##                  причина и потерянное — GameState.death_cause / death_lost
 ## Сигналы GameState (max_depth_changed, artifact_collected, leveled_up, died…)
 ## остаются как есть — на них подписываются напрямую.
 signal game_event(id: StringName, data: Dictionary)
@@ -825,7 +821,7 @@ var house_tutorial_stage: int = 0
 var house_dopings_shop_unlocked: bool = false
 
 ## Склад в мастерской (ГДД п.14, «Склад в мастерской»): item_id -> количество.
-## Живёт отдельно от инвентаря и от чёрного ящика: при смерти теряется только
+## Живёт отдельно от инвентаря: при смерти теряется только
 ## рюкзак, склад остаётся целиком — он и нужен затем, чтобы копить материалы
 ## на ступень инструмента, которую за одну ходку не принести (железная кирка
 ## — 160 кг при рюкзаке 60). Грузоподъёмность на склад не действует: он стоит

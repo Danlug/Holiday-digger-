@@ -8,9 +8,9 @@ extends CanvasLayer
 ##    нажатие по нему показывает подсказку).
 ## Слой знает только как нарисовать; когда показать и когда снять — решает HintDirector.
 
-const LAYER := 40
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
-const GOLD_LIGHT := Color8(0xF2, 0xD9, 0x9B)
+const LAYER := UiLayers.HINTS
+const GOLD := UiTheme.GOLD
+const GOLD_LIGHT := UiTheme.TEXT_HI
 const FINGER_TIP := Vector2(7.5, 1.5)   # где в рисунке кончик пальца (в единицах экрана)
 const ARROW_TIP := Vector2(6.0, 11.0)
 const CHIP_GAP := 3.0
@@ -77,7 +77,7 @@ func _ready() -> void:
 	row.add_child(_chip_icon)
 	_chip_label = Label.new()
 	_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_chip_label.add_theme_font_size_override("font_size", 12)
+	_chip_label.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
 	_chip_label.add_theme_color_override("font_color", GOLD_LIGHT)
 	_chip_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_chip_label.add_theme_constant_override("outline_size", 2)

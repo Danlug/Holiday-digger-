@@ -2,7 +2,7 @@ class_name SettingsSheet
 extends Control
 ## SettingsSheet — шторка настроек (Settings: scripts/core/settings.gd), только
 ## иконки: ползунки громкости звука и музыки с кнопкой-«мьют» (динамик/нота),
-## переключатели «вибрация», «радиус обзора», «меньше движения», три режима
+## переключатели «вибрация», «радиус обзора», «меньше движения», «аналитика», три режима
 ## управления (джойстик/нажатия/стрелки), язык и восстановление покупок. Слова —
 ## в подсказках Tip; исключение — названия языков на самих кнопках.
 ##
@@ -13,7 +13,7 @@ signal closed
 signal mode_chosen(mode: String)
 signal restore_pressed
 
-const ROW_BG := Color8(0x23, 0x1B, 0x14)
+const ROW_BG := UiTheme.ROW
 const GOLD := ProgressUiKit.GOLD
 const MUTED := ProgressUiKit.MUTED
 ## Высота кнопок во всех рядах одна: раньше было 26/30/32/34/36 и ряды выглядели рваными.
@@ -35,10 +35,12 @@ var _music_slider: HSlider
 var _haptics_btn: Button
 var _vision_btn: Button
 var _motion_btn: Button
+var _analytics_btn: Button
 var _mode_btns: Dictionary = {}
 var _lang_btns: Dictionary = {}
 var _last_tick_ms: int = 0
 var _hints_row: HintSettingsRow = null
+var _about_btn: Button = null
 var _closing: bool = false   # шторка уходит (анимация): по смыслу уже закрыта
 
 
@@ -56,6 +58,7 @@ func is_open() -> bool:
 func open() -> void:
 	refresh()
 	_closing = false
+	_card.offset_top = 22.0 + HudSafeArea.top(get_viewport())   # шапка шторки — под вырезом телефона
 	visible = true
 	Sfx.play("ui_open")
 	UiAnim.open(_card, UiAnim.Kind.SHEET, self)
@@ -63,6 +66,8 @@ func open() -> void:
 
 func close() -> void:
 	var was := visible and not _closing
+	if AboutCard.is_open_any():
+		AboutCard.instance().close()
 	if was:
 		Sfx.play("ui_close")
 		_closing = true
@@ -90,6 +95,11 @@ func refresh() -> void:
 	_set_toggle(_motion_btn, not Settings.reduce_motion, "Движение интерфейса")
 	_motion_btn.icon = UiIcons.tex("motion" if not Settings.reduce_motion else "motion_off")
 	Tip.bind(_motion_btn, "Движение интерфейса", "Включено" if not Settings.reduce_motion else "Меньше движения: выключено")
+	var stats := Settings.analytics_consent == "granted"
+	_set_toggle(_analytics_btn, stats, "")
+	_analytics_btn.icon = UiIcons.tex("analytics" if stats else "analytics_off")
+	Tip.bind(_analytics_btn, "Аналитика: включена" if stats else "Аналитика: выключена",
+		"Обезличенная статистика игры, случайный номер вместо имени" if stats else "Нажми, чтобы помочь улучшить игру")
 
 	if _hints_row != null:
 		_hints_row.refresh()
@@ -104,11 +114,7 @@ func refresh() -> void:
 # ---------------------------------------------------------------------------
 
 func _build() -> void:
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(dim)
-	UiBtn.on_tap(dim, close)
+	UiTheme.scrim(self, close, UiTheme.SCRIM_SHEET)
 
 	_card = PanelContainer.new()
 	_card.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -140,13 +146,7 @@ func _build() -> void:
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_child(sp)
-	var close_btn := UiBtn.icon_button(UiIcons.tex("close"), Vector2(28, 26), UiBtn.Kind.GHOST)
-	Tip.bind(close_btn, "Закрыть")
-	close_btn.pressed.connect(func():
-		if Tip.swallowed():
-			return
-		close())
-	head.add_child(close_btn)
+	head.add_child(UiBtn.close_button(close))
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -243,6 +243,10 @@ func _build_toggle_row(body: Control) -> void:
 		Settings.set_show_vision_radius(not Settings.show_vision_radius))
 	_motion_btn = _toggle(row, "motion", func():
 		Settings.set_reduce_motion(not Settings.reduce_motion))
+	# аналитика по согласию (scripts/core/analytics.gd); выключение сразу стирает очередь
+	_analytics_btn = _toggle(row, "analytics", func():
+		Settings.set_analytics_consent("denied" if Settings.analytics_consent == "granted" else "granted"))
+	_analytics_btn.visible = Analytics.build_enabled()
 
 
 func _toggle(row: Control, icon_name: String, action: Callable) -> Button:
@@ -301,7 +305,7 @@ func _build_language_row(body: Control) -> void:
 		var b := UiBtn.icon_button(null, Vector2(0, 28))
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.text = String(entry.get("name", code))
-		b.add_theme_font_size_override("font_size", 10)
+		b.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 		b.disabled = not available
 		if not available:
 			# Языки ждут перевода (задание владельца: "дальше, после моего
@@ -332,3 +336,19 @@ func _build_restore_row(body: Control) -> void:
 		IAPManager.restore_purchases()
 		restore_pressed.emit())
 	row.add_child(b)
+	# «О игре» (AboutCard): версия, сборка, политика — в том же ряду, чтобы шторка не росла.
+	_about_btn = UiBtn.icon_button(UiIcons.tex("info"), Vector2(0, BTN_H))
+	_about_btn.name = "About"
+	_about_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	Tip.bind(_about_btn, "О игре", AboutCard.version_text())
+	_about_btn.pressed.connect(func():
+		if Tip.swallowed():
+			return
+		open_about())
+	row.add_child(_about_btn)
+
+
+## Окно «О игре» поверх шторки (scripts/ui/about_card.gd).
+func open_about() -> AboutCard:
+	GameState.emit_event("screen_opened", {"id": "about"})   # аналитика (scripts/core/analytics.gd)
+	return AboutCard.open_in(self)

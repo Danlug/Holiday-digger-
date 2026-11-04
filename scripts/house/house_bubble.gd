@@ -89,7 +89,7 @@ func set_state(state: String) -> void:
 	var glyph_col := Color.WHITE
 	match state:
 		"dim":
-			col = Color8(0x6A, 0x62, 0x78)
+			col = UiTheme.NIGHT_RIM
 			body_col = Color(0.7, 0.7, 0.76)
 			glyph_col = Color(0.6, 0.6, 0.66)
 		"forced":

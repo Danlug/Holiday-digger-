@@ -377,6 +377,42 @@ def glyph_depth():
     cv.save("glyph_depth")
 
 
+def glyph_flame():
+    # печь мастерской работает (плавка бронзы по таймеру)
+    cv = Cv(16, 16)
+    cv.poly([(7.5, 0), (11, 4), (13, 8), (12.5, 12), (10, 14.5), (5, 14.5), (2.5, 12), (2, 8),
+             (4, 5), (5.5, 7), (6, 3)], rgba("#D9442A"))
+    cv.poly([(8, 4), (10.5, 7.5), (11, 11), (9.5, 13.5), (5.5, 13.5), (4, 11), (4.5, 8.5), (6, 10)],
+            rgba("#F28A2E"))
+    cv.poly([(7.5, 7), (9.5, 10), (9, 12.5), (6, 12.5), (5.5, 10.5)], rgba("#FFD84A"))
+    cv.rect(7, 11, 8, 12, rgba("#FFF3A0"))
+    cv.px(4, 9, rgba("#FFB070"))
+    cv.outline()
+    cv.save("glyph_flame")
+
+
+def glyph_hourglass():
+    # отсчёт до следующей штуки
+    cv = Cv(16, 16)
+    wood, wood_hi, wood_lo = rgba("#8F6238"), rgba("#B4854E"), rgba("#6B4428")
+    glass = rgba("#CFE6F2")
+    sand, sand_hi = rgba("#E8B32E"), rgba("#FFE066")
+    cv.poly([(4, 2), (11, 2), (11, 4), (8, 7.5), (8, 8.5), (11, 12), (11, 13), (4, 13), (4, 12),
+             (7, 8.5), (7, 7.5), (4, 4)], glass)
+    cv.poly([(5, 4), (10, 4), (8, 6.5), (7, 6.5)], sand)
+    cv.rect(7, 7, 8, 10, sand)
+    cv.poly([(5, 12), (7.5, 10), (10, 12)], sand)
+    cv.px(6, 4, sand_hi)
+    cv.px(7, 11, sand_hi)
+    cv.rect(2, 0, 13, 1, wood)
+    cv.rect(2, 0, 13, 0, wood_hi)
+    cv.rect(2, 14, 13, 15, wood)
+    cv.rect(2, 15, 13, 15, wood_lo)
+    cv.px(5, 5, WHITE)
+    cv.outline()
+    cv.save("glyph_hourglass")
+
+
 def glyph_stat_dot():
     # метка «хватает / не хватает» в строке материалов: простой кружок
     cv = Cv(16, 16)
@@ -655,68 +691,53 @@ def rot_rect(cx, cy, w, h, ang):
     return out
 
 
-def gen_full_restore_pill():
-    """Таблетка полного восстановления: классическая капсула 💊 — вытянутая, по диагонали «/»,
-    красная и белая половинки, шов, глянцевый блик и белый плюс с контуром на красной половине.
-    Свет сверху-слева идёт поперёк оси капсулы, поэтому ступени тона ложатся полосами вдоль неё.
-    Рисуем по маске «стадиона» (отрезок + два полукруга), без сглаживания: кромка держится
-    ступенькой в 45 градусов. Плюс вертикальный, не повёрнутый, с толщиной штриха в 2 пикселя и
-    на чётной сетке: при показе в 16x16 (тост, мелкий слот) он остаётся плюсом 5x5, а не крошится."""
-    R, LEN = 7.0, 33.0               # радиус и полная длина капсулы
-    HALF = LEN / 2 - R               # половина прямой части
-    S = 0.70710678                   # ось «/»: вдоль (S, -S), поперёк (S, S)
-    red = [rgba(h) for h in ("#FF8A9A", "#EC4A63", "#C9213D", "#A31A35", "#7A1230")]
-    wht = [rgba(h) for h in ("#FFFFFF", "#F5F8FB", "#DDE4EE", "#B4C0D2", "#8896AE")]
-    seam = rgba("#3A1220")
-    ink = rgba("#4A0A1A")            # контур плюса темнее самой тёмной ступени красного
+def gen_premium_unload():
+    """Выгрузка на склад (раунд 6, на месте таблетки восстановления): картонная посылка с
+    лентой, из неё по дуге вверх-вправо — зелёная стрелка, как у знака склада (glyph_storage),
+    к домику с красной крышей, как у glyph_house. Читается «ящик улетает домой» и в 32x32
+    (плитка витрины), и в 16x16 (чип, кнопка рюкзака): три крупных пятна — коробка, стрелка,
+    дом — и у каждого свой тон. Свет сверху-слева: верх коробки светлее, правый торец в тени."""
     cv = Cv()
-    for y in range(32):
-        for x in range(32):
-            dx, dy = x + 0.5 - 16, y + 0.5 - 16
-            u, v = S * (dx - dy), S * (dx + dy)
-            au = abs(u) - HALF
-            r = abs(v) if au <= 0 else math.hypot(au, v)
-            if r > R:
-                continue
-            t = v / R                          # -1 сверху-слева ... +1 снизу-справа
-            lo = (-0.55, 0.12, 0.58) if u < 0 else (-0.2, 0.3, 0.66)
-            i = 1 if t < lo[0] else 2 if t < lo[1] else 3 if t < lo[2] else 4
-            if r > R - 1.0 and t > 0.2:
-                i = 4                          # нижняя кромка: самый тёмный ободок
-            cv.px(x, y, (red if u < 0 else wht)[i])
-    # шов: красная половинка чуть «надета» на белую — тёмная черта и тень от ободка на белой стороне
-    for y in range(32):
-        for x in range(32):
-            k = x - y
-            c = cv.get(x, y)
-            if not c[3]:
-                continue
-            if k == 0:
-                cv.px(x, y, seam)
-            elif k == 1 and c in wht:
-                cv.px(x, y, wht[min(wht.index(c) + 1, 4)])
-    # глянцевый блик вдоль света: яркая черта на красной половине и короче — на белой
-    def gloss(u0, u1, v, c):
-        for k in range(int((u1 - u0) / S) + 1):
-            u = u0 + k * S
-            xx, yy = int(math.floor(16 + S * (u + v))), int(math.floor(16 + S * (v - u)))
-            if cv.get(xx, yy)[3]:
-                cv.px(xx, yy, c)
-    gloss(-14.5, -8.5, -4.6, red[0])
-    gloss(3.0, 8.0, -4.1, wht[0])
-    # плюс: белый, штрих 2 пикселя, длина 10, центр на узле чётной сетки (11, 21)
-    cx, cy = 11, 21
-    cross = {(x, y) for x in range(cx - 5, cx + 5) for y in (cy - 1, cy)}
-    cross |= {(x, y) for y in range(cy - 5, cy + 5) for x in (cx - 1, cx)}
-    for (x, y) in cross:
-        for ox in (-1, 0, 1):
-            for oy in (-1, 0, 1):
-                if (x + ox, y + oy) not in cross:
-                    cv.px(x + ox, y + oy, ink)
-    for (x, y) in cross:
-        cv.px(x, y, WHITE)
+    card = [rgba(h) for h in ("#E8C48A", "#C99A5C", "#A87A42", "#7E5630", "#5A3A1E")]
+    tape, tape_d = rgba("#F2E2B8"), rgba("#C8B07A")
+    roof, roof_l, roof_d = rgba("#C21E3A"), rgba("#FF5570"), rgba("#7A1024")
+    wall, wall_d, door = rgba("#F0E2BE"), rgba("#B49A6E"), rgba("#6B4428")
+    green, green_l, green_d = rgba("#4DE094"), rgba("#B8FFD8"), rgba("#1E9A5A")
+    # --- коробка: перёд, крышка-параллелограмм, правый торец ---
+    x0, x1, y0, y1 = 2, 15, 19, 29            # перёд включительно
+    cv.rect(x0, y0, x1, y1, card[2])
+    cv.rect(x0, y0, x0, y1 - 1, card[1])      # левая кромка на свету
+    cv.rect(x0, y1, x1, y1, card[3])          # низ
+    cv.poly([(x0, y0), (x0 + 4, y0 - 4), (x1 + 4, y0 - 4), (x1, y0)], card[1])   # крышка
+    cv.line([(x0 + 1, y0 - 1), (x0 + 4, y0 - 4)], card[0], 1)
+    cv.line([(x0 + 4, y0 - 4), (x1 + 3, y0 - 4)], card[0], 1)
+    cv.poly([(x1 + 1, y0), (x1 + 4, y0 - 3), (x1 + 4, y1 - 4), (x1 + 1, y1)], card[3])   # торец
+    cv.line([(x1 + 1, y1), (x1 + 4, y1 - 3)], card[4], 1)
+    # лента: по перёду вертикально и по крышке
+    cv.rect(7, y0, 9, y1, tape)
+    cv.rect(9, y0, 9, y1, tape_d)
+    cv.poly([(7, y0), (11, y0 - 4), (13, y0 - 4), (9, y0)], tape)
+    # шов крышки
+    cv.line([(x0, y0), (x1, y0)], card[3], 1)
+    # --- дом: крыша, стена, дверь ---
+    cv.rect(23, 10, 30, 16, wall)
+    cv.rect(29, 10, 30, 16, wall_d)
+    cv.poly([(21, 10), (26, 4), (31, 10)], roof)
+    cv.line([(22, 10), (26, 5)], roof_l, 1)
+    cv.line([(21, 11), (31, 11)], roof_d, 1)
+    cv.rect(25, 13, 27, 16, door)
+    cv.px(25, 13, rgba("#8F6238"))
+    # --- стрелка: из коробки вверх и дугой вправо, остриё смотрит в стену дома ---
+    shaft = [(9, 14), (9, 10), (10, 8), (12, 7), (14, 7)]
+    for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        cv.line([(x + dx, y + dy) for x, y in shaft], green, 1)
+    cv.poly([(14, 3), (19, 8), (14, 13)], green)                  # остриё вправо
+    cv.line([(9, 13), (9, 10), (10, 8), (12, 7), (14, 7)], green_l, 1)
+    cv.line([(15, 5), (17, 7)], green_l, 1)
+    cv.line([(10, 14), (10, 11)], green_d, 1)
+    cv.line([(15, 11), (18, 8)], green_d, 1)
     cv.outline()
-    cv.save("item_full_restore_pill")
+    cv.save("item_premium_unload")
 
 
 def _plus_with_ink(cv, cx, cy, half, stroke, fill, ink):
@@ -735,9 +756,8 @@ def _plus_with_ink(cv, cx, cy, half, stroke, fill, ink):
 
 
 def gen_medkit_icon():
-    """Аптечка (раунд 4, healing): красный чемоданчик с ручкой и белым крестом — родня таблетке
-    (тот же красный в пяти ступенях, тот же белый плюс с тёмным контуром и глянцевый блик), но
-    силуэт другой: коробка, а не капсула, — в слоте рюкзака их не спутать. Свет сверху-слева:
+    """Аптечка (раунд 4, healing): красный чемоданчик с ручкой и белым крестом (красный в пяти
+    ступенях, белый плюс с тёмным контуром и глянцевый блик). Свет сверху-слева:
     крышка светлее, правый торец и низ темнее, по кромке крышки — шов-защёлка."""
     red = [rgba(h) for h in ("#FF8A9A", "#EC4A63", "#C9213D", "#A31A35", "#7A1230")]
     ink = rgba("#4A0A1A")
@@ -777,48 +797,6 @@ def gen_medkit_icon():
             cv.px(x, y, rgba("#DDE4EE"))
     cv.outline()
     cv.save("item_medkit")
-
-
-def gen_ambulance_icon():
-    """Значок «скорая» для карточки смерти (раунд 4, healing: «скорая забрала» 200 монет): белый
-    фургон боком, красная полоса и красный крест, синяя мигалка, тёмные колёса. Показывается в
-    16x16 рядом с «−200», поэтому силуэт крупный, а деталей мало: кабина справа со стеклом,
-    крест — плюс 6x6 на борту."""
-    body = [rgba(h) for h in ("#FFFFFF", "#F5F8FB", "#DDE4EE", "#B4C0D2", "#8896AE")]
-    red, red_d = rgba("#EC4A63"), rgba("#A31A35")
-    glass, glass_l = rgba("#5C9BD8"), rgba("#B8E0FF")
-    tire, hub = rgba("#241A22"), rgba("#8896AE")
-    cv = Cv()
-    # кузов-фургон (слева) и кабина со скосом (справа)
-    cv.rect(2, 9, 21, 24, body[1])
-    cv.poly([(21, 12), (25, 12), (29, 17), (29, 24), (21, 24)], body[1])
-    cv.rect(2, 9, 20, 9, body[0])                  # крыша на свету
-    cv.rect(2, 10, 2, 23, body[0])
-    cv.rect(2, 22, 29, 24, body[3])                # низ в тени
-    cv.rect(2, 24, 29, 24, body[4])
-    cv.rect(21, 10, 21, 21, body[2])               # стык кузова и кабины
-    # стекло кабины с бликом
-    cv.poly([(23, 14), (25, 14), (27, 17), (23, 17)], glass)
-    cv.px(23, 14, glass_l)
-    cv.px(24, 14, glass_l)
-    # красная полоса по борту
-    cv.rect(2, 19, 29, 20, red)
-    cv.rect(2, 21, 29, 21, red_d)
-    # крест на борту
-    _plus_with_ink(cv, 11, 14, 4, 2, red, red_d)
-    # мигалка на крыше
-    cv.rect(9, 6, 13, 8, rgba("#2E5C9C"))
-    cv.rect(10, 6, 12, 7, rgba("#5C9BD8"))
-    cv.px(10, 6, glass_l)
-    # фара
-    cv.rect(28, 19, 29, 20, rgba("#FFE066"))
-    # колёса
-    for wx in (8, 24):
-        cv.ell(wx, 25, 3, 3, tire)
-        cv.px(wx, 25, hub)
-        cv.px(wx - 1, 24, hub)
-    cv.outline()
-    cv.save("glyph_ambulance")
 
 
 def gen_energy_bar_icon():
@@ -946,12 +924,12 @@ def gen_food():
 
     gen_energy_bar_icon()
 
-    # таблетка полного восстановления: капсула 💊 с плюсом (рисует gen_full_restore_pill)
-    gen_full_restore_pill()
+    # выгрузка на склад: посылка со стрелкой к дому (раунд 6, на месте таблетки восстановления)
+    gen_premium_unload()
 
-    # аптечка и «скорая» карточки смерти (раунд 4, healing)
+    # аптечка (раунд 4, healing); фургон карточки смерти убран вместе с поездкой (разбор чисел 26.10),
+    # окно смерти рисует больницу — tools/gen_death_icons.py
     gen_medkit_icon()
-    gen_ambulance_icon()
 
     # часы-телепорт: ремешок, золотой корпус, синий циферблат со стрелками
     cv = Cv()
@@ -1134,7 +1112,7 @@ def main():
     gen_frames()
     for fn in (glyph_check, glyph_cross, glyph_lock, glyph_new, glyph_video, glyph_gift, glyph_house,
                glyph_arrow, glyph_hammer, glyph_storage, glyph_x2, glyph_plus, glyph_dig, glyph_fly,
-               glyph_depth, glyph_stat_dot):
+               glyph_depth, glyph_stat_dot, glyph_flame, glyph_hourglass):
         fn()
     gen_ores()
     gen_crafted()

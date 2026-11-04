@@ -26,6 +26,7 @@ func _ready() -> void:
 	_stash_files()
 	_test_old_save_without_ext()
 	_test_v1_save_migrates()
+	_test_old_save_with_removed_box()
 	_test_garbage_and_truncated()
 	_test_wrong_types()
 	_test_backup_recovery()
@@ -86,7 +87,7 @@ func _state_sane() -> bool:
 		and typeof(GameState.ext) == TYPE_DICTIONARY and typeof(GameState.owned_tools) == TYPE_ARRAY \
 		and typeof(GameState.owned_gear) == TYPE_ARRAY and typeof(GameState.collected_artifacts) == TYPE_ARRAY \
 		and typeof(GameState.house_food_at_door) == TYPE_DICTIONARY and typeof(GameState.craft_invested) == TYPE_DICTIONARY \
-		and typeof(GameState.black_box) == TYPE_DICTIONARY and typeof(GameState.ad_daily_counts) == TYPE_DICTIONARY \
+		and typeof(GameState.ad_daily_counts) == TYPE_DICTIONARY \
 		and typeof(GameState.completed_branches) == TYPE_ARRAY
 
 
@@ -107,8 +108,11 @@ func _test_old_save_without_ext() -> void:
 	GameState.ext_set("leftover", 1)
 	check("старый сейв без ext загружается", SaveSystem.load_game())
 	check("монеты из старого сейва на месте", GameState.coins == 123)
-	check("ext после загрузки — пустой словарь, а не None и не хвост прошлой сессии",
-		typeof(GameState.ext) == TYPE_DICTIONARY and GameState.ext.is_empty(), str(GameState.ext))
+	# Единственное, что загрузка сама кладёт в ext, — отметка о разовых подарках (OwnerGifts, data/gifts.json).
+	var ext_rest: Array = GameState.ext.keys().filter(func(k): return String(k) != OwnerGifts.CLAIMED_KEY) \
+		if typeof(GameState.ext) == TYPE_DICTIONARY else ["не словарь"]
+	check("ext после загрузки — словарь без хвоста прошлой сессии (кроме отметки подарков), а не None",
+		typeof(GameState.ext) == TYPE_DICTIONARY and ext_rest.is_empty(), str(GameState.ext))
 	check("ext_get на пустом хранилище отдаёт значение по умолчанию", GameState.ext_get("probe", 7) == 7)
 	check("состояние пригодно к игре", _state_sane())
 
@@ -135,6 +139,41 @@ func _test_v1_save_migrates() -> void:
 	check("v1: железная кирка не потеряна", GameState.owns_tool("iron_pickaxe"))
 	check("v1: инвентарь и монеты на месте", GameState.get_item_count("iron_ore") == 4 and GameState.coins == 900)
 	check("v1: состояние пригодно к игре", _state_sane())
+
+
+
+## Ящик-страховка убран (решение владельца, раунд 5). Сейвы до этого несут его блок —
+## грузятся без ошибок, блок молча пропускается, содержимое не «высыпается» в рюкзак,
+## а следующее сохранение блок уже не пишет.
+const OLD_BOX := "black_box"   # ключ блока (и префикс полей GameState) в старых сейвах
+
+
+func _test_old_save_with_removed_box() -> void:
+	_fresh()
+	GameState.coins = 321
+	GameState.add_item("iron_ore", 3)
+	SaveSystem.save_game()
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("user://save.json"))
+	check("новый сейв блока ящика не пишет", not data.has(OLD_BOX))
+	data[OLD_BOX] = {"tier": "premium_plus", "contents": {"gold": 7, "diamond": 2}}
+	_write("user://save.json", JSON.stringify(data))
+	GameState.reset_progress()
+	check("сейв со старым блоком ящика загружается", SaveSystem.load_game())
+	check("ящик: монеты и рюкзак из сейва на месте", GameState.coins == 321 and GameState.get_item_count("iron_ore") == 3)
+	check("ящик: содержимое не попало в рюкзак", GameState.get_item_count("gold") == 0 and GameState.get_item_count("diamond") == 0,
+		str(GameState.inventory))
+	check("ящик: у GameState такого поля больше нет", GameState.get(OLD_BOX) == null and GameState.get(OLD_BOX + "_tier") == null)
+	check("ящик: состояние пригодно к игре", _state_sane())
+	SaveSystem.save_game()
+	var again: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("user://save.json"))
+	check("ящик: пересохранённый сейв от блока очищен", not again.has(OLD_BOX))
+	# Испорченный старый блок (не словарь, не те типы внутри) тоже ничего не ломает.
+	for junk in ["мусор", {"tier": 5, "contents": [1, 2]}, {"contents": {"gold": "много"}}]:
+		data[OLD_BOX] = junk
+		_write("user://save.json", JSON.stringify(data))
+		GameState.reset_progress()
+		check("ящик: испорченный блок %s не мешает загрузке" % str(junk).left(24),
+			SaveSystem.load_game() and GameState.coins == 321 and _state_sane())
 
 
 func _test_garbage_and_truncated() -> void:
@@ -279,7 +318,7 @@ const SURVIVES_RESET := {
 	"debug_instant_dig": "тумблер тестировщика", "debug_invincible": "тумблер тестировщика",
 	"debug_fly_300": "тумблер тестировщика", "debug_free_shop": "тумблер тестировщика",
 	"ad_daily_counts": "лимиты рекламы привязаны к реальным суткам", "last_reset_utc_date": "реальные сутки",
-	"black_box_tier": "уровень ящика — покупка за деньги", "world_ref": "ссылка", "fog_ref": "ссылка",
+	"world_ref": "ссылка", "fog_ref": "ссылка",
 	"world_seed": "мир сбрасывает main.gd", "world_dug_cells": "сбрасывается (запасной путь)",
 	"story_flags": "StoryDirector", "story_seen": "StoryDirector", "story_queue": "StoryDirector",
 	"era": "эпоху держит катсцена", "house_is_indoors": "вид дома закрывает HouseSystem",

@@ -41,6 +41,7 @@ const TUNNEL_WALL_RIGHT := 18   # правая стена, железобето�
 const TUNNEL_DEPTH := 4         # уровни 1..4, до самого фундамента
 const FUEL_STATION_X := 22      # левая клетка станции заправки (data/tech.json → fuel.station_x_cells)
 const WELL_X := 27              # левая клетка буровой скважины (две клетки шириной)
+const TELEPORT_PAD_X := 20      # площадка часов-телепорта: между парковкой бурмобиля (18) и станцией (scripts/teleport/)
 # Площадка под пробитым фундаментом: на сколько уровней ниже фундамента
 # расчищается приямок шириной со стены тоннеля (см. build_robert_tunnel).
 const TUNNEL_LANDING_HEIGHT := 2
@@ -93,6 +94,8 @@ var _form_cfg: Dictionary = {}
 var _form_slot_h: int = 36
 var _form_min_y: int = 1 << 30
 var _slot_cache: Dictionary = {}
+# ---- полости-фигуры с 1500 (caves.gd, раунд 5): кэш слотов, тот же приём ----
+var _cave_cache: Dictionary = {}
 # ---- кэш клеток: get_tile зовут на каждую клетку экрана каждый кадр ----
 # Плоский массив 32 x (глубина+64) байт, 255 = ещё не считали. Сбрасывается при
 # смене сида/событий — сама генерация остаётся чистой функцией. Один массив, а не
@@ -551,6 +554,9 @@ func garden_decor_at(x: int) -> String:
 	# одной запасной с каждой стороны: деревья шире клетки и залезли бы на объект.
 	if (x >= FUEL_STATION_X - 1 and x < FUEL_STATION_X + 3) or (x >= WELL_X - 1 and x < WELL_X + 3):
 		return ""
+	# Площадка часов-телепорта — плита на траве; декор поверх неё торчал бы из-под героя.
+	if x == TELEPORT_PAD_X:
+		return ""
 	if _roll(x, 0, "garden_decor_has", 0) > GARDEN_DECOR_DENSITY:
 		return ""
 	var list: Array = GARDEN_DECOR_GRANDPA if era == "grandpa" \
@@ -773,6 +779,7 @@ func _cache_reset() -> void:
 		_cells.resize(n)
 	_cells.fill(255)
 	_slot_cache.clear()
+	_cave_cache.clear()
 
 
 ## Поставить предикат защиты клеток (см. protect_cell) и сбросить кэш.
@@ -784,9 +791,10 @@ func set_protect_cell(c: Callable) -> void:
 ## База (слои, руды, камень) + особые образования поверх.
 func _generate_layered(x: int, y: int, salt: int) -> int:
 	var base := _generate_base(x, y, salt)
-	if y < _form_min_y:
-		return base
-	return Formations.apply(self, x, y, salt, base)
+	if y >= _form_min_y:
+		base = Formations.apply(self, x, y, salt, base)
+	# полости-фигуры с сундуком и стражами (раунд 5): поверх образований, геометрия только от сида
+	return Caves.apply(self, x, y, base)
 
 
 func _generate_base(x: int, y: int, salt: int) -> int:

@@ -20,7 +20,7 @@ extends Control
 var dir: Vector2 = Vector2.RIGHT
 
 ## Цвет заливки — по умолчанию тот же янтарный акцент, что у стрелок в hud.gd.
-var color: Color = Color8(0xE0, 0xA9, 0x3B)
+var color: Color = UiTheme.GOLD
 
 # Пропорции треугольника — те же числа, что были у hud.gd:_draw_arrow.
 # Важно, что он заметно ВЫТЯНУТ вдоль dir: первый заход дал почти

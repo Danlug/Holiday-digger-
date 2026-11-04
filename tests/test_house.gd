@@ -284,6 +284,19 @@ func _test_storage_access_rules() -> void:
 	check("рюкзак взял только то, что тянет", taken == max_by_weight and taken < 100)
 	check("остальное осталось на складе", HouseStorage.count("lead") == 100 - taken)
 
+	# «Переложить всё» уносит только руды и ресурсы: еда, аптечка и топливо остаются с героем.
+	GameState.inventory.clear()
+	GameState.house_storage.clear()
+	GameState.add_item("iron_ore", 3)
+	GameState.add_item("bronze", 2)
+	GameState.add_item("food_soup", 2)
+	GameState.add_item("medkit", 1)
+	GameState.add_item("fuel_block", 1)
+	check("переложено 5 единиц добычи", HouseStorage.put_all() == 5)
+	check("руда и бронза на складе", HouseStorage.count("iron_ore") == 3 and HouseStorage.count("bronze") == 2)
+	check("еда осталась в рюкзаке", GameState.get_item_count("food_soup") == 2 and HouseStorage.count("food_soup") == 0)
+	check("аптечка и топливо остались", GameState.get_item_count("medkit") == 1 and GameState.get_item_count("fuel_block") == 1)
+
 
 func _test_storage_survives_death_and_save() -> void:
 	GameState.house_storage.clear()

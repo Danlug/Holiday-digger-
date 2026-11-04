@@ -7,8 +7,8 @@ extends Control
 ## на термометр — открыть экран костюма.
 
 const FUEL_H := 30.0
-const WIDTH := 28.0
-const Y_TOP := 104.0   # справа по высоте героя ездит метка глубины — слева свободно
+const WIDTH := 36.0   # ширина левого столбика HUD (кнопка задания, задания дня)
+const Y_TOP := 104.0   # запасной верх, когда левого столбика HUD нет (см. _layout)
 
 var _fuel_btn: Button
 var _fuel_fill: ColorRect
@@ -40,19 +40,23 @@ func _fit() -> void:
 		_layout()
 
 
+## Верх — под левым столбиком HUD (портрет с часами, задания), а не на жёстком Y_TOP:
+## столбик то растёт (кнопка заданий дня, вырез телефона), то сжимается — бак наезжал
+## на кнопку заданий (HudAnchors.left_column_bottom, ветка hud-top 27.10).
 func _layout() -> void:
-	var x := 3.0
-	_fuel_btn.position = Vector2(x, Y_TOP)
-	_heat_btn.position = Vector2(x, Y_TOP + (_fuel_btn.size.y + 5.0 if _fuel_btn.visible else 0.0))
+	var x := 8.0   # по левому краю столбика (портрет, задания), а не 3: край не «гуляет»
+	var y := HudAnchors.left_column_bottom(1, Y_TOP - HudAnchors.COLUMN_GAP) + HudAnchors.COLUMN_GAP
+	_fuel_btn.position = Vector2(x, y)
+	_heat_btn.position = Vector2(x, y + (_fuel_btn.size.y + 5.0 if _fuel_btn.visible else 0.0))
 
 
 func _build_fuel() -> void:
 	_fuel_btn = UiBtn.icon_button(null, Vector2(WIDTH, 66), UiBtn.Kind.NORMAL)
 	var flame := TechUi.icon_rect(TechUi.tex("icon_flame"), 18)
-	flame.position = Vector2(5, 3)
+	flame.position = Vector2((WIDTH - 18.0) * 0.5, 3)
 	_fuel_btn.add_child(flame)
 	var track := Panel.new()
-	track.position = Vector2(9, 23)
+	track.position = Vector2((WIDTH - 10.0) * 0.5, 23)
 	track.size = Vector2(10, FUEL_H)
 	track.add_theme_stylebox_override("panel", TechUi.box(TechUi.PANEL_DARK, TechUi.BORDER, 2, 0))
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -61,21 +65,22 @@ func _build_fuel() -> void:
 	_fuel_fill.color = TechUi.FIRE
 	_fuel_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_fuel_fill)
-	_fuel_num = TechUi.label("0", 8, Color.WHITE)
+	_fuel_num = TechUi.label("0", UiTheme.FS_TINY, Color.WHITE)
 	_fuel_num.position = Vector2(0, 54)
 	_fuel_num.size = Vector2(WIDTH, 10)
 	_fuel_num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_fuel_btn.add_child(_fuel_num)
 	_fuel_btn.pressed.connect(_on_fuel_pressed)
 	add_child(_fuel_btn)
+	HudAnchors.join_left_column(_fuel_btn, 1)   # курьер встаёт ниже
 
 
 func _build_heat() -> void:
 	_heat_btn = UiBtn.icon_button(null, Vector2(WIDTH, 38), UiBtn.Kind.NORMAL)
 	_heat_icon = TechUi.icon_rect(TechUi.tex("icon_thermo_0"), 20)
-	_heat_icon.position = Vector2(4, 3)
+	_heat_icon.position = Vector2((WIDTH - 20.0) * 0.5, 3)
 	_heat_btn.add_child(_heat_icon)
-	_heat_num = TechUi.label("", 8, TechUi.MUTED)
+	_heat_num = TechUi.label("", UiTheme.FS_TINY, TechUi.MUTED)
 	_heat_num.position = Vector2(0, 25)
 	_heat_num.size = Vector2(WIDTH, 10)
 	_heat_num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -85,6 +90,7 @@ func _build_heat() -> void:
 			return
 		TechScreen.open(TechScreen.TAB_SUIT))
 	add_child(_heat_btn)
+	HudAnchors.join_left_column(_heat_btn, 1)
 
 
 func _tool() -> String:
@@ -136,6 +142,7 @@ func _process(dt: float) -> void:
 		_fuel_btn.modulate = Color(1, 1, 1, 0.65 + 0.35 * sin(_blink * 6.0))
 	else:
 		_fuel_btn.modulate = Color.WHITE
+	_layout()   # столбик над баком меняется без сигнала (задание, кнопка заданий дня)
 	# Глубина меняется плавно, а значок обновляем редко: не каждый кадр.
 	if int(_blink * 2.0) != int((_blink - dt) * 2.0):
 		refresh()

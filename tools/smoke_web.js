@@ -165,12 +165,6 @@ const isBenign = (t) => BENIGN.some((re) => re.test(t));
 			notice ? 'уведомление: ' + notice.trim().slice(0, 200) : `${(report.timings.engineStartMs / 1000).toFixed(1)} с`);
 		if (!started) throw new Error('движок не стартовал');
 
-		const wasmReq = requested.find((r) => /\.wasm/.test(r.url));
-		const pckReq = requested.find((r) => /\.pck/.test(r.url));
-		check('wasm отдаётся как application/wasm', !!wasmReq && /application\/wasm/.test(wasmReq.type), wasmReq ? wasmReq.type : 'нет запроса');
-		check('wasm и pck запрошены с меткой сборки ?v= (сброс кэша)',
-			!!wasmReq && !!pckReq && /[?&]v=/.test(wasmReq.url) && /[?&]v=/.test(pckReq.url));
-
 		const canvas = page.locator('#canvas');
 		await page.waitForSelector('#canvas');
 		const shot = async (name) => {
@@ -203,13 +197,53 @@ const isBenign = (t) => BENIGN.some((re) => re.test(t));
 		}), ms);
 		report.fps.intro = await fpsOf(3000);
 
+		// Оболочка (web/shell.src.html): фаза ready → первый жест по заставке запускает движок («Запуск»),
+		// started() ставит phase=running и прячет заставку. Раньше движок стартовал от первого клика
+		// «Пропустить», а всё дальнейшее шло по фиксированным паузам — под нагрузкой (SwiftShader + тесты
+		// рядом) герой не успевал появиться к нажатию клавиш. Теперь ждём фазы, а не секунды.
+		const phase = () => page.evaluate(() => (window.RaskopkiShell && window.RaskopkiShell.phase) || null).catch(() => null);
+		const waitPhase = async (want, ms) => {
+			const t = Date.now();
+			while (Date.now() - t < ms) { if ((await phase()) === want) return true; await sleep(250); }
+			return false;
+		};
+		await waitPhase('ready', 30000);
+		await page.mouse.click(vw / 2, vh / 2);   // жест «нажмите»
+		const running = await waitPhase('running', opt.timeout * 1000);
+		check('движок запущен жестом по заставке (phase=running)', running, `phase=${await phase()}`);
+		if (!running) throw new Error('движок не перешёл в running');
+		// Запросы wasm/pck идут после снятия #status — проверяем их уже после старта движка.
+		const wasmReq = requested.find((r) => /\.wasm/.test(r.url));
+		const pckReq = requested.find((r) => /\.pck/.test(r.url));
+		check('wasm отдаётся как application/wasm', !!wasmReq && /application\/wasm/.test(wasmReq.type), wasmReq ? wasmReq.type : 'нет запроса');
+		check('wasm и pck запрошены с меткой сборки ?v= (сброс кэша)',
+			!!wasmReq && !!pckReq && /[?&]v=/.test(wasmReq.url) && /[?&]v=/.test(pckReq.url));
+
+		await sleep(1500);   // заставка уходит ~1 с, главная сцена поднимается
+
+		// Первый запуск: окно согласия на аналитику («Помочь улучшить игру?») открывается поверх игры
+		// и держит интро (story_director: интро после ответа). Отвечаем «Нет, спасибо» (кнопка ~62×365
+		// проектных единиц); второй клик — на случай, если окно поднялось позже первого.
+		const consentScale = vw / 224;
+		for (let i = 0; i < 2; i++) {
+			await page.mouse.click(62 * consentScale, 365 * consentScale);
+			await sleep(1200);
+		}
+		await shot('01b_consent_answered');
+
 		// --- интро: пропускаем кнопкой «Пропустить» (правый верхний угол, 64×20 проектных) ---
 		const scale = vw / 224;
-		const skipX = (224 - 72 + 32) * scale;
-		const skipY = (8 + 10) * scale;
-		for (let i = 0; i < 4; i++) {
-			await page.mouse.click(skipX, skipY);
-			await sleep(700);
+		// Круглая кнопка ⏭ (UiBtn, переделка интерфейса 28.10) — центр ~199×15 проектных единиц.
+		const skipX = 199 * scale;
+		const skipY = 15 * scale;
+		// SkipButton: пропуск — удержание HOLD_SEC=0.6 с (или двойной тап); одиночный клик лишь
+		// показывает подсказку. Держим дольше с запасом на 8 fps; второй заход — на следующую сцену.
+		for (let i = 0; i < 2; i++) {
+			await page.mouse.move(skipX, skipY);
+			await page.mouse.down();
+			await sleep(1200);
+			await page.mouse.up();
+			await sleep(900);
 		}
 		await sleep(1500);
 		await shot('02_after_intro');
@@ -229,8 +263,25 @@ const isBenign = (t) => BENIGN.some((re) => re.test(t));
 		await sleep(1200);
 		await page.keyboard.up('a');
 
+		// Звук: SfxService отдаёт оболочке {unlocked, played, dig} (window.RaskopkiShell.sfx) на первых
+		// звуках — первая копка после загрузки обязана звучать, а не ждать опроса жеста.
+		const sfxState = () => page.evaluate(() => (window.RaskopkiShell && window.RaskopkiShell.sfx) || null).catch(() => null);
+		const sfx0 = await sfxState();
 		await page.keyboard.down('s');
-		await sleep(4000);
+		// Под SwiftShader (8 fps при параллельной нагрузке) герой сначала доходит до клетки и только
+		// потом бьёт — ждём первый удар до 6 с, а не фиксированные полторы секунды.
+		let sfx1 = null;
+		const digStart = Date.now();
+		while (Date.now() - digStart < 6000) {
+			await sleep(250);
+			sfx1 = await sfxState();
+			if (sfx1 && sfx1.dig > ((sfx0 && sfx0.dig) || 0)) break;
+		}
+		report.sfx = { before: sfx0, afterDig: sfx1 };
+		check('звук разблокирован и первая копка звучит (удар или осыпание сыграны)',
+			!!sfx1 && sfx1.unlocked && sfx1.dig > ((sfx0 && sfx0.dig) || 0),
+			sfx1 ? `unlocked=${sfx1.unlocked} played=${sfx1.played} dig=${sfx1.dig} last=${sfx1.last}` : 'оболочка не получила состояние звука');
+		await sleep(Math.max(500, 4000 - (Date.now() - digStart)));   // держим «s» те же ~4 с, что и раньше
 		await shot('04_digging');
 		report.fps.dig = await fpsOf(2000);
 		await page.keyboard.up('s');

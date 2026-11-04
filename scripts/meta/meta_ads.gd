@@ -47,6 +47,7 @@ static func consume(placement: String) -> bool:
 	if not can(placement):
 		return false
 	GameState.ad_daily_counts[placement] = GameState.get_ad_uses_today(placement) + 1
+	GameState.note_ad_watched(placement)
 	return true
 
 

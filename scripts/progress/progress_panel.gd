@@ -65,7 +65,7 @@ func _build() -> void:
 	_points_chip.add_child(chip_row)
 	_points_icon = HeroIcons.make("ui_star", 16.0)
 	chip_row.add_child(_points_icon)
-	_points_label = ProgressUiKit.make_label("0", 15, ProgressUiKit.GOLD)
+	_points_label = ProgressUiKit.make_label("0", UiTheme.FS_HEAD_L, ProgressUiKit.GOLD)
 	_points_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip_row.add_child(_points_label)
 	Tip.bind(_points_chip, "Очки навыков", points_rule_text(),
@@ -81,7 +81,7 @@ func _build() -> void:
 	level_chip.mouse_filter = Control.MOUSE_FILTER_STOP
 	top.add_child(level_chip)
 	level_chip.add_child(HeroIcons.make("ui_xp", 16.0))
-	_level_label = ProgressUiKit.make_label("1", 14, ProgressUiKit.BLUE)
+	_level_label = ProgressUiKit.make_label("1", UiTheme.FS_HEAD, ProgressUiKit.BLUE)
 	_level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level_chip.add_child(_level_label)
 	Tip.bind(level_chip, "Уровень героя", "Опыт даёт всё: копка, находки, глубина.")
@@ -96,7 +96,7 @@ func _build() -> void:
 	var track := _xp_fill.get_parent() as Control
 	track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	track.resized.connect(_sync_header)
-	_xp_label = ProgressUiKit.make_label("", 8, ProgressUiKit.DIM)
+	_xp_label = ProgressUiKit.make_label("", UiTheme.FS_TINY, ProgressUiKit.DIM)
 	bar_row.add_child(_xp_label)
 	Tip.bind(track, "Опыт", "До следующего уровня")
 

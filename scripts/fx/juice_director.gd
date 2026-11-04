@@ -19,10 +19,6 @@ const HEAVY_TILES := [
 	TileTypes.Type.UNIVERSALIUM, TileTypes.Type.ANGEL_STONE, TileTypes.Type.DIVINE_HEART,
 	TileTypes.Type.GEOCRYSTAL,
 ]
-const PRECIOUS_TILES := [
-	TileTypes.Type.GOLD_ORE, TileTypes.Type.DIAMOND, TileTypes.Type.RUBY,
-	TileTypes.Type.EMERALD, TileTypes.Type.PLATINUM_ORE,
-]
 const RARE_CATEGORIES := ["gem", "exotic", "warzone", "radioactive", "liquid_metal"]
 
 const COL_GOLD := Color("FFE066")
@@ -39,9 +35,9 @@ var story: Node = null
 var _prev_on_ground: bool = false
 var _prev_vy: float = 0.0
 var _step_dist: float = 0.0
-var _was_digging: bool = false
-var _next_hit: float = 0.0
 var _thrust_prev: String = ""
+## Звук копки: ритм ударов по длительности клетки, материал × инструмент, моторы (dig-sound).
+var dig_sound := DigSound.new()
 
 var _last_hp: float = -1.0
 var _hp_drip: float = 0.0
@@ -121,6 +117,7 @@ func _exit_tree() -> void:
 	_disconnect(GameState.survival_warning, _on_warning)
 	_disconnect(GameState.artifact_collected, _on_artifact)
 	_disconnect(GameState.coins_changed, _on_coins)
+	dig_sound.stop()
 
 
 func _disconnect(sig: Signal, c: Callable) -> void:
@@ -228,20 +225,11 @@ func _tick_player(delta: float) -> void:
 				Sfx.play("fly_stop")
 		_thrust_prev = thrust
 
-	# удары по породе, пока копка идёт
-	var d = player.digging
-	if d != null:
-		if not _was_digging:
-			_was_digging = true
-			_next_hit = Feel.hit_period(GameState.current_tool) * 0.5
-		var t: float = d["t"]
-		var total: float = d["total"]
-		if t >= _next_hit:
-			_next_hit += Feel.hit_period(GameState.current_tool)
-			if t < total - 0.12:
-				_dig_strike(d)
-	else:
-		_was_digging = false
+	# удары по породе, пока копка идёт: звук — DigSound, частицы — здесь
+	if dig_sound.tick(player, delta):
+		var d = player.digging
+		if d != null:
+			_dig_strike(d)
 
 	_prev_on_ground = on_ground
 	_prev_vy = vy
@@ -262,27 +250,12 @@ func _dig_strike(d: Dictionary) -> void:
 	var center := Vector2(float(d["x"]) * 32.0 + 16.0, float(d["y"]) * 32.0 + 16.0)
 	var toward := (Vector2(player.x, player.y) * 32.0 - center)
 	var spot := center + (toward.normalized() * 13.0 if toward.length() > 1.0 else Vector2.ZERO)
-	# высота и громкость удара зависят от инструмента: лопата глуше и выше, бур дробит, бурмобиль гудит
-	var prof := Feel.tool_profile(GameState.current_tool)
-	Sfx.play(_dig_sound(tile), randf_range(0.9, 1.0) * float(prof["pitch"]), float(prof["db"]))
 	_dig_burst(tile, spot, 0.4)
 
 
 # ---------------------------------------------------------------------------
 # Копка и добыча
 # ---------------------------------------------------------------------------
-
-func _dig_sound(tile: int) -> String:
-	if tile == TileTypes.Type.DIRT or tile == TileTypes.Type.PEAT:
-		return "dig_dirt"
-	if tile == TileTypes.Type.STONE:
-		return "dig_stone"
-	if HEAVY_TILES.has(tile):
-		return "dig_hard"
-	if PRECIOUS_TILES.has(tile):
-		return "dig_gold"
-	return "dig_ore"
-
 
 func _dig_burst(tile: int, pos: Vector2, amount: float) -> void:
 	if tile == TileTypes.Type.DIRT or tile == TileTypes.Type.PEAT:
@@ -335,7 +308,7 @@ func _on_event(id: StringName, data: Dictionary) -> void:
 		&"dug":
 			var tile := int(data.get("tile", 0))
 			var pos: Vector2 = data.get("pos", Vector2.ZERO)
-			Sfx.play(_dig_sound(tile))
+			dig_sound.on_dug(tile, GameState.current_tool)
 			_dig_burst(tile, pos, 1.3)
 			if bool(data.get("loot", false)):
 				_magnet(tile, pos)
@@ -431,12 +404,15 @@ func _item_icon(item: String) -> Texture2D:
 
 func _on_picked(item: String, count: int) -> void:
 	var rare := _is_rare(item)
-	Sfx.play("pickup_rare" if rare else "pickup")
+	# удачная находка (владелец 27.10, LuckJuice): тот же звук громче, «+N» крупнее
+	var lucky := LuckJuice.is_armed(item)
+	Sfx.play("pickup_rare" if rare else "pickup", 1.0, LuckJuice.sound_db() if lucky else 0.0)
 	if player == null:
 		return
 	var at := _head() + Vector2(randf_range(-7.0, 7.0), randf_range(-4.0, 2.0))
 	# подряд добытое одно и то же сливается в одно «+N» (aaa-feel); старые заглушки Fx метода не знают
-	Fx.float_stack(item, at, _item_icon(item), count, COL_RARE if rare else COL_ITEM, Feel.num("loot.stack_window_s", 0.75))
+	Fx.float_stack(item, at, _item_icon(item), count, COL_RARE if rare else COL_ITEM, Feel.num("loot.stack_window_s", 0.75),
+			LuckJuice.icon_scale() if lucky else 1.0)
 	Fx.burst("pickup_glint", at, 1.0 if rare else 0.6)
 	if rare:
 		Fx.burst("spark", at, 1.0)
@@ -511,10 +487,9 @@ func _on_hp(hp: float, max_hp: float) -> void:
 func _hurt(dmg: float, max_hp: float, k: float) -> void:
 	var share := clampf(dmg / maxf(max_hp, 1.0), 0.0, 1.0)
 	Sfx.play("hurt", 1.0, linear_to_db(clampf(0.55 + share * 2.0, 0.55, 1.0) * k))
-	Fx.flash(Color(0.85, 0.08, 0.1, clampf(0.18 + share * 1.2, 0.18, 0.5) * k), 0.25)
+	# краснота экрана, тряска и наезд камеры — HurtJuice (scripts/feel/, владелец 27.10)
 	if k >= 1.0:
 		Haptics.thud()
-		Fx.shake(clampf(1.5 + share * 8.0, 1.5, 5.0), 0.18)
 		if player != null:
 			Fx.float_text(_head(), "-%d" % int(round(dmg)), COL_DMG)
 

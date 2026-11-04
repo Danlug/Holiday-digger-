@@ -72,22 +72,44 @@ static func monster_ids() -> Array:
 	return section("monsters").keys()
 
 
+## Вид по id: тоннельные монстры (monsters) и стражи полостей (cave_monsters, раунд 5).
 static func monster(id: String) -> Dictionary:
-	return section("monsters").get(id, {})
+	var m: Dictionary = section("monsters").get(id, {})
+	if m.is_empty():
+		m = section("cave_monsters").get(id, {})
+	return m
+
+
+## Стражи полостей-фигур 1500–4000: только по своим полостям (CaveGuards), тоннельный
+## спавн их не перебирает.
+static func cave_monster_ids() -> Array:
+	var out: Array = []
+	for id in section("cave_monsters").keys():
+		if typeof(section("cave_monsters")[id]) == TYPE_DICTIONARY and not String(id).begins_with("_"):
+			out.append(String(id))
+	return out
+
+
+static func is_cave_monster(id: String) -> bool:
+	return section("cave_monsters").has(id)
 
 
 ## Множитель характеристик монстра на глубине (HP и урон растут от нижней
-## границы его пояса, чтобы глубже тот же вид был опаснее).
+## границы его пояса, чтобы глубже тот же вид был опаснее). У вида может быть
+## свой темп (hp_per_1000/dmg_per_1000 в записи) — у стражей полостей он выше:
+## герой между 1500 и 4000 растёт только ступенями HP.
 static func hp_mult(id: String, depth: int) -> float:
 	var m := monster(id)
 	var d0 := int((m.get("depth", [4000, 10000]) as Array)[0])
-	return 1.0 + float(v(section("scaling").get("hp_per_1000"), 0.1)) * maxf(0.0, float(depth - d0)) / 1000.0
+	var k := float(m.get("hp_per_1000", v(section("scaling").get("hp_per_1000"), 0.1)))
+	return 1.0 + k * maxf(0.0, float(depth - d0)) / 1000.0
 
 
 static func dmg_mult(id: String, depth: int) -> float:
 	var m := monster(id)
 	var d0 := int((m.get("depth", [4000, 10000]) as Array)[0])
-	return 1.0 + float(v(section("scaling").get("dmg_per_1000"), 0.06)) * maxf(0.0, float(depth - d0)) / 1000.0
+	var k := float(m.get("dmg_per_1000", v(section("scaling").get("dmg_per_1000"), 0.06)))
+	return 1.0 + k * maxf(0.0, float(depth - d0)) / 1000.0
 
 
 # --- снаряжение ---

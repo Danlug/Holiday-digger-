@@ -92,9 +92,12 @@ func _test_data() -> void:
 	check("первая ступень (постройка) без цены ступени", levels[0]["cost"] == null)
 	for key in ["capacity_blocks", "upgrade_cost"]:
 		var n = TechData.fuel()["tanks"]["hand_drill"][key]
-		check("числа бака %s помечены proposed" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", false) == true)
-	check("ступени костюма помечены proposed", TechData.heat()["suit_tiers"].get("proposed", false) == true)
-	check("ступени скважины помечены proposed", TechData.well()["levels"].get("proposed", false) == true)
+		# баки владелец утвердил на странице разбора чисел (26.10)
+		check("числа бака %s утверждены (proposed: false)" % key, typeof(n) == TYPE_DICTIONARY and n.get("proposed", true) == false)
+	# владелец принял совет на странице разбора чисел (26.10): ступени костюма утверждены
+	check("ступени костюма утверждены владельцем (proposed: false)", TechData.heat()["suit_tiers"].get("proposed", true) == false)
+	# владелец принял совет на странице разбора чисел (30.10): скважина «оставить»
+	check("ступени скважины утверждены владельцем (proposed: false)", TechData.well()["levels"].get("proposed", true) == false)
 	check("лава — решения владельца: 3000 / 20 HP/с / 5 с",
 		Heat.lava_min_depth() == 3000 and Heat.lava_raw_dps() == 20.0 and Heat.lava_dig_seconds() == 5.0)
 
@@ -207,7 +210,12 @@ func _test_player_fuel() -> void:
 	GameState.owned_tools = ["shovel", "rusty_pickaxe", "iron_pickaxe", "hand_drill", "drill_rig"]
 	GameState.current_tool = "hand_drill"
 	var best := Balance.get_best_pickaxe_speed_multiplier()
-	check("пустой бак бура: копаем киркой, а не буром", is_equal_approx(p._tool_speed_multiplier(), best))
+	var own := Balance.get_tool_speed_multiplier("iron_pickaxe")
+	check("пустой бак бура: копаем лучшей своей киркой (железной ×%.1f), а не лучшей в игре (×%.1f)" % [own, best],
+		is_equal_approx(p._tool_speed_multiplier(), own) and own < best)
+	GameState.owned_tools = ["shovel", "hand_drill"]
+	check("своей кирки нет — лопатой", is_equal_approx(p._tool_speed_multiplier(), Balance.get_tool_speed_multiplier("shovel")))
+	GameState.owned_tools = ["shovel", "rusty_pickaxe", "iron_pickaxe", "hand_drill", "drill_rig"]
 	FuelTank.set_fuel("hand_drill", 1.0)
 	check("с топливом бур вдвое быстрее лучшей кирки", is_equal_approx(p._tool_speed_multiplier(), best * 2.0))
 
@@ -256,6 +264,14 @@ func _test_heat() -> void:
 	check("костюм 3 гасит жару на 3000 полностью", Heat.stamina_multiplier(3000, 3) == 1.0)
 	check("костюм 1 на 3000 смягчает жару, но не убирает", Heat.stamina_multiplier(3000, 1) < 3.0 and Heat.stamina_multiplier(3000, 1) > 1.5)
 	check("ощущения: комфортно / припекает / печёт", Heat.felt_level(100) == 0 and Heat.felt_level(1500) == 1 and Heat.felt_level(3000) == 2)
+	# Владелец 30.10: «температура больше 70 начинает делать урон».
+	check("порог урона без костюма — 70 °C", Heat.damage_from_c(0) == 70.0)
+	check("до 70 °C жара здоровье не трогает (1500 — 63.5 °C)", Heat.damage_per_second(1500, 0) == 0.0)
+	check("на 2000 (85 °C) без костюма жжёт 1.5 HP/с", absf(Heat.damage_per_second(2000, 0) - 1.5) < 0.001)
+	check("костюм сдвигает порог на свою стойкость: ступень 1 — 100 °C, на 2000 урона нет",
+		Heat.damage_from_c(1) == 100.0 and Heat.damage_per_second(2000, 1) == 0.0)
+	check("на 3000 (140 °C) без костюма 7 HP/с, с костюмом 3 — 0", absf(Heat.damage_per_second(3000, 0) - 7.0) < 0.001
+		and Heat.damage_per_second(3000, 3) == 0.0)
 	var raw := Heat.lava_cell_cost_hp(0)
 	check("клетка лавы без костюма стоит 100 HP — вся полоска на старте", raw == 100.0)
 	var costs: Array = []
@@ -606,11 +622,12 @@ func _test_double_and_ads() -> void:
 	check("«×2» не трогает доллары и монеты", GameState.dollars == 0 and GameState.coins == 0)
 
 	GameState.ad_daily_counts.clear()
-	check("лимит роликов в сутки — 3", TechAds.daily_limit() == 3 and TechAds.left_today() == 3)
+	# владелец (26.10): «можно больше чуть» — 4 в сутки (было 3)
+	check("лимит роликов в сутки — 4", TechAds.daily_limit() == 4 and TechAds.left_today() == 4)
 	var results: Array = []
-	for i in range(4):
+	for i in range(5):
 		TechAds.request(func(ok: bool) -> void: results.append(ok))
-	check("три ролика дали награду, четвёртый — отказ", results == [true, true, true, false])
+	check("четыре ролика дали награду, пятый — отказ", results == [true, true, true, true, false])
 	check("осталось ноль", TechAds.left_today() == 0)
 	check("рекламная сеть не подключена: AdManager честно говорит «нет готового»", not AdManager.is_ad_ready(TechAds.PLACEMENT))
 	check("точка показа заведена в monetization.json (AdManager её знает)", not AdManager.placement(TechAds.PLACEMENT).is_empty())

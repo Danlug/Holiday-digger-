@@ -12,7 +12,7 @@ extends CanvasLayer
 ## поверх витрины. Свои секунды значок считает сам; приезд объявляет дом
 ## (arrive) — таймер доставки остаётся одним, в HouseSystem.
 
-const LAYER_ORDER := 10
+const LAYER_ORDER := UiLayers.HUD_TOP
 const POS := Vector2(6.0, 108.0)
 const SIZE := Vector2(52.0, 66.0)
 const KNOCK_SECONDS := 1.3
@@ -54,6 +54,7 @@ func _ready() -> void:
 	_holder.mouse_filter = Control.MOUSE_FILTER_STOP
 	_holder.visible = false
 	add_child(_holder)
+	HudAnchors.join_left_column(_holder, 2)
 
 	var body := HouseArt.nine("tile_body", 5, Color(1, 1, 1, 0.92), Vector2(48, 48))
 	body.position = Vector2(2, 0)
@@ -65,7 +66,7 @@ func _ready() -> void:
 	_icon = ShopArt.rect(HouseArt.tex("courier"), Vector2(10, 8), Vector2(32, 32))
 	_icon.pivot_offset = Vector2(16, 16)
 	_holder.add_child(_icon)
-	_label = ShopArt.label("", 11, Color.WHITE, HouseArt.INK, 4)
+	_label = ShopArt.label("", UiTheme.FS_LABEL, Color.WHITE, HouseArt.INK, 4)
 	_label.position = Vector2(0, 50)
 	_label.size = Vector2(52, 14)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -122,6 +123,7 @@ func _enter_transit() -> void:
 	_ring.tint = Color(1.0, 0.85, 0.35)
 	_holder.modulate.a = 1.0
 	_holder.visible = true
+	_place()
 	if _shake != null:
 		_shake.kill()
 	_icon.rotation = 0.0
@@ -168,6 +170,7 @@ func _enter_done() -> void:
 func _process(delta: float) -> void:
 	if _holder == null or _state == "idle":
 		return
+	_place()
 	_state_t += delta
 	match _state:
 		"transit":
@@ -194,6 +197,13 @@ func _process(delta: float) -> void:
 					_finish()
 				else:
 					_enter_transit()
+
+
+## Под левым столбиком HUD (портрет, задания дня, бак бура и термометр), а не на жёстком
+## POS.y — там он накрывал бак бура (ветка hud-top 27.10). HUD скрыт (дом) — прежнее место.
+func _place() -> void:
+	_holder.position = Vector2(POS.x,
+		HudAnchors.left_column_bottom(2, POS.y - HudAnchors.COLUMN_GAP) + HudAnchors.COLUMN_GAP)
 
 
 func _finish() -> void:

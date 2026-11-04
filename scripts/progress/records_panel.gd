@@ -93,10 +93,10 @@ func refresh() -> void:
 
 	_add("ui_depth", str(depth), ProgressUiKit.BLUE, -1.0,
 		"Максимальная глубина", "Самая глубокая точка, до которой ты добрался.", "%d клеток" % depth)
-	_add("ui_coin", HeroUi.short_num(wealth), ProgressUiKit.GOLD, -1.0,
+	_add("ui_coin", UiFmt.short(wealth), ProgressUiKit.GOLD, -1.0,
 		"Богатство", "Заработано %d монет, вынесено наверх на %d. Доход буровой скважины добавится сюда же." % [earned, hauled],
 		"Всего %d" % wealth)
-	_add("ui_bag", HeroUi.short_num(best_haul), ProgressUiKit.MUTED, -1.0,
+	_add("ui_bag", UiFmt.short(best_haul), ProgressUiKit.MUTED, -1.0,
 		"Лучшая ходка", "Самый дорогой рюкзак, поднятый на поверхность за один раз.", "%d монет" % best_haul)
 	var mf := float(minerals_found) / float(maxi(minerals_total, 1))
 	_add("ui_gem", "%d%%" % int(round(mf * 100.0)), Color8(0x4F, 0xD8, 0xD0), mf,

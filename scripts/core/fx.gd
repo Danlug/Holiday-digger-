@@ -22,25 +22,31 @@ static func burst(kind: String, world_pos: Vector2, amount: float = 1.0, tint: C
 	_call("burst", [kind, world_pos, amount] if tint.a <= 0.0 else [kind, world_pos, amount, tint])
 
 
-static func float_text(world_pos: Vector2, text: String, color: Color = Color.WHITE) -> void:
-	_call("float_text", [world_pos, text, color])
+## size — масштаб всплывашки (значок и надпись), 1 — обычный; удачная находка — 1.2.
+## Как у burst: лишний аргумент передаём, только если он задан (старые заглушки его не знают).
+static func float_text(world_pos: Vector2, text: String, color: Color = Color.WHITE, size: float = 1.0) -> void:
+	_call("float_text", [world_pos, text, color] if size == 1.0 else [world_pos, text, color, size])
 
 
 ## Всплывающая иконка с числом/словом (+1 с картинкой предмета).
-static func float_icon(world_pos: Vector2, icon: Texture2D, text: String = "", color: Color = Color.WHITE) -> void:
-	_call("float_icon", [world_pos, icon, text, color])
+static func float_icon(world_pos: Vector2, icon: Texture2D, text: String = "", color: Color = Color.WHITE,
+		size: float = 1.0) -> void:
+	_call("float_icon", [world_pos, icon, text, color] if size == 1.0 else [world_pos, icon, text, color, size])
 
 
 ## «+N» со слиянием: подряд добытое одно и то же (key) складывается в одно число.
 ## Заглушки сервиса в старых тестах метода не знают — вызов тогда молча пропускается.
 static func float_stack(key: String, world_pos: Vector2, icon: Texture2D, add: int,
-		color: Color = Color.WHITE, window_s: float = 0.75) -> void:
+		color: Color = Color.WHITE, window_s: float = 0.75, size: float = 1.0) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return
 	var n := tree.get_first_node_in_group(GROUP)
 	if n != null and n.has_method("float_stack"):
-		n.callv("float_stack", [key, world_pos, icon, add, color, window_s])
+		var args := [key, world_pos, icon, add, color, window_s]
+		if size != 1.0:
+			args.append(size)
+		n.callv("float_stack", args)
 
 
 static func shake(strength: float = 4.0, duration: float = 0.2) -> void:

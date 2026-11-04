@@ -6,7 +6,7 @@ extends Button
 ##
 ## Плитка рисуется из словаря-«предложения» (см. ShopItems и GDD §16):
 ##   icon: Texture2D, tier: int 0..5, state: String, title/body/extra: String (Tip),
-##   pill: {icon, text, color, pips}, corner: "check"|"lock"|"cross"|"home"|"gift",
+##   pill: {icon, text, color, pips}, corner: "check"|"lock"|"cross"|"home"|"gift"|"door",
 ##   count_text: String (число в углу значка), selected: bool, new: bool,
 ##   sub_icon: Texture2D (мелкая «награда» на значке ролика),
 ##   need_icon: Texture2D — значок проекта «нужно для…» в левом верхнем углу
@@ -17,8 +17,8 @@ extends Button
 
 const W := 64.0
 const H := 64.0
-const COL_GREEN := Color8(0x4D, 0xE0, 0x94)
-const COL_NEED := Color8(0xFF, 0x9A, 0x2E)
+const COL_GREEN := UiTheme.MONEY
+const COL_NEED := UiTheme.WARN
 
 var offer: Dictionary = {}
 
@@ -63,7 +63,7 @@ func _init() -> void:
 	_lock.visible = false
 	add_child(_lock)
 
-	_count = ShopArt.label("", 9, Color.WHITE, Color(0.05, 0.04, 0.08), 3)
+	_count = ShopArt.label("", UiTheme.FS_SMALL, Color.WHITE, Color(0.05, 0.04, 0.08), 3)
 	_count.position = Vector2(2, 27)
 	_count.size = Vector2(W - 5, 12)
 	_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -108,14 +108,12 @@ func _on_down() -> void:
 	if disabled:
 		return
 	pivot_offset = size * 0.5
-	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector2(0.93, 0.93), 0.06)
+	UiAnim.press(self, true, 0.93)
 
 
 func _on_up() -> void:
 	pivot_offset = size * 0.5
-	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	UiAnim.press(self, false)
 
 
 ## Заполняет плитку из предложения (формат — в шапке файла).
@@ -134,7 +132,7 @@ func setup(o: Dictionary) -> void:
 			body_col = Color(0.72, 0.72, 0.78)
 			icon_col = Color(0.55, 0.55, 0.62)
 		"locked":
-			rim_col = Color8(0x6A, 0x62, 0x78)
+			rim_col = UiTheme.NIGHT_RIM
 			body_col = Color(0.62, 0.62, 0.7)
 			icon_col = Color(0.07, 0.06, 0.11)
 		"away", "nosale", "off":
@@ -183,6 +181,18 @@ func setup(o: Dictionary) -> void:
 		_glow.modulate = Color(0.45, 1.0, 0.65, 0.6) if state == "ready" else Color(1, 0.9, 0.5, 0.6)
 		_start_pulse()
 
+	Tip.bind(self, String(o.get("title", "")), String(o.get("body", "")), String(o.get("extra", "")))
+
+
+## Только число на значке, левый угол и Tip — без пересборки плитки: так витрина
+## раз в секунду двигает отсчёт печи бронзы (ShopItems.furnace_decor), не
+## перезапуская пульс ореола.
+func refresh_badges(o: Dictionary) -> void:
+	offer = o
+	var ct := String(o.get("count_text", ""))
+	_count.visible = ct != ""
+	_count.text = ct
+	_set_corner(_corner_tl, "new" if bool(o.get("new", false)) else String(o.get("corner_tl", "")))
 	Tip.bind(self, String(o.get("title", "")), String(o.get("body", "")), String(o.get("extra", "")))
 
 
@@ -255,7 +265,7 @@ func _set_pill(p: Dictionary) -> void:
 		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		parts.append([d, 5.0])
 	if text != "":
-		var l := ShopArt.label(text, 9, col, Color(0.05, 0.04, 0.08), 2)
+		var l := ShopArt.label(text, UiTheme.FS_SMALL, col, Color(0.05, 0.04, 0.08), 2)
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var tw := l.get_minimum_size().x
 		l.size = Vector2(tw, 15.0)
@@ -285,3 +295,21 @@ func deny() -> void:
 
 func pill_center() -> Vector2:
 	return get_global_rect().get_center()
+
+
+## Значок в правом углу подпрыгивает (дверь «у входной двери», раунд 5): плитка
+## не качается «нельзя», а показывает, где это купить.
+func hop_corner() -> void:
+	if not _corner_tr.visible or ShopFx.reduced() or not is_inside_tree():
+		return
+	var base := Vector2(W - 15, 1)
+	_corner_tr.pivot_offset = _corner_tr.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(_corner_tr, "position", base + Vector2(0, -6), 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(_corner_tr, "scale", Vector2.ONE * 1.5, 0.1)
+	tw.tween_property(_corner_tr, "position", base, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(_corner_tr, "scale", Vector2.ONE, 0.22)
+
+
+func corner_center() -> Vector2:
+	return _corner_tr.get_global_rect().get_center()

@@ -9,6 +9,12 @@ config/name="Раскопки на каникулах"
 config/description="Пиксельная RPG-idle про раскопки"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
+config/version="1.0"
+boot_splash/bg_color=Color(0.050980, 0.039216, 0.027451, 1)
+boot_splash/image="res://art/ui/brand/boot_splash.png"
+boot_splash/fullsize=true
+boot_splash/use_filter=false
+config/icon="res://art/ui/brand/icon.png"
 
 [autoload]
 
@@ -31,3 +37,6 @@ window/handheld/orientation=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
+; iOS-экспорт отказывается без этого флага (should_import_etc2_astc); все текстуры
+; проекта — lossless (compress/mode=0), так что на веб-сборку он не влияет.
+textures/vram_compression/import_etc2_astc=true

@@ -38,6 +38,7 @@ static func request(on_result: Callable) -> void:
 
 static func _count_use() -> void:
 	GameState.ad_daily_counts[PLACEMENT] = used_today() + 1
+	GameState.note_ad_watched(PLACEMENT)   # миссии «посмотри рекламу» (ГДД §17.2)
 
 
 static func _show_real(on_result: Callable) -> void:

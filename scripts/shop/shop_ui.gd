@@ -44,7 +44,7 @@ const NAV_H := 38.0
 const HEAD_H := 32.0
 const ACTION_H := 46.0
 
-const GOLD := Color8(0xE0, 0xA9, 0x3B)
+const GOLD := UiTheme.GOLD
 const INK := Color(0.05, 0.04, 0.08)
 
 ## Единственный живой экземпляр — чтобы дом мог открыть магазин одной
@@ -59,6 +59,7 @@ var _busy: bool = false
 var _shown_new: Array = []
 
 var _root: Control
+var _closing := false   # шторка уезжает: уже закрыта по смыслу, но ещё видна
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _drag: DragScroll
@@ -70,10 +71,11 @@ var _shown_dollars: int = 0
 var _wallet_hold: bool = false
 var _wallet_tween: Dictionary = {}
 var _close_btn: Button
+var _safe_top := 0.0   # шапка — под вырезом/статус-баром (HudSafeArea.top)
+var _nav_bottom := NAV_H   # нижняя панель вместе с безопасной зоной (полоска «домой»)
 
 var _nav: Control
 var _nav_tabs: Control
-var _nav_done: Button
 var _tab_buttons: Dictionary = {}
 var _tab_badges: Dictionary = {}
 var _marker: NinePatchRect
@@ -95,10 +97,16 @@ var _card_panel: Control = null   # плашка карточки: над ней
 var _info_pulse: Tween = null     # пульсация «i», пока игрок не научился тапать
 var _craft_qty: CraftQtyBox = null   # ползунок «сколько» в карточке переработки (_craft_qty_*)
 var _craft_qty_ok: Label = null      # «×N» на зелёной кнопке карточки переработки
+var _furnace_pop := 0       # бронза, забранная из печи при входе: «+N» на плитке, когда покажут «Технику»
+var _furnace_acc := 0.0     # отсчёт печи на плитке бронзы — раз в секунду (_furnace_tick)
 
 var _notice_panel: Panel
 var _notice_label: Label
 var _notice_timer: Timer
+
+## «За монеты — у входной двери» (раунд 5): полоса над вкладками и стрелка «к двери».
+var _door_strip: ShopDoorStrip
+var _door_guide: ShopDoorGuide
 
 var _player: Node = null
 var _hud: Node = null
@@ -136,11 +144,24 @@ static func open_premium() -> void:
 	instance.open(SCREEN_PREMIUM)
 
 
+## Витрина за доллары сразу с карточкой товара: кнопка «на склад» в рюкзаке
+## (раунд 6) ведёт к той же карточке с ценой, что и плитка, — без второй кассы.
+static func open_premium_good(good_id: String) -> void:
+	if instance == null:
+		return
+	instance.open(SCREEN_PREMIUM)
+	var t: ShopTile = instance._tiles.get("good:dollars:" + good_id)
+	if t != null:
+		instance._on_tile_pressed(t.offer, t)
+
+
 func _ready() -> void:
 	instance = self
-	layer = 20  # выше HUD: шторка обязана перекрывать джойстик и нижнюю полосу
+	layer = UiLayers.SHEETS  # выше HUD: шторка обязана перекрывать джойстик и нижнюю полосу
 	_build()
 	_root.visible = false
+	_door_guide = ShopDoorGuide.new()
+	add_child(_door_guide)
 	GameState.tool_purchase_required.connect(_on_tool_purchase_required)
 	GameState.coins_changed.connect(func(_c): _sync_wallet(true))
 	GameState.dollars_changed.connect(func(_d): _sync_wallet(true))
@@ -156,15 +177,18 @@ func _exit_tree() -> void:
 
 
 func is_open() -> bool:
-	return _root != null and _root.visible
+	return _root != null and _root.visible and not _closing
 
 
 func open(tab: String = TAB_FOOD) -> void:
+	GameState.emit_event("screen_opened", {"id": "shop", "tab": tab})   # аналитика (scripts/core/analytics.gd)
 	_resolve_refs()
 	# Повторное open() при открытой шторке (из вкладки в экипировку) мир второй
 	# раз не замораживает: иначе «как было» запомнилось бы уже замороженным.
-	if not is_open():
+	var was_open := is_open()
+	if not was_open:
 		_freeze_world(true)
+	_door_guide.stop()
 	ShopItems.seed_seen()
 	_selected.clear()
 	# По умолчанию отмечено всё: типовой сценарий — поднялся с полным рюкзаком
@@ -173,8 +197,13 @@ func open(tab: String = TAB_FOOD) -> void:
 		_selected[row["id"]] = true
 	_busy = false
 	_close_card(false)
+	# Печь бронзы: всё сплавленное за время вылазки само ложится в рюкзак/на склад.
+	if ShopService.is_at_workshop():
+		_furnace_pop += int(BronzeFurnace.collect()["count"])
+	_closing = false
 	_root.visible = true
-	_root.modulate.a = 1.0
+	if not was_open:
+		UiAnim.open(_root, UiAnim.Kind.SHEET)
 	Sfx.play("ui_open")
 	if tab == SCREEN_EQUIP:
 		# Ржавая кирка находится в мастерской среди удочек, лопат и палок (слова
@@ -185,27 +214,26 @@ func open(tab: String = TAB_FOOD) -> void:
 	_announce_place(tab)
 
 
-## Витрину открыли вне двери и не под землёй (меню или «Магазин» на огороде):
-## плитки заперты, и сразу говорим почему. Под землёй не нужно — там плитки с
-## бейджем роликов, а отказ при пустом лимите объясняет сама плитка. Вкладке
-## без запертых местом плиток (за доллары всё покупается где угодно) объяснять
-## нечего.
+## Витрину открыли на огороде или в комнате дома (меню, «Магазин»): на вкладке
+## с плитками «у двери» полоса-напоминание сразу вспыхивает (раунд 5; раньше —
+## плашка с текстом сверху). Под землёй не нужно — там плитки с бейджем
+## роликов, а отказ при пустом лимите объясняет сама плитка. Вкладке без плиток
+## «у двери» (за доллары всё покупается где угодно) объяснять нечего.
 func _announce_place(tab: String) -> void:
 	if tab == SCREEN_EQUIP or tab == TAB_SELL:
 		return
-	var gate := ShopService.can_buy({"kind": "good"})
-	if bool(gate["ok"]) or String(gate["place"]) == ShopService.PLACE_UNDERGROUND:
-		return
-	if _tiles.values().any(func(t: ShopTile) -> bool: return t.offer.has("lock_reason")):
-		notice(String(gate["reason"]), 3.2)
+	if _door_strip.visible:
+		_door_strip.remind()
 
 
 func close() -> void:
-	if _root == null or not _root.visible:
+	if not is_open():
 		return
 	_close_card(false)
 	_leave_tab()
-	_root.visible = false
+	_furnace_pop = 0
+	_closing = true
+	UiAnim.close(_root, UiAnim.Kind.SHEET, null, func() -> void: _closing = false)
 	Tip.hide_all()
 	Sfx.play("ui_close")
 	_freeze_world(false)
@@ -266,7 +294,7 @@ func _build() -> void:
 	add_child(_root)
 
 	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color8(0x26, 0x1E, 0x30), Color8(0x14, 0x0F, 0x1B)])
+	grad.colors = PackedColorArray([UiTheme.NIGHT_TOP, UiTheme.NIGHT_DEEP])
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill_from = Vector2(0, 0)
@@ -281,9 +309,12 @@ func _build() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bg)
 
+	_nav_bottom = NAV_H + HudSafeArea.bottom(get_viewport())
+	_safe_top = HudSafeArea.top(get_viewport())
 	_build_scroll()
 	_build_header()
 	_build_action_bar()
+	_build_door_strip()
 	_build_nav()
 	_build_notice()
 
@@ -291,8 +322,8 @@ func _build() -> void:
 func _build_scroll() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_scroll.offset_top = HEAD_H + 2.0
-	_scroll.offset_bottom = -NAV_H
+	_scroll.offset_top = HEAD_H + 2.0 + _safe_top
+	_scroll.offset_bottom = -_nav_bottom
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_root.add_child(_scroll)
@@ -312,10 +343,10 @@ func _build_scroll() -> void:
 
 func _build_header() -> void:
 	var line := ColorRect.new()
-	line.color = Color8(0x4A, 0x3F, 0x5C)
+	line.color = UiTheme.NIGHT_LINE
 	line.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	line.offset_top = HEAD_H
-	line.offset_bottom = HEAD_H + 1.0
+	line.offset_top = HEAD_H + _safe_top
+	line.offset_bottom = HEAD_H + 1.0 + _safe_top
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(line)
 
@@ -324,22 +355,12 @@ func _build_header() -> void:
 	_chips["dig"] = _make_chip(ShopArt.tex("glyph_dig"), 56.0, Vector2(6, 6))
 	_chips["fly"] = _make_chip(ShopArt.tex("glyph_fly"), 56.0, Vector2(66, 6))
 
-	_close_btn = _make_btn("red", "glyph_cross", Vector2(32, 24), 14.0)
-	_close_btn.position = Vector2(224.0 - 32.0 - 6.0, 4.0)
-	_close_btn.anchor_left = 1.0
-	_close_btn.anchor_right = 1.0
-	_close_btn.offset_left = -38.0
-	_close_btn.offset_right = -6.0
-	_close_btn.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	Tip.bind(_close_btn, "Закрыть")
-	_root.add_child(_close_btn)
+	_close_btn = UiBtn.close_button(close, _root)
 
 
 func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	var root := Control.new()
-	root.position = pos
+	root.position = pos + Vector2(0, _safe_top)
 	root.size = Vector2(w, 20)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	var bg := NinePatchRect.new()
@@ -351,7 +372,7 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	root.add_child(bg)
 	var ic := ShopArt.rect(icon, Vector2(3, 3), Vector2(14, 14))
 	root.add_child(ic)
-	var lb := ShopArt.label("", 10)
+	var lb := ShopArt.label("", UiTheme.FS_BODY)
 	lb.position = Vector2(20, 1)
 	lb.size = Vector2(w - 24.0, 18)
 	lb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -361,46 +382,10 @@ func _make_chip(icon: Texture2D, w: float, pos: Vector2) -> Dictionary:
 	return {"root": root, "icon": ic, "label": lb}
 
 
-## Кнопка-картинка: рамка из девятизонника, знак по центру.
-func _make_btn(kind: String, glyph: String, sz: Vector2, icon_px: float = 16.0) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = sz
-	b.size = sz
-	b.focus_mode = Control.FOCUS_NONE
-	var tex := ShopArt.tex("btn_" + kind)
-	for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
-		var sb := StyleBoxTexture.new()
-		sb.texture = tex
-		sb.texture_margin_left = 5
-		sb.texture_margin_right = 5
-		sb.texture_margin_top = 5
-		sb.texture_margin_bottom = 5
-		match st:
-			"pressed", "hover_pressed":
-				sb.modulate_color = Color(0.78, 0.78, 0.78)
-			"disabled":
-				sb.modulate_color = Color(0.45, 0.45, 0.5)
-		b.add_theme_stylebox_override(st, sb)
-	if glyph != "":
-		var ic := ShopArt.rect(ShopArt.tex(glyph), (sz - Vector2(icon_px, icon_px)) * 0.5, Vector2(icon_px, icon_px))
-		ic.name = "Glyph"
-		b.add_child(ic)
-	b.button_down.connect(func() -> void:
-		if b.disabled:
-			return
-		b.pivot_offset = b.size * 0.5
-		b.create_tween().tween_property(b, "scale", Vector2(0.94, 0.94), 0.05))
-	b.button_up.connect(func() -> void:
-		b.pivot_offset = b.size * 0.5
-		b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.12) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
-	return b
-
-
 func _build_nav() -> void:
 	_nav = Control.new()
 	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_nav.offset_top = -NAV_H
+	_nav.offset_top = -_nav_bottom
 	_nav.offset_bottom = 0.0
 	_nav.mouse_filter = Control.MOUSE_FILTER_STOP
 	_root.add_child(_nav)
@@ -426,30 +411,44 @@ func _build_nav() -> void:
 	_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_nav_tabs.add_child(_marker)
 
+	# Вкладки делят всю ширину (премиум в 4/3 шире); маркер встаёт после раскладки.
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	row.offset_bottom = NAV_H
+	row.add_theme_constant_override("separation", 0)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.sort_children.connect(func() -> void: _move_marker(false))
+	_nav_tabs.add_child(row)
 	var widths := {TAB_FOOD: 42.0, TAB_PICKS: 42.0, TAB_TECH: 42.0, TAB_SELL: 42.0, SCREEN_PREMIUM: 56.0}
-	var x := 0.0
 	for id in NAV_TABS:
 		var w: float = widths[id]
 		var b := Button.new()
 		b.flat = true
 		b.focus_mode = Control.FOCUS_NONE
-		b.position = Vector2(x, 0)
-		b.size = Vector2(w, NAV_H)
-		b.custom_minimum_size = b.size
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.size_flags_stretch_ratio = w / 42.0
+		b.custom_minimum_size = Vector2(w, NAV_H)
+		b.size = b.custom_minimum_size
 		for st in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
 			b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
 		if id == SCREEN_PREMIUM:
 			_premium_glow = ShopArt.rect(ShopArt.tex("glow"), Vector2(0, -2), Vector2(w, NAV_H + 4.0))
 			_premium_glow.stretch_mode = TextureRect.STRETCH_SCALE
+			_premium_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			_premium_glow.offset_top = -2.0
+			_premium_glow.offset_bottom = 2.0
 			_premium_glow.modulate = Color(0.4, 1.0, 0.65, 0.5)
 			b.add_child(_premium_glow)
 		var isz := 30.0 if id == SCREEN_PREMIUM else 26.0
 		var ic := ShopArt.rect(ShopArt.tex(String(NAV_ICONS[id])),
 			Vector2((w - isz) * 0.5, (NAV_H - isz) * 0.5), Vector2(isz, isz))
 		ic.name = "Icon"
+		ic.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 		ic.pivot_offset = ic.size * 0.5
 		b.add_child(ic)
 		var badge := ShopArt.rect(ShopArt.tex("glyph_new"), Vector2(w - 15.0, 2), Vector2(11, 11))
+		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_KEEP_SIZE)
+		badge.position = Vector2(w - 15.0, 2)
 		badge.visible = false
 		b.add_child(badge)
 		_tab_badges[id] = badge
@@ -462,31 +461,16 @@ func _build_nav() -> void:
 				_scroll.scroll_vertical = 0)
 		var tip: Array = NAV_TIPS[id]
 		Tip.bind(b, String(tip[0]), String(tip[1]))
-		_nav_tabs.add_child(b)
+		row.add_child(b)
 		_tab_buttons[id] = b
-		x += w
 	_marker.get_parent().move_child(_marker, 0)
-
-	# На экране верстака вкладок нет: одна большая кнопка «готово» под большим пальцем.
-	_nav_done = _make_btn("green", "glyph_check", Vector2(96, 28), 18.0)
-	_nav_done.anchor_left = 0.5
-	_nav_done.anchor_right = 0.5
-	_nav_done.offset_left = -48.0
-	_nav_done.offset_right = 48.0
-	_nav_done.offset_top = 5.0
-	_nav_done.offset_bottom = 33.0
-	_nav_done.pressed.connect(func() -> void:
-		if not Tip.swallowed():
-			close())
-	Tip.bind(_nav_done, "Готово")
-	_nav.add_child(_nav_done)
 
 
 func _build_action_bar() -> void:
 	_action = Control.new()
 	_action.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_action.offset_top = -(NAV_H + ACTION_H)
-	_action.offset_bottom = -NAV_H
+	_action.offset_top = -(_nav_bottom + ACTION_H)
+	_action.offset_bottom = -_nav_bottom
 	_action.mouse_filter = Control.MOUSE_FILTER_STOP
 	_action.visible = false
 	_root.add_child(_action)
@@ -499,11 +483,11 @@ func _build_action_bar() -> void:
 	_action.add_child(back)
 
 	# Ролик «×2»: слева, маленькая кнопка; справа — крупная «Продать».
-	_ad_btn = _make_btn("gray", "", Vector2(48, 36))
+	_ad_btn = UiBtn.texture_button("gray", null, Vector2(48, 36), 16.0, false)
 	_ad_btn.position = Vector2(6, 5)
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_video"), Vector2(4, 3), Vector2(14, 14)))
 	_ad_btn.add_child(ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(14, 8), Vector2(30, 24)))
-	_ad_label = ShopArt.label("", 9)
+	_ad_label = ShopArt.label("", UiTheme.FS_SMALL)
 	_ad_label.position = Vector2(2, 20)
 	_ad_label.size = Vector2(44, 14)
 	_ad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -511,12 +495,12 @@ func _build_action_bar() -> void:
 	_ad_btn.pressed.connect(_on_ad_x2_pressed)
 	_action.add_child(_ad_btn)
 
-	_sell_btn = _make_btn("gold", "", Vector2(158, 38))
+	_sell_btn = UiBtn.texture_button("gold", null, Vector2(158, 38), 16.0, false)
 	_sell_btn.position = Vector2(60, 4)
 	_sell_lead = ShopArt.rect(ShopArt.ui("icon_inventory"), Vector2(8, 5), Vector2(28, 28))
 	_sell_btn.add_child(_sell_lead)
 	_sell_btn.add_child(ShopArt.rect(ShopArt.ui("icon_coin"), Vector2(42, 11), Vector2(18, 18)))
-	_sell_label = ShopArt.label("0", 14, Color.WHITE, Color8(0x6A, 0x3E, 0x0A), 4)
+	_sell_label = ShopArt.label("0", UiTheme.FS_HEAD, Color.WHITE, UiTheme.GOLD_INK, 4)
 	_sell_label.position = Vector2(62, 6)
 	_sell_label.size = Vector2(70, 26)
 	_sell_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -525,7 +509,7 @@ func _build_action_bar() -> void:
 	_sell_x2 = ShopArt.rect(ShopArt.tex("glyph_x2"), Vector2(134, 8), Vector2(22, 22))
 	_sell_x2.visible = false
 	_sell_btn.add_child(_sell_x2)
-	_sell_uses = ShopArt.label("", 9, Color.WHITE, Color(0.2, 0.12, 0.02), 4)
+	_sell_uses = ShopArt.label("", UiTheme.FS_SMALL, Color.WHITE, Color(0.2, 0.12, 0.02), 4)
 	_sell_uses.position = Vector2(2, 20)
 	_sell_uses.size = Vector2(36, 16)
 	_sell_uses.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -534,6 +518,13 @@ func _build_action_bar() -> void:
 	_sell_btn.add_child(_sell_uses)
 	_sell_btn.pressed.connect(_on_sell_pressed)
 	_action.add_child(_sell_btn)
+	# «Продать» тянется до правого края; «×2» прижата к его правому краю, сумма — между.
+	_sell_btn.anchor_right = 1.0
+	_sell_btn.offset_right = -6.0
+	_sell_x2.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_KEEP_SIZE)
+	_sell_x2.position.x = _sell_btn.size.x - 24.0
+	_sell_label.anchor_right = 1.0
+	_sell_label.offset_right = -26.0
 
 
 ## Сообщение магазина. Живёт ВНЕ шторки: о том, что бур теперь собирается на
@@ -543,8 +534,8 @@ func _build_notice() -> void:
 	_notice_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_notice_panel.offset_left = 10
 	_notice_panel.offset_right = -10
-	_notice_panel.offset_top = HEAD_H + 6.0
-	_notice_panel.offset_bottom = HEAD_H + 46.0
+	_notice_panel.offset_top = HEAD_H + 6.0 + _safe_top
+	_notice_panel.offset_bottom = HEAD_H + 46.0 + _safe_top
 	_notice_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_notice_panel.visible = false
 	var sb := StyleBoxFlat.new()
@@ -558,7 +549,7 @@ func _build_notice() -> void:
 	_notice_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_notice_label.offset_left = 6
 	_notice_label.offset_right = -6
-	_notice_label.add_theme_font_size_override("font_size", 9)
+	_notice_label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_notice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -583,16 +574,6 @@ func notice(text: String, seconds: float = 2.4) -> void:
 # Кошелёк
 # ---------------------------------------------------------------------------
 
-## Число в плашке кошелька: целиком, пока влезает, дальше 1.23M. Плашка с
-## долларами уже монетной, поэтому ей «длинно» наступает раньше.
-static func wallet_text(n: int, compact_from: int = 1000000) -> String:
-	return ShopArt.full(n) if n < compact_from else ShopArt.compact(n)
-
-
-func _chip_fmt(n: int, which: String) -> String:
-	return wallet_text(n, 1000000 if which == "coins" else 10000)
-
-
 func _sync_wallet(animate: bool) -> void:
 	if _chips.is_empty():
 		return
@@ -600,8 +581,8 @@ func _sync_wallet(animate: bool) -> void:
 		return
 	_set_chip_value("coins", GameState.coins, animate)
 	_set_chip_value("dollars", GameState.dollars, animate)
-	Tip.bind(_chips["coins"]["root"], "Монеты", "", ShopArt.full(GameState.coins))
-	Tip.bind(_chips["dollars"]["root"], "Доллары", "", ShopArt.full(GameState.dollars))
+	Tip.bind(_chips["coins"]["root"], "Монеты", "", UiFmt.full(GameState.coins))
+	Tip.bind(_chips["dollars"]["root"], "Доллары", "", UiFmt.full(GameState.dollars))
 
 
 func _set_chip_value(which: String, value: int, animate: bool) -> void:
@@ -612,10 +593,10 @@ func _set_chip_value(which: String, value: int, animate: bool) -> void:
 		(_wallet_tween[which] as Tween).kill()
 		_wallet_tween[which] = null
 	if animate and is_open() and shown != value:
-		_wallet_tween[which] = ShopFx.count_up(self, label, shown, value, 0.45, 0.0, _chip_fmt.bind(which))
+		_wallet_tween[which] = ShopFx.count_up(self, label, shown, value, 0.45, 0.0, UiFmt.short)
 		ShopFx.pop(chip["root"], 0.12, 0.2)
 	else:
-		label.text = _chip_fmt(value, which)
+		label.text = UiFmt.short(value)
 	if which == "coins":
 		_shown_coins = value
 	else:
@@ -646,8 +627,7 @@ func _set_tab(tab: String, animate: bool) -> void:
 	_tab = tab
 	_close_card(false)
 	var equip := tab == SCREEN_EQUIP
-	_nav_tabs.visible = not equip
-	_nav_done.visible = equip
+	_nav.visible = not equip   # у верстака вкладок нет; закрывает крестик сверху справа, как везде
 	_chips["coins"]["root"].visible = not equip
 	_chips["dollars"]["root"].visible = not equip
 	_chips["dig"]["root"].visible = equip
@@ -655,6 +635,8 @@ func _set_tab(tab: String, animate: bool) -> void:
 	_scroll.scroll_vertical = 0
 	_render()
 	_move_marker(animate)
+	if animate and _door_strip.visible:
+		_door_strip.remind()   # перешёл на вкладку с плитками «у двери» — полоса кивает
 	if animate and not ShopFx.reduced():
 		var dir := 1.0 if NAV_TABS.find(tab) >= old_index else -1.0
 		_scroll.modulate.a = 0.0
@@ -678,6 +660,7 @@ func _leave_tab() -> void:
 
 
 func _move_marker(animate: bool) -> void:
+	animate = animate and not ShopFx.reduced()
 	var b: Button = _tab_buttons.get(_tab)
 	for id in _tab_buttons.keys():
 		var btn: Button = _tab_buttons[id]
@@ -751,6 +734,10 @@ func _render() -> void:
 		_list.add_child(_make_empty_state())
 	_update_badges()
 	_update_action_bar()
+	_sync_door_strip()
+	if _tab == TAB_TECH and _furnace_pop > 0:
+		_furnace_show_pickup(_furnace_pop)
+		_furnace_pop = 0
 
 
 func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
@@ -766,7 +753,7 @@ func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(ic)
 	var line := ColorRect.new()
-	line.color = Color8(0x4A, 0x3F, 0x5C)
+	line.color = UiTheme.NIGHT_LINE
 	line.custom_minimum_size = Vector2(0, 2)
 	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -780,17 +767,14 @@ func _make_section_header(icon: Texture2D, badge_text: String = "") -> Control:
 		gift.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		gift.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(gift)
-		row.add_child(ShopArt.label(badge_text, 10, ShopArt.COL_GOOD))
+		row.add_child(ShopArt.label(badge_text, UiTheme.FS_BODY, ShopArt.COL_GOOD))
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		Tip.bind(row, "Бесплатные заказы", "Бабка оставила денег: сегодня еда даром", "Осталось: " + badge_text)
 	return row
 
 
 func _make_grid(offers: Array) -> GridContainer:
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
+	var grid := ShopArt.tile_grid()
 	for o in offers:
 		var t := ShopTile.new()
 		t.setup(o)
@@ -840,6 +824,14 @@ func _on_tile_pressed(offer: Dictionary, tile: ShopTile) -> void:
 					Sfx.play("ui_tap")
 					ShopFx.pop(tile, 0.08, 0.18)
 				"locked", "away":
+					if bool(offer.get("at_door", false)):
+						_remind_door(tile)
+						return
+					if bool(offer.get("furnace", false)):
+						# Печь работает: из шахты карточку можно открыть — посмотреть очередь и отсчёт.
+						Sfx.play("ui_tap")
+						_open_card(offer, tile)
+						return
 					Sfx.play("ui_deny")
 					Haptics.tap()
 					tile.deny()
@@ -925,6 +917,70 @@ func _after_snap(tile: ShopTile, color: Color) -> void:
 
 
 # ---------------------------------------------------------------------------
+# «За монеты — у входной двери» (раунд 5, слова владельца: «В огороде покупки
+# напоминают, что покупать надо у входной двери»)
+# ---------------------------------------------------------------------------
+
+func _build_door_strip() -> void:
+	_door_strip = ShopDoorStrip.new().setup(UiBtn.texture_button("green", null, Vector2(56, 32), 16.0, false))
+	_door_strip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_door_strip.offset_top = -(_nav_bottom + ShopDoorStrip.H)
+	_door_strip.offset_bottom = -_nav_bottom
+	_door_strip.visible = false
+	_door_strip.go_btn.pressed.connect(_go_to_door)
+	_root.add_child(_door_strip)
+
+
+## Полоса видна, пока на вкладке есть плитки «у двери»; список над ней короче.
+func _sync_door_strip() -> void:
+	var want := _tab != TAB_SELL and _tab != SCREEN_EQUIP \
+		and _tiles.values().any(func(t: ShopTile) -> bool: return bool(t.offer.get("at_door", false)))
+	_door_strip.visible = want
+	if not want:
+		return
+	_scroll.offset_bottom = -(_nav_bottom + ShopDoorStrip.H)
+	_door_strip.configure(ShopService.purchase_place(), _door_dir())
+
+
+## Где дверь от героя: -1 левее, +1 правее (стрелка на кнопке «к двери»).
+func _door_dir() -> int:
+	if _player == null or not is_instance_valid(_player):
+		return 1
+	var door_x := float(HouseConfig.door_cell().x) + 0.5
+	return -1 if door_x < float(_player.get("x")) else 1
+
+
+## Тап по плитке «у двери»: не «нельзя», а «вот где». Плитка мягко щёлкает,
+## её дверь подпрыгивает и летит в полосу внизу, полоса вспыхивает, стрелка
+## «кивает» к двери. Ни ролика, ни «N/3», ни плашки с текстом сверху.
+func _remind_door(tile: ShopTile) -> void:
+	Sfx.play("ui_tap")
+	Haptics.tap()
+	if not _door_strip.visible:
+		_sync_door_strip()
+	if tile != null and is_instance_valid(tile):
+		ShopFx.pop(tile, 0.08, 0.2)
+		tile.hop_corner()
+		ShopFx.coins(_root, ShopArt.tex("glyph_door"), tile.corner_center(), _door_strip.door_center(), 1,
+			func(_i: int) -> void: _door_strip.remind(), 24.0)
+	else:
+		_door_strip.remind()
+
+
+## «К двери»: витрина закрывается, над миром стрелка к входной двери. Сам
+## герой идёт пешком — это не телепорт; зайдёт в дом — витрина откроется
+## в прихожей на этой же вкладке (ShopDoorGuide).
+func _go_to_door() -> void:
+	if Tip.swallowed():
+		return
+	var tab := _tab
+	Sfx.play("ui_tap")
+	Haptics.tap()
+	close()
+	_door_guide.start(tab)
+
+
+# ---------------------------------------------------------------------------
 # Карточка подтверждения
 # ---------------------------------------------------------------------------
 
@@ -957,16 +1013,8 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	_root.add_child(_card)
 	_drag.set_process_input(false)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.62)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and ev.pressed or ev is InputEventScreenTouch and ev.pressed:
-			# Тап мимо открытого описания гасит только описание, окно остаётся.
-			if not Tip.swallowed() and not Tip.dismissed_by_tap():
-				_close_card(true))
-	_card.add_child(dim)
+	# Тап мимо открытого описания гасит только описание, окно остаётся.
+	var dim := UiTheme.scrim(_card, _close_card.bind(true), UiTheme.SCRIM_SHEET)
 
 	var panel := PanelContainer.new()
 	panel.anchor_left = 0.0
@@ -975,7 +1023,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	panel.anchor_bottom = 1.0
 	panel.offset_left = 10.0
 	panel.offset_right = -10.0
-	panel.offset_bottom = -(NAV_H + 8.0)
+	panel.offset_bottom = -(_nav_bottom + 8.0)
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var sb := StyleBoxTexture.new()
@@ -1017,6 +1065,7 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 		for e in offer.get("effects", []):
 			side.add_child(_make_chip_row(e["icon"], String(e["text"]), Color.WHITE))
 	_bind_card_info(preview, side, offer)
+	_furnace_mount(side, offer)
 
 	if is_recipe:
 		col.add_child(_make_inputs_grid(offer))
@@ -1024,25 +1073,27 @@ func _open_card(offer: Dictionary, tile: ShopTile) -> void:
 	else:
 		col.add_child(_make_price_row(offer))
 
-	# Низ: красный крестик слева, зелёная галочка справа — под большим пальцем.
+	# Низ: красный крестик прижат влево, зелёная галочка растянута до правого края
+	# (как в HouseQtyCard) — под большим пальцем и без дыр на широком экране.
 	var btns := HBoxContainer.new()
-	btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns.add_theme_constant_override("separation", 8)
+	btns.add_theme_constant_override("separation", 6)
 	col.add_child(btns)
-	var cancel := _make_btn("red", "glyph_cross", Vector2(52, 32), 18.0)
+	var cancel := UiBtn.texture_button("red", ShopArt.tex("glyph_cross"), Vector2(52, 32), 18.0, false)
 	cancel.pressed.connect(func() -> void:
 		if not Tip.swallowed():
 			_close_card(true))
 	Tip.bind(cancel, "Отмена")
 	if is_recipe and bool(offer.get("can_invest", false)):
-		var inv := _make_btn("gray", "glyph_storage", Vector2(52, 32), 18.0)
+		var inv := UiBtn.texture_button("gray", ShopArt.tex("glyph_storage"), Vector2(52, 32), 18.0, false)
 		inv.pressed.connect(func() -> void: _invest(offer))
 		Tip.bind(inv, "На склад", "Переложить из рюкзака то, чего рецепту не хватает")
 		btns.add_child(inv)
 	btns.add_child(cancel)
 	btns.move_child(cancel, 0)
 	var ok_glyph := "glyph_hammer" if is_recipe else "glyph_check"
-	_card_ok = _make_btn("green", ok_glyph, Vector2(96, 32), 20.0)
+	_card_ok = UiBtn.texture_button("green", ShopArt.tex(ok_glyph), Vector2(96, 32), 20.0, false)
+	_card_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_card_ok.get_node("Glyph").set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	var can_do := _card_can_confirm(offer)
 	_card_ok.disabled = not can_do
 	_card_ok.pressed.connect(_confirm_card)
@@ -1128,7 +1179,7 @@ func _make_chip_row(icon: Texture2D, text: String, color: Color) -> Control:
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(ic)
 	if text != "":
-		row.add_child(ShopArt.label(text, 12, color))
+		row.add_child(ShopArt.label(text, UiTheme.FS_TITLE, color))
 	return row
 
 
@@ -1143,7 +1194,7 @@ func _make_compare_row(cmp: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	row.add_child(ShopArt.label(String(cmp["from"]), 11, Color(0.7, 0.7, 0.76)))
+	row.add_child(ShopArt.label(String(cmp["from"]), UiTheme.FS_LABEL, Color(0.7, 0.7, 0.76)))
 	var arrow := TextureRect.new()
 	arrow.texture = ShopArt.tex("glyph_arrow")
 	arrow.custom_minimum_size = Vector2(14, 14)
@@ -1151,7 +1202,7 @@ func _make_compare_row(cmp: Dictionary) -> Control:
 	arrow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(arrow)
-	row.add_child(ShopArt.label(String(cmp["to"]), 13, ShopArt.COL_GOOD))
+	row.add_child(ShopArt.label(String(cmp["to"]), UiTheme.FS_TITLE_L, ShopArt.COL_GOOD))
 	return row
 
 
@@ -1169,7 +1220,7 @@ func _make_price_row(offer: Dictionary) -> Control:
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
-	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else ShopArt.full(price), 15,
+	row.add_child(ShopArt.label("0" if bool(offer.get("free", false)) else UiFmt.short(price), UiTheme.FS_HEAD_L,
 		Color.WHITE if ok else ShopArt.COL_BAD, INK, 4))
 	return row
 
@@ -1183,8 +1234,8 @@ func _make_chip_tappable(row: Control, title: String, have: int, need: int) -> v
 		if c is Label:
 			(c as Label).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var short := need - have
-	Tip.bind_tap(row, title, "Есть: %s из %s" % [ShopArt.full(have), ShopArt.full(need)],
-		"Не хватает: %s" % ShopArt.full(short) if short > 0 else "Хватает", _card_panel)
+	Tip.bind_tap(row, title, "Есть: %s из %s" % [UiFmt.full(have), UiFmt.full(need)],
+		"Не хватает: %s" % UiFmt.full(short) if short > 0 else "Хватает", _card_panel)
 
 
 ## Материалы рецепта значками: «есть/нужно», зелёное — хватает, красное — нет.
@@ -1197,7 +1248,7 @@ func _make_inputs_grid(offer: Dictionary) -> Control:
 	for inp in offer.get("inputs", []):
 		var have := int(inp["have"])
 		var need := int(inp["need"])
-		var chip := _make_chip_row(inp["icon"], "%s/%s" % [ShopArt.compact(have), ShopArt.compact(need)],
+		var chip := _make_chip_row(inp["icon"], "%s/%s" % [UiFmt.short(have), UiFmt.short(need)],
 			ShopArt.COL_GOOD if have >= need else ShopArt.COL_BAD)
 		_make_chip_tappable(chip, ShopCatalog.item_name(String(inp["id"])), have, need)
 		grid.add_child(chip)
@@ -1205,7 +1256,7 @@ func _make_inputs_grid(offer: Dictionary) -> Control:
 	if coins_need > 0:
 		var have := int(offer.get("coins_have", 0))
 		var coin_chip := _make_chip_row(ShopArt.ui("icon_coin"),
-			"%s/%s" % [ShopArt.compact(have), ShopArt.compact(coins_need)],
+			"%s/%s" % [UiFmt.short(have), UiFmt.short(coins_need)],
 			ShopArt.COL_GOOD if have >= coins_need or GameState.debug_free_shop else ShopArt.COL_BAD)
 		_make_chip_tappable(coin_chip, "Монеты", have, coins_need)
 		grid.add_child(coin_chip)
@@ -1217,6 +1268,11 @@ func _confirm_card() -> void:
 	if Tip.swallowed() or _card == null:
 		return
 	var offer := _card_offer
+	# За монеты не у двери (огород, комната дома) — не отказ, а «вот где».
+	if ShopService.is_door_reminder(ShopService.can_buy(offer)):
+		_close_card(true)
+		_remind_door(_tiles.get(String(offer["key"])))
+		return
 	var result := _perform(offer)
 	if not bool(result.get("ok", false)):
 		Sfx.play("ui_deny")
@@ -1236,6 +1292,9 @@ func _confirm_card() -> void:
 	var t: ShopTile = _tiles.get(String(offer["key"]))
 	if t != null and not result.has("craft_fx"):
 		_after_snap(t, ShopArt.COL_GOLD if String(offer["kind"]) != "recipe" else ShopArt.COL_GOOD)
+	if result.has("unload"):   # выгрузка на склад (раунд 6): добыча летит из плитки домой
+		PremiumUnloadFx.play(self, t.get_global_rect().get_center() if t != null else Vector2(112, 240),
+			result["unload"].get("moved", {}))
 
 
 ## Единая точка вызова торговой логики для всех видов плиток.
@@ -1307,14 +1366,19 @@ func _craft_qty_sync() -> void:
 		return
 	var glyph := _card_ok.get_node_or_null("Glyph") as Control
 	if _craft_qty_ok == null:
-		_craft_qty_ok = ShopArt.label("", 13, Color.WHITE, INK, 3)
+		_craft_qty_ok = ShopArt.label("", UiTheme.FS_TITLE_L, Color.WHITE, INK, 3)
 		_craft_qty_ok.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_craft_qty_ok.position = Vector2(_card_ok.size.x * 0.5 - 2.0, 0)
-		_craft_qty_ok.size = Vector2(_card_ok.size.x * 0.5, _card_ok.size.y - 2.0)
 		_card_ok.add_child(_craft_qty_ok)
+		_craft_qty_ok.anchor_left = 0.5   # правая половина кнопки — кнопка тянется на всю ширину
+		_craft_qty_ok.anchor_right = 1.0
+		_craft_qty_ok.anchor_bottom = 1.0
+		_craft_qty_ok.offset_left = -2.0
+		_craft_qty_ok.offset_right = 0.0
+		_craft_qty_ok.offset_top = 0.0
+		_craft_qty_ok.offset_bottom = -2.0
 		if glyph != null:
 			glyph.position.x = _card_ok.size.x * 0.5 - glyph.size.x - 4.0
-	_craft_qty_ok.text = "×" + ShopArt.compact(_craft_qty.amount())
+	_craft_qty_ok.text = "×" + UiFmt.short(_craft_qty.amount())
 
 
 ## Крафт с числом с ползунка. Точки полёта снимаются ДО закрытия карточки:
@@ -1331,6 +1395,10 @@ func _craft_qty_perform(ref: String) -> Dictionary:
 	var res := ShopService.craft(ref, _craft_qty.amount())
 	if bool(res.get("ok", false)):
 		res["craft_fx"] = true
+		if bool(res.get("timed", false)):
+			# Печь: лом летит в плитку, а выпрыгивает огонёк с «+N» в очередь — бронза будет позже.
+			res["count"] = int(res.get("queued", 0))
+			res["fx_icon"] = ShopArt.tex("glyph_flame")
 		_craft_qty_celebrate(ref, res, from, at)
 	return res
 
@@ -1354,8 +1422,9 @@ func _craft_qty_celebrate(ref: String, res: Dictionary, from: Dictionary, fallba
 	var left := [0]
 	for f in flights:
 		left[0] += int(f[1])
+	var fx_icon: Texture2D = res.get("fx_icon", null)
 	if int(left[0]) <= 0 or ShopFx.reduced():
-		_craft_qty_hit(ref, int(res.get("count", 0)))
+		_craft_qty_hit(ref, int(res.get("count", 0)), fx_icon)
 		return
 	for f in flights:
 		var id := String(f[0])
@@ -1365,7 +1434,7 @@ func _craft_qty_celebrate(ref: String, res: Dictionary, from: Dictionary, fallba
 				left[0] -= 1
 				Sfx.play("ui_tap", 0.8 + 0.05 * float(left[0]))
 				if int(left[0]) == 0:
-					_craft_qty_hit(ref, int(res.get("count", 0))), 14.0)
+					_craft_qty_hit(ref, int(res.get("count", 0)), fx_icon), 14.0)
 
 
 ## Плитка рецепта в сетке, если она ещё жива (витрину могли пересобрать или закрыть).
@@ -1378,7 +1447,7 @@ func _craft_qty_tile(ref: String) -> ShopTile:
 
 ## Удар по верстаку и вылет результата с числом. Плитку ищем заново, а не
 ## держим в лямбде полёта: пока сырьё летит, витрину могут закрыть.
-func _craft_qty_hit(ref: String, made: int) -> void:
+func _craft_qty_hit(ref: String, made: int, icon_override: Texture2D = null) -> void:
 	Sfx.play("dig_hard")
 	Haptics.thud()
 	var tile := _craft_qty_tile(ref)
@@ -1389,7 +1458,8 @@ func _craft_qty_hit(ref: String, made: int) -> void:
 		Sfx.play("pickup")
 		return
 	var r := ShopCatalog.recipe(ref)
-	var icon := ShopArt.item_icon(String(r.get("output", {}).get("id", ref)))
+	var icon := icon_override if icon_override != null \
+		else ShopArt.item_icon(String(r.get("output", {}).get("id", ref)))
 	# Вылет вешается на саму плитку: витрину пересоберут или закроют — уйдёт вместе с ней.
 	var c := tile.size * 0.5
 	var ic := ShopArt.rect(icon, c - Vector2(12, 12), Vector2(24, 24))
@@ -1397,7 +1467,7 @@ func _craft_qty_hit(ref: String, made: int) -> void:
 	ic.pivot_offset = Vector2(12, 12)
 	ic.scale = Vector2(0.4, 0.4)
 	tile.add_child(ic)
-	var lbl := ShopArt.label("+" + ShopArt.compact(made), 16, ShopArt.COL_GOOD, INK, 4)
+	var lbl := ShopArt.label("+" + UiFmt.short(made), UiTheme.FS_HERO, ShopArt.COL_GOOD, INK, 4)
 	lbl.z_index = 111
 	lbl.position = c + Vector2(4, -14)
 	tile.add_child(lbl)
@@ -1413,11 +1483,69 @@ func _craft_qty_hit(ref: String, made: int) -> void:
 	Sfx.play("pickup")
 
 
+# ---------------------------------------------------------------------------
+# Печь бронзы (BronzeFurnace): «бронза делается со скоростью минута штука»
+#
+# Карточка бронзы — очередь, отсчёт и «готово N» (FurnaceBox справа от плитки);
+# плитка — огонёк и отсчёт на значке, раз в секунду. Готовое забирается при
+# открытии витрины дома (open) и тапом по «готово N».
+# ---------------------------------------------------------------------------
+
+func _furnace_mount(side: Control, offer: Dictionary) -> void:
+	if String(offer.get("kind", "")) != "recipe" or not BronzeFurnace.handles(String(offer.get("ref", ""))):
+		return
+	var box := FurnaceBox.new().setup(_card_panel)
+	box.cancelled.connect(func(_n: int) -> void: _furnace_reopen(0))
+	box.collected.connect(func(n: int) -> void: _furnace_reopen(n))
+	side.add_child(box)
+
+
+## Очередь отменили или забрали готовое: материалы и ползунок карточки уже
+## другие — пересобрать витрину и открыть карточку заново (как после «На склад»).
+func _furnace_reopen(got: int) -> void:
+	_close_card(false)
+	_render()
+	if got > 0:
+		_furnace_show_pickup(got)
+	var t := _craft_qty_tile(BronzeFurnace.RECIPE)
+	if t != null:
+		_on_tile_pressed(t.offer, t)
+
+
+## Забранная бронза выпрыгивает из плитки с «+N» (тот же удар, что у крафта).
+func _furnace_show_pickup(n: int) -> void:
+	await get_tree().process_frame
+	if is_open():
+		_craft_qty_hit(BronzeFurnace.RECIPE, n)
+
+
+func _process(delta: float) -> void:
+	if not is_open() or _tab != TAB_TECH:
+		return
+	_furnace_acc += delta
+	if _furnace_acc < 1.0:
+		return
+	_furnace_acc = 0.0
+	_furnace_tick()
+
+
+## Отсчёт на плитке бронзы. Плитку не пересобираем: только число, угол и Tip.
+func _furnace_tick() -> void:
+	var t := _craft_qty_tile(BronzeFurnace.RECIPE)
+	if t == null:
+		return
+	var was := bool(t.offer.get("furnace", false))
+	ShopItems.furnace_decor(t.offer)
+	if was or bool(t.offer.get("furnace", false)):
+		t.refresh_badges(t.offer)
+
+
 ## Часы-телепорт: единственный товар, который трогает не GameState, а героя.
+## Куда переносят и как вернуться вниз — TeleportWatch (scripts/teleport/).
 func _teleport_home() -> void:
 	_resolve_refs()
 	if _player != null and is_instance_valid(_player) and _player.has_method("teleport_home"):
-		_player.teleport_home()
+		TeleportWatch.use(_player)
 
 
 # ---------------------------------------------------------------------------
@@ -1481,7 +1609,8 @@ func _selection_items() -> Dictionary:
 ## ГДД раздел 15) и значок ролика «×2».
 func _update_action_bar() -> void:
 	_action.visible = _tab == TAB_SELL
-	_scroll.offset_bottom = -(NAV_H + (ACTION_H if _tab == TAB_SELL else 0.0))
+	var nav := _nav_bottom - (NAV_H if _tab == SCREEN_EQUIP else 0.0)   # у верстака нижней панели нет
+	_scroll.offset_bottom = -(nav + (ACTION_H if _tab == TAB_SELL else 0.0))
 	if _tab != TAB_SELL:
 		return
 	var remote := _footer_mode == "remote"
@@ -1489,7 +1618,7 @@ func _update_action_bar() -> void:
 	var q := ShopService.quote(items)
 	var coins := int(q["coins"])
 	var doubled := GameState.next_sale_doubled and coins > 0
-	_sell_label.text = ShopArt.full(coins * 2 if doubled else coins) if coins < 100000000 else ShopArt.compact(coins)
+	_sell_label.text = UiFmt.short(coins * 2 if doubled else coins)
 	_sell_x2.visible = doubled
 	_sell_uses.visible = remote
 	_sell_uses.text = "%d/%d" % [ShopService.ad_uses_left("remote_dump_loot_for_sale"),
@@ -1503,7 +1632,7 @@ func _update_action_bar() -> void:
 	var tip_body := "Мастерская в подвале дома. Отсюда весь лут уходит за ролик (%d/%d сегодня)." % [
 		ShopService.ad_uses_left("remote_dump_loot_for_sale"), Balance.get_ad_daily_limit("remote_dump_loot_for_sale")] \
 		if remote else "Выбранное уходит в скупку. Тап по плитке — убрать из продажи."
-	Tip.bind(_sell_btn, tip_title, tip_body, "Выручка: %s монет%s" % [ShopArt.full(coins * 2 if doubled else coins),
+	Tip.bind(_sell_btn, tip_title, tip_body, "Выручка: %s монет%s" % [UiFmt.full(coins * 2 if doubled else coins),
 		" (×2 за ролик)" if doubled else ""])
 	# ролик ×2: золотой — можно смотреть, зелёный — уже включён, серый — лимит
 	var ad_id := ShopCatalog.ad_double_sale_id()
@@ -1575,7 +1704,7 @@ func _do_sell(remote: bool) -> void:
 		arrived += 1
 		Sfx.play("coin", 1.0 + 0.04 * float(arrived % 6))
 		var part := coins_before + int(round(float(gained) * float(arrived) / float(n_total)))
-		(_chips["coins"]["label"] as Label).text = _chip_fmt(mini(part, coins_before + gained), "coins")
+		(_chips["coins"]["label"] as Label).text = UiFmt.short(mini(part, coins_before + gained))
 		ShopFx.pop(_chips["coins"]["root"], 0.1, 0.12)
 	var spawned := 0
 	for t in sold_tiles:
@@ -1585,6 +1714,9 @@ func _do_sell(remote: bool) -> void:
 		if k > 0:
 			ShopFx.coins(_root, coin_tex, c, wallet, k, on_arrive)
 			spawned += k
+		if ShopFx.reduced():
+			tile.create_tween().tween_property(tile, "modulate:a", 0.0, 0.12)
+			continue
 		tile.pivot_offset = tile.size * 0.5
 		var tw := tile.create_tween()
 		tw.tween_interval(0.04 * float(sold_tiles.find(t)))

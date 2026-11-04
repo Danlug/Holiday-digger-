@@ -1,14 +1,15 @@
 class_name FuelRefinery
 extends RefCounted
-## Перегонка на станции заправки: торф и уголь -> топливные блоки (решение
+## Перегонка на станции заправки: торф, уголь и уран -> топливные блоки (решение
 ## владельца, раунд 3: «пусть переработка торфа в топливо будет на заправочной
 ## станции, а не в магазине»). Станция в огороде = перегонка + заправка в одном
 ## месте; рецептов блока на верстаке больше нет (ГДД п.5, «Станция: перегонка и
 ## заправка»).
 ##
-## Пропорции — числа владельца в balance.json (fuel_consumption.<сырьё>_per_fuel_block:
-## торф 4:1, уголь 2:1 proposed); порядок сырья и глубина, с которой показывается
-## уголь, — data/tech.json → refinery. Своего сохраняемого состояния нет: сырьё и
+## Пропорции — числа владельца в balance.json: fuel_consumption.<сырьё>_per_fuel_block
+## (сколько сырья на одну перегонку: торф 4, уголь 2, уран 1) и fuel_blocks_per_<сырьё>
+## (сколько блоков она даёт; по умолчанию 1, уран — 4: владелец 30.10 «с урана выходит
+## 4 блока топлива»). Порядок сырья и глубина, с которой оно показывается, — data/tech.json → refinery. Своего сохраняемого состояния нет: сырьё и
 ## блоки лежат в рюкзаке и на складе, которые и так входят в сейв.
 ##
 ## Откуда и куда. Сырьё берётся сначала из рюкзака (принёс — значит, сюда), потом
@@ -48,9 +49,14 @@ static func is_input(raw: String) -> bool:
 	return inputs().has(raw)
 
 
-## Сколько сырья идёт на один блок (balance.json, число владельца для торфа).
+## Сколько сырья уходит на одну перегонку (balance.json, число владельца для торфа).
 static func per_block(raw: String) -> int:
 	return maxi(1, int(TechData.bal(["fuel_consumption", "%s_per_fuel_block" % raw], 0)))
+
+
+## Сколько блоков даёт одна перегонка: 1, у урана — 4 (владелец 30.10).
+static func blocks_per_batch(raw: String) -> int:
+	return maxi(1, int(TechData.bal(["fuel_consumption", "fuel_blocks_per_%s" % raw], 1)))
 
 
 static func unlock_depth(raw: String) -> int:
@@ -80,11 +86,16 @@ static func held(raw: String) -> int:
 	return in_pack(raw) + in_storage(raw)
 
 
-## Сколько блоков можно перегнать прямо сейчас.
-static func max_blocks(raw: String) -> int:
+## Сколько перегонок хватит сырья прямо сейчас.
+static func max_batches(raw: String) -> int:
 	if not is_input(raw):
 		return 0
 	return held(raw) / per_block(raw)
+
+
+## Сколько блоков можно перегнать прямо сейчас.
+static func max_blocks(raw: String) -> int:
+	return max_batches(raw) * blocks_per_batch(raw)
 
 
 ## Станция стоит: после сцены заправки (флаг сюжета) — или раз у героя уже есть
@@ -125,11 +136,14 @@ static func refine(raw: String, blocks: int) -> Dictionary:
 		res["reason"] = "Откроется на глубине %d" % unlock_depth(raw)
 		return res
 	var per := per_block(raw)
-	var n := mini(blocks, max_blocks(raw))
-	if blocks <= 0 or n <= 0:
-		res["reason"] = "Мало сырья: нужно %d на блок" % per
+	var out := blocks_per_batch(raw)
+	# Просят блоки; перегонка выдаёт их пачкой по out — округляем до целых перегонок вверх.
+	var batches := mini(ceili(float(blocks) / float(out)), max_batches(raw))
+	if blocks <= 0 or batches <= 0:
+		res["reason"] = "Мало сырья: нужно %d на перегонку" % per
 		return res
-	var need := n * per
+	var n := batches * out
+	var need := batches * per
 	var from_pack := mini(need, in_pack(raw))
 	var from_storage := need - from_pack
 	if from_pack > 0 and not GameState.remove_item(raw, from_pack):
@@ -138,7 +152,7 @@ static func refine(raw: String, blocks: int) -> Dictionary:
 	if from_storage > 0:
 		HouseStorage.consume(raw, from_storage)
 	# Блок, целиком сделанный из рюкзачного сырья, — в рюкзак; смешанный и складской — на склад.
-	var for_pack := from_pack / per
+	var for_pack := (from_pack / per) * out
 	var to_pack := GameState.add_item(block_item(), for_pack) if for_pack > 0 else 0
 	var to_storage := n - to_pack
 	if to_storage > 0:

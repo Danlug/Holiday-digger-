@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/test_bronze_timer.gd" id="1_bronze_timer"]
+
+[node name="TestBronzeTimer" type="Node"]
+script = ExtResource("1_bronze_timer")

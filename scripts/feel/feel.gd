@@ -3,7 +3,7 @@ extends RefCounted
 ## Feel — точка входа ветки «aaa-feel»: числа ощущения (data/feel.json), общие
 ## формулы и подключение режиссёра одной строкой в main.gd (`Feel.attach(self)`).
 ## Правил ГДД здесь нет — только отклик: койот-время, буфер прыжка, упреждение
-## камеры, трещины на породе, слияние «+N», карточка потерь.
+## камеры, трещины на породе, слияние «+N», окно смерти.
 
 const CONFIG_PATH := "res://data/feel.json"
 
@@ -134,10 +134,6 @@ static func is_epic_price(price: int) -> bool:
 ## Куда класть наезд камеры: статическая очередь, которую подбирает CameraRig в
 ## следующем кадре. Статика — число, не Callable (гигиена статик, GDD §19).
 static var pending_punch: float = 0.0
-
-## Карточка потерь будет показана после этого респавна — тост «Ты погиб…» в main.gd
-## в этом случае лишний (то же самое, но абзацем). Число/флаг, не Callable.
-static var card_pending: bool = false
 
 
 static func punch(amount: float) -> void:

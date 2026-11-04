@@ -84,7 +84,8 @@ func _setup(host: Node) -> void:
 
 	var hud_layer := CanvasLayer.new()
 	hud_layer.name = "TechHudLayer"
-	hud_layer.layer = 2
+	hud_layer.layer = UiLayers.HUD_WIDGETS   # бак и термометр: над миром, под окнами (и рюкзаком)
+	hud_layer.add_to_group(UiLayers.WIDGETS_GROUP)
 	host.add_child(hud_layer)
 	_tech_hud = TechHud.new()
 	_tech_hud.name = "TechHud"
@@ -128,7 +129,7 @@ func _register_menu() -> void:
 func _build_hotspot(host: Node) -> void:
 	_hot_layer = CanvasLayer.new()
 	_hot_layer.name = "TechHotspot"
-	_hot_layer.layer = 8
+	_hot_layer.layer = UiLayers.WORLD_BUBBLES
 	host.add_child(_hot_layer)
 	_hot_btn = UiBtn.icon_button(TechUi.tex("icon_tank"), Vector2(36, 32), UiBtn.Kind.ACCENT, 24)
 	_hot_btn.visible = false
@@ -145,7 +146,7 @@ func _build_hotspot(host: Node) -> void:
 func _build_haze(host: Node) -> void:
 	_haze_layer = CanvasLayer.new()
 	_haze_layer.name = "HeatHaze"
-	_haze_layer.layer = 1
+	_haze_layer.layer = UiLayers.HUD
 	host.add_child(_haze_layer)
 	# Тот же слой, что у HUD, но раньше него в дереве: дрожит мир, а не интерфейс.
 	if hud != null and hud.get_parent() != null:
@@ -183,7 +184,8 @@ func _depth() -> float:
 	return float(maxi(GameState.player_depth, 0))
 
 
-## Жара сверх стойкости костюма: бодрость уходит быстрее (множитель считает Heat).
+## Жара сверх стойкости костюма: бодрость уходит быстрее (множитель считает Heat); выше порога
+## урона (70 °C без костюма, владелец 30.10) — ещё и здоровье.
 func _heat_tick(dt: float) -> void:
 	if not GameState.is_alive or GameState.house_is_indoors or player.frozen:
 		return
@@ -195,6 +197,9 @@ func _heat_tick(dt: float) -> void:
 		return
 	var base := Balance.get_bar_depletion_rate_per_second("stamina", GameState.is_digging)
 	GameState.set_stamina(GameState.stamina - base * (mult - 1.0) * 100.0 * dt)
+	var dps := Heat.damage_per_second(depth)
+	if dps > 0.0:
+		GameState.take_damage(dps * dt, "heat")
 
 
 func _announce_zone(depth: float) -> void:
@@ -267,7 +272,7 @@ func _on_game_event(id: StringName, data: Dictionary) -> void:
 		Sfx.play("ui_deny")
 		Haptics.buzz(60)
 		Fx.shake(2.0, 0.15)
-		if hud != null and tool_id == "hand_drill":
+		if hud != null:
 			hud.toast("Бак пуст — копаю киркой", 2.6)
 		_warned[tool_id] = 2
 	elif FuelTank.is_low(tool_id) and not _warned.has(tool_id):

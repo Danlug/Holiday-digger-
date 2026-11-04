@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/test_peat_depth.gd" id="1_peat"]
+
+[node name="TestPeatDepth" type="Node"]
+script = ExtResource("1_peat")

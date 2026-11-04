@@ -12,7 +12,7 @@ extends Node
 ## Красный бейдж-число (MenuRegistry badge) — другое: он считает готовые награды, а
 ## здесь — «ты тут ещё не был».
 
-const LAYER := 41
+const LAYER := UiLayers.HINT_MARKS
 const POLL := 0.2
 const BANG_OFFSET := Vector2(-4, -5)
 const NEW_OFFSET := Vector2(-6, -5)

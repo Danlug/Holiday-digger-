@@ -131,7 +131,12 @@ def summarize(run_dir):
     L.append("Вехи: " + ("; ".join(got) if got else "нет"))
     deaths = tel.get("deaths", [])
     if deaths:
-        L.append("Смерти (%d): %s" % (len(deaths), "; ".join("%s %s гл.%s −%s" % (mmss(d["t"]), d["cause"], d["depth"], d.get("lost_value", 0)) for d in deaths[:8])))
+        L.append("Смерти (%d): %s" % (len(deaths), "; ".join("%s %s гл.%s −%s%s" % (mmss(d["t"]), d["cause"], d["depth"], d.get("lost_value", 0),
+            # плата больнице, свой подъём и лечение против цены смерти (детектор death_lift, ГДД §7)
+            (" (плата %s, подъём ~%sс, лечение %s, выгода %s / цена %s%s)" % (d.get("coins_lost", "?"), d["ascent_est_s"],
+                d.get("heal_value", 0), d.get("lift_gain"), d.get("lift_cost"), ", нарочно" if d.get("deliberate") else ""))
+            if "ascent_est_s" in d else "")
+            for d in deaths[:8])))
     trips = tel.get("trips", [])
     if trips:
         avg = sum(float(t.get("end", 0)) - float(t.get("start", 0)) for t in trips) / len(trips)
@@ -142,6 +147,12 @@ def summarize(run_dir):
         L.append("Ходок %d, средняя %s, причины возврата: %s" % (len(trips), mmss(avg), reasons))
     act = tel.get("activity_seconds", {})
     tot = sum(act.values()) or 1
+    # жадность (азарт): сколько раз за прогон и как часто на минуту работы в шахте (26.10: «не сработала»)
+    fv = int(tel.get("event_counts", {}).get("fever_started", 0))
+    mine_min = float(act.get("mine", 0)) / 60.0
+    L.append("Жадность: %d раз%s, в режиме %s с; в шахте %.0f мин — %s" % (
+        fv, (" (первая %s)" % mmss(ms["first_greed"])) if "first_greed" in ms else "", m.get("greed_seconds", 0),
+        mine_min, ("раз в %.1f мин копки" % (mine_min / fv)) if fv else "ни разу"))
     L.append("Время: " + ", ".join("%s %d%%" % (k, round(100 * v / tot)) for k, v in sorted(act.items(), key=lambda kv: -kv[1])))
     fr = tel.get("frame", {})
     if fr:

@@ -133,6 +133,7 @@ func _test_food_icons() -> void:
 func _test_rooms_data_has_icons_and_tips() -> void:
 	var buttons := 0
 	var bad := 0
+	var bad_size := 0
 	for room_id in HouseRoomsConfig.ROOM_IDS:
 		var points := HouseRoomsConfig.points(room_id)
 		for key in points.keys():
@@ -143,8 +144,19 @@ func _test_rooms_data_has_icons_and_tips() -> void:
 						or String(b.get("tip", "")).is_empty() or String(b.get("label", "")).is_empty():
 					bad += 1
 					print("  кнопка без значка/подсказки: %s.%s %s" % [room_id, key, String(b.get("action", ""))])
+				elif HouseArt.tex(icon).get_size() != Vector2(24, 24):
+					bad_size += 1
+					print("  значок не 24×24: %s %s" % [icon, str(HouseArt.tex(icon).get_size())])
 	check("в data/rooms.json есть кнопки", buttons >= 10)
 	check("у каждой кнопки есть значок, заголовок и описание подсказки", bad == 0)
+	check("значки кнопок дома — 24×24, как окно глифа пузыря", bad_size == 0)
+	# Подвал (владелец 27.10): мастерская — ящик с инструментами, кирка — кирка;
+	# картинки не должны совпасть друг с другом и со складом при перегенерации.
+	var workshop := HouseArt.tex("act_workbench").get_image().get_data()
+	var pick := HouseArt.tex("act_pickaxe").get_image().get_data()
+	var chest := HouseArt.tex("act_chest").get_image().get_data()
+	check("в подвале ящик, кирка и склад — три разные картинки",
+		workshop != pick and workshop != chest and pick != chest)
 
 
 func _test_bubble_widget() -> void:

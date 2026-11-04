@@ -1,8 +1,9 @@
 extends Node
 ## test_healing — лечение раунда 4 (ГДД §7 «Лечение», scripts/house/healing.gd):
 ## сон лечит по часам и сытости, еда — по питательности, аптечка из лавки
-## «применяется» из рюкзака, смерть забирает рюкзак и 200 монет («скорая»),
-## карточка смерти это показывает. Сценой — нужны автозагрузки:
+## «применяется» из рюкзака, смерть забирает рюкзак и плату больнице (раунд 5:
+## 5% монет, от 50 до 5000), окно смерти это показывает. Причины смерти, окно и
+## полоски после смерти — tests/test_death_window. Сценой — нужны автозагрузки:
 ##   godot --headless --path . res://tests/test_healing.tscn
 
 var failures := 0
@@ -30,7 +31,7 @@ func _ready() -> void:
 	_test_medkit_purchase_place_rules()
 	_test_medkit_use()
 	_test_death_fee()
-	await _test_death_card()
+	await _test_death_window()
 	_test_economy_ordering()
 
 	print("=== Итог: %d проверок, %d провалов ===" % [total, failures])
@@ -71,7 +72,8 @@ func _events_of(id: String) -> Array:
 
 func _test_numbers() -> void:
 	check("полная ночь — 8 игровых часов", is_equal_approx(Healing.full_night_hours(), 8.0))
-	check("плата скорой — 200 монет (число владельца)", Healing.death_fee_coins() == 200)
+	check("плата больнице — 5% монет, от 50 до 5000 (числа владельца, раунд 5)", is_equal_approx(Healing.death_fee_percent(), 5.0)
+		and Healing.death_fee_min() == 50 and Healing.death_fee_max() == 5000)
 	check("аптечка лечит 50%", Healing.medkit_hp_percent() == 50)
 	check("стейк лечит 25% (сытость 100 × 0.25)", Healing.food_hp_percent("food_steak") == 25)
 	check("пельмени лечат 19%", Healing.food_hp_percent("food_dumplings") == 19)
@@ -274,33 +276,30 @@ func _test_medkit_use() -> void:
 
 func _test_death_fee() -> void:
 	GameState.inventory.clear()
-	GameState.black_box.clear()
 	GameState.add_item("silver", 3)
 	GameState.add_item("food_bar", 1)
 	GameState.add_item("medkit", 1)
-	GameState.add_to_black_box("gold", 2)
 	GameState.coins = 1000
 	_events.clear()
 	GameState.die()
 	check("смерть: весь рюкзак пропал (руда, еда, аптечка)", GameState.inventory.is_empty())
-	check("смерть: чёрный ящик цел", int(GameState.black_box.get("gold", 0)) == 2)
-	check("смерть: скорая забрала 200", GameState.coins == 800)
-	var amb := _events_of("ambulance")
-	check("событие ambulance {coins: 200}", amb.size() == 1 and int(amb[0]["coins"]) == 200)
-	check("плата скорой — не «трата» для заданий дня", _events_of("spent").is_empty())
+	check("смерть: больница взяла 5% от 1000 = 50", GameState.coins == 950)
+	var fee_ev := _events_of("hospital")
+	check("событие hospital {coins: 50}", fee_ev.size() == 1 and int(fee_ev[0]["coins"]) == 50)
+	check("плата больнице — не «трата» для заданий дня", _events_of("spent").is_empty())
 	GameState.respawn()
 	check("после респавна жив и здоров", GameState.is_alive and is_equal_approx(GameState.hp, GameState.get_max_hp()))
 
-	GameState.coins = 50
+	GameState.coins = 30
 	GameState.die()
-	check("меньше 200 — забрали сколько было", GameState.coins == 0 and Healing.last_death_fee == 50)
+	check("меньше 50 — забрали сколько было", GameState.coins == 0 and Healing.last_death_fee == 30)
 	GameState.respawn()
 	GameState.die()
 	check("без монет — в минус не уходим", GameState.coins == 0 and Healing.last_death_fee == 0)
 	GameState.respawn()
 
 
-func _test_death_card() -> void:
+func _test_death_window() -> void:
 	GameState.reset_progress()
 	GameState.coins = 600
 	GameState.add_item("iron_ore", 4)
@@ -312,45 +311,37 @@ func _test_death_card() -> void:
 	GameState.add_item("iron_ore", 1)
 	GameState.die()
 	var rep: Dictionary = dir._pending
-	check("отчёт смерти знает плату скорой", int(rep.get("fee", 0)) == 200)
-	check("в отчёте монеты уже после платы", int(rep["coins"]) == 400)
-	check("карточку стоит показать", DeathCard.worth_showing(rep))
-	var empty := DeathCard.build_report({}, 0, "", 200)
-	check("даже с пустым рюкзаком на поверхности: −200 — повод показать карточку", DeathCard.worth_showing(empty))
-	var card := DeathCard.new()
-	add_child(card)
+	check("отчёт смерти знает плату больнице (5% от 600 = 30 → не меньше 50)", int(rep.get("fee", 0)) == 50)
+	check("в отчёте весь рюкзак (железо ×5)", (rep["lost"] as Array).size() == 1 and int(rep["lost"][0]["count"]) == 5)
+	var win := DeathWindow.new()
+	add_child(win)
 	await get_tree().process_frame
-	card.open(rep)
-	var fee_node := card.find_child("Fee", true, false) as Control
-	check("на карточке есть «скорая −200»", fee_node != null and fee_node.visible)
+	win.open(rep)
+	var fee_node := win.find_child("Fee", true, false) as Control
 	var fee_label := false
 	if fee_node != null:
 		for l in fee_node.find_children("*", "Label", true, false):
-			if String((l as Label).text) == "−200":
+			if String((l as Label).text) == "−50":
 				fee_label = true
-	check("число на чипе — «−200»", fee_label)
-	check("у «скорой» подсказка Tip", fee_node != null and fee_node.has_meta(Tip.META))
-	card.close()
-	await get_tree().process_frame   # старый корень карточки уходит из дерева к концу кадра
-	var rep0 := DeathCard.build_report({"iron_ore": 1}, 10, "", 0)
-	card.open(rep0)
-	fee_node = card.find_child("Fee", true, false) as Control
-	check("без платы чипа скорой нет", fee_node == null or not fee_node.visible)
-	card.close()
+	check("в окне «потрачено на больницу −50»", fee_label)
+	check("у платы подсказка Tip", win.find_child("Hospital", true, false) != null
+		and (win.find_child("Hospital", true, false) as Control).has_meta(Tip.META))
+	win.close()
 	GameState.respawn()
-	card.queue_free()
+	win.queue_free()
 	dir.queue_free()
 	await get_tree().process_frame
 
 
-## Экономика лечения: смерть дороже аптечки, аптечка не отменяет таблетку.
+## Экономика лечения: смерть лечит не лучше аптечки, аптечка не отменяет сон.
 func _test_economy_ordering() -> void:
 	var medkit := ShopCatalog.good_price(ShopCatalog.good("medkit", "coins"), "coins")
-	check("аптечка (%d) дешевле платы скорой (%d) — лечиться выгоднее, чем умирать" % [medkit, Healing.death_fee_coins()],
-		medkit < Healing.death_fee_coins())
-	var pill := ShopCatalog.good("full_restore_pill", "dollars")
-	check("таблетка по-прежнему полное восстановление трёх полосок", String(pill.get("effect", "")) == "full_restore")
-	check("аптечка лечит не всё (таблетка не лишняя)", Healing.medkit_hp_percent() < 100)
+	# владелец (разбор чисел, 26.10): «только хп полное» — смерть лечит до 100%, её цена — рюкзак
+	# и плата больнице; аптечка остаётся лечением без потери рюкзака и без дороги вниз заново
+	check("после смерти HP полное (решение владельца)", is_equal_approx(Healing.respawn_hp_percent(), 100.0))
+	# Раунд 6: таблетка восстановления снята с продажи, её место — выгрузка на склад.
+	check("таблетки за доллары больше нет", ShopCatalog.good("full_restore_pill", "dollars").is_empty())
+	check("аптечка лечит не всё (сон и еда не лишние)", Healing.medkit_hp_percent() < 100)
 	var steak_coins := HouseConfig.food_price_coins("food_steak")
 	check("аптечка лечит дешевле еды за процент HP", float(medkit) / Healing.medkit_hp_percent()
 		< float(steak_coins) / Healing.food_hp_percent("food_steak"))

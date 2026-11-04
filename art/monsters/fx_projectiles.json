@@ -1,0 +1,29 @@
+{
+	"frame": [
+		12,
+		12
+	],
+	"scale": 3,
+	"foot": 0,
+	"anchor": "center",
+	"anims": {
+		"acid": {
+			"row": 0,
+			"frames": 2,
+			"fps": 9,
+			"loop": true
+		},
+		"stone": {
+			"row": 1,
+			"frames": 2,
+			"fps": 9,
+			"loop": true
+		},
+		"spark": {
+			"row": 2,
+			"frames": 2,
+			"fps": 9,
+			"loop": true
+		}
+	}
+}

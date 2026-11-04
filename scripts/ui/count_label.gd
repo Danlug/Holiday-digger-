@@ -8,12 +8,10 @@ extends Label
 ##   c.set_value(1250, true)   # true — без анимации (первая установка)
 ##   c.set_value(1300)         # накрутка 1250 -> 1300
 ##
-## Длинные числа не вылезают за плитку: до 10 млн — с пробелами между
-## разрядами («1 250 000»), дальше — сокращение «12,3M», «1,2B». Точное
+## Число пишется через UiFmt.short («9999», «15.3к», «1.2М»). Точное
 ## значение остаётся в подсказке — его берут через exact_text().
 
 const ROLL_TIME := 0.55
-const MAX_FULL := 9_999_999
 
 var base_color: Color = Color.WHITE:
 	set(v):
@@ -46,7 +44,7 @@ func value() -> int:
 
 
 func exact_text() -> String:
-	return group_digits(_target)
+	return UiFmt.full(_target)
 
 
 func set_value(v: int, instant: bool = false) -> void:
@@ -93,33 +91,4 @@ func _process(dt: float) -> void:
 
 
 func _refresh() -> void:
-	text = short_text(int(round(_shown)))
-
-
-static func group_digits(n: int) -> String:
-	var s := str(absi(n))
-	var out := ""
-	var count := 0
-	for i in range(s.length() - 1, -1, -1):
-		out = s[i] + out
-		count += 1
-		if count % 3 == 0 and i > 0:
-			out = " " + out    # обычный пробел: узкого U+202F в шрифте темы нет
-	return ("-" if n < 0 else "") + out
-
-
-static func short_text(n: int) -> String:
-	var a := absi(n)
-	if a <= MAX_FULL:
-		return group_digits(n)
-	var sign := "-" if n < 0 else ""
-	if a < 1_000_000_000:
-		return sign + _one_decimal(float(a) / 1_000_000.0) + "M"
-	return sign + _one_decimal(float(a) / 1_000_000_000.0) + "B"
-
-
-static func _one_decimal(x: float) -> String:
-	var s := "%.1f" % x
-	if s.ends_with(".0"):
-		s = s.substr(0, s.length() - 2)
-	return s.replace(".", ",")
+	text = UiFmt.short(int(round(_shown)))

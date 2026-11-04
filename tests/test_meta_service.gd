@@ -40,8 +40,8 @@ func _ready() -> void:
 	svc._poll()
 	check("флаг gold_sold включает мета-слой", MetaState.is_unlocked())
 	check("после включения выданы задания дня и недели",
-		(MetaState.sub("quests")["daily"] as Array).size() == int(MetaData.quests()["daily"]["count"])
-		and (MetaState.sub("quests")["weekly"] as Array).size() == 2)
+		(MetaState.sub("quests")["daily"] as Array).size() == QuestGen.count_of(MetaData.quests()["daily"])
+		and (MetaState.sub("quests")["weekly"] as Array).size() == 3)
 	check("накопленное до включения выдано достижениями («Первый комок»)", Achievements.is_done("dug_1") and GameState.coins >= 50)
 	var ids: Array = []
 	for e in MenuRegistry.entries():
@@ -117,6 +117,24 @@ func _ready() -> void:
 	svc.open_hub(MetaHub.TAB_ROAD)
 	await get_tree().process_frame
 	check("хаб открывается сразу на дороге трофеев", svc.hub.current_tab() == MetaHub.TAB_ROAD and svc.hub._road_scroll != null)
+	svc.hub.close()
+
+	# --- тост и окна: окно смерти держит тост, открытое окно уводит его вниз ---
+	var t := MetaToast.new()
+	add_child(t)
+	DeathWindow._open_any = true
+	t.show_road(2)
+	check("при окне смерти тост ждёт в очереди", t._queue.size() == 1 and t._panel == null)
+	DeathWindow._open_any = false
+	await get_tree().create_timer(0.4).timeout
+	check("окно смерти закрылось — тост показан сверху", t._panel != null and not t._from_bottom)
+	svc.open_hub(MetaHub.TAB_ROAD)
+	await get_tree().process_frame
+	var t2 := MetaToast.new()
+	add_child(t2)
+	t2.show_road(3)
+	check("при открытом окне тост снизу, над вкладками", t2._from_bottom
+		and t2._rest_y() + t2._panel.size.y <= t2._view_h() - ProgressUiKit.TAB_BAR_H)
 	svc.hub.close()
 
 	MetaClock.override_unix = -1

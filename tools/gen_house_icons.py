@@ -4,7 +4,8 @@
 Пишет в art/house_ui/ (скрипт — источник правды, PNG руками не правим):
 
   act_*.png     24x24  значки действий в пузырях над героем: дверь, лестница,
-                       кровать, заказ, пакет, верстак, склад, кирка, бурмобиль
+                       кровать, заказ, пакет, ящик с инструментами (мастерская, 🧰),
+                       склад, кирка (⛏️), бурмобиль
   z_small/z_big        «Z» сна, летящие вверх; sun, moon — рассвет и ночь
   skip_sleep    24x24  «пропустить сон за ролик»
   courier       32x32  курьер на скутере с коробом; knock — кулак у двери
@@ -19,6 +20,7 @@
     python3 tools/gen_house_icons.py            # записать в art/house_ui/
     python3 tools/gen_house_icons.py --sheet X  # заодно контактный лист в файл X
 """
+import math
 import os
 import sys
 
@@ -190,20 +192,34 @@ def act_package():
 
 
 def act_workbench():
+    # ящик с инструментами в духе 🧰 (слова владельца 27.10): красный металлический,
+    # стальная ручка-дуга сверху, две защёлки через шов крышки
     cv = cv24()
-    cv.rect(1, 11, 22, 14, WOOD_L)
-    cv.rect(1, 11, 22, 11, rgba("#D8A868"))
-    cv.rect(1, 14, 22, 14, WOOD_D)
-    cv.rect(3, 15, 5, 22, WOOD)
-    cv.rect(18, 15, 20, 22, WOOD)
-    cv.rect(3, 15, 3, 22, WOOD_L)
-    cv.rect(6, 17, 17, 18, WOOD_D)
-    # молоток на столе
-    cv.line([(6, 10), (13, 5)], WOOD_D, 3)
-    cv.line([(6, 9), (12, 5)], WOOD_L, 1)
-    cv.rect(11, 1, 19, 6, STEEL)
-    cv.rect(11, 1, 19, 2, STEEL_L)
-    cv.rect(11, 5, 19, 6, STEEL_D)
+    cv.rect(8, 1, 15, 5, STEEL)
+    cv.rect(8, 1, 15, 1, STEEL_L)
+    cv.rect(10, 3, 13, 5, (0, 0, 0, 0))
+    cv.px(8, 1, STEEL_L)
+    cv.px(9, 2, STEEL_L)
+    cv.rect(14, 2, 15, 5, STEEL_D)
+    # крышка
+    cv.rect(2, 6, 21, 12, RED)
+    cv.rect(2, 6, 21, 6, RED_L)
+    cv.rect(2, 7, 3, 12, RED_L)
+    cv.rect(20, 7, 21, 12, RED_D)
+    cv.rect(2, 12, 21, 12, RED_D)
+    cv.rect(2, 13, 21, 13, DARK)
+    # корпус
+    cv.rect(2, 14, 21, 22, RED)
+    cv.rect(2, 14, 3, 21, RED_L)
+    cv.rect(20, 14, 21, 22, RED_D)
+    cv.rect(2, 22, 21, 22, RED_D)
+    for x in (5, 16):
+        cv.rect(x, 11, x + 2, 15, STEEL)
+        cv.rect(x, 11, x + 2, 11, STEEL_L)
+        cv.rect(x, 15, x + 2, 15, STEEL_D)
+        cv.px(x + 1, 13, STEEL_D)
+    cv.px(5, 8, WHITE)
+    cv.px(6, 8, WHITE)
     cv.outline()
     cv.save("act_workbench")
 
@@ -228,14 +244,34 @@ def act_chest():
 
 
 def act_pickaxe():
+    # кирка в духе ⛏️ (слова владельца 27.10): рукоять снизу-слева, серый двузубый
+    # серп-наконечник сверху-справа; серп — дуга вокруг центра C с толщиной,
+    # сходящей на нет к зубьям, иначе на 24 px он читался как молоток
     cv = cv24()
-    cv.line([(5, 20), (17, 7)], WOOD_D, 4)
-    cv.line([(5, 19), (16, 7)], WOOD, 2)
-    cv.line([(4, 19), (15, 7)], WOOD_L, 1)
-    cv.poly([(4, 9), (9, 4), (21, 4), (20, 9), (15, 8), (10, 10)], STEEL)
-    cv.poly([(4, 9), (9, 4), (12, 4), (8, 8)], STEEL_L)
-    cv.poly([(15, 8), (20, 9), (21, 4), (18, 5)], STEEL_D)
-    cv.px(10, 5, WHITE)
+    cv.line([(3, 21), (16, 8)], WOOD_D, 4)
+    cv.line([(3, 20), (15, 8)], WOOD, 2)
+    cv.line([(2, 20), (14, 8)], WOOD_L, 1)
+    cx, cy = 9.0, 15.0
+    r_mid, th_max, span = 10.0, 6.5, math.radians(60)
+    axis = math.radians(-45)  # ось рукояти, вверх-вправо
+    for y in range(24):
+        for x in range(24):
+            dx, dy = x + 0.5 - cx, y + 0.5 - cy
+            r = math.hypot(dx, dy)
+            phi = (math.atan2(dy, dx) - axis + math.pi) % (2 * math.pi) - math.pi
+            k = abs(phi) / span
+            if k >= 1.0:
+                continue
+            th = th_max * (1.0 - k ** 2.2)
+            if th < 1.0:
+                continue
+            r_in, r_out = r_mid - th * 0.5, r_mid + th * 0.5
+            if r < r_in or r > r_out:
+                continue
+            t = (r - r_in) / (r_out - r_in)
+            cv.px(x, y, STEEL_L if t > 0.66 else (STEEL_D if t < 0.26 else STEEL))
+    cv.px(9, 3, WHITE)
+    cv.px(10, 2, WHITE)
     cv.outline()
     cv.save("act_pickaxe")
 

@@ -125,11 +125,11 @@ func _build_clock() -> void:
 	_pill.add_child(HouseArt.nine("pill", 4, Color.WHITE, Vector2(124, 38)))
 	_icon = ShopArt.rect(HouseArt.tex("sun"), Vector2(8, 7), Vector2(24, 24))
 	_pill.add_child(_icon)
-	_time = ShopArt.label("06:00", 16, Color.WHITE, HouseArt.INK, 4)
+	_time = ShopArt.label("06:00", UiTheme.FS_HERO, Color.WHITE, HouseArt.INK, 4)
 	_time.position = Vector2(36, 7)
 	_pill.add_child(_time)
 	_pill.add_child(ShopArt.rect(HouseArt.tex("calendar"), Vector2(92, 11), Vector2(16, 16)))
-	_day = ShopArt.label("1", 11, HouseArt.GOLD_BRIGHT, HouseArt.INK, 3)
+	_day = ShopArt.label("1", UiTheme.FS_LABEL, HouseArt.GOLD_BRIGHT, HouseArt.INK, 3)
 	_day.position = Vector2(108, 11)
 	_pill.add_child(_day)
 	var track := ColorRect.new()
@@ -147,7 +147,7 @@ func _build_clock() -> void:
 
 
 func _build_skip() -> void:
-	_skip = HouseArt.button("gold", HouseArt.tex("skip_sleep"), Vector2(72, 40), 24.0)
+	_skip = UiBtn.texture_button("gold", HouseArt.tex("skip_sleep"), Vector2(72, 40), 24.0)
 	_skip.name = "Skip"
 	_skip.anchor_left = 0.5
 	_skip.anchor_right = 0.5

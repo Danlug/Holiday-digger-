@@ -366,23 +366,24 @@ func _test_director() -> void:
 	await _frames(1)
 	check("режиссёр не нашёл настоящих сервисов, работает через группы", dir.sfx == null and dir.fx == null)
 
-	# --- добыча ---
+	# --- добыча --- (звук удара зависит от инструмента: здесь кирка)
+	GameState.current_tool = "iron_pickaxe"
 	var cell := Vector2i(5, 9)
 	GameState.emit_event(&"dug", {"cell": cell, "tile": TileTypes.Type.DIRT, "mineral": "earth", "loot": false, "pos": Vector2(176, 304)})
-	check("dug: земля → dig_dirt + частицы земли", rec.has_play("dig_dirt") and rec.has_burst("dig_dirt"))
+	check("dug: земля → dig_dirt_pick + break_dirt + частицы земли", rec.has_play("dig_dirt_pick") and rec.has_play("break_dirt") and rec.has_burst("dig_dirt"))
 	check("dug: земля не трясёт экран", rec.shakes == 0)
 	rec.clear()
 	GameState.emit_event(&"dug", {"cell": cell, "tile": TileTypes.Type.STONE, "mineral": "stone", "loot": false, "pos": Vector2(176, 304)})
-	check("dug: камень → dig_stone + частицы камня + микро-тряска", rec.has_play("dig_stone") and rec.has_burst("dig_stone") and rec.shakes == 1)
+	check("dug: камень → dig_stone_pick + break_stone + частицы камня + микро-тряска", rec.has_play("dig_stone_pick") and rec.has_play("break_stone") and rec.has_burst("dig_stone") and rec.shakes == 1)
 	rec.clear()
 	GameState.emit_event(&"dug", {"cell": cell, "tile": TileTypes.Type.IRON_ORE, "mineral": "iron_ore", "loot": true, "pos": Vector2(176, 304)})
-	check("dug: руда → dig_ore, частицы с цветом руды", rec.has_play("dig_ore") and rec.has_burst("dig_ore"))
+	check("dug: руда → dig_ore_pick, частицы с цветом руды", rec.has_play("dig_ore_pick") and rec.has_burst("dig_ore"))
 	rec.clear()
 	GameState.emit_event(&"dug", {"cell": cell, "tile": TileTypes.Type.GOLD_ORE, "mineral": "gold", "loot": true, "pos": Vector2(176, 304)})
-	check("dug: золото → dig_gold + золотые искры", rec.has_play("dig_gold") and rec.has_burst("dig_gold"))
+	check("dug: золото → dig_gold_pick + золотые искры", rec.has_play("dig_gold_pick") and rec.has_burst("dig_gold"))
 	rec.clear()
 	GameState.emit_event(&"dug", {"cell": cell, "tile": TileTypes.Type.FOUNDATION, "mineral": "", "loot": false, "pos": Vector2(176, 304)})
-	check("dug: фундамент → dig_hard и тряска", rec.has_play("dig_hard") and rec.shakes == 1)
+	check("dug: фундамент → dig_hard_pick, break_hard и тряска", rec.has_play("dig_hard_pick") and rec.has_play("break_hard") and rec.shakes == 1)
 	rec.clear()
 	GameState.emit_event(&"picked", {"item": "iron_ore", "count": 1})
 	check("picked: обычная добыча → pickup и «+1» с иконкой", rec.has_play("pickup") and rec.icons == 1)
@@ -411,7 +412,8 @@ func _test_director() -> void:
 	# --- сигналы GameState ---
 	rec.clear()
 	GameState.hp_changed.emit(88.0, 100.0)
-	check("hp вниз → hurt и красная вспышка", rec.has_play("hurt") and rec.flashes == 1)
+	# краснота, тряска и наезд урона с 27.10 — HurtJuice (tests/test_hurt_juice.gd), не общая вспышка
+	check("hp вниз → hurt, без общей вспышки и тряски", rec.has_play("hurt") and rec.flashes == 0 and rec.shakes == 0)
 	rec.clear()
 	GameState.hp_changed.emit(87.9, 100.0)
 	check("капля голода не вызывает hurt на каждый кадр", not rec.has_play("hurt"))
@@ -515,22 +517,29 @@ func _test_director() -> void:
 	pl.on_ground = true
 
 	rec.clear()
-	# частота ударов зависит от инструмента (Feel.tool_profile, aaa-feel): здесь — кирка, 0.38 с
+	# ритм ударов (DigSound, dig-sound): кирка 0.38 с → в клетку 3.0 с ложится 8 ударов
+	# по 0.375 с, из них 7 во время копки и восьмой — сама клетка (`dug`)
 	GameState.current_tool = "iron_pickaxe"
 	pl.digging = {"x": 5, "y": 13, "t": 0.0, "total": 3.0, "type": TileTypes.Type.DIRT}
 	dir._process(0.016)
 	pl.digging["t"] = 0.2
 	dir._process(0.016)
-	check("удар по породе во время копки: звук и мелкие частицы", rec.count_play("dig_dirt") == 1 and rec.count_burst("dig_dirt") == 1)
-	check("удар тише финального", rec.last_play_db("dig_dirt") < -3.0)
+	check("первый удар не раньше замаха", rec.count_play("dig_dirt_pick") == 0)
+	pl.digging["t"] = 0.4
 	dir._process(0.016)
-	check("один удар на период, а не на кадр", rec.count_play("dig_dirt") == 1)
-	pl.digging["t"] = 0.65
+	check("удар по породе во время копки: звук и мелкие частицы", rec.count_play("dig_dirt_pick") == 1 and rec.count_burst("dig_dirt") == 1)
+	check("удар тише финального", rec.last_play_db("dig_dirt_pick") < -3.0)
 	dir._process(0.016)
-	check("следующий удар через период", rec.count_play("dig_dirt") == 2)
-	pl.digging["t"] = 2.95
+	check("один удар на период, а не на кадр", rec.count_play("dig_dirt_pick") == 1)
+	pl.digging["t"] = 0.8
 	dir._process(0.016)
-	check("перед самым финалом лишнего удара нет", rec.count_play("dig_dirt") == 2)
+	check("следующий удар через период", rec.count_play("dig_dirt_pick") == 2)
+	var tt := 0.8
+	while tt < 2.99:
+		tt += 1.0 / 60.0
+		pl.digging["t"] = tt
+		dir._process(1.0 / 60.0)
+	check("удары ложатся в длительность клетки: 7 до финала", rec.count_play("dig_dirt_pick") == 7)
 	pl.digging = null
 	dir._process(0.016)
 
@@ -637,7 +646,9 @@ func _test_integration() -> void:
 	var played1: int = sfx.stats["played"]
 	sfx._last_ms.clear()
 	GameState.take_damage(20.0, "test")
-	check("настоящий урон: звук и красная вспышка", sfx.stats["played"] > played1 and fx._flash.color.a > 0.0)
+	# краснота урона с 27.10 — HurtJuice (scripts/feel/), а не общая вспышка Fx
+	var hurt: HurtJuice = main.get_node("FeelDirector").hurt
+	check("настоящий урон: звук и краснота экрана", sfx.stats["played"] > played1 and hurt.alpha() > 0.0)
 	GameState.heal(100.0)
 	await get_tree().create_timer(0.7).timeout
 	check("музыка по контексту включилась сама (%s)" % sfx.current_music(), sfx.current_music() != "")

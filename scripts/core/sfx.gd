@@ -10,13 +10,20 @@ extends RefCounted
 ## Каталог событий (договорённость между ветками; новые — добавляйте сюда):
 ##   интерфейс : ui_tap ui_open ui_close ui_tab ui_toggle ui_buy ui_deny ui_slider
 ##   деньги    : coin coins_big sell
-##   копка     : dig_dirt dig_stone dig_ore dig_gold dig_hard tile_break
+##   копка     : dig_dirt dig_stone dig_ore dig_gold dig_hard tile_break (старые имена — псевдонимы новых)
+##               удар материал×инструмент (scripts/fx/dig_sound.gd, tools/audio_dig.py):
+##               dig_dirt_shovel dig_dirt_pick dig_dirt_drill dig_peat_shovel dig_peat_pick dig_peat_drill
+##               dig_stone_pick dig_stone_drill dig_ore_shovel dig_ore_pick dig_ore_drill
+##               dig_gold_pick dig_gold_drill dig_gem_pick dig_gem_drill dig_hard_pick dig_hard_drill dig_lava
+##               осыпание: break_dirt break_peat break_stone break_ore break_gold break_gem break_hard break_lava
+##               ржавая кирка и моторы: rattle drill_loop rig_loop
 ##   движение  : step step_grass step_stone jump land fly_start fly_stop fly_loop thud
 ##   герой     : hurt die respawn eat drink heal warn_low
 ##   прогресс  : pickup pickup_rare levelup skill_buy artifact quest_done reward
 ##   механики  : greed_start greed_end (жадность азарта, scripts/mechanics/)
 ##   мир       : quake collapse lava_hiss door phone explosion
 ##   бой       : swing hit_enemy enemy_die boss_roar hurt_armor
+##   полости   : spit (плевок стрелка) cave_unlock (все стражи мертвы — сундук отперт)
 ##   музыка    : mus_surface mus_mine_1 mus_mine_2 mus_deep mus_boss mus_story
 ##               mus_shop mus_menu
 
@@ -60,6 +67,20 @@ static func loop_stop(id: String, fade: float = 0.15) -> void:
 	var n := _service()
 	if n != null:
 		n.call("loop_stop", id, fade)
+
+
+## Громкость и высота уже идущей петли (мотор под нагрузкой); без петли — ничего.
+static func loop_set(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
+	var n := _service()
+	if n != null and n.has_method("loop_set"):
+		n.call("loop_set", id, volume_db, pitch)
+
+
+## Игрок что-то нажал (копка, кнопка): в вебе это разрешает звук, если он ещё ждал жеста.
+static func gesture() -> void:
+	var n := _service()
+	if n != null and n.has_method("unlock"):
+		n.call("unlock")
 
 
 static func _service() -> Node:

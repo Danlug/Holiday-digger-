@@ -12,6 +12,10 @@ extends Node
 ## bronze_one (материала на одну штуку), bronze_none (материала нет),
 ## bronze_fly (полёт материалов в верстак после «плавить»), bronze_done (итог
 ## «+N»), drill (разовый рецепт — без ползунка, вид прежний).
+## Печь бронзы (26.10, «минута штука»): furnace_busy (карточка: очередь, отсчёт,
+## готово N, крестик), furnace_tile (плитка с огоньком и отсчётом), furnace_away
+## (из шахты: карточка без ползунка, только печь), furnace_load (лом долетел в
+## печь — огонёк с «+N» в очередь).
 
 var _out_dir := "/tmp/craft_shots"
 var _only: Array[String] = []
@@ -43,6 +47,11 @@ func _ready() -> void:
 	await _scene("bronze_fly", _s_bronze_fly)
 	await _scene("bronze_done", _s_bronze_done)
 	await _scene("drill", _s_drill)
+	await _scene("furnace_busy", _s_furnace_busy)
+	await _scene("furnace_tile", _s_furnace_tile)
+	await _scene("furnace_away", _s_furnace_away)
+	await _scene("furnace_load", _s_furnace_load)
+	BronzeFurnace.override_unix = -1
 	print("test_screenshot_craft: снимки -> " + _out_dir)
 	get_tree().quit(0)
 
@@ -136,6 +145,42 @@ func _s_drill() -> void:
 	var t: ShopTile = _ui._tiles["recipe:hand_drill"]
 	_ui._on_tile_pressed(t.offer, t)
 	await _frames(6)
+
+
+## Печь: 12 штук загружено полторы минуты назад — одна готова, вторая наполовину.
+func _load_furnace() -> void:
+	BronzeFurnace.override_unix = 1_800_000_000
+	GameState.house_storage["scrap"] = 12
+	ShopService.craft("bronze", 12)
+	BronzeFurnace.override_unix += BronzeFurnace.seconds_per_unit() * 3 / 2
+
+
+func _s_furnace_busy() -> void:
+	GameState.inventory["scrap"] = 14
+	_load_furnace()
+	await _open_bronze()
+
+
+func _s_furnace_tile() -> void:
+	_load_furnace()
+	_ui.open(ShopUI.TAB_TECH)
+	await _frames(2)
+
+
+func _s_furnace_away() -> void:
+	_load_furnace()
+	GameState.house_is_indoors = false
+	await _open_bronze()
+
+
+func _s_furnace_load() -> void:
+	GameState.inventory["scrap"] = 14
+	GameState.house_storage["scrap"] = 23
+	await _open_bronze()
+	Settings.reduce_motion = false
+	_ui._confirm_card()
+	# Полёт лома идёт по настоящему времени (~0.9 с), кадры под xvfb быстрее.
+	await get_tree().create_timer(1.05).timeout
 
 
 ## Ползунок карточки ищется по имени: тест не должен знать, как устроена строка.

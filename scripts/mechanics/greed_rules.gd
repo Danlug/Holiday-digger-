@@ -4,7 +4,7 @@ extends RefCounted
 ## полна — N секунд любая клетка копается с первого удара, ход, полёт и падение
 ## в 7 раз быстрее. База — раздел `greed` в data/mechanics.json, ступени — ветка
 ## «Жадность» в data/upgrades.json (длительность 4–8 с, порог на 5–25% меньше
-## streak.fever_at). Один источник для игры, симулятора и тестов.
+## streak.fever_s). Один источник для игры, симулятора и тестов.
 
 const BRANCH := "greed"
 
@@ -30,11 +30,12 @@ static func stage() -> int:
 	return GameState.get_skill_stage(BRANCH)
 
 
-## Клеток подряд до жадности: streak.fever_at минус процент ступени.
-static func threshold(stage_n: int) -> int:
-	var base := maxi(1, int(MechData.num("streak", "fever_at", 60)))
+## Секунд работы до жадности: streak.fever_s минус процент ступени (до 26.10 —
+## клетки подряд; почему секунды — streak_logic.gd).
+static func threshold(stage_n: int) -> float:
+	var base := maxf(1.0, MechData.num("streak", "fever_s", 60.0))
 	var less := _at("less_percent", stage_n, 0.0)
-	return maxi(1, roundi(float(base) * (1.0 - less / 100.0)))
+	return maxf(1.0, base * (1.0 - less / 100.0))
 
 
 ## Секунд жадности на ступени (0 — база владельца, 3 с).
@@ -45,6 +46,17 @@ static func seconds(stage_n: int) -> float:
 ## Во сколько раз быстрее ход, полёт и падение.
 static func speed_mult() -> float:
 	return maxf(1.0, MechData.num("greed", "speed_mult", 7.0))
+
+
+## Падение в жадности (владелец 27.10): каждые столько клеток полёта вниз — миг
+## остановки (Player._greed_fall_tick): разбиться нельзя, мгновенно спуститься тоже.
+static func fall_stop_cells() -> float:
+	return maxf(1.0, MechData.num("greed", "fall_stop_cells", 3.0))
+
+
+## Сколько реальных секунд длится остановка.
+static func fall_stop_seconds() -> float:
+	return maxf(0.0, MechData.num("greed", "fall_stop_s", 0.18))
 
 
 ## «С первого удара»: клетка разбивается в тот миг, когда кирка впервые бьёт по

@@ -76,13 +76,15 @@ func _coins_and_kg(w: WorldGen, y: int) -> Vector2:
 	return Vector2(coins, kg)
 
 
-const RISE_ORES := ["copper", "nickel", "platinum", "titanium", "lithium", "mercury", "uranium",
+const RISE_ORES := ["coal", "copper", "nickel", "platinum", "titanium", "lithium", "mercury", "uranium",
 		"ruby", "emerald", "geocrystal", "ancient_metal", "obsidian"]
 
 
 func test_ore_layers_no_cliffs() -> void:
 	print("-- Руды ГДД §18: плотность растёт с нуля, без ступеньки на y_min --")
 	var w := WorldGen.new(1)
+	# Владелец 27.10: уголь не обрушивается на 1000, а набирает к 1100 ровно 11%.
+	check("уголь на 1100 = 11%", absf(w._ore_density(_ore(w, "coal"), 1100) - 0.11) < 0.002)
 	for id in RISE_ORES:
 		var o := _ore(w, id)
 		check("%s: слой задан и подъём с нуля (rise=zero)" % id, not o.is_empty() and o.get("rise", "") == "zero")

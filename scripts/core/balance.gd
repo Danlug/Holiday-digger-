@@ -541,12 +541,8 @@ func get_coins_per_premium_currency() -> float:
 	return float(_v(balance.get("economy", {}).get("coins_per_premium_currency_unit", 100.0)))
 
 
-func get_black_box_capacity(tier: String) -> int:
-	return int(balance.get("black_box", {}).get("tiers", {}).get(tier, 1))
-
-
 func get_ad_daily_limit(ad_id: String) -> int:
-	return int(balance.get("ads", {}).get("daily_limits", {}).get(ad_id, 0))
+	return int(_v(balance.get("ads", {}).get("daily_limits", {}).get(ad_id, 0)))
 
 
 # ---------------------------------------------------------------------------

@@ -198,6 +198,8 @@ func _scene_combat() -> void:
 	for id in ["helm_t2", "armor_t2", "blade_t2", "shield_t1"]:
 		CombatService.give(id)
 		CombatService.equip(id)
+	TechState.set_suit(Heat.suit_tiers().size())   # лучший жарозащитный костюм: без капель урона от жары в кадре
+	GameState.hp = GameState.get_max_hp()
 	_carve(depth - 2, depth + 1, 5)
 	_place(float(depth) + 0.5)
 	main.player.facing = 1

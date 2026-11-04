@@ -192,6 +192,7 @@ func _ready() -> void:
 	_apply_saved_earthquake_on_start()
 
 	GameState.debug_action_triggered.connect(_on_debug_action)
+	StoreShots.attach(self)  # постановочные кадры для стора по ?shot=<id> / shot=<id>; без запроса — ничего (scripts/qa/store_shots.gd)
 
 
 var _artifact_cells: Dictionary = {}

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bgreturn0001"]
+
+[ext_resource type="Script" path="res://tests/test_background_return.gd" id="1"]
+
+[node name="TestBackgroundReturn" type="Node"]
+script = ExtResource("1")

@@ -340,7 +340,14 @@ static func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 	return data
 
 
+## Постановочные кадры для стора (scripts/qa/store_shots.gd): игра ставит сцену с подставным
+## прогрессом и не должна записать его игроку. Пока true — save_game ничего не пишет и отвечает «ок».
+static var readonly: bool = false
+
+
 static func save_game() -> bool:
+	if readonly:
+		return true
 	var data := _serialize()
 	var json_text := JSON.stringify(data, "\t")
 	var f := FileAccess.open(TMP_PATH, FileAccess.WRITE)

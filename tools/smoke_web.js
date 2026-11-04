@@ -234,13 +234,20 @@ const isBenign = (t) => BENIGN.some((re) => re.test(t));
 		const sfxState = () => page.evaluate(() => (window.RaskopkiShell && window.RaskopkiShell.sfx) || null).catch(() => null);
 		const sfx0 = await sfxState();
 		await page.keyboard.down('s');
-		await sleep(1500);
-		const sfx1 = await sfxState();
+		// Под SwiftShader (8 fps при параллельной нагрузке) герой сначала доходит до клетки и только
+		// потом бьёт — ждём первый удар до 6 с, а не фиксированные полторы секунды.
+		let sfx1 = null;
+		const digStart = Date.now();
+		while (Date.now() - digStart < 6000) {
+			await sleep(250);
+			sfx1 = await sfxState();
+			if (sfx1 && sfx1.dig > ((sfx0 && sfx0.dig) || 0)) break;
+		}
 		report.sfx = { before: sfx0, afterDig: sfx1 };
 		check('звук разблокирован и первая копка звучит (удар или осыпание сыграны)',
 			!!sfx1 && sfx1.unlocked && sfx1.dig > ((sfx0 && sfx0.dig) || 0),
 			sfx1 ? `unlocked=${sfx1.unlocked} played=${sfx1.played} dig=${sfx1.dig} last=${sfx1.last}` : 'оболочка не получила состояние звука');
-		await sleep(2500);
+		await sleep(Math.max(500, 4000 - (Date.now() - digStart)));   // держим «s» те же ~4 с, что и раньше
 		await shot('04_digging');
 		report.fps.dig = await fpsOf(2000);
 		await page.keyboard.up('s');
